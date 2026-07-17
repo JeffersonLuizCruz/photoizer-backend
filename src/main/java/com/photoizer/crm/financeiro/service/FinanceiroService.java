@@ -66,7 +66,7 @@ public class FinanceiroService {
 
     @Transactional(readOnly = true)
     public List<Pagamento> listarPagamentos(UUID agendamentoId) {
-        return pagamentoRepository.findAll();
+        return pagamentoRepository.findByAgendamentoId(agendamentoId);
     }
 
     public boolean isClienteBloqueado(UUID clienteId) {

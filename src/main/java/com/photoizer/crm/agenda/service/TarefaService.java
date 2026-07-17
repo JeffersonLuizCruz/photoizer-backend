@@ -1,6 +1,10 @@
 package com.photoizer.crm.agenda.service;
 
+import com.photoizer.crm.agenda.api.AtualizarTarefaRequest;
+import com.photoizer.crm.agenda.api.TarefaResponse;
 import com.photoizer.crm.agenda.exception.AgendamentoNaoEncontradoException;
+import com.photoizer.crm.agenda.exception.TarefaNaoEncontradaException;
+import com.photoizer.crm.agenda.exception.TarefaNaoPodeSerExcluidaException;
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.StatusTarefa;
 import com.photoizer.crm.agenda.model.Tarefa;
@@ -69,7 +73,7 @@ public class TarefaService {
 
     public Tarefa atualizarStatus(UUID id, String status) {
         var tarefa = tarefaRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Tarefa não encontrada: " + id));
+            .orElseThrow(() -> new TarefaNaoEncontradaException(id));
 
         StatusTarefa novoStatus;
         try {
@@ -85,5 +89,32 @@ public class TarefaService {
         }
 
         return tarefaRepository.save(tarefa);
+    }
+
+    public TarefaResponse atualizar(UUID id, AtualizarTarefaRequest request) {
+        var tarefa = tarefaRepository.findById(id)
+            .orElseThrow(() -> new TarefaNaoEncontradaException(id));
+
+        Usuario responsavel = null;
+        if (request.responsavelId() != null) {
+            responsavel = usuarioRepository.findById(request.responsavelId())
+                .orElseThrow(() -> new com.photoizer.crm.agenda.exception.EditorNaoEncontradoException(request.responsavelId()));
+        }
+
+        tarefa.setTipo(request.tipo());
+        tarefa.setResponsavel(responsavel);
+        tarefa.setDataLimite(request.dataLimite());
+
+        tarefa = tarefaRepository.save(tarefa);
+        return TarefaResponse.of(tarefa);
+    }
+
+    public void excluir(UUID id) {
+        var tarefa = tarefaRepository.findById(id)
+            .orElseThrow(() -> new TarefaNaoEncontradaException(id));
+        if (tarefa.getStatus() != StatusTarefa.PENDENTE) {
+            throw new TarefaNaoPodeSerExcluidaException("Apenas tarefas pendentes podem ser excluídas");
+        }
+        tarefaRepository.delete(tarefa);
     }
 }

@@ -16,6 +16,9 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID>,
     boolean existsByDataHoraEnsaioBetweenAndStatusNot(
         LocalDateTime start, LocalDateTime end, StatusAgendamento statusExcluded);
 
+    boolean existsByDataHoraEnsaioBetweenAndStatusNotAndIdNot(
+        LocalDateTime start, LocalDateTime end, StatusAgendamento statusExcluded, UUID idExcluded);
+
     @Query("SELECT a FROM Agendamento a WHERE a.localEnsaio = :local " +
            "AND a.dataHoraEnsaio >= :diaInicio AND a.dataHoraEnsaio < :diaFim " +
            "AND a.status NOT IN :statusesIgnorados")
@@ -24,4 +27,19 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID>,
         @Param("diaInicio") LocalDateTime diaInicio,
         @Param("diaFim") LocalDateTime diaFim,
         @Param("statusesIgnorados") List<StatusAgendamento> statusesIgnorados);
+
+    @Query("SELECT a FROM Agendamento a WHERE a.dataHoraEnsaio >= :diaInicio AND a.dataHoraEnsaio < :diaFim " +
+           "AND a.status NOT IN :statusesIgnorados")
+    List<Agendamento> findByDataBetween(
+        @Param("diaInicio") LocalDateTime diaInicio,
+        @Param("diaFim") LocalDateTime diaFim,
+        @Param("statusesIgnorados") List<StatusAgendamento> statusesIgnorados);
+
+    @Query("SELECT a FROM Agendamento a WHERE a.dataHoraEnsaio >= :diaInicio AND a.dataHoraEnsaio < :diaFim " +
+           "AND a.status NOT IN :statusesIgnorados AND a.id <> :excluirId")
+    List<Agendamento> findByLocalAndDataBetweenExcludingId(
+        @Param("diaInicio") LocalDateTime diaInicio,
+        @Param("diaFim") LocalDateTime diaFim,
+        @Param("statusesIgnorados") List<StatusAgendamento> statusesIgnorados,
+        @Param("excluirId") UUID excluirId);
 }

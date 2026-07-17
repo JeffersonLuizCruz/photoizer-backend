@@ -22,12 +22,17 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.photoizer.crm.agenda.api.AtualizarAgendamentoRequest;
+import com.photoizer.crm.agenda.api.AgendamentoResponse;
+import com.photoizer.crm.agenda.api.DisponibilidadeResponse;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -207,6 +212,87 @@ public class AgendamentoService {
         return agendamentoRepository.save(agendamento);
     }
 
+    public AgendamentoResponse atualizar(UUID id, AtualizarAgendamentoRequest request) {
+        var agendamento = buscarPorId(id);
+
+        var pacote = pacoteRepository.findById(request.pacoteId())
+            .orElseThrow(() -> new PacoteNaoEncontradoException(request.pacoteId()));
+        if (!pacote.getAtivo()) {
+            throw new PacoteInativoException(pacote.getId());
+        }
+
+        var editor = request.editorId() != null
+            ? usuarioRepository.findById(request.editorId())
+                .orElseThrow(() -> new EditorNaoEncontradoException(request.editorId()))
+            : null;
+
+        if (request.dataHoraEnsaio().isBefore(LocalDateTime.now())) {
+            throw new AgendamentoNoPassadoException();
+        }
+
+        var duracao = agendamento.getDuracaoMinutos();
+        validarConflitoAgenda(pacote, request.dataHoraEnsaio(), duracao, request.localEnsaio(), agendamento.getId());
+
+        var taxaDeslocamento = request.taxaDeslocamento() != null ? request.taxaDeslocamento() : BigDecimal.ZERO;
+
+        var novoValorTotal = pacote.getValorBase().add(taxaDeslocamento);
+        var novoValorEntradaExigido = novoValorTotal.multiply(new BigDecimal("0.30"))
+            .setScale(2, RoundingMode.HALF_UP);
+        var novoValorRestante = novoValorTotal.subtract(agendamento.getValorEntradaPago());
+        var novoValorTotalFinal = novoValorTotal.add(agendamento.getValorExtras());
+
+        agendamento.setPacote(pacote);
+        agendamento.setEditor(editor);
+        agendamento.setDataHoraEnsaio(request.dataHoraEnsaio());
+        agendamento.setLocalEnsaio(request.localEnsaio());
+        agendamento.setEnderecoCompleto(request.enderecoCompleto());
+        agendamento.setTaxaDeslocamento(taxaDeslocamento);
+        agendamento.setAutorizaUsoImagem(request.autorizaUsoImagem() != null ? request.autorizaUsoImagem() : agendamento.getAutorizaUsoImagem());
+        agendamento.setObservacoes(request.observacoes());
+
+        agendamento.setValorTotal(novoValorTotal);
+        agendamento.setValorEntradaExigido(novoValorEntradaExigido);
+        agendamento.setValorRestante(novoValorRestante);
+        agendamento.setValorTotalFinal(novoValorTotalFinal);
+
+        agendamento = agendamentoRepository.save(agendamento);
+        return AgendamentoResponse.of(agendamento);
+    }
+
+    public DisponibilidadeResponse verificarDisponibilidade(LocalDate data, String hora, Integer duracaoMinutos, UUID excluirAgendamentoId) {
+        var time = LocalTime.parse(hora, DateTimeFormatter.ofPattern("HH:mm"));
+        var dataHora = LocalDateTime.of(data, time);
+        var duracao = duracaoMinutos != null ? duracaoMinutos : 60;
+
+        var inicioDia = data.atStartOfDay();
+        var fimDia = data.atTime(23, 59, 59);
+        var statusesIgnorados = List.of(StatusAgendamento.CANCELADO, StatusAgendamento.NO_SHOW);
+
+        List<Agendamento> agendamentosNoDia;
+        if (excluirAgendamentoId != null) {
+            agendamentosNoDia = agendamentoRepository.findByLocalAndDataBetweenExcludingId(
+                inicioDia, fimDia, statusesIgnorados, excluirAgendamentoId);
+        } else {
+            agendamentosNoDia = agendamentoRepository.findByDataBetween(inicioDia, fimDia, statusesIgnorados);
+        }
+
+        var novoFim = dataHora.plusMinutes(duracao);
+        var conflitos = new ArrayList<DisponibilidadeResponse.Conflito>();
+
+        for (var existente : agendamentosNoDia) {
+            var fimExistente = existente.getDataHoraEnsaio().plusMinutes(existente.getDuracaoMinutos());
+            if (dataHora.isBefore(fimExistente) && novoFim.isAfter(existente.getDataHoraEnsaio())) {
+                conflitos.add(new DisponibilidadeResponse.Conflito(
+                    existente.getId(),
+                    existente.getDataHoraEnsaio().toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm")),
+                    existente.getCliente().getNome()
+                ));
+            }
+        }
+
+        return new DisponibilidadeResponse(conflitos.isEmpty(), conflitos);
+    }
+
     public Agendamento registrarPagamentoFinal(UUID id, org.springframework.web.multipart.MultipartFile comprovante) {
         var agendamento = buscarPorId(id);
 
@@ -259,6 +345,7 @@ public class AgendamentoService {
             .cidade(command.cidade())
             .estado(command.estado())
             .origem(origemCliente)
+            .observacoes(command.observacoes())
             .build();
 
         return clienteRepository.save(cliente);
@@ -273,6 +360,38 @@ public class AgendamentoService {
             return LocalDateTime.of(command.data(), time);
         }
         throw new IllegalArgumentException("Data e hora do ensaio são obrigatórias (dataHoraEnsaio ou data + hora)");
+    }
+
+    private void validarConflitoAgenda(Pacote pacote, LocalDateTime dataHora, int duracao, String local, UUID excluirId) {
+        if (pacote.getBloqueiaDiaInteiro()) {
+            var inicioDia = dataHora.toLocalDate().atStartOfDay();
+            var fimDia = dataHora.toLocalDate().atTime(23, 59, 59);
+            var conflito = agendamentoRepository.existsByDataHoraEnsaioBetweenAndStatusNotAndIdNot(
+                inicioDia, fimDia, StatusAgendamento.CANCELADO, excluirId);
+            if (conflito) {
+                throw new ConflitoDeAgendaException(
+                    "Já existe um agendamento nesta data. O pacote selecionado bloqueia o dia inteiro.");
+            }
+            return;
+        }
+
+        var inicioDia = dataHora.toLocalDate().atStartOfDay();
+        var fimDia = dataHora.toLocalDate().atTime(23, 59, 59);
+        var statusesIgnorados = List.of(StatusAgendamento.CANCELADO, StatusAgendamento.NO_SHOW);
+        var agendamentosNoDia = agendamentoRepository.findByLocalAndDataBetweenExcludingId(
+            inicioDia, fimDia, statusesIgnorados, excluirId);
+
+        var novoFim = dataHora.plusMinutes(duracao);
+
+        for (var existente : agendamentosNoDia) {
+            var fimExistente = existente.getDataHoraEnsaio()
+                .plusMinutes(existente.getDuracaoMinutos());
+            if (dataHora.isBefore(fimExistente) && novoFim.isAfter(existente.getDataHoraEnsaio())) {
+                throw new ConflitoDeAgendaException(
+                    "Já existe um agendamento neste horário e local: "
+                    + existente.getDataHoraEnsaio() + " às " + fimExistente);
+            }
+        }
     }
 
     private void validarConflitoAgenda(Pacote pacote, LocalDateTime dataHora, int duracao, String local) {

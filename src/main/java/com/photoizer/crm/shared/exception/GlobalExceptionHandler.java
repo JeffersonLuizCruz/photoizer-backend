@@ -6,6 +6,8 @@ import com.photoizer.crm.agenda.exception.ConflitoDeAgendaException;
 import com.photoizer.crm.agenda.exception.EditorNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.PacoteInativoException;
 import com.photoizer.crm.agenda.exception.PacoteNaoEncontradoException;
+import com.photoizer.crm.agenda.exception.TarefaNaoEncontradaException;
+import com.photoizer.crm.agenda.exception.TarefaNaoPodeSerExcluidaException;
 import com.photoizer.crm.cliente.exception.ClienteNaoEncontradoException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -48,6 +50,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AgendamentoNoPassadoException.class)
     public ResponseEntity<ErrorResponse> handleAgendamentoNoPassado(AgendamentoNoPassadoException e) {
         return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
+    }
+
+    @ExceptionHandler(TarefaNaoEncontradaException.class)
+    public ResponseEntity<ErrorResponse> handleTarefaNaoEncontrada(TarefaNaoEncontradaException e) {
+        return build(HttpStatus.NOT_FOUND, e);
+    }
+
+    @ExceptionHandler(TarefaNaoPodeSerExcluidaException.class)
+    public ResponseEntity<ErrorResponse> handleTarefaNaoPodeSerExcluida(TarefaNaoPodeSerExcluidaException e) {
+        return build(HttpStatus.CONFLICT, e);
     }
 
     @ExceptionHandler(ConflitoDeAgendaException.class)
