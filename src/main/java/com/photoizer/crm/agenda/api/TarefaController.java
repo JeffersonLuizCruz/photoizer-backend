@@ -19,7 +19,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -52,7 +54,10 @@ public class TarefaController {
         var tipo = (String) body.get("tipo");
         var responsavelId = body.get("responsavelId") != null
             ? UUID.fromString((String) body.get("responsavelId")) : null;
-        var dataLimite = LocalDateTime.parse((String) body.get("dataLimite"));
+        var dataLimiteStr = (String) body.get("dataLimite");
+        var dataLimite = dataLimiteStr.endsWith("Z") || dataLimiteStr.contains("+")
+            ? Instant.parse(dataLimiteStr).atZone(ZoneId.systemDefault()).toLocalDateTime()
+            : LocalDateTime.parse(dataLimiteStr);
 
         var tarefa = tarefaService.criar(agendamentoId, tipo, responsavelId, dataLimite);
         return ResponseEntity.status(HttpStatus.CREATED).body(TarefaResponse.of(tarefa));

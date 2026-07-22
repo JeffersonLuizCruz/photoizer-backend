@@ -1,6 +1,7 @@
 package com.photoizer.crm.agenda.service;
 
 import com.photoizer.crm.agenda.event.AgendamentoCriadoEvent;
+import com.photoizer.crm.agenda.event.AgendamentoRealizadoEvent;
 import com.photoizer.crm.agenda.exception.AgendamentoNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.AgendamentoNoPassadoException;
 import com.photoizer.crm.agenda.exception.ConflitoDeAgendaException;
@@ -178,6 +179,10 @@ public class AgendamentoService {
 
         if (status == StatusAgendamento.REALIZADO) {
             agendamento.setDataRealizacao(LocalDateTime.now());
+            eventPublisher.publishEvent(new AgendamentoRealizadoEvent(
+                agendamento.getId(),
+                agendamento.getCliente().getId()
+            ));
         }
 
         return agendamentoRepository.save(agendamento);
@@ -303,7 +308,8 @@ public class AgendamentoService {
 
         agendamento.setValorRestante(BigDecimal.ZERO);
         agendamento.setValorEntradaPago(agendamento.getValorTotalFinal());
-        agendamento.setStatus(StatusAgendamento.AGUARDANDO_PAGAMENTO_FINAL);
+        agendamento.setStatus(StatusAgendamento.EM_EDICAO);
+        agendamento.setDataEnvioSelecao(LocalDateTime.now());
 
         return agendamentoRepository.save(agendamento);
     }
