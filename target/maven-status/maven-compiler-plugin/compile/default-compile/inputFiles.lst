@@ -39,6 +39,9 @@
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/cliente/model/OrigemCliente.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/cliente/repository/ClienteRepository.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/cliente/service/ClienteService.java
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/dashboard/api/DashboardController.java
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/dashboard/api/DashboardMensalResponse.java
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/dashboard/service/DashboardService.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/documento/api/DocumentoController.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/documento/listener/DocumentoEventListener.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/documento/service/ContratoService.java
