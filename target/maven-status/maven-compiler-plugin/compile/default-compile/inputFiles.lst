@@ -60,6 +60,7 @@
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/notificacao/listener/AlertaPrazoListener.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/notificacao/listener/LembreteEnsaioListener.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/notificacao/service/NotificacaoService.java
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/shared/api/PageResponse.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/shared/config/CorsConfig.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/shared/config/DataSeeder.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/shared/config/LoggingConfig.java

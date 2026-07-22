@@ -42,4 +42,7 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID>,
         @Param("diaFim") LocalDateTime diaFim,
         @Param("statusesIgnorados") List<StatusAgendamento> statusesIgnorados,
         @Param("excluirId") UUID excluirId);
+
+    @Query("SELECT a FROM Agendamento a WHERE a.cliente.id = :clienteId ORDER BY a.dataHoraEnsaio DESC")
+    List<Agendamento> findByClienteId(@Param("clienteId") UUID clienteId);
 }

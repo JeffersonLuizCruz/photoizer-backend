@@ -3,6 +3,8 @@ package com.photoizer.crm.cliente.service;
 import com.photoizer.crm.cliente.exception.ClienteNaoEncontradoException;
 import com.photoizer.crm.cliente.model.Cliente;
 import com.photoizer.crm.cliente.repository.ClienteRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,5 +64,20 @@ public class ClienteService {
         cliente.setOrigem(dados.getOrigem());
         cliente.setObservacoes(dados.getObservacoes());
         return clienteRepository.save(cliente);
+    }
+
+    public void deletar(UUID id) {
+        if (!clienteRepository.existsById(id)) {
+            throw new ClienteNaoEncontradoException(id);
+        }
+        clienteRepository.deleteById(id);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<Cliente> listarPaginado(String search, Pageable pageable) {
+        if (search == null || search.isBlank()) {
+            return clienteRepository.findAll(pageable);
+        }
+        return clienteRepository.findByNomeContainingIgnoreCaseOrTelefoneContaining(search, search, pageable);
     }
 }

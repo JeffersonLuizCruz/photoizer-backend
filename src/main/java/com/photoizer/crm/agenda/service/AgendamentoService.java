@@ -188,6 +188,11 @@ public class AgendamentoService {
         return agendamentoRepository.save(agendamento);
     }
 
+    @Transactional(readOnly = true)
+    public List<Agendamento> listarPorClienteId(UUID clienteId) {
+        return agendamentoRepository.findByClienteId(clienteId);
+    }
+
     public Agendamento reagendar(UUID id, LocalDate data, String hora, Integer duracaoMinutos) {
         var agendamento = buscarPorId(id);
 
