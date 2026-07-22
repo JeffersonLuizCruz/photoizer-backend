@@ -25,6 +25,7 @@ import lombok.experimental.SuperBuilder;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "agendamentos", indexes = {
@@ -152,4 +153,7 @@ public class Agendamento extends BaseEntity {
 
     @Column(columnDefinition = "TEXT")
     private String observacoes;
+
+    @Column(unique = true, nullable = false)
+    private UUID tokenGaleria;
 }

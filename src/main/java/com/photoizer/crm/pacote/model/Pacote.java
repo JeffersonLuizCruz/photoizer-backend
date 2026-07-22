@@ -1,8 +1,12 @@
 package com.photoizer.crm.pacote.model;
 
+import com.photoizer.crm.agenda.model.Usuario;
 import com.photoizer.crm.shared.model.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -59,4 +63,16 @@ public class Pacote extends BaseEntity {
     @NotNull
     @Column(nullable = false)
     private Boolean ativo;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "fotografo_id")
+    private Usuario fotografo;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "editor_responsavel_id")
+    private Usuario editorResponsavel;
+
+    @Positive
+    @Column
+    private Integer diasParaEntrega;
 }

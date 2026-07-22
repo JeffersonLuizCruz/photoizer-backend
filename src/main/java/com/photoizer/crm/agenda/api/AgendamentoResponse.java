@@ -45,6 +45,7 @@ public record AgendamentoResponse(
     Boolean contratoGerado,
     Boolean ensaioDestaque,
     String observacoes,
+    UUID tokenGaleria,
     LocalDateTime createdAt,
     LocalDateTime updatedAt
 ) {
@@ -90,6 +91,7 @@ public record AgendamentoResponse(
             a.getContratoGerado(),
             a.getEnsaioDestaque(),
             a.getObservacoes(),
+            a.getTokenGaleria(),
             a.getCreatedAt(),
             a.getUpdatedAt()
         );

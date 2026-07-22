@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID>, JpaSpecificationExecutor<Agendamento> {
@@ -45,4 +46,6 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID>,
 
     @Query("SELECT a FROM Agendamento a WHERE a.cliente.id = :clienteId ORDER BY a.dataHoraEnsaio DESC")
     List<Agendamento> findByClienteId(@Param("clienteId") UUID clienteId);
+
+    java.util.Optional<Agendamento> findByTokenGaleria(UUID tokenGaleria);
 }

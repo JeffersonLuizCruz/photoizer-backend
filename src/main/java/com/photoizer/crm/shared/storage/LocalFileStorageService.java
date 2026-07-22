@@ -28,11 +28,41 @@ public class LocalFileStorageService implements FileStorageService {
     @Override
     public String salvar(MultipartFile arquivo) {
         if (arquivo == null || arquivo.isEmpty()) {
-            throw new IllegalArgumentException("Arquivo de comprovante é obrigatório");
+            throw new IllegalArgumentException("Arquivo é obrigatório");
         }
 
         var nomeArquivo = UUID.randomUUID() + "_" + arquivo.getOriginalFilename();
         var caminho = uploadDir.resolve(nomeArquivo);
+
+        try {
+            Files.copy(arquivo.getInputStream(), caminho, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            throw new RuntimeException("Erro ao salvar arquivo: " + nomeArquivo, e);
+        }
+
+        return caminho.toString();
+    }
+
+    @Override
+    public String salvarEmSubdiretorio(MultipartFile arquivo, UUID agendamentoId, String prefix) {
+        if (arquivo == null || arquivo.isEmpty()) {
+            throw new IllegalArgumentException("Arquivo é obrigatório");
+        }
+
+        var subDir = uploadDir.resolve(agendamentoId.toString());
+        try {
+            Files.createDirectories(subDir);
+        } catch (IOException e) {
+            throw new RuntimeException("Erro ao criar diretório: " + subDir, e);
+        }
+
+        var ext = "";
+        var originalName = arquivo.getOriginalFilename();
+        if (originalName != null && originalName.contains(".")) {
+            ext = originalName.substring(originalName.lastIndexOf("."));
+        }
+        var nomeArquivo = prefix + "_" + UUID.randomUUID() + ext;
+        var caminho = subDir.resolve(nomeArquivo);
 
         try {
             Files.copy(arquivo.getInputStream(), caminho, StandardCopyOption.REPLACE_EXISTING);
@@ -50,5 +80,10 @@ public class LocalFileStorageService implements FileStorageService {
         } catch (IOException e) {
             throw new RuntimeException("Erro ao deletar arquivo: " + caminho, e);
         }
+    }
+
+    @Override
+    public Path getUploadDir() {
+        return uploadDir;
     }
 }

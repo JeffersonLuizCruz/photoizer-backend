@@ -16,6 +16,11 @@ public record PacoteResponse(
     String duracaoEstimada,
     boolean bloqueiaDiaInteiro,
     boolean ativo,
+    UUID fotografoId,
+    String fotografoNome,
+    UUID editorResponsavelId,
+    String editorResponsavelNome,
+    Integer diasParaEntrega,
     LocalDateTime createdAt,
     LocalDateTime updatedAt
 ) {
@@ -30,6 +35,11 @@ public record PacoteResponse(
             p.getDuracaoEstimada(),
             p.getBloqueiaDiaInteiro(),
             p.getAtivo(),
+            p.getFotografo() != null ? p.getFotografo().getId() : null,
+            p.getFotografo() != null ? p.getFotografo().getNome() : null,
+            p.getEditorResponsavel() != null ? p.getEditorResponsavel().getId() : null,
+            p.getEditorResponsavel() != null ? p.getEditorResponsavel().getNome() : null,
+            p.getDiasParaEntrega(),
             p.getCreatedAt(),
             p.getUpdatedAt()
         );

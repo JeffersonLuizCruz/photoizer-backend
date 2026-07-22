@@ -127,6 +127,7 @@ public class AgendamentoService {
             .contratoGerado(false)
             .ensaioDestaque(false)
             .observacoes(command.observacoes())
+            .tokenGaleria(UUID.randomUUID())
             .build();
 
         agendamento = agendamentoRepository.save(agendamento);
