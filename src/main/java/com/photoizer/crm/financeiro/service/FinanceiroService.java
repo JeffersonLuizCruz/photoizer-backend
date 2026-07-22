@@ -50,7 +50,7 @@ public class FinanceiroService {
         var taxa = taxaDeslocamento != null ? taxaDeslocamento : BigDecimal.ZERO;
 
         var valorTotal = pacote.getValorBase().add(taxa);
-        var valorEntradaExigido = valorTotal.multiply(PERCENTUAL_ENTRADA);
+        var valorEntradaExigido = pacote.getValorBase().multiply(PERCENTUAL_ENTRADA);
         var valorRestante = valorTotal.subtract(valorEntradaExigido);
         var valorTotalFinal = valorTotal;
 

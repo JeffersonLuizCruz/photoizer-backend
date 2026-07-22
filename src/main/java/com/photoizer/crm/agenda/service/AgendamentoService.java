@@ -93,7 +93,7 @@ public class AgendamentoService {
         validarConflitoAgenda(pacote, dataHoraEnsaio, duracao, command.localEnsaio());
 
         var valorTotal = pacote.getValorBase().add(taxaDeslocamento);
-        var valorEntradaExigido = valorTotal.multiply(new BigDecimal("0.30"))
+        var valorEntradaExigido = pacote.getValorBase().multiply(new BigDecimal("0.30"))
             .setScale(2, RoundingMode.HALF_UP);
         var valorEntradaPago = valorEntradaExigido;
         var valorRestante = valorTotal.subtract(valorEntradaPago);
@@ -241,7 +241,7 @@ public class AgendamentoService {
         var taxaDeslocamento = request.taxaDeslocamento() != null ? request.taxaDeslocamento() : BigDecimal.ZERO;
 
         var novoValorTotal = pacote.getValorBase().add(taxaDeslocamento);
-        var novoValorEntradaExigido = novoValorTotal.multiply(new BigDecimal("0.30"))
+        var novoValorEntradaExigido = pacote.getValorBase().multiply(new BigDecimal("0.30"))
             .setScale(2, RoundingMode.HALF_UP);
         var novoValorRestante = novoValorTotal.subtract(agendamento.getValorEntradaPago());
         var novoValorTotalFinal = novoValorTotal.add(agendamento.getValorExtras());
