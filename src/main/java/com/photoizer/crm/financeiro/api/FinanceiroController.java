@@ -17,6 +17,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -54,6 +57,34 @@ public class FinanceiroController {
     @Operation(summary = "Listar pagamentos de um agendamento")
     public ResponseEntity<List<Pagamento>> listarPagamentos(@PathVariable UUID agendamentoId) {
         return ResponseEntity.ok(financeiroService.listarPagamentos(agendamentoId));
+    }
+
+    @PostMapping("/preview")
+    @Operation(summary = "Calcular preview de valores financeiros")
+    public ResponseEntity<FinanceiroPreviewResponse> preview(
+            @RequestParam UUID pacoteId,
+            @RequestParam(required = false) BigDecimal taxaDeslocamento) {
+        return ResponseEntity.ok(financeiroService.calcularPreview(pacoteId, taxaDeslocamento));
+    }
+
+    @GetMapping("/resumo")
+    @Operation(summary = "Obter resumo financeiro com totais agregados")
+    public ResponseEntity<FinanceiroResumoResponse> resumo(
+            @RequestParam(required = false) LocalDate dataInicio,
+            @RequestParam(required = false) LocalDate dataFim) {
+        var inicio = dataInicio != null ? dataInicio.atStartOfDay() : null;
+        var fim = dataFim != null ? dataFim.atTime(LocalTime.MAX) : null;
+        return ResponseEntity.ok(financeiroService.calcularResumo(inicio, fim));
+    }
+
+    @GetMapping("/relatorios")
+    @Operation(summary = "Obter dados para relatorios financeiros")
+    public ResponseEntity<FinanceiroRelatoriosResponse> relatorios(
+            @RequestParam(required = false) LocalDate dataInicio,
+            @RequestParam(required = false) LocalDate dataFim) {
+        var inicio = dataInicio != null ? dataInicio.atStartOfDay() : null;
+        var fim = dataFim != null ? dataFim.atTime(LocalTime.MAX) : null;
+        return ResponseEntity.ok(financeiroService.calcularRelatorios(inicio, fim));
     }
 
     @GetMapping("/clientes/{clienteId}/bloqueado")

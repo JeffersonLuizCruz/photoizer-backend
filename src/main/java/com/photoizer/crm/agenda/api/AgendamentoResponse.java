@@ -30,6 +30,8 @@ public record AgendamentoResponse(
     BigDecimal valorExtras,
     BigDecimal taxaDeslocamento,
     BigDecimal valorTotalFinal,
+    BigDecimal valorPacote,
+    BigDecimal saldoDevedor,
     String status,
     LocalDateTime dataConfirmacao,
     LocalDateTime dataRealizacao,
@@ -47,6 +49,8 @@ public record AgendamentoResponse(
     LocalDateTime updatedAt
 ) {
     public static AgendamentoResponse of(Agendamento a) {
+        var valorPacote = a.getValorTotal().subtract(a.getTaxaDeslocamento());
+        var saldoDevedor = a.getValorTotalFinal().subtract(a.getValorEntradaPago());
         return new AgendamentoResponse(
             a.getId(),
             a.getCliente().getId(),
@@ -71,6 +75,8 @@ public record AgendamentoResponse(
             a.getValorExtras(),
             a.getTaxaDeslocamento(),
             a.getValorTotalFinal(),
+            valorPacote,
+            saldoDevedor,
             a.getStatus().name(),
             a.getDataConfirmacao(),
             a.getDataRealizacao(),

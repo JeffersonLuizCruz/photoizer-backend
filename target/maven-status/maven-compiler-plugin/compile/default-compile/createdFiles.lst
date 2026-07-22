@@ -26,12 +26,14 @@ com/photoizer/crm/financeiro/service/FinanceiroService.class
 com/photoizer/crm/cliente/model/Cliente.class
 com/photoizer/crm/agenda/model/Pacote$PacoteBuilder.class
 com/photoizer/crm/agenda/exception/TarefaNaoPodeSerExcluidaException.class
+com/photoizer/crm/financeiro/api/FinanceiroRelatoriosResponse.class
 com/photoizer/crm/agenda/model/Agendamento.class
 com/photoizer/crm/shared/storage/FileStorageService.class
 com/photoizer/crm/cliente/api/ClienteController.class
 com/photoizer/crm/agenda/repository/AgendamentoRepository.class
 com/photoizer/crm/shared/exception/ErrorResponse.class
 com/photoizer/crm/financeiro/api/FinanceiroController.class
+com/photoizer/crm/financeiro/api/ConfigController.class
 com/photoizer/crm/financeiro/listener/FinanceiroEventListener.class
 com/photoizer/crm/shared/config/DataSeeder.class
 com/photoizer/crm/agenda/exception/TarefaNaoEncontradaException.class
@@ -41,6 +43,7 @@ com/photoizer/crm/agenda/service/CriarAgendamentoCommand.class
 com/photoizer/crm/agenda/api/PacoteController.class
 com/photoizer/crm/agenda/api/AgendamentoController.class
 com/photoizer/crm/agenda/event/AgendamentoCriadoEvent.class
+com/photoizer/crm/financeiro/api/FinanceiroResumoResponse.class
 com/photoizer/crm/shared/model/BaseEntity$BaseEntityBuilder.class
 com/photoizer/crm/shared/exception/ErrorResponse$FieldError.class
 com/photoizer/crm/agenda/api/DisponibilidadeResponse.class
@@ -57,6 +60,7 @@ com/photoizer/crm/agenda/exception/AgendamentoNoPassadoException.class
 com/photoizer/crm/financeiro/repository/FotoExtraRepository.class
 com/photoizer/crm/agenda/model/Usuario.class
 com/photoizer/crm/financeiro/model/FotoExtra.class
+com/photoizer/crm/financeiro/api/FinanceiroRelatoriosResponse$RelatoriosTotais.class
 com/photoizer/crm/documento/service/ContratoService.class
 com/photoizer/crm/agenda/model/Usuario$UsuarioBuilder.class
 com/photoizer/crm/agenda/api/AtualizarTarefaRequest.class
@@ -74,6 +78,7 @@ com/photoizer/crm/agenda/repository/UsuarioRepository.class
 com/photoizer/crm/agenda/model/StatusTarefa.class
 com/photoizer/crm/agenda/model/Tarefa.class
 com/photoizer/crm/shared/config/OpenApiConfig.class
+com/photoizer/crm/financeiro/api/FinanceiroPreviewResponse.class
 com/photoizer/crm/cliente/repository/ClienteRepository.class
 com/photoizer/crm/agenda/api/DisponibilidadeResponse$Conflito.class
 com/photoizer/crm/notificacao/service/NotificacaoService.class
