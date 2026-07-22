@@ -16,6 +16,7 @@ com/photoizer/crm/cliente/exception/ClienteNaoEncontradoException.class
 com/photoizer/crm/financeiro/repository/PagamentoRepository.class
 com/photoizer/crm/agenda/model/Tarefa$TarefaBuilder.class
 com/photoizer/crm/financeiro/model/FotoExtra$FotoExtraBuilderImpl.class
+com/photoizer/crm/shared/logging/LoggingAspect.class
 com/photoizer/crm/documento/api/DocumentoController.class
 com/photoizer/crm/documento/service/PdfGeneratorService.class
 com/photoizer/crm/agenda/model/StatusAgendamento.class
@@ -37,6 +38,7 @@ com/photoizer/crm/financeiro/api/ConfigController.class
 com/photoizer/crm/financeiro/listener/FinanceiroEventListener.class
 com/photoizer/crm/shared/config/DataSeeder.class
 com/photoizer/crm/agenda/exception/TarefaNaoEncontradaException.class
+com/photoizer/crm/shared/config/LoggingConfig.class
 com/photoizer/crm/financeiro/model/Pagamento$PagamentoBuilderImpl.class
 com/photoizer/crm/agenda/repository/PacoteRepository.class
 com/photoizer/crm/agenda/service/CriarAgendamentoCommand.class
@@ -70,6 +72,7 @@ com/photoizer/crm/agenda/model/Pacote$PacoteBuilderImpl.class
 com/photoizer/crm/agenda/api/AgendamentoResponse.class
 com/photoizer/crm/agenda/exception/PacoteNaoEncontradoException.class
 com/photoizer/crm/shared/exception/GlobalExceptionHandler.class
+com/photoizer/crm/shared/logging/SensitiveDataMask.class
 com/photoizer/crm/financeiro/model/Pagamento.class
 com/photoizer/crm/agenda/service/AgendamentoService.class
 com/photoizer/crm/financeiro/model/Pagamento$PagamentoBuilder.class
