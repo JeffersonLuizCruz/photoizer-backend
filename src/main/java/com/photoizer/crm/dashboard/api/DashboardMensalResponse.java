@@ -16,6 +16,8 @@ public record DashboardMensalResponse(
         int finalizados,
         BigDecimal valorTotalFinalizados,
         BigDecimal despesasDeslocamento,
+        BigDecimal despesasComissao,
+        BigDecimal despesasManuais,
         BigDecimal saldoLiquido,
         BigDecimal receitaProjetada,
         BigDecimal liquidoAtual,
@@ -28,6 +30,8 @@ public record DashboardMensalResponse(
         BigDecimal valorConfirmados,
         BigDecimal valorFinalizados,
         BigDecimal despesasDeslocamento,
+        BigDecimal despesasComissao,
+        BigDecimal despesasManuais,
         BigDecimal entradasRecebidas,
         BigDecimal liquidoAtual,
         BigDecimal liquidoPrevisto

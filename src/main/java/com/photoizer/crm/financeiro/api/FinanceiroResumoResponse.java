@@ -6,6 +6,9 @@ public record FinanceiroResumoResponse(
     BigDecimal totalEntradas,
     BigDecimal totalFinal,
     BigDecimal totalExtras,
-    BigDecimal faturamentoTotal
+    BigDecimal faturamentoTotal,
+    BigDecimal despesasDeslocamento,
+    BigDecimal despesasComissao,
+    BigDecimal despesasManuais
 ) {
 }

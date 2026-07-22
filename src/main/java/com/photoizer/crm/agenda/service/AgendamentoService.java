@@ -1,19 +1,21 @@
 package com.photoizer.crm.agenda.service;
 
+import com.photoizer.crm.agenda.event.AgendamentoCanceladoEvent;
 import com.photoizer.crm.agenda.event.AgendamentoCriadoEvent;
 import com.photoizer.crm.agenda.event.AgendamentoRealizadoEvent;
+import com.photoizer.crm.agenda.event.PagamentoFinalRegistradoEvent;
 import com.photoizer.crm.agenda.exception.AgendamentoNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.AgendamentoNoPassadoException;
 import com.photoizer.crm.agenda.exception.ConflitoDeAgendaException;
 import com.photoizer.crm.agenda.exception.EditorNaoEncontradoException;
-import com.photoizer.crm.agenda.exception.PacoteInativoException;
-import com.photoizer.crm.agenda.exception.PacoteNaoEncontradoException;
 import com.photoizer.crm.agenda.model.Agendamento;
-import com.photoizer.crm.agenda.model.Pacote;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
-import com.photoizer.crm.agenda.repository.PacoteRepository;
 import com.photoizer.crm.agenda.repository.UsuarioRepository;
+import com.photoizer.crm.pacote.exception.PacoteInativoException;
+import com.photoizer.crm.pacote.exception.PacoteNaoEncontradoException;
+import com.photoizer.crm.pacote.model.Pacote;
+import com.photoizer.crm.pacote.repository.PacoteRepository;
 import com.photoizer.crm.cliente.exception.ClienteNaoEncontradoException;
 import com.photoizer.crm.cliente.model.Cliente;
 import com.photoizer.crm.cliente.model.OrigemCliente;
@@ -133,7 +135,11 @@ public class AgendamentoService {
             agendamento.getId(),
             agendamento.getCliente().getId(),
             agendamento.getPacote().getId(),
-            agendamento.getDataHoraEnsaio()
+            agendamento.getDataHoraEnsaio(),
+            command.indicadorNome(),
+            command.indicadorTelefone(),
+            null,
+            agendamento.getValorTotal()
         ));
 
         return agendamento;
@@ -183,6 +189,10 @@ public class AgendamentoService {
                 agendamento.getId(),
                 agendamento.getCliente().getId()
             ));
+        }
+
+        if (status == StatusAgendamento.CANCELADO || status == StatusAgendamento.NO_SHOW) {
+            eventPublisher.publishEvent(new AgendamentoCanceladoEvent(agendamento.getId()));
         }
 
         return agendamentoRepository.save(agendamento);
@@ -316,7 +326,14 @@ public class AgendamentoService {
         agendamento.setStatus(StatusAgendamento.EM_EDICAO);
         agendamento.setDataEnvioSelecao(LocalDateTime.now());
 
-        return agendamentoRepository.save(agendamento);
+        agendamento = agendamentoRepository.save(agendamento);
+
+        eventPublisher.publishEvent(new PagamentoFinalRegistradoEvent(
+            agendamento.getId(),
+            agendamento.getValorTotalFinal()
+        ));
+
+        return agendamento;
     }
 
     private Cliente resolverCliente(CriarAgendamentoCommand command) {

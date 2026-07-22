@@ -4,11 +4,12 @@ import com.photoizer.crm.agenda.exception.AgendamentoNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.AgendamentoNoPassadoException;
 import com.photoizer.crm.agenda.exception.ConflitoDeAgendaException;
 import com.photoizer.crm.agenda.exception.EditorNaoEncontradoException;
-import com.photoizer.crm.agenda.exception.PacoteInativoException;
-import com.photoizer.crm.agenda.exception.PacoteNaoEncontradoException;
+import com.photoizer.crm.pacote.exception.PacoteInativoException;
+import com.photoizer.crm.pacote.exception.PacoteNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.TarefaNaoEncontradaException;
 import com.photoizer.crm.agenda.exception.TarefaNaoPodeSerExcluidaException;
 import com.photoizer.crm.cliente.exception.ClienteNaoEncontradoException;
+import com.photoizer.crm.comissao.exception.IndicacaoNaoEncontradaException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -72,6 +73,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleTarefaNaoPodeSerExcluida(TarefaNaoPodeSerExcluidaException e) {
         log.warn("Tarefa nao pode ser excluida: {}", e.getMessage());
         return build(HttpStatus.CONFLICT, e);
+    }
+
+    @ExceptionHandler(IndicacaoNaoEncontradaException.class)
+    public ResponseEntity<ErrorResponse> handleIndicacaoNaoEncontrada(IndicacaoNaoEncontradaException e) {
+        log.warn("Indicacao nao encontrada: {}", e.getMessage());
+        return build(HttpStatus.NOT_FOUND, e);
     }
 
     @ExceptionHandler(ConflitoDeAgendaException.class)

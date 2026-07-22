@@ -75,7 +75,9 @@ public class AgendamentoController {
             @RequestParam(required = false) @Parameter(description = "Comprovante de pagamento (PDF, JPG, PNG - max 10MB)") MultipartFile comprovanteEntrada,
             @RequestParam(required = false) @Parameter(description = "Autoriza uso de imagem (default: false)") Boolean autorizaUsoImagem,
             @RequestParam(required = false) @Parameter(description = "Cláusulas personalizadas (opcional)") String clausulasPersonalizadas,
-            @RequestParam(required = false) @Parameter(description = "Observações (opcional)") String observacoes
+            @RequestParam(required = false) @Parameter(description = "Observações (opcional)") String observacoes,
+            @RequestParam(required = false) @Parameter(description = "Nome de quem indicou (opcional)") String indicadorNome,
+            @RequestParam(required = false) @Parameter(description = "Telefone de quem indicou (opcional)") String indicadorTelefone
     ) {
         validarComprovante(comprovanteEntrada);
 
@@ -83,7 +85,8 @@ public class AgendamentoController {
             clienteId, nome, telefone, email, cpf, cidade, estado, origem,
             pacoteId, editorId, dataHoraEnsaio, data, hora, duracaoMinutos,
             localEnsaio, enderecoCompleto, taxaDeslocamento,
-            comprovanteEntrada, autorizaUsoImagem, clausulasPersonalizadas, observacoes
+            comprovanteEntrada, autorizaUsoImagem, clausulasPersonalizadas, observacoes,
+            indicadorNome, indicadorTelefone
         );
 
         var agendamento = agendamentoService.criarAgendamento(command);

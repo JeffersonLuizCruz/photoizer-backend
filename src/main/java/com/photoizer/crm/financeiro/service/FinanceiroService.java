@@ -1,24 +1,33 @@
 package com.photoizer.crm.financeiro.service;
 
 import com.photoizer.crm.agenda.model.Agendamento;
-import com.photoizer.crm.agenda.model.Pacote;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
-import com.photoizer.crm.agenda.repository.PacoteRepository;
+import com.photoizer.crm.comissao.model.Indicacao;
+import com.photoizer.crm.comissao.repository.IndicacaoRepository;
+import com.photoizer.crm.config.service.ConfiguracaoService;
+import com.photoizer.crm.despesa.repository.DespesaRepository;
+import com.photoizer.crm.indicador.service.IndicadorService;
+import com.photoizer.crm.pacote.model.Pacote;
+import com.photoizer.crm.pacote.repository.PacoteRepository;
 import com.photoizer.crm.agenda.api.AgendamentoResponse;
 import com.photoizer.crm.financeiro.api.FinanceiroPreviewResponse;
 import com.photoizer.crm.financeiro.api.FinanceiroRelatoriosResponse;
 import com.photoizer.crm.financeiro.api.FinanceiroResumoResponse;
 import com.photoizer.crm.financeiro.model.FotoExtra;
 import com.photoizer.crm.financeiro.model.Pagamento;
+import com.photoizer.crm.financeiro.model.VideoExtra;
 import com.photoizer.crm.financeiro.repository.FotoExtraRepository;
 import com.photoizer.crm.financeiro.repository.PagamentoRepository;
+import com.photoizer.crm.financeiro.repository.VideoExtraRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -31,17 +40,32 @@ public class FinanceiroService {
 
     private final PagamentoRepository pagamentoRepository;
     private final FotoExtraRepository fotoExtraRepository;
+    private final VideoExtraRepository videoExtraRepository;
     private final AgendamentoRepository agendamentoRepository;
     private final PacoteRepository pacoteRepository;
+    private final IndicacaoRepository indicacaoRepository;
+    private final IndicadorService indicadorService;
+    private final ConfiguracaoService configuracaoService;
+    private final DespesaRepository despesaRepository;
 
     public FinanceiroService(PagamentoRepository pagamentoRepository,
                              FotoExtraRepository fotoExtraRepository,
+                             VideoExtraRepository videoExtraRepository,
                              AgendamentoRepository agendamentoRepository,
-                             PacoteRepository pacoteRepository) {
+                             PacoteRepository pacoteRepository,
+                             IndicacaoRepository indicacaoRepository,
+                             IndicadorService indicadorService,
+                             ConfiguracaoService configuracaoService,
+                             DespesaRepository despesaRepository) {
         this.pagamentoRepository = pagamentoRepository;
         this.fotoExtraRepository = fotoExtraRepository;
+        this.videoExtraRepository = videoExtraRepository;
         this.agendamentoRepository = agendamentoRepository;
         this.pacoteRepository = pacoteRepository;
+        this.indicacaoRepository = indicacaoRepository;
+        this.indicadorService = indicadorService;
+        this.configuracaoService = configuracaoService;
+        this.despesaRepository = despesaRepository;
     }
 
     @Transactional(readOnly = true)
@@ -80,18 +104,36 @@ public class FinanceiroService {
         var totalFinal = BigDecimal.ZERO;
         var totalExtras = BigDecimal.ZERO;
         var faturamentoTotal = BigDecimal.ZERO;
+        var deslocamento = BigDecimal.ZERO;
 
         for (var a : agendamentos) {
             totalEntradas = totalEntradas.add(a.getValorEntradaPago());
             totalExtras = totalExtras.add(a.getValorExtras());
             faturamentoTotal = faturamentoTotal.add(a.getValorTotalFinal());
 
+            var taxa = a.getTaxaDeslocamento() != null ? a.getTaxaDeslocamento() : BigDecimal.ZERO;
+            deslocamento = deslocamento.add(taxa);
+
             if (statusPagamentoFinal.contains(a.getStatus())) {
                 totalFinal = totalFinal.add(a.getValorRestante());
             }
         }
 
-        return new FinanceiroResumoResponse(totalEntradas, totalFinal, totalExtras, faturamentoTotal);
+        var ids = agendamentos.stream().map(Agendamento::getId).toList();
+        var indicacoes = indicacaoRepository.findByAgendamentoIdIn(ids);
+        var comissao = indicacoes.stream()
+            .map(com.photoizer.crm.comissao.model.Indicacao::getValorComissao)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal despesasManuais;
+        if (dataInicio != null && dataFim != null) {
+            despesasManuais = despesaRepository.findByDataBetweenOrderByDataDesc(dataInicio.toLocalDate(), dataFim.toLocalDate())
+                .stream().map(d -> d.getValor()).reduce(BigDecimal.ZERO, BigDecimal::add);
+        } else {
+            despesasManuais = BigDecimal.ZERO;
+        }
+
+        return new FinanceiroResumoResponse(totalEntradas, totalFinal, totalExtras, faturamentoTotal, deslocamento, comissao, despesasManuais);
     }
 
     @Transactional(readOnly = true)
@@ -146,7 +188,8 @@ public class FinanceiroService {
         return pagamentoRepository.save(pagamento);
     }
 
-    public FotoExtra adicionarFotoExtra(UUID agendamentoId, int quantidade, BigDecimal valorUnitario) {
+    public FotoExtra adicionarFotoExtra(UUID agendamentoId, int quantidade, BigDecimal valorUnitario,
+                                        String indicadorNome, String indicadorTelefone, UUID indicadorId) {
         var agendamento = agendamentoRepository.findById(agendamentoId).orElseThrow();
 
         var valorTotal = valorUnitario.multiply(BigDecimal.valueOf(quantidade));
@@ -161,7 +204,68 @@ public class FinanceiroService {
         agendamento.setValorTotalFinal(agendamento.getValorTotal().add(agendamento.getValorExtras()));
         agendamentoRepository.save(agendamento);
 
+        criarComissaoSeNecessario(agendamentoId, indicadorNome, indicadorTelefone, indicadorId,
+            "FOTO_EXTRA", valorTotal);
+
         return fotoExtraRepository.save(fotoExtra);
+    }
+
+    public VideoExtra adicionarVideoExtra(UUID agendamentoId, int quantidade, BigDecimal valorUnitario,
+                                          String indicadorNome, String indicadorTelefone, UUID indicadorId) {
+        var agendamento = agendamentoRepository.findById(agendamentoId).orElseThrow();
+
+        var valorTotal = valorUnitario.multiply(BigDecimal.valueOf(quantidade));
+        var videoExtra = VideoExtra.builder()
+            .agendamento(agendamento)
+            .quantidade(quantidade)
+            .valorUnitario(valorUnitario)
+            .valorTotal(valorTotal)
+            .build();
+
+        agendamento.setValorExtras(agendamento.getValorExtras().add(valorTotal));
+        agendamento.setValorTotalFinal(agendamento.getValorTotal().add(agendamento.getValorExtras()));
+        agendamentoRepository.save(agendamento);
+
+        criarComissaoSeNecessario(agendamentoId, indicadorNome, indicadorTelefone, indicadorId,
+            "VIDEO_EXTRA", valorTotal);
+
+        return videoExtraRepository.save(videoExtra);
+    }
+
+    private void criarComissaoSeNecessario(UUID agendamentoId, String indicadorNome, String indicadorTelefone,
+                                           UUID indicadorId, String origem, BigDecimal valorReferencia) {
+        var nome = indicadorNome;
+        var telefone = indicadorTelefone;
+        UUID id = indicadorId;
+
+        if ((nome == null || nome.isBlank()) && (telefone == null || telefone.isBlank()) && id == null) return;
+
+        if (id == null && nome != null && !nome.isBlank() && telefone != null && !telefone.isBlank()) {
+            var indicador = indicadorService.buscarOuCriar(nome, telefone);
+            id = indicador.getId();
+            nome = indicador.getNome();
+            telefone = indicador.getTelefone();
+        }
+
+        if (id == null) return;
+
+        var percentual = configuracaoService.getValorDecimal("percentualComissao", BigDecimal.TEN);
+
+        var comissao = valorReferencia.multiply(percentual).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+
+        var indicacao = Indicacao.builder()
+            .agendamentoId(agendamentoId)
+            .indicadorId(id)
+            .indicadorNome(nome)
+            .indicadorTelefone(telefone)
+            .origem(origem)
+            .percentual(percentual)
+            .valorReferencia(valorReferencia)
+            .valorComissao(comissao)
+            .status("PENDENTE")
+            .build();
+
+        indicacaoRepository.save(indicacao);
     }
 
     @Transactional(readOnly = true)

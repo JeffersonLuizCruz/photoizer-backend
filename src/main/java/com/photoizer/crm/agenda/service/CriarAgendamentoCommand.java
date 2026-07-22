@@ -28,6 +28,8 @@ public record CriarAgendamentoCommand(
     MultipartFile comprovanteEntrada,
     Boolean autorizaUsoImagem,
     String clausulasPersonalizadas,
-    String observacoes
+    String observacoes,
+    String indicadorNome,
+    String indicadorTelefone
 ) {
 }

@@ -2,6 +2,7 @@ package com.photoizer.crm.financeiro.api;
 
 import com.photoizer.crm.financeiro.model.FotoExtra;
 import com.photoizer.crm.financeiro.model.Pagamento;
+import com.photoizer.crm.financeiro.model.VideoExtra;
 import com.photoizer.crm.financeiro.service.FinanceiroService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -44,13 +45,31 @@ public class FinanceiroController {
     }
 
     @PostMapping("/agendamentos/{agendamentoId}/fotos-extras")
-    @Operation(summary = "Adicionar fotos extras")
+    @Operation(summary = "Adicionar fotos extras (com comissão opcional)")
     public ResponseEntity<FotoExtra> adicionarFotoExtra(
             @PathVariable UUID agendamentoId,
             @RequestParam int quantidade,
-            @RequestParam BigDecimal valorUnitario) {
+            @RequestParam BigDecimal valorUnitario,
+            @RequestParam(required = false) UUID indicadorId,
+            @RequestParam(required = false) String indicadorNome,
+            @RequestParam(required = false) String indicadorTelefone) {
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(financeiroService.adicionarFotoExtra(agendamentoId, quantidade, valorUnitario));
+            .body(financeiroService.adicionarFotoExtra(agendamentoId, quantidade, valorUnitario,
+                indicadorNome, indicadorTelefone, indicadorId));
+    }
+
+    @PostMapping("/agendamentos/{agendamentoId}/videos-extras")
+    @Operation(summary = "Adicionar vídeos extras (com comissão opcional)")
+    public ResponseEntity<VideoExtra> adicionarVideoExtra(
+            @PathVariable UUID agendamentoId,
+            @RequestParam int quantidade,
+            @RequestParam BigDecimal valorUnitario,
+            @RequestParam(required = false) UUID indicadorId,
+            @RequestParam(required = false) String indicadorNome,
+            @RequestParam(required = false) String indicadorTelefone) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(financeiroService.adicionarVideoExtra(agendamentoId, quantidade, valorUnitario,
+                indicadorNome, indicadorTelefone, indicadorId));
     }
 
     @GetMapping("/agendamentos/{agendamentoId}/pagamentos")

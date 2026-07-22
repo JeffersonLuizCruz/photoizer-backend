@@ -1,9 +1,11 @@
 package com.photoizer.crm.shared.config;
 
-import com.photoizer.crm.agenda.model.Pacote;
 import com.photoizer.crm.agenda.model.Usuario;
-import com.photoizer.crm.agenda.repository.PacoteRepository;
 import com.photoizer.crm.agenda.repository.UsuarioRepository;
+import com.photoizer.crm.config.model.Configuracao;
+import com.photoizer.crm.config.repository.ConfiguracaoRepository;
+import com.photoizer.crm.pacote.model.Pacote;
+import com.photoizer.crm.pacote.repository.PacoteRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
@@ -15,10 +17,13 @@ public class DataSeeder implements CommandLineRunner {
 
     private final PacoteRepository pacoteRepository;
     private final UsuarioRepository usuarioRepository;
+    private final ConfiguracaoRepository configuracaoRepository;
 
-    public DataSeeder(PacoteRepository pacoteRepository, UsuarioRepository usuarioRepository) {
+    public DataSeeder(PacoteRepository pacoteRepository, UsuarioRepository usuarioRepository,
+                      ConfiguracaoRepository configuracaoRepository) {
         this.pacoteRepository = pacoteRepository;
         this.usuarioRepository = usuarioRepository;
+        this.configuracaoRepository = configuracaoRepository;
     }
 
     @Override
@@ -86,6 +91,19 @@ public class DataSeeder implements CommandLineRunner {
                     .papel("ASSISTENTE")
                     .build()
             ));
+        }
+
+        if (configuracaoRepository.count() == 0) {
+            var c1 = new Configuracao();
+            c1.setChave("valorUnitarioFotoExtra");
+            c1.setValor("15.00");
+            var c2 = new Configuracao();
+            c2.setChave("valorUnitarioVideoExtra");
+            c2.setValor("50.00");
+            var c3 = new Configuracao();
+            c3.setChave("percentualComissao");
+            c3.setValor("10.00");
+            configuracaoRepository.saveAll(List.of(c1, c2, c3));
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.photoizer.crm.agenda.model;
 
 import com.photoizer.crm.cliente.model.Cliente;
+import com.photoizer.crm.pacote.model.Pacote;
 import com.photoizer.crm.shared.model.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

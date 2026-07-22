@@ -3,9 +3,12 @@ package com.photoizer.crm.dashboard.service;
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
+import com.photoizer.crm.comissao.model.Indicacao;
+import com.photoizer.crm.comissao.repository.IndicacaoRepository;
 import com.photoizer.crm.dashboard.api.DashboardMensalResponse;
 import com.photoizer.crm.dashboard.api.DashboardMensalResponse.DadosMensais;
 import com.photoizer.crm.dashboard.api.DashboardMensalResponse.ResumoMesAtual;
+import com.photoizer.crm.despesa.repository.DespesaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +18,7 @@ import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
@@ -33,9 +37,15 @@ public class DashboardService {
     );
 
     private final AgendamentoRepository agendamentoRepository;
+    private final IndicacaoRepository indicacaoRepository;
+    private final DespesaRepository despesaRepository;
 
-    public DashboardService(AgendamentoRepository agendamentoRepository) {
+    public DashboardService(AgendamentoRepository agendamentoRepository,
+                            IndicacaoRepository indicacaoRepository,
+                            DespesaRepository despesaRepository) {
         this.agendamentoRepository = agendamentoRepository;
+        this.indicacaoRepository = indicacaoRepository;
+        this.despesaRepository = despesaRepository;
     }
 
     public DashboardMensalResponse calcularFinanceiroMensal(int mesesHistorico) {
@@ -55,6 +65,22 @@ public class DashboardService {
             porMes.computeIfAbsent(ym, k -> new ArrayList<>()).add(a);
         }
 
+        var todosIds = agendamentos.stream().map(Agendamento::getId).toList();
+        var indicacoes = indicacaoRepository.findByAgendamentoIdIn(todosIds);
+        Map<UUID, BigDecimal> comissaoPorAgendamento = new HashMap<>();
+        for (var ind : indicacoes) {
+            comissaoPorAgendamento.put(ind.getAgendamentoId(), ind.getValorComissao());
+        }
+
+        var primeiroDia = inicio.toLocalDate();
+        var ultimoDia = fim.toLocalDate();
+        var todasDespesas = despesaRepository.findByDataBetweenOrderByDataDesc(primeiroDia, ultimoDia);
+        Map<YearMonth, BigDecimal> despesasPorMes = new HashMap<>();
+        for (var d : todasDespesas) {
+            var ym = YearMonth.from(d.getData());
+            despesasPorMes.merge(ym, d.getValor(), BigDecimal::add);
+        }
+
         var historico = new ArrayList<DadosMensais>();
         ResumoMesAtual resumoMesAtual = null;
 
@@ -65,6 +91,7 @@ public class DashboardService {
             var valorConfirmados = BigDecimal.ZERO;
             var valorFinalizados = BigDecimal.ZERO;
             var deslocamento = BigDecimal.ZERO;
+            var comissao = BigDecimal.ZERO;
             var entradasRecebidas = BigDecimal.ZERO;
             int qtdConfirmados = 0;
             int qtdFinalizados = 0;
@@ -72,6 +99,9 @@ public class DashboardService {
             for (var a : lista) {
                 var taxa = a.getTaxaDeslocamento() != null ? a.getTaxaDeslocamento() : BigDecimal.ZERO;
                 deslocamento = deslocamento.add(taxa);
+
+                var c = comissaoPorAgendamento.getOrDefault(a.getId(), BigDecimal.ZERO);
+                comissao = comissao.add(c);
 
                 if (STATUS_FINALIZADOS.contains(a.getStatus())) {
                     qtdFinalizados++;
@@ -89,23 +119,28 @@ public class DashboardService {
                 }
             }
 
+            var despesasManuais = despesasPorMes.getOrDefault(ym, BigDecimal.ZERO);
+            var totalDespesas = deslocamento.add(comissao).add(despesasManuais);
+
             var dados = new DadosMensais(
                 ym.format(DateTimeFormatter.ofPattern("yyyy-MM")),
                 lista.size(),
                 valorConfirmados,
                 valorFinalizados,
                 deslocamento,
+                comissao,
+                despesasManuais,
                 entradasRecebidas,
-                entradasRecebidas.subtract(deslocamento),
-                valorConfirmados.subtract(deslocamento)
+                entradasRecebidas.subtract(totalDespesas),
+                valorConfirmados.subtract(totalDespesas)
             );
             historico.add(dados);
 
             if (ym.equals(mesAtual)) {
                 var saldoRestante = valorConfirmados.subtract(entradasRecebidas);
-                var saldoLiquido = entradasRecebidas.subtract(deslocamento);
-                var receitaProjetada = valorFinalizados.subtract(deslocamento);
-                var liquidoPrevisto = valorConfirmados.subtract(deslocamento);
+                var saldoLiquido = entradasRecebidas.subtract(totalDespesas);
+                var receitaProjetada = valorFinalizados.subtract(totalDespesas);
+                var liquidoPrevisto = valorConfirmados.subtract(totalDespesas);
 
                 resumoMesAtual = new ResumoMesAtual(
                     lista.size(),
@@ -116,6 +151,8 @@ public class DashboardService {
                     qtdFinalizados,
                     valorFinalizados,
                     deslocamento,
+                    comissao,
+                    despesasManuais,
                     saldoLiquido,
                     receitaProjetada,
                     saldoLiquido,
