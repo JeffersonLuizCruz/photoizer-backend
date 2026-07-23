@@ -12,12 +12,16 @@ public record CompraExtraResponse(
     BigDecimal valorTotal,
     String status,
     String urlComprovante,
-    LocalDateTime dataPagamento
+    LocalDateTime dataPagamento,
+    Integer quantidadeFotos,
+    String metodoPagamento
 ) {
     public static CompraExtraResponse of(CompraExtra c) {
         return new CompraExtraResponse(
             c.getId(), c.getAgendamentoId(), c.getValorTotal(),
-            c.getStatus(), c.getUrlComprovante(), c.getDataPagamento()
+            c.getStatus().name(), c.getUrlComprovante(), c.getDataPagamento(),
+            c.getQuantidadeFotos(),
+            c.getMetodoPagamento() != null ? c.getMetodoPagamento().name() : null
         );
     }
 }

@@ -28,6 +28,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -52,40 +54,54 @@ public class AgendamentoController {
         @ApiResponse(responseCode = "413", description = "Arquivo excede o tamanho máximo", content = @Content)
     })
     public ResponseEntity<AgendamentoResponse> criar(
-            @RequestParam(required = false) @Parameter(description = "ID do cliente (se existente)") UUID clienteId,
-            @RequestParam(required = false) @Parameter(description = "Nome do cliente (para novo cliente)") String nome,
-            @RequestParam(required = false) @Parameter(description = "Telefone do cliente (para novo cliente)") String telefone,
-            @RequestParam(required = false) @Parameter(description = "Email do cliente") String email,
-            @RequestParam(required = false) @Parameter(description = "CPF do cliente") String cpf,
-            @RequestParam(required = false) @Parameter(description = "Cidade do cliente") String cidade,
-            @RequestParam(required = false) @Parameter(description = "Estado do cliente") String estado,
-            @RequestParam(required = false) @Parameter(description = "Origem do cliente (INDICACAO, ANUNCIO, OUTROS)") String origem,
-            @RequestParam @Parameter(description = "ID do pacote") UUID pacoteId,
-            @RequestParam(required = false) @Parameter(description = "ID do editor (opcional)") UUID editorId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-            @Parameter(description = "Data e hora do ensaio (ISO 8601)") LocalDateTime dataHoraEnsaio,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-            @Parameter(description = "Data do ensaio (alternativa ao dataHoraEnsaio)") LocalDate data,
-            @RequestParam(required = false) @Parameter(description = "Hora do ensaio (alternativa ao dataHoraEnsaio, formato HH:mm)") String hora,
-            @RequestParam(required = false, defaultValue = "60")
-            @Parameter(description = "Duração em minutos (default: 60)") Integer duracaoMinutos,
-            @RequestParam @Parameter(description = "Local do ensaio") String localEnsaio,
-            @RequestParam(required = false) @Parameter(description = "Endereço completo (opcional)") String enderecoCompleto,
-            @RequestParam(required = false) @Parameter(description = "Taxa de deslocamento (opcional)") BigDecimal taxaDeslocamento,
-            @RequestParam(required = false) @Parameter(description = "Comprovante de pagamento (PDF, JPG, PNG - max 10MB)") MultipartFile comprovanteEntrada,
-            @RequestParam(required = false) @Parameter(description = "Autoriza uso de imagem (default: false)") Boolean autorizaUsoImagem,
-            @RequestParam(required = false) @Parameter(description = "Cláusulas personalizadas (opcional)") String clausulasPersonalizadas,
-            @RequestParam(required = false) @Parameter(description = "Observações (opcional)") String observacoes,
-            @RequestParam(required = false) @Parameter(description = "Nome de quem indicou (opcional)") String indicadorNome,
-            @RequestParam(required = false) @Parameter(description = "Telefone de quem indicou (opcional)") String indicadorTelefone
+            @RequestParam(required = false) String clienteId,
+            @RequestParam(required = false) String nome,
+            @RequestParam(required = false) String telefone,
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) String cpf,
+            @RequestParam(required = false) String cidade,
+            @RequestParam(required = false) String estado,
+            @RequestParam(required = false) String origem,
+            @RequestParam String pacoteId,
+            @RequestParam(required = false) String editorId,
+            @RequestParam(required = false) String dataHoraEnsaio,
+            @RequestParam(required = false) String data,
+            @RequestParam(required = false) String hora,
+            @RequestParam(required = false, defaultValue = "60") String duracaoMinutos,
+            @RequestParam String localEnsaio,
+            @RequestParam(required = false) String enderecoCompleto,
+            @RequestParam(required = false) String taxaDeslocamento,
+            @RequestParam(required = false) MultipartFile comprovanteEntrada,
+            @RequestParam(required = false) String autorizaUsoImagem,
+            @RequestParam(required = false) String clausulasPersonalizadas,
+            @RequestParam(required = false) String observacoes,
+            @RequestParam(required = false) String indicadorNome,
+            @RequestParam(required = false) String indicadorTelefone
     ) {
         validarComprovante(comprovanteEntrada);
 
+        var parsedPacoteId = UUID.fromString(pacoteId);
+        var parsedEditorId = editorId != null && !editorId.isBlank() ? UUID.fromString(editorId) : null;
+        var parsedClienteId = clienteId != null && !clienteId.isBlank() ? UUID.fromString(clienteId) : null;
+        var parsedDuracao = duracaoMinutos != null ? Integer.parseInt(duracaoMinutos) : 60;
+        var parsedTaxa = taxaDeslocamento != null && !taxaDeslocamento.isBlank() ? new BigDecimal(taxaDeslocamento) : BigDecimal.ZERO;
+        var parsedAutoriza = autorizaUsoImagem != null && "true".equalsIgnoreCase(autorizaUsoImagem);
+
+        LocalDateTime parsedDataHora = null;
+        if (dataHoraEnsaio != null && !dataHoraEnsaio.isBlank()) {
+            parsedDataHora = LocalDateTime.parse(dataHoraEnsaio, DateTimeFormatter.ISO_DATE_TIME);
+        } else if (data != null && !data.isBlank() && hora != null && !hora.isBlank()) {
+            parsedDataHora = LocalDateTime.of(
+                LocalDate.parse(data, DateTimeFormatter.ISO_DATE),
+                LocalTime.parse(hora, DateTimeFormatter.ofPattern("HH:mm"))
+            );
+        }
+
         var command = new CriarAgendamentoCommand(
-            clienteId, nome, telefone, email, cpf, cidade, estado, origem,
-            pacoteId, editorId, dataHoraEnsaio, data, hora, duracaoMinutos,
-            localEnsaio, enderecoCompleto, taxaDeslocamento,
-            comprovanteEntrada, autorizaUsoImagem, clausulasPersonalizadas, observacoes,
+            parsedClienteId, nome, telefone, email, cpf, cidade, estado, origem,
+            parsedPacoteId, parsedEditorId, parsedDataHora, null, null, parsedDuracao,
+            localEnsaio, enderecoCompleto, parsedTaxa,
+            comprovanteEntrada, parsedAutoriza, clausulasPersonalizadas, observacoes,
             indicadorNome, indicadorTelefone
         );
 

@@ -3,6 +3,8 @@ package com.photoizer.crm.ecommerce.model;
 import com.photoizer.crm.shared.model.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -34,14 +36,22 @@ public class CompraExtra extends BaseEntity {
     private BigDecimal valorTotal;
 
     @NotNull
-    @Column(nullable = false, length = 25)
-    private String status;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    private StatusCompraExtra status;
 
     @Column(length = 500)
     private String urlComprovante;
 
     @Column
     private LocalDateTime dataPagamento;
+
+    @Column
+    private Integer quantidadeFotos;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private MetodoPagamento metodoPagamento;
 
     @Column(columnDefinition = "TEXT")
     private String observacao;

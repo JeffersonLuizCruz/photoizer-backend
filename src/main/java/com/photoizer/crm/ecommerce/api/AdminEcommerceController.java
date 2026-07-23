@@ -1,11 +1,12 @@
 package com.photoizer.crm.ecommerce.api;
 
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
+import com.photoizer.crm.ecommerce.model.StatusCompraExtra;
 import com.photoizer.crm.ecommerce.service.EcommerceService;
 import com.photoizer.crm.foto.api.FotoEnsaioResponse;
+import com.photoizer.crm.foto.model.StatusFoto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -42,15 +43,15 @@ public class AdminEcommerceController {
         var compras = ecommerceService.listarComprasPorAgendamento(agendamentoId);
 
         var totalFotos = fotos.size();
-        var publicadas = (int) fotos.stream().filter(f -> "PUBLICADA".equals(f.getStatus())).count();
+        var publicadas = (int) fotos.stream().filter(f -> f.getStatus() == StatusFoto.PUBLICADA).count();
         var selecionadas = (int) fotos.stream().filter(f -> f.isSelecionadaPacote()).count();
-        var pagas = (int) fotos.stream().filter(f -> "PAGA".equals(f.getStatus())).count();
+        var pagas = (int) fotos.stream().filter(f -> f.getStatus() == StatusFoto.PAGA).count();
         var aguardando = (int) fotos.stream()
-            .filter(f -> "AGUARDANDO_COMPROVANTE".equals(f.getStatus()) || "AGUARDANDO_CONFIRMACAO".equals(f.getStatus()))
+            .filter(f -> f.getStatus() == StatusFoto.AGUARDANDO_COMPROVANTE || f.getStatus() == StatusFoto.AGUARDANDO_CONFIRMACAO)
             .count();
 
         var valorTotalExtras = compras.stream()
-            .filter(c -> "PAGA".equals(c.getStatus()))
+            .filter(c -> c.getStatus() == StatusCompraExtra.PAGA)
             .map(c -> c.getValorTotal())
             .reduce(BigDecimal.ZERO, BigDecimal::add);
 

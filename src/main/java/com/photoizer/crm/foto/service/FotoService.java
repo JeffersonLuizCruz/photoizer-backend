@@ -1,6 +1,7 @@
 package com.photoizer.crm.foto.service;
 
 import com.photoizer.crm.foto.model.FotoEnsaio;
+import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
 import com.photoizer.crm.shared.storage.FileStorageService;
 import org.springframework.stereotype.Service;
@@ -55,25 +56,33 @@ public class FotoService {
             var original = Path.of(originalPath);
             var targetDir = original.getParent();
 
+            String watermarkedPath;
+            String thumbPath;
             try {
-                var watermarkedPath = imageProcessingService.aplicarMarcaDagua(original, targetDir, TEXTO_MARCA_DAGUA, OPACIDADE_MARCA);
-                var thumbPath = imageProcessingService.gerarThumbnail(original, targetDir);
-
-                var foto = FotoEnsaio.builder()
-                    .agendamentoId(agendamentoId)
-                    .fileName(arquivo.getOriginalFilename())
-                    .originalPath(originalPath)
-                    .watermarkedPath(watermarkedPath.toString())
-                    .thumbPath(thumbPath.toString())
-                    .ordem(count + i)
-                    .status("INEDITA")
-                    .selecionadaPacote(false)
-                    .build();
-
-                fotos.add(fotoEnsaioRepository.save(foto));
-            } catch (IOException e) {
-                throw new RuntimeException("Erro ao processar imagem: " + arquivo.getOriginalFilename(), e);
+                var wm = imageProcessingService.aplicarMarcaDagua(original, targetDir, TEXTO_MARCA_DAGUA, OPACIDADE_MARCA);
+                watermarkedPath = wm.toString();
+            } catch (Exception e) {
+                watermarkedPath = originalPath;
             }
+            try {
+                var thumb = imageProcessingService.gerarThumbnail(original, targetDir);
+                thumbPath = thumb.toString();
+            } catch (Exception e) {
+                thumbPath = originalPath;
+            }
+
+            var foto = FotoEnsaio.builder()
+                .agendamentoId(agendamentoId)
+                .fileName(arquivo.getOriginalFilename())
+                .originalPath(originalPath)
+                .watermarkedPath(watermarkedPath)
+                .thumbPath(thumbPath)
+                .ordem(count + i)
+                .status(StatusFoto.INEDITA)
+                .selecionadaPacote(false)
+                .build();
+
+            fotos.add(fotoEnsaioRepository.save(foto));
         }
 
         return fotos;
@@ -90,7 +99,7 @@ public class FotoService {
     public List<FotoEnsaio> publicar(UUID agendamentoId) {
         var fotos = fotoEnsaioRepository.findByAgendamentoIdOrderByOrdemAsc(agendamentoId);
         for (var foto : fotos) {
-            foto.setStatus("PUBLICADA");
+            foto.setStatus(StatusFoto.PUBLICADA);
         }
         return fotoEnsaioRepository.saveAll(fotos);
     }
@@ -98,6 +107,21 @@ public class FotoService {
     public FotoEnsaio atualizarOrdem(UUID id, int ordem) {
         var foto = buscarPorId(id);
         foto.setOrdem(ordem);
+        return fotoEnsaioRepository.save(foto);
+    }
+
+    /**
+     * Atualiza metadados da foto: título, descrição, tags, categoria,
+     * data da sessão e marcação de destaque (RF017).
+     */
+    public FotoEnsaio atualizarMetadata(UUID id, com.photoizer.crm.foto.api.FotoMetadataRequest request) {
+        var foto = buscarPorId(id);
+        if (request.titulo() != null) foto.setTitulo(request.titulo());
+        if (request.descricao() != null) foto.setDescricao(request.descricao());
+        if (request.tags() != null) foto.setTags(new ArrayList<>(request.tags()));
+        if (request.categoria() != null) foto.setCategoria(request.categoria());
+        if (request.dataSessao() != null) foto.setDataSessao(request.dataSessao());
+        if (request.destaque() != null) foto.setDestaque(request.destaque());
         return fotoEnsaioRepository.save(foto);
     }
 

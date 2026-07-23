@@ -13,6 +13,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -70,6 +72,9 @@ public class PacoteService {
             .quantidadeFotos(request.quantidadeFotos())
             .quantidadeVideos(request.quantidadeVideos())
             .valorBase(request.valorBase())
+            .precoFotoExtra(request.precoFotoExtra() != null ? request.precoFotoExtra() : BigDecimal.valueOf(15))
+            .imagemCapa(request.imagemCapa())
+            .beneficios(request.beneficios())
             .duracaoEstimada(request.duracaoEstimada())
             .bloqueiaDiaInteiro(request.bloqueiaDiaInteiro())
             .ativo(request.ativo())
@@ -88,6 +93,9 @@ public class PacoteService {
         pacote.setQuantidadeFotos(request.quantidadeFotos());
         pacote.setQuantidadeVideos(request.quantidadeVideos());
         pacote.setValorBase(request.valorBase());
+        pacote.setPrecoFotoExtra(request.precoFotoExtra() != null ? request.precoFotoExtra() : pacote.getPrecoFotoExtra());
+        pacote.setImagemCapa(request.imagemCapa());
+        pacote.setBeneficios(request.beneficios());
         pacote.setDuracaoEstimada(request.duracaoEstimada());
         pacote.setBloqueiaDiaInteiro(request.bloqueiaDiaInteiro());
         pacote.setAtivo(request.ativo());

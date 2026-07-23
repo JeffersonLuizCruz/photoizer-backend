@@ -26,4 +26,23 @@ public class DashboardController {
             @RequestParam(defaultValue = "6") int meses) {
         return ResponseEntity.ok(dashboardService.calcularFinanceiroMensal(meses));
     }
+
+    @GetMapping("/ecommerce")
+    @Operation(summary = "Métricas consolidadas do ecommerce (total faturado, fotos, ticket médio, top clientes)")
+    public ResponseEntity<DashboardEcommerceResponse> ecommerce() {
+        return ResponseEntity.ok(dashboardService.calcularEcommerce());
+    }
+
+    @GetMapping("/ecommerce/mensal")
+    @Operation(summary = "Série histórica mensal de vendas do ecommerce")
+    public ResponseEntity<DashboardEcommerceMensalResponse> ecommerceMensal(
+            @RequestParam(defaultValue = "6") int meses) {
+        return ResponseEntity.ok(dashboardService.calcularEcommerceMensal(meses));
+    }
+
+    @GetMapping("/kpis")
+    @Operation(summary = "KPIs do dashboard (agendamentos, receita, conversão, novos clientes, tarefas)")
+    public ResponseEntity<DashboardKpisResponse> kpis() {
+        return ResponseEntity.ok(dashboardService.calcularKpis());
+    }
 }

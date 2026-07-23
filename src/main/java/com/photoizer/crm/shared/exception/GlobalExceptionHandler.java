@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -79,6 +80,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleIndicacaoNaoEncontrada(IndicacaoNaoEncontradaException e) {
         log.warn("Indicacao nao encontrada: {}", e.getMessage());
         return build(HttpStatus.NOT_FOUND, e);
+    }
+
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<ErrorResponse> handleBadCredentials(BadCredentialsException e) {
+        log.warn("Credenciais invalidas: {}", e.getMessage());
+        return build(HttpStatus.UNAUTHORIZED, e);
     }
 
     @ExceptionHandler(ConflitoDeAgendaException.class)

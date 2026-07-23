@@ -18,6 +18,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "clientes", uniqueConstraints = {
     @UniqueConstraint(columnNames = "telefone"),
@@ -64,4 +66,14 @@ public class Cliente extends BaseEntity {
 
     @Column(columnDefinition = "TEXT")
     private String observacoes;
+
+    @Size(max = 255)
+    @Column(length = 255)
+    private String senhaHash;
+
+    @Column
+    private LocalDateTime dataCadastro;
+
+    @Column(columnDefinition = "TEXT")
+    private String preferencias;
 }

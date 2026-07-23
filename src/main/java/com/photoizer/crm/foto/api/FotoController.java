@@ -90,6 +90,15 @@ public class FotoController {
         return ResponseEntity.ok(fotos.stream().map(FotoEnsaioResponse::of).toList());
     }
 
+    @PatchMapping("/{fotoId}/metadata")
+    @Operation(summary = "Atualizar metadados da foto (título, tags, categoria, destaque)")
+    public ResponseEntity<FotoEnsaioResponse> atualizarMetadata(
+            @PathVariable UUID fotoId,
+            @org.springframework.web.bind.annotation.RequestBody FotoMetadataRequest request) {
+        var foto = fotoService.atualizarMetadata(fotoId, request);
+        return ResponseEntity.ok(FotoEnsaioResponse.of(foto));
+    }
+
     @DeleteMapping("/{fotoId}")
     @Operation(summary = "Remover foto")
     public ResponseEntity<Void> deletar(@PathVariable UUID fotoId) {

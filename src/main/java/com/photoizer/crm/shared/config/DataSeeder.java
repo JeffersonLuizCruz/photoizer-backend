@@ -2,9 +2,12 @@ package com.photoizer.crm.shared.config;
 
 import com.photoizer.crm.agenda.model.Usuario;
 import com.photoizer.crm.agenda.repository.UsuarioRepository;
+import com.photoizer.crm.auth.model.AdminUser;
+import com.photoizer.crm.auth.repository.AdminUserRepository;
 import com.photoizer.crm.config.model.Configuracao;
 import com.photoizer.crm.config.repository.ConfiguracaoRepository;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -14,11 +17,17 @@ public class DataSeeder implements CommandLineRunner {
 
     private final UsuarioRepository usuarioRepository;
     private final ConfiguracaoRepository configuracaoRepository;
+    private final AdminUserRepository adminUserRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public DataSeeder(UsuarioRepository usuarioRepository,
-                      ConfiguracaoRepository configuracaoRepository) {
+                      ConfiguracaoRepository configuracaoRepository,
+                      AdminUserRepository adminUserRepository,
+                      PasswordEncoder passwordEncoder) {
         this.usuarioRepository = usuarioRepository;
         this.configuracaoRepository = configuracaoRepository;
+        this.adminUserRepository = adminUserRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
@@ -40,6 +49,14 @@ public class DataSeeder implements CommandLineRunner {
                     .email("maria@photoizer.com")
                     .papel("ASSISTENTE")
                     .build()
+            ));
+        }
+
+        if (adminUserRepository.count() == 0) {
+            adminUserRepository.save(new AdminUser(
+                "admin@photoizer.com",
+                passwordEncoder.encode("admin123"),
+                "Administrador"
             ));
         }
 

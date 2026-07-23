@@ -48,4 +48,6 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID>,
     List<Agendamento> findByClienteId(@Param("clienteId") UUID clienteId);
 
     java.util.Optional<Agendamento> findByTokenGaleria(UUID tokenGaleria);
+
+    long countByDataHoraEnsaioBetween(LocalDateTime start, LocalDateTime end);
 }

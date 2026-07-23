@@ -1,6 +1,7 @@
 package com.photoizer.crm.agenda.service;
 
 import com.photoizer.crm.agenda.event.AgendamentoCanceladoEvent;
+import com.photoizer.crm.agenda.event.AgendamentoConfirmadoEvent;
 import com.photoizer.crm.agenda.event.AgendamentoCriadoEvent;
 import com.photoizer.crm.agenda.event.AgendamentoRealizadoEvent;
 import com.photoizer.crm.agenda.event.PagamentoFinalRegistradoEvent;
@@ -28,6 +29,9 @@ import org.springframework.transaction.annotation.Transactional;
 import com.photoizer.crm.agenda.api.AtualizarAgendamentoRequest;
 import com.photoizer.crm.agenda.api.AgendamentoResponse;
 import com.photoizer.crm.agenda.api.DisponibilidadeResponse;
+import com.photoizer.crm.cliente.api.AgendamentoClienteResponse;
+import com.photoizer.crm.foto.model.StatusFoto;
+import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -52,19 +56,22 @@ public class AgendamentoService {
     private final AgendamentoRepository agendamentoRepository;
     private final FileStorageService fileStorageService;
     private final ApplicationEventPublisher eventPublisher;
+    private final FotoEnsaioRepository fotoEnsaioRepository;
 
     public AgendamentoService(ClienteRepository clienteRepository,
                               PacoteRepository pacoteRepository,
                               UsuarioRepository usuarioRepository,
                               AgendamentoRepository agendamentoRepository,
                               FileStorageService fileStorageService,
-                              ApplicationEventPublisher eventPublisher) {
+                              ApplicationEventPublisher eventPublisher,
+                              FotoEnsaioRepository fotoEnsaioRepository) {
         this.clienteRepository = clienteRepository;
         this.pacoteRepository = pacoteRepository;
         this.usuarioRepository = usuarioRepository;
         this.agendamentoRepository = agendamentoRepository;
         this.fileStorageService = fileStorageService;
         this.eventPublisher = eventPublisher;
+        this.fotoEnsaioRepository = fotoEnsaioRepository;
     }
 
     public Agendamento criarAgendamento(CriarAgendamentoCommand command) {
@@ -143,6 +150,11 @@ public class AgendamentoService {
             agendamento.getValorTotal()
         ));
 
+        eventPublisher.publishEvent(new AgendamentoConfirmadoEvent(
+            agendamento.getId(),
+            agendamento.getCliente().getId()
+        ));
+
         return agendamento;
     }
 
@@ -204,6 +216,20 @@ public class AgendamentoService {
         return agendamentoRepository.findByClienteId(clienteId);
     }
 
+    @Transactional(readOnly = true)
+    public List<AgendamentoClienteResponse> listarAgendamentosCliente(UUID clienteId) {
+        return agendamentoRepository.findByClienteId(clienteId).stream()
+            .map(a -> {
+                var totalPublicadas = fotoEnsaioRepository.countByAgendamentoIdAndStatus(
+                    a.getId(), StatusFoto.PUBLICADA);
+                var selecionadasPacote = fotoEnsaioRepository.countSelecionadasPacoteByAgendamentoId(
+                    a.getId());
+                var pagas = fotoEnsaioRepository.countPagasByAgendamentoId(a.getId());
+                return AgendamentoClienteResponse.of(a, totalPublicadas, selecionadasPacote, pagas);
+            })
+            .toList();
+    }
+
     public Agendamento reagendar(UUID id, LocalDate data, String hora, Integer duracaoMinutos) {
         var agendamento = buscarPorId(id);
 
@@ -224,7 +250,14 @@ public class AgendamentoService {
         agendamento.setStatus(StatusAgendamento.CONFIRMADO);
         agendamento.setDataConfirmacao(LocalDateTime.now());
 
-        return agendamentoRepository.save(agendamento);
+        agendamento = agendamentoRepository.save(agendamento);
+
+        eventPublisher.publishEvent(new AgendamentoConfirmadoEvent(
+            agendamento.getId(),
+            agendamento.getCliente().getId()
+        ));
+
+        return agendamento;
     }
 
     public Agendamento toggleDestaque(UUID id) {
@@ -374,7 +407,6 @@ public class AgendamentoService {
             .cidade(command.cidade())
             .estado(command.estado())
             .origem(origemCliente)
-            .observacoes(command.observacoes())
             .build();
 
         return clienteRepository.save(cliente);

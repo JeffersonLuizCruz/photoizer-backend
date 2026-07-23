@@ -20,6 +20,7 @@ import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Entity
 @Table(name = "pacotes")
@@ -51,6 +52,18 @@ public class Pacote extends BaseEntity {
     @Positive
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal valorBase;
+
+    @NotNull
+    @PositiveOrZero
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal precoFotoExtra;
+
+    @Size(max = 500)
+    @Column(length = 500)
+    private String imagemCapa;
+
+    @Column(columnDefinition = "TEXT")
+    private String beneficios;
 
     @Size(max = 50)
     @Column(length = 50)

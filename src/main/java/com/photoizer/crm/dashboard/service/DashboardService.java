@@ -2,17 +2,29 @@ package com.photoizer.crm.dashboard.service;
 
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
+import com.photoizer.crm.agenda.model.StatusTarefa;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
+import com.photoizer.crm.agenda.repository.TarefaRepository;
+import com.photoizer.crm.cliente.repository.ClienteRepository;
 import com.photoizer.crm.comissao.model.Indicacao;
 import com.photoizer.crm.comissao.repository.IndicacaoRepository;
+import com.photoizer.crm.dashboard.api.DashboardEcommerceMensalResponse;
+import com.photoizer.crm.dashboard.api.DashboardEcommerceMensalResponse.DadosEcommerceMensal;
+import com.photoizer.crm.dashboard.api.DashboardEcommerceResponse;
+import com.photoizer.crm.dashboard.api.DashboardEcommerceResponse.TopCliente;
+import com.photoizer.crm.dashboard.api.DashboardKpisResponse;
 import com.photoizer.crm.dashboard.api.DashboardMensalResponse;
 import com.photoizer.crm.dashboard.api.DashboardMensalResponse.DadosMensais;
 import com.photoizer.crm.dashboard.api.DashboardMensalResponse.ResumoMesAtual;
 import com.photoizer.crm.despesa.repository.DespesaRepository;
+import com.photoizer.crm.ecommerce.model.CompraExtra;
+import com.photoizer.crm.ecommerce.model.StatusCompraExtra;
+import com.photoizer.crm.ecommerce.repository.CompraExtraRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
@@ -39,13 +51,22 @@ public class DashboardService {
     private final AgendamentoRepository agendamentoRepository;
     private final IndicacaoRepository indicacaoRepository;
     private final DespesaRepository despesaRepository;
+    private final CompraExtraRepository compraExtraRepository;
+    private final ClienteRepository clienteRepository;
+    private final TarefaRepository tarefaRepository;
 
     public DashboardService(AgendamentoRepository agendamentoRepository,
                             IndicacaoRepository indicacaoRepository,
-                            DespesaRepository despesaRepository) {
+                            DespesaRepository despesaRepository,
+                            CompraExtraRepository compraExtraRepository,
+                            ClienteRepository clienteRepository,
+                            TarefaRepository tarefaRepository) {
         this.agendamentoRepository = agendamentoRepository;
         this.indicacaoRepository = indicacaoRepository;
         this.despesaRepository = despesaRepository;
+        this.compraExtraRepository = compraExtraRepository;
+        this.clienteRepository = clienteRepository;
+        this.tarefaRepository = tarefaRepository;
     }
 
     public DashboardMensalResponse calcularFinanceiroMensal(int mesesHistorico) {
@@ -163,4 +184,132 @@ public class DashboardService {
 
         return new DashboardMensalResponse(resumoMesAtual, historico);
     }
+
+    public DashboardEcommerceResponse calcularEcommerce() {
+        var comprasPagas = compraExtraRepository.findByStatus(StatusCompraExtra.PAGA);
+
+        var totalFaturado = comprasPagas.stream()
+            .map(CompraExtra::getValorTotal)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        var totalFotosExtras = comprasPagas.stream()
+            .filter(c -> c.getQuantidadeFotos() != null)
+            .mapToInt(CompraExtra::getQuantidadeFotos)
+            .sum();
+        var totalCompras = comprasPagas.size();
+        var ticketMedio = totalCompras > 0
+            ? totalFaturado.divide(BigDecimal.valueOf(totalCompras), 2, RoundingMode.HALF_UP)
+            : BigDecimal.ZERO;
+
+        var agendamentoIds = comprasPagas.stream()
+            .map(CompraExtra::getAgendamentoId)
+            .distinct()
+            .toList();
+        var agendamentos = agendamentoRepository.findAllById(agendamentoIds);
+
+        Map<UUID, CompraAgg> porAgendamento = new HashMap<>();
+        for (var compra : comprasPagas) {
+            porAgendamento.merge(compra.getAgendamentoId(),
+                new CompraAgg(1, compra.getValorTotal()),
+                (a, b) -> new CompraAgg(a.qtd + b.qtd, a.total.add(b.total)));
+        }
+
+        var topClientes = agendamentos.stream()
+            .map(a -> {
+                var agg = porAgendamento.getOrDefault(a.getId(), new CompraAgg(0, BigDecimal.ZERO));
+                return new TopCliente(
+                    a.getCliente().getNome(),
+                    a.getCliente().getTelefone(),
+                    agg.qtd,
+                    agg.total
+                );
+            })
+            .sorted((c1, c2) -> c2.totalGasto().compareTo(c1.totalGasto()))
+            .limit(5)
+            .toList();
+
+        return new DashboardEcommerceResponse(
+            totalCompras, (int) totalFotosExtras, totalFaturado, ticketMedio, topClientes
+        );
+    }
+
+    public DashboardEcommerceMensalResponse calcularEcommerceMensal(int meses) {
+        var hoje = LocalDate.now();
+        var mesAtual = YearMonth.from(hoje);
+        var inicio = mesAtual.minusMonths(meses - 1).atDay(1).atStartOfDay();
+        var fim = mesAtual.atEndOfMonth().atTime(23, 59, 59);
+
+        var todasCompras = compraExtraRepository.findAll().stream()
+            .filter(c -> c.getCreatedAt() != null
+                && !c.getCreatedAt().isBefore(inicio)
+                && !c.getCreatedAt().isAfter(fim))
+            .toList();
+
+        Map<YearMonth, List<CompraExtra>> porMes = new TreeMap<>();
+        for (var c : todasCompras) {
+            var ym = YearMonth.from(c.getCreatedAt());
+            porMes.computeIfAbsent(ym, k -> new ArrayList<>()).add(c);
+        }
+
+        var historico = new ArrayList<DadosEcommerceMensal>();
+        for (int i = meses - 1; i >= 0; i--) {
+            var ym = mesAtual.minusMonths(i);
+            var compras = porMes.getOrDefault(ym, List.of());
+            var qtdCompras = (int) compras.stream().filter(c -> c.getStatus() == StatusCompraExtra.PAGA).count();
+            var qtdFotos = compras.stream()
+                .filter(c -> c.getStatus() == StatusCompraExtra.PAGA && c.getQuantidadeFotos() != null)
+                .mapToInt(CompraExtra::getQuantidadeFotos)
+                .sum();
+            var valorTotal = compras.stream()
+                .filter(c -> c.getStatus() == StatusCompraExtra.PAGA)
+                .map(CompraExtra::getValorTotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+            historico.add(new DadosEcommerceMensal(
+                ym.format(DateTimeFormatter.ofPattern("yyyy-MM")),
+                qtdCompras, qtdFotos, valorTotal
+            ));
+        }
+
+        return new DashboardEcommerceMensalResponse(historico);
+    }
+
+    public DashboardKpisResponse calcularKpis() {
+        var hoje = LocalDate.now();
+        var inicioMes = hoje.withDayOfMonth(1).atStartOfDay();
+        var fimMes = YearMonth.from(hoje).atEndOfMonth().atTime(23, 59, 59);
+
+        var agendamentosMes = agendamentoRepository.countByDataHoraEnsaioBetween(inicioMes, fimMes);
+        var agendamentosHoje = agendamentoRepository.countByDataHoraEnsaioBetween(
+            hoje.atStartOfDay(), hoje.atTime(23, 59, 59));
+
+        var receitaMes = agendamentoRepository.findAll().stream()
+            .filter(a -> a.getDataHoraEnsaio() != null
+                && !a.getDataHoraEnsaio().isBefore(inicioMes)
+                && !a.getDataHoraEnsaio().isAfter(fimMes))
+            .filter(a -> a.getStatus() == StatusAgendamento.CONFIRMADO
+                || a.getStatus() == StatusAgendamento.REALIZADO
+                || a.getStatus() == StatusAgendamento.EM_EDICAO
+                || a.getStatus() == StatusAgendamento.FOTOS_ENVIADAS_PARA_SELECAO
+                || a.getStatus() == StatusAgendamento.FOTOS_ENTREGUES
+                || a.getStatus() == StatusAgendamento.FINALIZADO)
+            .map(a -> a.getValorTotalFinal() != null ? a.getValorTotalFinal() : BigDecimal.ZERO)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        var novosClientesMes = clienteRepository.countByDataCadastroBetween(inicioMes, fimMes);
+
+        var tarefasPendentes = tarefaRepository.findAll().stream()
+            .filter(t -> t.getStatus() == StatusTarefa.PENDENTE)
+            .count();
+
+        var totalAgendamentos = agendamentoRepository.count();
+        var taxaConversao = totalAgendamentos > 0
+            ? (double) agendamentosMes / totalAgendamentos
+            : 0.0;
+
+        return new DashboardKpisResponse(
+            agendamentosMes, receitaMes, taxaConversao,
+            novosClientesMes, tarefasPendentes, agendamentosHoje
+        );
+    }
+
+    private record CompraAgg(int qtd, BigDecimal total) {}
 }

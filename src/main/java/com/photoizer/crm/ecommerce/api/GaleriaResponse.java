@@ -8,5 +8,7 @@ import java.util.List;
 public record GaleriaResponse(
     List<FotoEnsaioResponse> fotos,
     int pacoteQuantidadeFotos,
-    BigDecimal valorUnitarioFotoExtra
+    BigDecimal valorUnitarioFotoExtra,
+    String pacoteNome,
+    String localEnsaio
 ) {}

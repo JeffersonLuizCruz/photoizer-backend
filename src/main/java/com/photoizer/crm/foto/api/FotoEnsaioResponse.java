@@ -2,7 +2,9 @@ package com.photoizer.crm.foto.api;
 
 import com.photoizer.crm.foto.model.FotoEnsaio;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 public record FotoEnsaioResponse(
@@ -16,7 +18,14 @@ public record FotoEnsaioResponse(
     String status,
     boolean selecionadaPacote,
     UUID compraExtraId,
-    LocalDateTime createdAt
+    LocalDateTime createdAt,
+    String titulo,
+    String descricao,
+    List<String> tags,
+    String categoria,
+    LocalDate dataSessao,
+    String metadataExif,
+    boolean destaque
 ) {
     public static FotoEnsaioResponse of(FotoEnsaio f) {
         return new FotoEnsaioResponse(
@@ -27,10 +36,17 @@ public record FotoEnsaioResponse(
             "/api/v1/ecommerce/fotos/" + f.getId() + "/watermarked",
             "/api/v1/agendamentos/" + f.getAgendamentoId() + "/fotos/" + f.getId() + "/thumb",
             f.getOrdem(),
-            f.getStatus(),
+            f.getStatus().name(),
             f.isSelecionadaPacote(),
             f.getCompraExtraId(),
-            f.getCreatedAt()
+            f.getCreatedAt(),
+            f.getTitulo(),
+            f.getDescricao(),
+            f.getTags(),
+            f.getCategoria(),
+            f.getDataSessao(),
+            f.getMetadataExif(),
+            f.isDestaque()
         );
     }
 }
