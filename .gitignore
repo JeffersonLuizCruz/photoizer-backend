@@ -1,0 +1,36 @@
+# --- Backend (Java + Maven) ---
+photoizer-backend/target/
+photoizer-backend/*.class
+photoizer-backend/*.jar
+photoizer-backend/*.war
+photoizer-backend/*.log
+photoizer-backend/.sts4-cache/
+photoizer-backend/.vscode/
+
+# Uploads (runtime data)
+photoizer-backend/uploads/
+
+# Maven wrapper (the jar is large; keep the scripts but ignore the jar)
+photoizer-backend/.mvn/wrapper/maven-wrapper.jar
+
+# --- Frontend (Node + Vite + TypeScript) ---
+photoizer-frontend/node_modules/
+photoizer-frontend/dist/
+photoizer-frontend/dev-dist/
+
+# --- IDE ---
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Environment ---
+.env
+.env.local
+.env.*.local
