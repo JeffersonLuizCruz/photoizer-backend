@@ -4,12 +4,16 @@ import com.photoizer.crm.agenda.exception.AgendamentoNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.AgendamentoNoPassadoException;
 import com.photoizer.crm.agenda.exception.ConflitoDeAgendaException;
 import com.photoizer.crm.agenda.exception.EditorNaoEncontradoException;
+import com.photoizer.crm.agenda.exception.EnsaioNaoFinalizadoException;
 import com.photoizer.crm.pacote.exception.PacoteInativoException;
 import com.photoizer.crm.pacote.exception.PacoteNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.TarefaNaoEncontradaException;
 import com.photoizer.crm.agenda.exception.TarefaNaoPodeSerExcluidaException;
 import com.photoizer.crm.cliente.exception.ClienteNaoEncontradoException;
 import com.photoizer.crm.comissao.exception.IndicacaoNaoEncontradaException;
+import com.photoizer.crm.edicao.exception.EdicaoNaoEncontradaException;
+import com.photoizer.crm.edicao.exception.FotoEdicaoNaoEncontradaException;
+import com.photoizer.crm.edicao.exception.StatusEdicaoInvalidoException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -82,6 +86,24 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, e);
     }
 
+    @ExceptionHandler(EdicaoNaoEncontradaException.class)
+    public ResponseEntity<ErrorResponse> handleEdicaoNaoEncontrada(EdicaoNaoEncontradaException e) {
+        log.warn("Edicao nao encontrada: {}", e.getMessage());
+        return build(HttpStatus.NOT_FOUND, e);
+    }
+
+    @ExceptionHandler(FotoEdicaoNaoEncontradaException.class)
+    public ResponseEntity<ErrorResponse> handleFotoEdicaoNaoEncontrada(FotoEdicaoNaoEncontradaException e) {
+        log.warn("Foto edicao nao encontrada: {}", e.getMessage());
+        return build(HttpStatus.NOT_FOUND, e);
+    }
+
+    @ExceptionHandler(StatusEdicaoInvalidoException.class)
+    public ResponseEntity<ErrorResponse> handleStatusEdicaoInvalido(StatusEdicaoInvalidoException e) {
+        log.warn("Status de edicao invalido: {}", e.getMessage());
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
+    }
+
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ErrorResponse> handleBadCredentials(BadCredentialsException e) {
         log.warn("Credenciais invalidas: {}", e.getMessage());
@@ -92,6 +114,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleConflitoDeAgenda(ConflitoDeAgendaException e) {
         log.warn("Conflito de agenda: {}", e.getMessage());
         return build(HttpStatus.CONFLICT, e);
+    }
+
+    @ExceptionHandler(EnsaioNaoFinalizadoException.class)
+    public ResponseEntity<ErrorResponse> handleEnsaioNaoFinalizado(EnsaioNaoFinalizadoException e) {
+        log.warn("Ensaio nao finalizado: {}", e.getMessage());
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

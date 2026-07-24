@@ -85,7 +85,7 @@ public class Pacote extends BaseEntity {
     @JoinColumn(name = "editor_responsavel_id")
     private Usuario editorResponsavel;
 
-    @Positive
+    @PositiveOrZero
     @Column
     private Integer diasParaEntrega;
 }

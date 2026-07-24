@@ -1,5 +1,9 @@
 package com.photoizer.crm.foto.service;
 
+import com.photoizer.crm.agenda.exception.EnsaioNaoFinalizadoException;
+import com.photoizer.crm.agenda.model.Agendamento;
+import com.photoizer.crm.agenda.model.StatusAgendamento;
+import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.foto.model.FotoEnsaio;
 import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
@@ -22,16 +26,27 @@ public class FotoService {
     private static final String TEXTO_MARCA_DAGUA = "© Photoizer Studio";
     private static final float OPACIDADE_MARCA = 0.15f;
 
+    private static final List<StatusAgendamento> STATUS_ALLOW_UPLOAD = List.of(
+        StatusAgendamento.EM_EDICAO,
+        StatusAgendamento.SELECAO_DAS_FOTOS,
+        StatusAgendamento.FOTOS_ENVIADAS_PARA_SELECAO,
+        StatusAgendamento.FOTOS_ENTREGUES,
+        StatusAgendamento.FINALIZADO
+    );
+
     private final FotoEnsaioRepository fotoEnsaioRepository;
     private final FileStorageService fileStorageService;
     private final ImageProcessingService imageProcessingService;
+    private final AgendamentoRepository agendamentoRepository;
 
     public FotoService(FotoEnsaioRepository fotoEnsaioRepository,
                        FileStorageService fileStorageService,
-                       ImageProcessingService imageProcessingService) {
+                       ImageProcessingService imageProcessingService,
+                       AgendamentoRepository agendamentoRepository) {
         this.fotoEnsaioRepository = fotoEnsaioRepository;
         this.fileStorageService = fileStorageService;
         this.imageProcessingService = imageProcessingService;
+        this.agendamentoRepository = agendamentoRepository;
     }
 
     @Transactional(readOnly = true)
@@ -46,6 +61,13 @@ public class FotoService {
     }
 
     public List<FotoEnsaio> uploadFotos(UUID agendamentoId, List<MultipartFile> arquivos) {
+        var agendamento = agendamentoRepository.findById(agendamentoId)
+            .orElseThrow(() -> new RuntimeException("Agendamento não encontrado: " + agendamentoId));
+
+        if (!STATUS_ALLOW_UPLOAD.contains(agendamento.getStatus())) {
+            throw new EnsaioNaoFinalizadoException();
+        }
+
         var fotos = new ArrayList<FotoEnsaio>();
         var count = fotoEnsaioRepository.countByAgendamentoId(agendamentoId);
 

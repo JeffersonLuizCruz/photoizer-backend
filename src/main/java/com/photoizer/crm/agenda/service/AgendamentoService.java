@@ -9,6 +9,7 @@ import com.photoizer.crm.agenda.exception.AgendamentoNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.AgendamentoNoPassadoException;
 import com.photoizer.crm.agenda.exception.ConflitoDeAgendaException;
 import com.photoizer.crm.agenda.exception.EditorNaoEncontradoException;
+import com.photoizer.crm.agenda.exception.EnsaioNaoFinalizadoException;
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
@@ -350,10 +351,19 @@ public class AgendamentoService {
     public Agendamento registrarPagamentoFinal(UUID id, org.springframework.web.multipart.MultipartFile comprovante) {
         var agendamento = buscarPorId(id);
 
-        if (comprovante != null && !comprovante.isEmpty()) {
-            var url = fileStorageService.salvar(comprovante);
-            agendamento.setUrlComprovanteFinal(url);
+        if (agendamento.getStatus() != StatusAgendamento.REALIZADO
+            && agendamento.getStatus() != StatusAgendamento.AGUARDANDO_PAGAMENTO_FINAL) {
+            throw new EnsaioNaoFinalizadoException(
+                "O agendamento precisa estar como REALIZADO ou AGUARDANDO_PAGAMENTO_FINAL para registrar o pagamento final. Status atual: " + agendamento.getStatus()
+            );
         }
+
+        if (comprovante == null || comprovante.isEmpty()) {
+            throw new IllegalArgumentException("Comprovante de pagamento é obrigatório para finalizar o ensaio");
+        }
+
+        var url = fileStorageService.salvar(comprovante);
+        agendamento.setUrlComprovanteFinal(url);
 
         agendamento.setValorRestante(BigDecimal.ZERO);
         agendamento.setValorEntradaPago(agendamento.getValorTotalFinal());
