@@ -1,6 +1,6 @@
 package com.photoizer.crm.pacote.model;
 
-import com.photoizer.crm.agenda.model.Usuario;
+import com.photoizer.crm.auth.model.User;
 import com.photoizer.crm.shared.model.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -79,11 +79,11 @@ public class Pacote extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "fotografo_id")
-    private Usuario fotografo;
+    private User fotografo;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "editor_responsavel_id")
-    private Usuario editorResponsavel;
+    private User editorResponsavel;
 
     @PositiveOrZero
     @Column

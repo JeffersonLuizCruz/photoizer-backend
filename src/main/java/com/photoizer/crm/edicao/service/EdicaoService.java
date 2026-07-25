@@ -3,6 +3,8 @@ package com.photoizer.crm.edicao.service;
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
+import com.photoizer.crm.auth.model.User;
+import com.photoizer.crm.auth.repository.UserRepository;
 import com.photoizer.crm.edicao.api.EdicaoResponse;
 import com.photoizer.crm.edicao.api.FotoEdicaoResponse;
 import com.photoizer.crm.edicao.event.EdicaoConcluidaEvent;
@@ -23,6 +25,7 @@ import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
 import com.photoizer.crm.foto.service.ImageProcessingService;
 import com.photoizer.crm.shared.storage.FileStorageService;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -53,6 +56,7 @@ public class EdicaoService {
     private final FileStorageService fileStorageService;
     private final ImageProcessingService imageProcessingService;
     private final ApplicationEventPublisher eventPublisher;
+    private final UserRepository userRepository;
 
     public EdicaoService(EdicaoRepository edicaoRepository,
                          FotoEdicaoRepository fotoEdicaoRepository,
@@ -60,7 +64,8 @@ public class EdicaoService {
                          FotoEnsaioRepository fotoEnsaioRepository,
                          FileStorageService fileStorageService,
                          ImageProcessingService imageProcessingService,
-                         ApplicationEventPublisher eventPublisher) {
+                         ApplicationEventPublisher eventPublisher,
+                         UserRepository userRepository) {
         this.edicaoRepository = edicaoRepository;
         this.fotoEdicaoRepository = fotoEdicaoRepository;
         this.agendamentoRepository = agendamentoRepository;
@@ -68,6 +73,15 @@ public class EdicaoService {
         this.fileStorageService = fileStorageService;
         this.imageProcessingService = imageProcessingService;
         this.eventPublisher = eventPublisher;
+        this.userRepository = userRepository;
+    }
+
+    private User getCurrentUser() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || auth.getPrincipal().equals("anonymousUser")) {
+            return null;
+        }
+        return userRepository.findById(UUID.fromString(auth.getName())).orElse(null);
     }
 
     public EdicaoResponse obterStatus(UUID agendamentoId) {
@@ -165,6 +179,9 @@ public class EdicaoService {
 
         edicao.setStatus(StatusEdicao.RAW_ENVIADOS);
         edicao.setDataEnvioRaw(LocalDateTime.now());
+        if (edicao.getFotografo() == null) {
+            edicao.setFotografo(getCurrentUser());
+        }
         edicaoRepository.save(edicao);
 
         if (agendamento.getStatus() == StatusAgendamento.AGUARDANDO_PAGAMENTO_FINAL) {

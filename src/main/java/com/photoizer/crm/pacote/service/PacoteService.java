@@ -1,7 +1,7 @@
 package com.photoizer.crm.pacote.service;
 
-import com.photoizer.crm.agenda.model.Usuario;
-import com.photoizer.crm.agenda.repository.UsuarioRepository;
+import com.photoizer.crm.auth.model.User;
+import com.photoizer.crm.auth.repository.UserRepository;
 import com.photoizer.crm.pacote.api.PacoteRequest;
 import com.photoizer.crm.pacote.api.PacoteResponse;
 import com.photoizer.crm.pacote.exception.PacoteInativoException;
@@ -23,15 +23,15 @@ import java.util.UUID;
 public class PacoteService {
 
     private final PacoteRepository pacoteRepository;
-    private final UsuarioRepository usuarioRepository;
+    private final UserRepository userRepository;
 
-    public PacoteService(PacoteRepository pacoteRepository, UsuarioRepository usuarioRepository) {
+    public PacoteService(PacoteRepository pacoteRepository, UserRepository userRepository) {
         this.pacoteRepository = pacoteRepository;
-        this.usuarioRepository = usuarioRepository;
+        this.userRepository = userRepository;
     }
 
-    private Usuario buscarUsuario(UUID id) {
-        return id != null ? usuarioRepository.findById(id).orElse(null) : null;
+    private User buscarUsuario(UUID id) {
+        return id != null ? userRepository.findById(id).orElse(null) : null;
     }
 
     @Transactional(readOnly = true)

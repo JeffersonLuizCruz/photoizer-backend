@@ -13,7 +13,7 @@ import com.photoizer.crm.agenda.exception.EnsaioNaoFinalizadoException;
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
-import com.photoizer.crm.agenda.repository.UsuarioRepository;
+import com.photoizer.crm.auth.repository.UserRepository;
 import com.photoizer.crm.pacote.exception.PacoteInativoException;
 import com.photoizer.crm.pacote.exception.PacoteNaoEncontradoException;
 import com.photoizer.crm.pacote.model.Pacote;
@@ -53,7 +53,7 @@ public class AgendamentoService {
 
     private final ClienteRepository clienteRepository;
     private final PacoteRepository pacoteRepository;
-    private final UsuarioRepository usuarioRepository;
+    private final UserRepository userRepository;
     private final AgendamentoRepository agendamentoRepository;
     private final FileStorageService fileStorageService;
     private final ApplicationEventPublisher eventPublisher;
@@ -61,14 +61,14 @@ public class AgendamentoService {
 
     public AgendamentoService(ClienteRepository clienteRepository,
                               PacoteRepository pacoteRepository,
-                              UsuarioRepository usuarioRepository,
+                               UserRepository userRepository,
                               AgendamentoRepository agendamentoRepository,
                               FileStorageService fileStorageService,
                               ApplicationEventPublisher eventPublisher,
                               FotoEnsaioRepository fotoEnsaioRepository) {
         this.clienteRepository = clienteRepository;
         this.pacoteRepository = pacoteRepository;
-        this.usuarioRepository = usuarioRepository;
+        this.userRepository = userRepository;
         this.agendamentoRepository = agendamentoRepository;
         this.fileStorageService = fileStorageService;
         this.eventPublisher = eventPublisher;
@@ -86,7 +86,7 @@ public class AgendamentoService {
         }
 
         var editor = (command.editorId() != null)
-            ? usuarioRepository.findById(command.editorId())
+            ? userRepository.findById(command.editorId())
                 .orElseThrow(() -> new EditorNaoEncontradoException(command.editorId()))
             : null;
 
@@ -277,7 +277,7 @@ public class AgendamentoService {
         }
 
         var editor = request.editorId() != null
-            ? usuarioRepository.findById(request.editorId())
+            ? userRepository.findById(request.editorId())
                 .orElseThrow(() -> new EditorNaoEncontradoException(request.editorId()))
             : null;
 

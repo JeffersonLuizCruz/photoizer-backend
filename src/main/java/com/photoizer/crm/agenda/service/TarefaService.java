@@ -9,10 +9,10 @@ import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.StatusTarefa;
 import com.photoizer.crm.agenda.model.Tarefa;
 import com.photoizer.crm.agenda.model.TipoTarefa;
-import com.photoizer.crm.agenda.model.Usuario;
+import com.photoizer.crm.auth.model.User;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.agenda.repository.TarefaRepository;
-import com.photoizer.crm.agenda.repository.UsuarioRepository;
+import com.photoizer.crm.auth.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,14 +26,14 @@ public class TarefaService {
 
     private final TarefaRepository tarefaRepository;
     private final AgendamentoRepository agendamentoRepository;
-    private final UsuarioRepository usuarioRepository;
+    private final UserRepository userRepository;
 
     public TarefaService(TarefaRepository tarefaRepository,
                          AgendamentoRepository agendamentoRepository,
-                         UsuarioRepository usuarioRepository) {
+                         UserRepository userRepository) {
         this.tarefaRepository = tarefaRepository;
         this.agendamentoRepository = agendamentoRepository;
-        this.usuarioRepository = usuarioRepository;
+        this.userRepository = userRepository;
     }
 
     @Transactional(readOnly = true)
@@ -55,9 +55,9 @@ public class TarefaService {
             throw new IllegalArgumentException("Tipo de tarefa inválido: " + tipo);
         }
 
-        Usuario responsavel = null;
+        User responsavel = null;
         if (responsavelId != null) {
-            responsavel = usuarioRepository.findById(responsavelId).orElse(null);
+            responsavel = userRepository.findById(responsavelId).orElse(null);
         }
 
         var tarefa = Tarefa.builder()
@@ -95,9 +95,9 @@ public class TarefaService {
         var tarefa = tarefaRepository.findById(id)
             .orElseThrow(() -> new TarefaNaoEncontradaException(id));
 
-        Usuario responsavel = null;
+        User responsavel = null;
         if (request.responsavelId() != null) {
-            responsavel = usuarioRepository.findById(request.responsavelId())
+            responsavel = userRepository.findById(request.responsavelId())
                 .orElseThrow(() -> new com.photoizer.crm.agenda.exception.EditorNaoEncontradoException(request.responsavelId()));
         }
 

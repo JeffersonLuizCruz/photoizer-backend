@@ -1,9 +1,8 @@
 package com.photoizer.crm.shared.config;
 
-import com.photoizer.crm.agenda.model.Usuario;
-import com.photoizer.crm.agenda.repository.UsuarioRepository;
-import com.photoizer.crm.auth.model.AdminUser;
-import com.photoizer.crm.auth.repository.AdminUserRepository;
+import com.photoizer.crm.auth.model.Papel;
+import com.photoizer.crm.auth.model.User;
+import com.photoizer.crm.auth.repository.UserRepository;
 import com.photoizer.crm.config.model.Configuracao;
 import com.photoizer.crm.config.repository.ConfiguracaoRepository;
 import org.springframework.boot.CommandLineRunner;
@@ -15,48 +14,27 @@ import java.util.List;
 @Component
 public class DataSeeder implements CommandLineRunner {
 
-    private final UsuarioRepository usuarioRepository;
+    private final UserRepository userRepository;
     private final ConfiguracaoRepository configuracaoRepository;
-    private final AdminUserRepository adminUserRepository;
     private final PasswordEncoder passwordEncoder;
 
-    public DataSeeder(UsuarioRepository usuarioRepository,
+    public DataSeeder(UserRepository userRepository,
                       ConfiguracaoRepository configuracaoRepository,
-                      AdminUserRepository adminUserRepository,
                       PasswordEncoder passwordEncoder) {
-        this.usuarioRepository = usuarioRepository;
+        this.userRepository = userRepository;
         this.configuracaoRepository = configuracaoRepository;
-        this.adminUserRepository = adminUserRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
     @Override
     public void run(String... args) {
-        if (usuarioRepository.count() == 0) {
-            usuarioRepository.saveAll(List.of(
-                Usuario.builder()
-                    .nome("Carol (Fotógrafa)")
-                    .email("carol@photoizer.com")
-                    .papel("FOTOGRAFA")
-                    .build(),
-                Usuario.builder()
-                    .nome("João (Editor)")
-                    .email("joao@photoizer.com")
-                    .papel("EDITOR")
-                    .build(),
-                Usuario.builder()
-                    .nome("Maria (Assistente)")
-                    .email("maria@photoizer.com")
-                    .papel("ASSISTENTE")
-                    .build()
-            ));
-        }
-
-        if (adminUserRepository.count() == 0) {
-            adminUserRepository.save(new AdminUser(
-                "admin@photoizer.com",
-                passwordEncoder.encode("admin123"),
-                "Administrador"
+        if (userRepository.count() == 0) {
+            userRepository.saveAll(List.of(
+                new User("admin@photoizer.com", passwordEncoder.encode("dev123"), "Administrador", Papel.ADMIN),
+                new User("carol@photoizer.com", passwordEncoder.encode("dev123"), "Carol (Fotógrafa)", Papel.FOTOGRAFO),
+                new User("joao@photoizer.com", passwordEncoder.encode("dev123"), "João (Editor)", Papel.EDITOR),
+                new User("maria@photoizer.com", passwordEncoder.encode("dev123"), "Maria (Assistente)", Papel.EDITOR),
+                new User("agendador@photoizer.com", passwordEncoder.encode("dev123"), "Lucas (Agendador)", Papel.AGENDADOR)
             ));
         }
 

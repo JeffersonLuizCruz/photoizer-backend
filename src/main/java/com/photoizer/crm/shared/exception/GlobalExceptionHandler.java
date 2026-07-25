@@ -1,5 +1,6 @@
 package com.photoizer.crm.shared.exception;
 
+import org.springframework.security.access.AccessDeniedException;
 import com.photoizer.crm.agenda.exception.AgendamentoNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.AgendamentoNoPassadoException;
 import com.photoizer.crm.agenda.exception.ConflitoDeAgendaException;
@@ -154,6 +155,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleMissingPart(MissingServletRequestPartException e) {
         log.warn("Campo obrigatorio ausente: {}", e.getRequestPartName());
         return build(HttpStatus.UNPROCESSABLE_ENTITY, "Campo obrigatório não enviado: " + e.getRequestPartName());
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException e) {
+        log.warn("Acesso negado: {}", e.getMessage());
+        return build(HttpStatus.FORBIDDEN, "Acesso negado");
     }
 
     @ExceptionHandler(Exception.class)

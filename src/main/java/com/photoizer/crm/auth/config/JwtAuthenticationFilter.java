@@ -45,8 +45,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         var userId = jwtTokenProvider.getUserIdFromToken(token);
+        var papel = jwtTokenProvider.getPapelFromToken(token);
+
         var authentication = new UsernamePasswordAuthenticationToken(
-            userId, null, List.of());
+            userId, null, List.of(() -> "ROLE_" + papel));
         authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
         SecurityContextHolder.getContext().setAuthentication(authentication);

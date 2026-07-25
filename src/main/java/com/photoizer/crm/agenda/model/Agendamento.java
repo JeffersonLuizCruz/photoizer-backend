@@ -1,5 +1,6 @@
 package com.photoizer.crm.agenda.model;
 
+import com.photoizer.crm.auth.model.User;
 import com.photoizer.crm.cliente.model.Cliente;
 import com.photoizer.crm.pacote.model.Pacote;
 import com.photoizer.crm.shared.model.BaseEntity;
@@ -51,7 +52,7 @@ public class Agendamento extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "editor_id")
-    private Usuario editor;
+    private User editor;
 
     @NotNull
     @Column(nullable = false)

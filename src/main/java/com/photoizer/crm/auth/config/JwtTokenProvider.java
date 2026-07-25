@@ -25,11 +25,12 @@ public class JwtTokenProvider {
         this.expiration = expiration;
     }
 
-    public String generateToken(UUID userId, String email) {
+    public String generateToken(UUID userId, String email, String papel) {
         var now = new Date();
         return Jwts.builder()
             .subject(userId.toString())
             .claim("email", email)
+            .claim("papel", papel)
             .issuedAt(now)
             .expiration(new Date(now.getTime() + expiration))
             .signWith(secretKey)
@@ -38,6 +39,10 @@ public class JwtTokenProvider {
 
     public String getUserIdFromToken(String token) {
         return getClaims(token).getSubject();
+    }
+
+    public String getPapelFromToken(String token) {
+        return getClaims(token).get("papel", String.class);
     }
 
     public boolean validateToken(String token) {

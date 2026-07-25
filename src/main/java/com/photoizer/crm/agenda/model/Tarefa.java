@@ -1,5 +1,6 @@
 package com.photoizer.crm.agenda.model;
 
+import com.photoizer.crm.auth.model.User;
 import com.photoizer.crm.shared.model.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -43,7 +44,7 @@ public class Tarefa extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "responsavel_id")
-    private Usuario responsavel;
+    private User responsavel;
 
     @NotNull
     @Column(nullable = false)

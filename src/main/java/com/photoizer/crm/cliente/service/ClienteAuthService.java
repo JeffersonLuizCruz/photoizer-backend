@@ -55,7 +55,7 @@ public class ClienteAuthService {
             .build();
         cliente = clienteRepository.save(cliente);
 
-        var token = jwtTokenProvider.generateToken(cliente.getId(), cliente.getEmail());
+        var token = jwtTokenProvider.generateToken(cliente.getId(), cliente.getEmail(), "CLIENTE");
         return new ClienteAuthResponse(token, cliente.getId(), cliente.getNome(),
             cliente.getEmail(), cliente.getTelefone());
     }
@@ -69,7 +69,7 @@ public class ClienteAuthService {
             throw new BadCredentialsException("Email ou senha inválidos");
         }
 
-        var token = jwtTokenProvider.generateToken(cliente.getId(), cliente.getEmail());
+        var token = jwtTokenProvider.generateToken(cliente.getId(), cliente.getEmail(), "CLIENTE");
         return new ClienteAuthResponse(token, cliente.getId(), cliente.getNome(),
             cliente.getEmail(), cliente.getTelefone());
     }
