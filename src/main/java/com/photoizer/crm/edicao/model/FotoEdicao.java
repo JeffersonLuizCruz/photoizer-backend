@@ -49,4 +49,10 @@ public class FotoEdicao extends BaseEntity {
 
     @Column(nullable = false)
     private int ordem;
+
+    @Column(length = 10)
+    private Boolean aprovado;
+
+    @Column(length = 1000)
+    private String comentario;
 }

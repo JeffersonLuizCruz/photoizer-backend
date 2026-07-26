@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface FotoEnsaioRepository extends JpaRepository<FotoEnsaio, UUID> {
@@ -28,4 +29,6 @@ public interface FotoEnsaioRepository extends JpaRepository<FotoEnsaio, UUID> {
     List<FotoEnsaio> findByAgendamentoIdAndCategoria(UUID agendamentoId, String categoria);
 
     List<FotoEnsaio> findByAgendamentoIdAndTagsContaining(UUID agendamentoId, String tag);
+
+    Optional<FotoEnsaio> findByFotoEdicaoId(UUID fotoEdicaoId);
 }

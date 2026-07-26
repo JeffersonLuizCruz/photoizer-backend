@@ -7,11 +7,15 @@ import com.photoizer.crm.auth.model.User;
 import com.photoizer.crm.auth.repository.UserRepository;
 import com.photoizer.crm.edicao.api.EdicaoResponse;
 import com.photoizer.crm.edicao.api.FotoEdicaoResponse;
+import com.photoizer.crm.edicao.api.RevisaoRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.photoizer.crm.edicao.event.EdicaoConcluidaEvent;
 import com.photoizer.crm.edicao.event.FotosPublicadasEvent;
 import com.photoizer.crm.edicao.event.RawEnviadosEvent;
 import com.photoizer.crm.edicao.exception.EdicaoNaoEncontradaException;
 import com.photoizer.crm.edicao.exception.FotoEdicaoNaoEncontradaException;
+import com.photoizer.crm.edicao.exception.FotoSemRawException;
 import com.photoizer.crm.edicao.exception.StatusEdicaoInvalidoException;
 import com.photoizer.crm.edicao.model.Edicao;
 import com.photoizer.crm.edicao.model.FotoEdicao;
@@ -46,6 +50,7 @@ import java.util.zip.ZipOutputStream;
 @Transactional
 public class EdicaoService {
 
+    private static final Logger log = LoggerFactory.getLogger(EdicaoService.class);
     private static final String TEXTO_MARCA_DAGUA = "© Photoizer Studio";
     private static final float OPACIDADE_MARCA = 0.15f;
 
@@ -222,17 +227,10 @@ public class EdicaoService {
                 fotoExistente.setStatus(StatusFotoEdicao.EDITADO);
                 fotoEdicaoRepository.save(fotoExistente);
             } else {
-                var novaFoto = FotoEdicao.builder()
-                    .edicaoId(edicao.getId())
-                    .rawPath("")
-                    .rawFileName(nomeArquivo != null ? nomeArquivo : "")
-                    .editedPath(editedPath)
-                    .editedFileName(nomeArquivo)
-                    .status(StatusFotoEdicao.EDITADO)
-                    .ordem((int) ordemAtual)
-                    .build();
-                fotoEdicaoRepository.save(novaFoto);
-                ordemAtual++;
+                throw new FotoSemRawException(
+                    "O arquivo \"" + nomeArquivo + "\" não possui uma foto RAW correspondente. " +
+                    "Verifique se o nome do arquivo editado é idêntico ao nome original."
+                );
             }
         }
 
@@ -335,6 +333,118 @@ public class EdicaoService {
             .orElseThrow(() -> new EdicaoNaoEncontradaException("Processo de edição não encontrado"));
         edicao.setObservacoes(observacoes);
         edicao = edicaoRepository.save(edicao);
+        var totalRaw = fotoEdicaoRepository.countByEdicaoIdAndStatus(edicao.getId(), StatusFotoEdicao.RAW);
+        var totalEditadas = fotoEdicaoRepository.countByEdicaoIdAndStatus(edicao.getId(), StatusFotoEdicao.EDITADO);
+        return EdicaoResponse.of(edicao, totalRaw, totalEditadas);
+    }
+
+    public FotoEdicaoResponse revisarFoto(UUID fotoId, RevisaoRequest request) {
+        var foto = fotoEdicaoRepository.findById(fotoId)
+            .orElseThrow(() -> new FotoEdicaoNaoEncontradaException("Foto não encontrada: " + fotoId));
+
+        if (request.aprovado() != null) {
+            foto.setAprovado(request.aprovado());
+        }
+        if (request.comentario() != null) {
+            foto.setComentario(request.comentario());
+        }
+
+        fotoEdicaoRepository.save(foto);
+
+        if (Boolean.TRUE.equals(request.aprovado()) && foto.getEditedPath() != null) {
+            var existing = fotoEnsaioRepository.findByFotoEdicaoId(fotoId);
+            if (existing.isEmpty()) {
+                var edicao = edicaoRepository.findById(foto.getEdicaoId())
+                    .orElseThrow(() -> new EdicaoNaoEncontradaException("Processo de edição não encontrado"));
+                var editedPath = Path.of(foto.getEditedPath());
+                var targetDir = editedPath.getParent();
+
+                String watermarkedPath;
+                String thumbPath;
+                try {
+                    var wm = imageProcessingService.aplicarMarcaDagua(editedPath, targetDir, TEXTO_MARCA_DAGUA, OPACIDADE_MARCA);
+                    watermarkedPath = wm.toString();
+                } catch (Exception e) {
+                    log.warn("Erro ao aplicar marca d'agua para foto {}: {}", fotoId, e.getMessage());
+                    watermarkedPath = foto.getEditedPath();
+                }
+                try {
+                    var thumb = imageProcessingService.gerarThumbnail(editedPath, targetDir);
+                    thumbPath = thumb.toString();
+                } catch (Exception e) {
+                    log.warn("Erro ao gerar thumbnail para foto {}: {}", fotoId, e.getMessage());
+                    thumbPath = foto.getEditedPath();
+                }
+
+                var count = fotoEnsaioRepository.countByAgendamentoId(edicao.getAgendamentoId());
+                var ensaio = FotoEnsaio.builder()
+                    .agendamentoId(edicao.getAgendamentoId())
+                    .fotoEdicaoId(fotoId)
+                    .fileName(foto.getEditedFileName() != null ? foto.getEditedFileName() : foto.getRawFileName())
+                    .originalPath(foto.getEditedPath())
+                    .watermarkedPath(watermarkedPath)
+                    .thumbPath(thumbPath)
+                    .ordem((int) count)
+                    .status(StatusFoto.INEDITA)
+                    .selecionadaPacote(false)
+                    .build();
+                fotoEnsaioRepository.save(ensaio);
+            }
+        } else {
+            fotoEnsaioRepository.findByFotoEdicaoId(fotoId).ifPresent(ensaio -> {
+                if (ensaio.getStatus() == StatusFoto.INEDITA) {
+                    fotoEnsaioRepository.delete(ensaio);
+                }
+            });
+        }
+
+        return FotoEdicaoResponse.of(foto);
+    }
+
+    public EdicaoResponse publicarLoja(UUID agendamentoId) {
+        var edicao = edicaoRepository.findByAgendamentoId(agendamentoId)
+            .orElseThrow(() -> new EdicaoNaoEncontradaException("Processo de edição não encontrado"));
+
+        if (edicao.getStatus() == StatusEdicao.AGUARDANDO_RAW || edicao.getStatus() == StatusEdicao.RAW_ENVIADOS) {
+            throw new StatusEdicaoInvalidoException(
+                "A edição precisa estar concluída para publicar na loja. Status atual: " + edicao.getStatus()
+            );
+        }
+
+        var fotosIneditas = fotoEnsaioRepository.findByAgendamentoIdAndStatusOrderByOrdemAsc(
+            agendamentoId, StatusFoto.INEDITA);
+
+        if (fotosIneditas.isEmpty()) {
+            var fotosPublicadas = fotoEnsaioRepository.findByAgendamentoIdAndStatusOrderByOrdemAsc(
+                agendamentoId, StatusFoto.PUBLICADA);
+            if (!fotosPublicadas.isEmpty()) {
+                var agendamento = agendamentoRepository.findById(agendamentoId)
+                    .orElseThrow(() -> new EdicaoNaoEncontradaException("Agendamento não encontrado"));
+                if (agendamento.getStatus() != StatusAgendamento.SELECAO_DAS_FOTOS) {
+                    agendamento.setStatus(StatusAgendamento.SELECAO_DAS_FOTOS);
+                    agendamentoRepository.save(agendamento);
+                }
+                var totalRaw = fotoEdicaoRepository.countByEdicaoIdAndStatus(edicao.getId(), StatusFotoEdicao.RAW);
+                var totalEditadas = fotoEdicaoRepository.countByEdicaoIdAndStatus(edicao.getId(), StatusFotoEdicao.EDITADO);
+                return EdicaoResponse.of(edicao, totalRaw, totalEditadas);
+            }
+            throw new FotoEdicaoNaoEncontradaException("Nenhuma foto aprovada encontrada para publicar.");
+        }
+
+        for (var foto : fotosIneditas) {
+            foto.setStatus(StatusFoto.PUBLICADA);
+        }
+        fotoEnsaioRepository.saveAll(fotosIneditas);
+
+        var agendamento = agendamentoRepository.findById(agendamentoId)
+            .orElseThrow(() -> new EdicaoNaoEncontradaException("Agendamento não encontrado"));
+        agendamento.setStatus(StatusAgendamento.SELECAO_DAS_FOTOS);
+        agendamentoRepository.save(agendamento);
+
+        eventPublisher.publishEvent(new FotosPublicadasEvent(agendamentoId, fotosIneditas.size()));
+
+        log.info("Fotos publicadas na loja para agendamento {}: {} fotos", agendamentoId, fotosIneditas.size());
+
         var totalRaw = fotoEdicaoRepository.countByEdicaoIdAndStatus(edicao.getId(), StatusFotoEdicao.RAW);
         var totalEditadas = fotoEdicaoRepository.countByEdicaoIdAndStatus(edicao.getId(), StatusFotoEdicao.EDITADO);
         return EdicaoResponse.of(edicao, totalRaw, totalEditadas);

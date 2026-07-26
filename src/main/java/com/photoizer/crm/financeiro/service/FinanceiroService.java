@@ -36,8 +36,6 @@ import java.util.UUID;
 @Transactional
 public class FinanceiroService {
 
-    private static final BigDecimal PERCENTUAL_ENTRADA = BigDecimal.valueOf(0.3);
-
     private final PagamentoRepository pagamentoRepository;
     private final FotoExtraRepository fotoExtraRepository;
     private final VideoExtraRepository videoExtraRepository;
@@ -73,12 +71,15 @@ public class FinanceiroService {
         var pacote = pacoteRepository.findById(pacoteId).orElseThrow();
         var taxa = taxaDeslocamento != null ? taxaDeslocamento : BigDecimal.ZERO;
 
+        var percentualEntrada = configuracaoService.getValorDecimal("percentualEntrada", new BigDecimal("30.00"));
+        var fatorEntrada = percentualEntrada.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
         var valorTotal = pacote.getValorBase().add(taxa);
-        var valorEntradaExigido = pacote.getValorBase().multiply(PERCENTUAL_ENTRADA);
+        var valorEntradaExigido = pacote.getValorBase().multiply(fatorEntrada)
+            .setScale(2, RoundingMode.HALF_UP);
         var valorRestante = valorTotal.subtract(valorEntradaExigido);
         var valorTotalFinal = valorTotal;
 
-        return new FinanceiroPreviewResponse(valorTotal, valorEntradaExigido, valorRestante, valorTotalFinal);
+        return new FinanceiroPreviewResponse(valorTotal, valorEntradaExigido, valorRestante, valorTotalFinal, percentualEntrada);
     }
 
     @Transactional(readOnly = true)

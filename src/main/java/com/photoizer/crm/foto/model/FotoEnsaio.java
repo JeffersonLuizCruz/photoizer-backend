@@ -89,4 +89,7 @@ public class FotoEnsaio extends BaseEntity {
 
     @Column(nullable = false)
     private boolean destaque;
+
+    @Column
+    private UUID fotoEdicaoId;
 }

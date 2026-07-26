@@ -24,7 +24,7 @@ public class ConfiguracaoService {
         var configs = configuracaoRepository.findAll();
         var map = new HashMap<String, Object>();
         for (var c : configs) {
-            map.put(c.getChave(), new BigDecimal(c.getValor()));
+            map.put(c.getChave(), c.getValor());
         }
         return map;
     }

@@ -107,6 +107,10 @@ public class Agendamento extends BaseEntity {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal valorTotalFinal;
 
+    @PositiveOrZero
+    @Column(precision = 5, scale = 2)
+    private BigDecimal percentualEntrada;
+
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 40)
@@ -157,4 +161,7 @@ public class Agendamento extends BaseEntity {
 
     @Column(unique = true, nullable = false)
     private UUID tokenGaleria;
+
+    @Column
+    private LocalDateTime tokenExpiracao;
 }

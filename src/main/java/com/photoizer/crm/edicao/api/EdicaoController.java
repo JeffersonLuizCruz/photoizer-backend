@@ -93,6 +93,12 @@ public class EdicaoController {
         return ResponseEntity.ok(edicaoService.concluirEdicao(agendamentoId));
     }
 
+    @PatchMapping("/{agendamentoId}/publicar-loja")
+    @Operation(summary = "Publicar fotos aprovadas na loja virtual (fotógrafo)")
+    public ResponseEntity<EdicaoResponse> publicarLoja(@PathVariable UUID agendamentoId) {
+        return ResponseEntity.ok(edicaoService.publicarLoja(agendamentoId));
+    }
+
     @PatchMapping("/{agendamentoId}/publicar")
     @Operation(summary = "Publicar fotos editadas no ecommerce")
     public ResponseEntity<List<FotoEdicaoResponse>> publicarNoEcommerce(@PathVariable UUID agendamentoId) {
@@ -166,6 +172,14 @@ public class EdicaoController {
         var observacoes = body.getOrDefault("observacoes", "");
         var response = edicaoService.atualizarObservacoes(agendamentoId, observacoes);
         return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/fotos/{fotoId}/revisao")
+    @Operation(summary = "Revisar foto (aprovar/rejeitar + comentário)")
+    public ResponseEntity<FotoEdicaoResponse> revisarFoto(
+            @PathVariable UUID fotoId,
+            @RequestBody RevisaoRequest request) {
+        return ResponseEntity.ok(edicaoService.revisarFoto(fotoId, request));
     }
 
     @PatchMapping("/fotos/reordenar")

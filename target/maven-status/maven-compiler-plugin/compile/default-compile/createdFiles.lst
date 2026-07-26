@@ -1,4 +1,5 @@
 com/photoizer/crm/edicao/api/EdicaoResponse.class
+com/photoizer/crm/notificacao/api/NotificacaoController.class
 com/photoizer/crm/pacote/exception/PacoteNaoEncontradoException.class
 com/photoizer/crm/cliente/model/OrigemCliente.class
 com/photoizer/crm/agenda/event/AgendamentoCanceladoEvent.class
@@ -23,6 +24,7 @@ com/photoizer/crm/ecommerce/model/ItemCarrinho$ItemCarrinhoBuilder.class
 com/photoizer/crm/edicao/repository/FotoEdicaoRepository.class
 com/photoizer/crm/ecommerce/api/AdminEcommerceController.class
 com/photoizer/crm/edicao/repository/EdicaoRepository.class
+com/photoizer/crm/ecommerce/exception/TokenExpiradoException.class
 com/photoizer/crm/agenda/api/AgendamentoController.class
 com/photoizer/crm/indicador/model/Indicador$IndicadorBuilder.class
 com/photoizer/crm/financeiro/api/FinanceiroResumoResponse.class
@@ -53,6 +55,7 @@ com/photoizer/crm/auth/api/UserController.class
 com/photoizer/crm/auth/config/JwtTokenProvider.class
 com/photoizer/crm/cliente/repository/ClienteRepository.class
 com/photoizer/crm/ecommerce/model/Sessao$SessaoBuilderImpl.class
+com/photoizer/crm/notificacao/repository/NotificacaoRepository.class
 com/photoizer/crm/dashboard/api/DashboardEcommerceMensalResponse.class
 com/photoizer/crm/ecommerce/api/CarrinhoItemResponse.class
 com/photoizer/crm/despesa/model/Despesa$DespesaBuilder.class
@@ -162,6 +165,7 @@ com/photoizer/crm/dashboard/api/DashboardEcommerceMensalResponse$DadosEcommerceM
 com/photoizer/crm/agenda/api/DisponibilidadeResponse.class
 com/photoizer/crm/comissao/model/Indicacao$IndicacaoBuilderImpl.class
 com/photoizer/crm/shared/storage/LocalFileStorageService.class
+com/photoizer/crm/notificacao/model/Notificacao.class
 com/photoizer/crm/dashboard/api/DashboardMensalResponse.class
 com/photoizer/crm/agenda/api/TarefaResponse.class
 com/photoizer/crm/agenda/api/TarefaController.class
@@ -176,6 +180,7 @@ com/photoizer/crm/foto/api/FotoMetadataRequest.class
 com/photoizer/crm/dashboard/api/DashboardEcommerceResponse.class
 com/photoizer/crm/dashboard/service/DashboardService$CompraAgg.class
 com/photoizer/crm/agenda/event/PagamentoFinalRegistradoEvent.class
+com/photoizer/crm/edicao/api/RevisaoRequest.class
 com/photoizer/crm/config/model/Configuracao.class
 com/photoizer/crm/edicao/model/Edicao$EdicaoBuilderImpl.class
 com/photoizer/crm/pacote/model/Pacote.class
@@ -188,6 +193,7 @@ com/photoizer/crm/ecommerce/repository/FavoritoRepository.class
 com/photoizer/crm/agenda/model/Tarefa.class
 com/photoizer/crm/shared/config/OpenApiConfig.class
 com/photoizer/crm/ecommerce/api/CarrinhoResponse.class
+com/photoizer/crm/notificacao/scheduler/LembreteAgendamentoJob.class
 com/photoizer/crm/financeiro/api/FinanceiroPreviewResponse.class
 com/photoizer/crm/cliente/api/ClienteRegistroRequest.class
 com/photoizer/crm/agenda/api/DisponibilidadeResponse$Conflito.class
@@ -229,6 +235,7 @@ com/photoizer/crm/financeiro/model/Pagamento$PagamentoBuilderImpl.class
 com/photoizer/crm/config/repository/ConfiguracaoRepository.class
 com/photoizer/crm/ecommerce/model/StatusCompraExtra.class
 com/photoizer/crm/shared/exception/ErrorResponse$FieldError.class
+com/photoizer/crm/edicao/exception/FotoSemRawException.class
 com/photoizer/crm/agenda/repository/TarefaRepository.class
 com/photoizer/crm/indicador/service/IndicadorService.class
 com/photoizer/crm/comissao/service/IndicacaoListener.class

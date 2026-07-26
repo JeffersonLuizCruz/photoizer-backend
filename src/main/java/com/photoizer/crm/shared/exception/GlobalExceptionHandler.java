@@ -14,7 +14,9 @@ import com.photoizer.crm.cliente.exception.ClienteNaoEncontradoException;
 import com.photoizer.crm.comissao.exception.IndicacaoNaoEncontradaException;
 import com.photoizer.crm.edicao.exception.EdicaoNaoEncontradaException;
 import com.photoizer.crm.edicao.exception.FotoEdicaoNaoEncontradaException;
+import com.photoizer.crm.edicao.exception.FotoSemRawException;
 import com.photoizer.crm.edicao.exception.StatusEdicaoInvalidoException;
+import com.photoizer.crm.ecommerce.exception.TokenExpiradoException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -99,10 +101,22 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, e);
     }
 
+    @ExceptionHandler(FotoSemRawException.class)
+    public ResponseEntity<ErrorResponse> handleFotoSemRaw(FotoSemRawException e) {
+        log.warn("Foto sem RAW correspondente: {}", e.getMessage());
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
+    }
+
     @ExceptionHandler(StatusEdicaoInvalidoException.class)
     public ResponseEntity<ErrorResponse> handleStatusEdicaoInvalido(StatusEdicaoInvalidoException e) {
         log.warn("Status de edicao invalido: {}", e.getMessage());
         return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
+    }
+
+    @ExceptionHandler(TokenExpiradoException.class)
+    public ResponseEntity<ErrorResponse> handleTokenExpirado(TokenExpiradoException e) {
+        log.warn("Token da galeria expirado: {}", e.getMessage());
+        return build(HttpStatus.GONE, e);
     }
 
     @ExceptionHandler(BadCredentialsException.class)

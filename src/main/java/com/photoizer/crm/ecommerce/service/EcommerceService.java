@@ -5,6 +5,7 @@ import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.config.service.ConfiguracaoService;
 import com.photoizer.crm.ecommerce.api.AdminCompraDetalheResponse;
 import com.photoizer.crm.ecommerce.api.AdminComprasRelatorioResponse;
+import com.photoizer.crm.ecommerce.exception.TokenExpiradoException;
 import com.photoizer.crm.ecommerce.api.CalculoCarrinhoResponse;
 import com.photoizer.crm.ecommerce.api.CalculoItemResponse;
 import com.photoizer.crm.ecommerce.event.CompraExtraConfirmadaEvent;
@@ -102,8 +103,12 @@ public class EcommerceService {
 
     @Transactional(readOnly = true)
     public Agendamento buscarAgendamentoPorToken(UUID token) {
-        return agendamentoRepository.findByTokenGaleria(token)
+        var agendamento = agendamentoRepository.findByTokenGaleria(token)
             .orElseThrow(() -> new RuntimeException("Galeria não encontrada"));
+        if (agendamento.getTokenExpiracao() != null && agendamento.getTokenExpiracao().isBefore(LocalDateTime.now())) {
+            throw new TokenExpiradoException("O link da galeria expirou. Solicite um novo link ao fotógrafo.");
+        }
+        return agendamento;
     }
 
     @Transactional(readOnly = true)
@@ -428,6 +433,7 @@ public class EcommerceService {
             .orElseThrow(() -> new RuntimeException("Agendamento não encontrado"));
         var novoToken = UUID.randomUUID();
         agendamento.setTokenGaleria(novoToken);
+        agendamento.setTokenExpiracao(LocalDateTime.now().plusDays(15));
         agendamentoRepository.save(agendamento);
         return novoToken;
     }

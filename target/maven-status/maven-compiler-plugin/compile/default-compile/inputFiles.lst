@@ -116,6 +116,7 @@
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/ecommerce/api/SessaoResponse.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/ecommerce/event/CompraExtraConfirmadaEvent.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/ecommerce/event/CompraExtraCriadaEvent.java
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/ecommerce/exception/TokenExpiradoException.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/ecommerce/listener/EcommerceEventListener.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/ecommerce/model/Avaliacao.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/ecommerce/model/CompraExtra.java
@@ -138,12 +139,14 @@
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/edicao/api/EdicaoController.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/edicao/api/EdicaoResponse.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/edicao/api/FotoEdicaoResponse.java
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/edicao/api/RevisaoRequest.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/edicao/api/ZipJobResponse.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/edicao/event/EdicaoConcluidaEvent.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/edicao/event/FotosPublicadasEvent.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/edicao/event/RawEnviadosEvent.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/edicao/exception/EdicaoNaoEncontradaException.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/edicao/exception/FotoEdicaoNaoEncontradaException.java
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/edicao/exception/FotoSemRawException.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/edicao/exception/StatusEdicaoInvalidoException.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/edicao/listener/EdicaoListener.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/edicao/model/Edicao.java
@@ -179,8 +182,12 @@
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/indicador/model/Indicador.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/indicador/repository/IndicadorRepository.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/indicador/service/IndicadorService.java
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/notificacao/api/NotificacaoController.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/notificacao/listener/AlertaPrazoListener.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/notificacao/listener/LembreteEnsaioListener.java
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/notificacao/model/Notificacao.java
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/notificacao/repository/NotificacaoRepository.java
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/notificacao/scheduler/LembreteAgendamentoJob.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/notificacao/service/NotificacaoService.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/pacote/api/PacoteController.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/pacote/api/PacoteRequest.java

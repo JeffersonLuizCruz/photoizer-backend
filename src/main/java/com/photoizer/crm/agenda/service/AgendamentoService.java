@@ -22,6 +22,7 @@ import com.photoizer.crm.cliente.exception.ClienteNaoEncontradoException;
 import com.photoizer.crm.cliente.model.Cliente;
 import com.photoizer.crm.cliente.model.OrigemCliente;
 import com.photoizer.crm.cliente.repository.ClienteRepository;
+import com.photoizer.crm.config.service.ConfiguracaoService;
 import com.photoizer.crm.shared.storage.FileStorageService;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -58,6 +59,7 @@ public class AgendamentoService {
     private final FileStorageService fileStorageService;
     private final ApplicationEventPublisher eventPublisher;
     private final FotoEnsaioRepository fotoEnsaioRepository;
+    private final ConfiguracaoService configuracaoService;
 
     public AgendamentoService(ClienteRepository clienteRepository,
                               PacoteRepository pacoteRepository,
@@ -65,7 +67,8 @@ public class AgendamentoService {
                               AgendamentoRepository agendamentoRepository,
                               FileStorageService fileStorageService,
                               ApplicationEventPublisher eventPublisher,
-                              FotoEnsaioRepository fotoEnsaioRepository) {
+                              FotoEnsaioRepository fotoEnsaioRepository,
+                              ConfiguracaoService configuracaoService) {
         this.clienteRepository = clienteRepository;
         this.pacoteRepository = pacoteRepository;
         this.userRepository = userRepository;
@@ -73,6 +76,7 @@ public class AgendamentoService {
         this.fileStorageService = fileStorageService;
         this.eventPublisher = eventPublisher;
         this.fotoEnsaioRepository = fotoEnsaioRepository;
+        this.configuracaoService = configuracaoService;
     }
 
     public Agendamento criarAgendamento(CriarAgendamentoCommand command) {
@@ -97,13 +101,16 @@ public class AgendamentoService {
         }
 
         var duracao = command.duracaoMinutos() != null ? command.duracaoMinutos() : 60;
-        var taxaDeslocamento = command.taxaDeslocamento() != null ? command.taxaDeslocamento() : BigDecimal.ZERO;
+        var taxaDeslocamentoPadrao = configuracaoService.getValorDecimal("taxaDeslocamentoPadrao", BigDecimal.ZERO);
+        var taxaDeslocamento = command.taxaDeslocamento() != null ? command.taxaDeslocamento() : taxaDeslocamentoPadrao;
         var autorizaUsoImagem = command.autorizaUsoImagem() != null ? command.autorizaUsoImagem() : false;
 
         validarConflitoAgenda(pacote, dataHoraEnsaio, duracao, command.localEnsaio());
 
+        var percentualEntrada = configuracaoService.getValorDecimal("percentualEntrada", new BigDecimal("30.00"));
+        var fatorEntrada = percentualEntrada.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
         var valorTotal = pacote.getValorBase().add(taxaDeslocamento);
-        var valorEntradaExigido = pacote.getValorBase().multiply(new BigDecimal("0.30"))
+        var valorEntradaExigido = pacote.getValorBase().multiply(fatorEntrada)
             .setScale(2, RoundingMode.HALF_UP);
         var valorEntradaPago = valorEntradaExigido;
         var valorRestante = valorTotal.subtract(valorEntradaPago);
@@ -127,6 +134,7 @@ public class AgendamentoService {
             .valorExtras(valorExtras)
             .taxaDeslocamento(taxaDeslocamento)
             .valorTotalFinal(valorTotalFinal)
+            .percentualEntrada(percentualEntrada)
             .status(StatusAgendamento.CONFIRMADO)
             .dataConfirmacao(LocalDateTime.now())
             .urlComprovanteEntrada(urlComprovante)
@@ -136,6 +144,7 @@ public class AgendamentoService {
             .ensaioDestaque(false)
             .observacoes(command.observacoes())
             .tokenGaleria(UUID.randomUUID())
+            .tokenExpiracao(LocalDateTime.now().plusDays(15))
             .build();
 
         agendamento = agendamentoRepository.save(agendamento);
@@ -288,10 +297,13 @@ public class AgendamentoService {
         var duracao = agendamento.getDuracaoMinutos();
         validarConflitoAgenda(pacote, request.dataHoraEnsaio(), duracao, request.localEnsaio(), agendamento.getId());
 
-        var taxaDeslocamento = request.taxaDeslocamento() != null ? request.taxaDeslocamento() : BigDecimal.ZERO;
+        var taxaDeslocamento = request.taxaDeslocamento() != null ? request.taxaDeslocamento()
+            : configuracaoService.getValorDecimal("taxaDeslocamentoPadrao", BigDecimal.ZERO);
 
+        var percentualEntrada = configuracaoService.getValorDecimal("percentualEntrada", new BigDecimal("30.00"));
+        var fatorEntrada = percentualEntrada.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
         var novoValorTotal = pacote.getValorBase().add(taxaDeslocamento);
-        var novoValorEntradaExigido = pacote.getValorBase().multiply(new BigDecimal("0.30"))
+        var novoValorEntradaExigido = pacote.getValorBase().multiply(fatorEntrada)
             .setScale(2, RoundingMode.HALF_UP);
         var novoValorRestante = novoValorTotal.subtract(agendamento.getValorEntradaPago());
         var novoValorTotalFinal = novoValorTotal.add(agendamento.getValorExtras());
@@ -307,6 +319,7 @@ public class AgendamentoService {
 
         agendamento.setValorTotal(novoValorTotal);
         agendamento.setValorEntradaExigido(novoValorEntradaExigido);
+        agendamento.setPercentualEntrada(percentualEntrada);
         agendamento.setValorRestante(novoValorRestante);
         agendamento.setValorTotalFinal(novoValorTotalFinal);
 

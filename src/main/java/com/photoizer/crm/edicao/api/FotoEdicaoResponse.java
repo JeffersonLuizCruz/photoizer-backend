@@ -16,7 +16,9 @@ public record FotoEdicaoResponse(
     String editedPreviewUrl,
     String status,
     int ordem,
-    LocalDateTime createdAt
+    LocalDateTime createdAt,
+    Boolean aprovado,
+    String comentario
 ) {
     public static FotoEdicaoResponse of(FotoEdicao f) {
         var fotoBase = "/api/v1/edicao/fotos/" + f.getId();
@@ -31,7 +33,9 @@ public record FotoEdicaoResponse(
             f.getEditedPath() != null ? fotoBase + "/edited-preview" : null,
             f.getStatus().name(),
             f.getOrdem(),
-            f.getCreatedAt()
+            f.getCreatedAt(),
+            f.getAprovado(),
+            f.getComentario()
         );
     }
 }

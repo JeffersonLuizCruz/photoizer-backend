@@ -6,6 +6,7 @@ public record FinanceiroPreviewResponse(
     BigDecimal valorTotal,
     BigDecimal valorEntradaExigido,
     BigDecimal valorRestante,
-    BigDecimal valorTotalFinal
+    BigDecimal valorTotalFinal,
+    BigDecimal percentualEntrada
 ) {
 }
