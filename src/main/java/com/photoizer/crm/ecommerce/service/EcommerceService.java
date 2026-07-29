@@ -130,20 +130,6 @@ public class EcommerceService {
 
     public List<FotoEnsaio> selecionarFotos(UUID token, List<UUID> fotoIds, boolean selecionada) {
         var agendamento = buscarAgendamentoPorToken(token);
-        var pacote = agendamento.getPacote();
-
-        if (selecionada) {
-            var atualmenteSelecionadas = fotoEnsaioRepository.findByAgendamentoIdOrderByOrdemAsc(
-                agendamento.getId()).stream()
-                .filter(FotoEnsaio::isSelecionadaPacote)
-                .count();
-
-            if (atualmenteSelecionadas + fotoIds.size() > pacote.getQuantidadeFotos()) {
-                throw new IllegalArgumentException(
-                    "Limite de " + pacote.getQuantidadeFotos() + " fotos do pacote excedido");
-            }
-        }
-
         var fotos = fotoEnsaioRepository.findAllById(fotoIds);
         for (var foto : fotos) {
             if (!foto.getAgendamentoId().equals(agendamento.getId())) continue;
