@@ -26,7 +26,8 @@ public record FotoEnsaioResponse(
     LocalDate dataSessao,
     String metadataExif,
     boolean destaque,
-    UUID fotoEdicaoId
+    UUID fotoEdicaoId,
+    boolean visivel
 ) {
     public static FotoEnsaioResponse of(FotoEnsaio f) {
         return new FotoEnsaioResponse(
@@ -48,7 +49,8 @@ public record FotoEnsaioResponse(
             f.getDataSessao(),
             f.getMetadataExif(),
             f.isDestaque(),
-            f.getFotoEdicaoId()
+            f.getFotoEdicaoId(),
+            f.isVisivel()
         );
     }
 }

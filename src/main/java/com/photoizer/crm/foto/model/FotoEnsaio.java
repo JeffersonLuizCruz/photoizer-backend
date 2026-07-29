@@ -92,4 +92,7 @@ public class FotoEnsaio extends BaseEntity {
 
     @Column
     private UUID fotoEdicaoId;
+
+    @Column
+    private boolean visivel = true;
 }

@@ -311,6 +311,7 @@ public class EdicaoService {
                 .ordem(count + i)
                 .status(StatusFoto.PUBLICADA)
                 .selecionadaPacote(false)
+                .visivel(true)
                 .build();
 
             fotoEnsaioRepository.save(fotoEnsaio);
@@ -387,6 +388,7 @@ public class EdicaoService {
                     .ordem((int) count)
                     .status(StatusFoto.INEDITA)
                     .selecionadaPacote(false)
+                    .visivel(true)
                     .build();
                 fotoEnsaioRepository.save(ensaio);
             }

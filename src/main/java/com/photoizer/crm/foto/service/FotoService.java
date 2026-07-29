@@ -102,6 +102,7 @@ public class FotoService {
                 .ordem(count + i)
                 .status(StatusFoto.INEDITA)
                 .selecionadaPacote(false)
+                .visivel(true)
                 .build();
 
             fotos.add(fotoEnsaioRepository.save(foto));
@@ -144,6 +145,61 @@ public class FotoService {
         if (request.categoria() != null) foto.setCategoria(request.categoria());
         if (request.dataSessao() != null) foto.setDataSessao(request.dataSessao());
         if (request.destaque() != null) foto.setDestaque(request.destaque());
+        return fotoEnsaioRepository.save(foto);
+    }
+
+    public FotoEnsaio alterarVisibilidade(UUID agendamentoId, UUID fotoId, boolean visivel) {
+        var foto = buscarPorId(fotoId);
+        if (!foto.getAgendamentoId().equals(agendamentoId)) {
+            throw new RuntimeException("Foto não pertence a este agendamento");
+        }
+        foto.setVisivel(visivel);
+        return fotoEnsaioRepository.save(foto);
+    }
+
+    public FotoEnsaio alterarStatus(UUID agendamentoId, UUID fotoId, StatusFoto status) {
+        var foto = buscarPorId(fotoId);
+        if (!foto.getAgendamentoId().equals(agendamentoId)) {
+            throw new RuntimeException("Foto não pertence a este agendamento");
+        }
+        foto.setStatus(status);
+        return fotoEnsaioRepository.save(foto);
+    }
+
+    public FotoEnsaio substituirImagem(UUID agendamentoId, UUID fotoId, MultipartFile arquivo) {
+        var foto = buscarPorId(fotoId);
+        if (!foto.getAgendamentoId().equals(agendamentoId)) {
+            throw new RuntimeException("Foto não pertence a este agendamento");
+        }
+
+        deletarArquivo(foto.getOriginalPath());
+        deletarArquivo(foto.getWatermarkedPath());
+        deletarArquivo(foto.getThumbPath());
+
+        var originalPath = fileStorageService.salvarEmSubdiretorio(arquivo, agendamentoId, "orig");
+        var original = Path.of(originalPath);
+        var targetDir = original.getParent();
+
+        String watermarkedPath;
+        String thumbPath;
+        try {
+            var wm = imageProcessingService.aplicarMarcaDagua(original, targetDir, TEXTO_MARCA_DAGUA, OPACIDADE_MARCA);
+            watermarkedPath = wm.toString();
+        } catch (Exception e) {
+            watermarkedPath = originalPath;
+        }
+        try {
+            var thumb = imageProcessingService.gerarThumbnail(original, targetDir);
+            thumbPath = thumb.toString();
+        } catch (Exception e) {
+            thumbPath = originalPath;
+        }
+
+        foto.setOriginalPath(originalPath);
+        foto.setWatermarkedPath(watermarkedPath);
+        foto.setThumbPath(thumbPath);
+        foto.setFileName(arquivo.getOriginalFilename());
+
         return fotoEnsaioRepository.save(foto);
     }
 

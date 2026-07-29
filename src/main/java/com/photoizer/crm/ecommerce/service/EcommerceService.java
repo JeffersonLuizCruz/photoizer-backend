@@ -124,8 +124,8 @@ public class EcommerceService {
     @Transactional(readOnly = true)
     public List<FotoEnsaio> listarFotosPublicadas(UUID token) {
         var agendamento = buscarAgendamentoPorToken(token);
-        return fotoEnsaioRepository.findByAgendamentoIdAndStatusOrderByOrdemAsc(
-            agendamento.getId(), StatusFoto.PUBLICADA);
+        return fotoEnsaioRepository.findPublicadasVisiveisByAgendamentoId(
+            agendamento.getId());
     }
 
     public List<FotoEnsaio> selecionarFotos(UUID token, List<UUID> fotoIds, boolean selecionada) {

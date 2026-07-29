@@ -31,4 +31,7 @@ public interface FotoEnsaioRepository extends JpaRepository<FotoEnsaio, UUID> {
     List<FotoEnsaio> findByAgendamentoIdAndTagsContaining(UUID agendamentoId, String tag);
 
     Optional<FotoEnsaio> findByFotoEdicaoId(UUID fotoEdicaoId);
+
+    @Query("SELECT f FROM FotoEnsaio f WHERE f.agendamentoId = :agendamentoId AND f.status = 'PUBLICADA' AND f.visivel = true ORDER BY f.ordem ASC")
+    List<FotoEnsaio> findPublicadasVisiveisByAgendamentoId(@Param("agendamentoId") UUID agendamentoId);
 }

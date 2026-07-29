@@ -1,5 +1,6 @@
 package com.photoizer.crm.foto.api;
 
+import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.service.FotoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -104,5 +106,38 @@ public class FotoController {
     public ResponseEntity<Void> deletar(@PathVariable UUID fotoId) {
         fotoService.deletar(fotoId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{fotoId}/visibilidade")
+    @Operation(summary = "Alterar visibilidade da foto na loja")
+    public ResponseEntity<FotoEnsaioResponse> alterarVisibilidade(
+            @PathVariable UUID agendamentoId,
+            @PathVariable UUID fotoId,
+            @RequestParam boolean visivel) {
+        var foto = fotoService.alterarVisibilidade(agendamentoId, fotoId, visivel);
+        return ResponseEntity.ok(FotoEnsaioResponse.of(foto));
+    }
+
+    @PatchMapping("/{fotoId}/status")
+    @Operation(summary = "Alterar status individual da foto")
+    public ResponseEntity<FotoEnsaioResponse> alterarStatus(
+            @PathVariable UUID agendamentoId,
+            @PathVariable UUID fotoId,
+            @RequestParam StatusFoto status) {
+        var foto = fotoService.alterarStatus(agendamentoId, fotoId, status);
+        return ResponseEntity.ok(FotoEnsaioResponse.of(foto));
+    }
+
+    @PutMapping("/{fotoId}/imagem")
+    @Operation(summary = "Substituir arquivo de imagem da foto")
+    public ResponseEntity<FotoEnsaioResponse> substituirImagem(
+            @PathVariable UUID agendamentoId,
+            @PathVariable UUID fotoId,
+            @RequestParam("arquivo") MultipartFile arquivo) {
+        if (arquivo == null || arquivo.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+        var foto = fotoService.substituirImagem(agendamentoId, fotoId, arquivo);
+        return ResponseEntity.ok(FotoEnsaioResponse.of(foto));
     }
 }
