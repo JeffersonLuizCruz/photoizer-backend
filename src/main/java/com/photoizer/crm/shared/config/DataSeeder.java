@@ -5,28 +5,43 @@ import com.photoizer.crm.auth.model.User;
 import com.photoizer.crm.auth.repository.UserRepository;
 import com.photoizer.crm.config.model.Configuracao;
 import com.photoizer.crm.config.repository.ConfiguracaoRepository;
+import com.photoizer.crm.indicador.repository.IndicadorRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Component
 public class DataSeeder implements CommandLineRunner {
 
+    private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
+
     private final UserRepository userRepository;
     private final ConfiguracaoRepository configuracaoRepository;
     private final PasswordEncoder passwordEncoder;
+    private final IndicadorRepository indicadorRepository;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public DataSeeder(UserRepository userRepository,
                       ConfiguracaoRepository configuracaoRepository,
-                      PasswordEncoder passwordEncoder) {
+                      PasswordEncoder passwordEncoder,
+                      IndicadorRepository indicadorRepository) {
         this.userRepository = userRepository;
         this.configuracaoRepository = configuracaoRepository;
         this.passwordEncoder = passwordEncoder;
+        this.indicadorRepository = indicadorRepository;
     }
 
     @Override
+    @Transactional
     public void run(String... args) {
         if (userRepository.count() == 0) {
             userRepository.saveAll(List.of(
@@ -58,6 +73,28 @@ public class DataSeeder implements CommandLineRunner {
             c6.setChave("notificarAutomaticamente");
             c6.setValor("true");
             configuracaoRepository.saveAll(List.of(c1, c2, c3, c4, c5, c6));
+        }
+
+        limparIndicadoresDuplicados();
+    }
+
+    private void limparIndicadoresDuplicados() {
+        var duplicados = entityManager.createQuery(
+            "SELECT i.telefone FROM Indicador i GROUP BY i.telefone HAVING COUNT(i) > 1",
+            String.class
+        ).getResultList();
+
+        if (!duplicados.isEmpty()) {
+            for (var telefone : duplicados) {
+                var indicadores = indicadorRepository.findByTelefone(telefone);
+                var manter = indicadores.getFirst();
+                for (var i = 1; i < indicadores.size(); i++) {
+                    indicadorRepository.delete(indicadores.get(i));
+                }
+                log.warn("Indicadores duplicados com telefone {}: mantido ID {} ({}), removidos {} registro(s)",
+                    telefone, manter.getId(), manter.getNome(), indicadores.size() - 1);
+            }
+            log.info("Limpeza de indicadores duplicados concluída: {} telefone(s) com duplicatas", duplicados.size());
         }
     }
 }

@@ -29,6 +29,8 @@ public record AgendamentoResponse(
     BigDecimal valorRestante,
     BigDecimal valorExtras,
     BigDecimal taxaDeslocamento,
+    BigDecimal custoDeslocamento,
+    Boolean repassarDeslocamento,
     BigDecimal valorTotalFinal,
     BigDecimal percentualEntrada,
     BigDecimal valorPacote,
@@ -48,7 +50,10 @@ public record AgendamentoResponse(
     String observacoes,
     UUID tokenGaleria,
     LocalDateTime createdAt,
-    LocalDateTime updatedAt
+    LocalDateTime updatedAt,
+    BigDecimal valorComissao,
+    String indicadorNome,
+    String statusComissao
 ) {
     public static AgendamentoResponse of(Agendamento a) {
         var valorPacote = a.getValorTotal().subtract(a.getTaxaDeslocamento());
@@ -76,6 +81,8 @@ public record AgendamentoResponse(
             a.getValorRestante(),
             a.getValorExtras(),
             a.getTaxaDeslocamento(),
+            a.getCustoDeslocamento() != null ? a.getCustoDeslocamento() : BigDecimal.ZERO,
+            a.getRepassarDeslocamento() != null ? a.getRepassarDeslocamento() : true,
             a.getValorTotalFinal(),
             a.getPercentualEntrada() != null ? a.getPercentualEntrada() : BigDecimal.valueOf(30),
             valorPacote,
@@ -95,7 +102,64 @@ public record AgendamentoResponse(
             a.getObservacoes(),
             a.getTokenGaleria(),
             a.getCreatedAt(),
-            a.getUpdatedAt()
+            a.getUpdatedAt(),
+            null,
+            null,
+            null
+        );
+    }
+
+    public static AgendamentoResponse of(Agendamento a, BigDecimal valorComissao, String indicadorNome, String statusComissao) {
+        var valorPacote = a.getValorTotal().subtract(a.getTaxaDeslocamento());
+        var saldoDevedor = a.getValorTotalFinal().subtract(a.getValorEntradaPago());
+        return new AgendamentoResponse(
+            a.getId(),
+            a.getCliente().getId(),
+            a.getCliente().getNome(),
+            a.getCliente().getTelefone(),
+            a.getCliente().getEmail(),
+            a.getCliente().getCpf(),
+            a.getCliente().getCidade(),
+            a.getCliente().getEstado(),
+            a.getPacote().getId(),
+            a.getPacote().getNome(),
+            a.getEditor() != null ? a.getEditor().getId() : null,
+            a.getEditor() != null ? a.getEditor().getNome() : null,
+            a.getDataHoraEnsaio(),
+            a.getDuracaoMinutos(),
+            a.getLocalEnsaio(),
+            a.getEnderecoCompleto(),
+            a.getValorTotal(),
+            a.getValorEntradaExigido(),
+            a.getValorEntradaPago(),
+            a.getValorRestante(),
+            a.getValorExtras(),
+            a.getTaxaDeslocamento(),
+            a.getCustoDeslocamento() != null ? a.getCustoDeslocamento() : BigDecimal.ZERO,
+            a.getRepassarDeslocamento() != null ? a.getRepassarDeslocamento() : true,
+            a.getValorTotalFinal(),
+            a.getPercentualEntrada() != null ? a.getPercentualEntrada() : BigDecimal.valueOf(30),
+            valorPacote,
+            saldoDevedor,
+            a.getStatus().name(),
+            a.getDataConfirmacao(),
+            a.getDataRealizacao(),
+            a.getDataEnvioSelecao(),
+            a.getDataEntregaFinal(),
+            a.getDataFinalizacao(),
+            a.getUrlComprovanteEntrada(),
+            a.getUrlComprovanteFinal(),
+            a.getAutorizaUsoImagem(),
+            a.getClausulasPersonalizadas(),
+            a.getContratoGerado(),
+            a.getEnsaioDestaque(),
+            a.getObservacoes(),
+            a.getTokenGaleria(),
+            a.getCreatedAt(),
+            a.getUpdatedAt(),
+            valorComissao,
+            indicadorNome,
+            statusComissao
         );
     }
 }

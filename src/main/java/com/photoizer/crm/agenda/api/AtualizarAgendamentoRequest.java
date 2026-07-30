@@ -16,6 +16,8 @@ public record AtualizarAgendamentoRequest(
     String enderecoCompleto,
     UUID editorId,
     @NotNull @PositiveOrZero BigDecimal taxaDeslocamento,
+    @PositiveOrZero BigDecimal custoDeslocamento,
+    Boolean repassarDeslocamento,
     Boolean autorizaUsoImagem,
     String observacoes
 ) {}

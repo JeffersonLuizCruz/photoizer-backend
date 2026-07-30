@@ -3,6 +3,7 @@ package com.photoizer.crm.comissao.service;
 import com.photoizer.crm.agenda.event.AgendamentoCanceladoEvent;
 import com.photoizer.crm.agenda.event.AgendamentoCriadoEvent;
 import com.photoizer.crm.agenda.event.PagamentoFinalRegistradoEvent;
+import com.photoizer.crm.config.service.ConfiguracaoService;
 import com.photoizer.crm.indicador.service.IndicadorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,11 +20,14 @@ public class IndicacaoListener {
 
     private final IndicacaoService indicacaoService;
     private final IndicadorService indicadorService;
+    private final ConfiguracaoService configuracaoService;
 
     public IndicacaoListener(IndicacaoService indicacaoService,
-                             IndicadorService indicadorService) {
+                              IndicadorService indicadorService,
+                              ConfiguracaoService configuracaoService) {
         this.indicacaoService = indicacaoService;
         this.indicadorService = indicadorService;
+        this.configuracaoService = configuracaoService;
     }
 
     @EventListener
@@ -32,10 +36,14 @@ public class IndicacaoListener {
         if (event.indicadorNome() == null || event.indicadorNome().isBlank()) return;
         if (event.indicadorTelefone() == null || event.indicadorTelefone().isBlank()) return;
 
-        var percentual = event.percentualComissao() != null ? event.percentualComissao() : BigDecimal.TEN;
-        log.info("Criando indicação (PACOTE) para agendamento {}: indicador={}", event.agendamentoId(), event.indicadorNome());
-
         var indicador = indicadorService.buscarOuCriar(event.indicadorNome(), event.indicadorTelefone());
+
+        var percentual = indicador.getPercentualComissao() != null
+            ? indicador.getPercentualComissao()
+            : configuracaoService.getValorDecimal("percentualComissao", BigDecimal.TEN);
+
+        log.info("Criando indicação (PACOTE) para agendamento {}: indicador={}, percentual={}%",
+            event.agendamentoId(), event.indicadorNome(), percentual);
 
         indicacaoService.criar(
             event.agendamentoId(),

@@ -10,13 +10,14 @@ public record IndicadorResponse(
     String nome,
     String telefone,
     String observacoes,
+    BigDecimal percentualComissao,
     BigDecimal totalPendente,
     BigDecimal totalPago,
     long totalIndicacoes
 ) {
     public static IndicadorResponse of(Indicador i, BigDecimal totalPendente, BigDecimal totalPago, long totalIndicacoes) {
         return new IndicadorResponse(
-            i.getId(), i.getNome(), i.getTelefone(), i.getObservacoes(),
+            i.getId(), i.getNome(), i.getTelefone(), i.getObservacoes(), i.getPercentualComissao(),
             totalPendente, totalPago, totalIndicacoes
         );
     }

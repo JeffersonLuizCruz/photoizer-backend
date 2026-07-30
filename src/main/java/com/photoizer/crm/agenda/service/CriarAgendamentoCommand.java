@@ -25,6 +25,8 @@ public record CriarAgendamentoCommand(
     String localEnsaio,
     String enderecoCompleto,
     BigDecimal taxaDeslocamento,
+    BigDecimal custoDeslocamento,
+    Boolean repassarDeslocamento,
     MultipartFile comprovanteEntrada,
     Boolean autorizaUsoImagem,
     String clausulasPersonalizadas,

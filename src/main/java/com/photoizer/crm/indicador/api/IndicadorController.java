@@ -13,9 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/indicadores")
@@ -26,7 +24,7 @@ public class IndicadorController {
     private final IndicacaoRepository indicacaoRepository;
 
     public IndicadorController(IndicadorService indicadorService,
-                               IndicacaoRepository indicacaoRepository) {
+                                IndicacaoRepository indicacaoRepository) {
         this.indicadorService = indicadorService;
         this.indicacaoRepository = indicacaoRepository;
     }
@@ -52,7 +50,7 @@ public class IndicadorController {
     @PostMapping
     @Operation(summary = "Criar novo indicador")
     public ResponseEntity<IndicadorResponse> criar(@Valid @RequestBody IndicadorRequest request) {
-        var indicador = indicadorService.criar(request.nome(), request.telefone(), request.observacoes());
+        var indicador = indicadorService.criar(request.nome(), request.telefone(), request.observacoes(), request.percentualComissao());
         return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(indicador));
     }
 
@@ -61,7 +59,7 @@ public class IndicadorController {
     public ResponseEntity<IndicadorResponse> atualizar(
             @PathVariable UUID id,
             @Valid @RequestBody IndicadorRequest request) {
-        var indicador = indicadorService.atualizar(id, request.nome(), request.telefone(), request.observacoes());
+        var indicador = indicadorService.atualizar(id, request.nome(), request.telefone(), request.observacoes(), request.percentualComissao());
         return ResponseEntity.ok(toResponse(indicador));
     }
 

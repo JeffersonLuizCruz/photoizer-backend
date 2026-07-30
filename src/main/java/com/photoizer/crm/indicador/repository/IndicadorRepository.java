@@ -13,6 +13,8 @@ public interface IndicadorRepository extends JpaRepository<Indicador, UUID> {
 
     Optional<Indicador> findByNomeAndTelefone(String nome, String telefone);
 
+    List<Indicador> findByTelefone(String telefone);
+
     @Query("SELECT i FROM Indicador i WHERE " +
            "LOWER(i.nome) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
            "i.telefone LIKE CONCAT('%', :search, '%') " +

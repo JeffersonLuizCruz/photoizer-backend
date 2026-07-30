@@ -3,6 +3,7 @@ package com.photoizer.crm.agenda.api;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.service.AgendamentoService;
 import com.photoizer.crm.agenda.service.CriarAgendamentoCommand;
+import com.photoizer.crm.comissao.repository.IndicacaoRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -40,9 +41,12 @@ import java.util.UUID;
 public class AgendamentoController {
 
     private final AgendamentoService agendamentoService;
+    private final IndicacaoRepository indicacaoRepository;
 
-    public AgendamentoController(AgendamentoService agendamentoService) {
+    public AgendamentoController(AgendamentoService agendamentoService,
+                                  IndicacaoRepository indicacaoRepository) {
         this.agendamentoService = agendamentoService;
+        this.indicacaoRepository = indicacaoRepository;
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -71,6 +75,8 @@ public class AgendamentoController {
             @RequestParam String localEnsaio,
             @RequestParam(required = false) String enderecoCompleto,
             @RequestParam(required = false) String taxaDeslocamento,
+            @RequestParam(required = false) String custoDeslocamento,
+            @RequestParam(required = false) String repassarDeslocamento,
             @RequestParam(required = false) MultipartFile comprovanteEntrada,
             @RequestParam(required = false) String autorizaUsoImagem,
             @RequestParam(required = false) String clausulasPersonalizadas,
@@ -85,6 +91,8 @@ public class AgendamentoController {
         var parsedClienteId = clienteId != null && !clienteId.isBlank() ? UUID.fromString(clienteId) : null;
         var parsedDuracao = duracaoMinutos != null ? Integer.parseInt(duracaoMinutos) : 60;
         var parsedTaxa = taxaDeslocamento != null && !taxaDeslocamento.isBlank() ? new BigDecimal(taxaDeslocamento) : BigDecimal.ZERO;
+        var parsedCusto = custoDeslocamento != null && !custoDeslocamento.isBlank() ? new BigDecimal(custoDeslocamento) : BigDecimal.ZERO;
+        var parsedRepassar = repassarDeslocamento == null || "true".equalsIgnoreCase(repassarDeslocamento);
         var parsedAutoriza = autorizaUsoImagem != null && "true".equalsIgnoreCase(autorizaUsoImagem);
 
         LocalDateTime parsedDataHora = null;
@@ -100,7 +108,7 @@ public class AgendamentoController {
         var command = new CriarAgendamentoCommand(
             parsedClienteId, nome, telefone, email, cpf, cidade, estado, origem,
             parsedPacoteId, parsedEditorId, parsedDataHora, null, null, parsedDuracao,
-            localEnsaio, enderecoCompleto, parsedTaxa,
+            localEnsaio, enderecoCompleto, parsedTaxa, parsedCusto, parsedRepassar,
             comprovanteEntrada, parsedAutoriza, clausulasPersonalizadas, observacoes,
             indicadorNome, indicadorTelefone
         );
@@ -157,7 +165,13 @@ public class AgendamentoController {
     public ResponseEntity<AgendamentoResponse> buscarPorId(
             @PathVariable @Parameter(description = "ID do agendamento") UUID id) {
         var agendamento = agendamentoService.buscarPorId(id);
-        return ResponseEntity.ok(AgendamentoResponse.of(agendamento));
+        var indicacoes = indicacaoRepository.findAllByAgendamentoId(id);
+        if (indicacoes.isEmpty()) {
+            return ResponseEntity.ok(AgendamentoResponse.of(agendamento));
+        }
+        var primeira = indicacoes.getFirst();
+        return ResponseEntity.ok(AgendamentoResponse.of(
+            agendamento, primeira.getValorComissao(), primeira.getIndicadorNome(), primeira.getStatus()));
     }
 
     @PatchMapping("/{id}/status")

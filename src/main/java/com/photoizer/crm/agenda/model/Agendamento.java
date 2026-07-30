@@ -102,6 +102,13 @@ public class Agendamento extends BaseEntity {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal taxaDeslocamento;
 
+    @PositiveOrZero
+    @Column(precision = 10, scale = 2)
+    private BigDecimal custoDeslocamento;
+
+    @Column
+    private Boolean repassarDeslocamento;
+
     @NotNull
     @PositiveOrZero
     @Column(nullable = false, precision = 10, scale = 2)

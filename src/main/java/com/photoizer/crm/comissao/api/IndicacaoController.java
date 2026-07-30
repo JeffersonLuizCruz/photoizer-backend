@@ -5,6 +5,7 @@ import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.comissao.model.Indicacao;
 import com.photoizer.crm.comissao.repository.IndicacaoRepository;
 import com.photoizer.crm.comissao.service.IndicacaoService;
+import com.photoizer.crm.indicador.repository.IndicadorRepository;
 import com.photoizer.crm.indicador.service.IndicadorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -30,15 +32,18 @@ public class IndicacaoController {
     private final IndicacaoRepository indicacaoRepository;
     private final AgendamentoRepository agendamentoRepository;
     private final IndicadorService indicadorService;
+    private final IndicadorRepository indicadorRepository;
 
     public IndicacaoController(IndicacaoService indicacaoService,
-                               IndicacaoRepository indicacaoRepository,
-                               AgendamentoRepository agendamentoRepository,
-                               IndicadorService indicadorService) {
+                                IndicacaoRepository indicacaoRepository,
+                                AgendamentoRepository agendamentoRepository,
+                                IndicadorService indicadorService,
+                                IndicadorRepository indicadorRepository) {
         this.indicacaoService = indicacaoService;
         this.indicacaoRepository = indicacaoRepository;
         this.agendamentoRepository = agendamentoRepository;
         this.indicadorService = indicadorService;
+        this.indicadorRepository = indicadorRepository;
     }
 
     @GetMapping("/consulta")
@@ -90,6 +95,7 @@ public class IndicacaoController {
     @Operation(summary = "Listar todos os indicadores com resumo de comissões")
     public ResponseEntity<List<Map<String, Object>>> listarIndicadores() {
         var todosTelefones = indicacaoRepository.findAllDistinctTelefones();
+        var indicadorCache = new HashMap<String, BigDecimal>();
         var resultado = new ArrayList<Map<String, Object>>();
 
         for (var telefone : todosTelefones) {
@@ -110,15 +116,21 @@ public class IndicacaoController {
                 .map(Indicacao::getValorComissao)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            resultado.add(Map.of(
-                "indicadorId", primeira.getIndicadorId() != null ? primeira.getIndicadorId().toString() : null,
-                "indicadorNome", primeira.getIndicadorNome(),
-                "indicadorTelefone", primeira.getIndicadorTelefone(),
-                "totalPendente", totalPendente,
-                "totalPago", totalPago,
-                "totalCancelado", totalCancelado,
-                "totalIndicacoes", indicacoes.size()
-            ));
+            var percentualComissao = indicadorCache.computeIfAbsent(telefone, t -> {
+                var list = indicadorRepository.findByTelefone(t);
+                return list.isEmpty() ? null : list.getFirst().getPercentualComissao();
+            });
+
+            var entry = new HashMap<String, Object>();
+            entry.put("indicadorId", primeira.getIndicadorId() != null ? primeira.getIndicadorId().toString() : null);
+            entry.put("indicadorNome", primeira.getIndicadorNome());
+            entry.put("indicadorTelefone", primeira.getIndicadorTelefone());
+            entry.put("totalPendente", totalPendente);
+            entry.put("totalPago", totalPago);
+            entry.put("totalCancelado", totalCancelado);
+            entry.put("totalIndicacoes", indicacoes.size());
+            entry.put("percentualComissao", percentualComissao);
+            resultado.add(entry);
         }
 
         return ResponseEntity.ok(resultado);

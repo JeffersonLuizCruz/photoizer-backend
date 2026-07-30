@@ -5,6 +5,7 @@ import com.photoizer.crm.indicador.repository.IndicadorRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,20 +33,22 @@ public class IndicadorService {
             .orElseThrow(() -> new RuntimeException("Indicador não encontrado: " + id));
     }
 
-    public Indicador criar(String nome, String telefone, String observacoes) {
+    public Indicador criar(String nome, String telefone, String observacoes, BigDecimal percentualComissao) {
         var indicador = Indicador.builder()
             .nome(nome)
             .telefone(telefone)
             .observacoes(observacoes)
+            .percentualComissao(percentualComissao)
             .build();
         return indicadorRepository.save(indicador);
     }
 
-    public Indicador atualizar(UUID id, String nome, String telefone, String observacoes) {
+    public Indicador atualizar(UUID id, String nome, String telefone, String observacoes, BigDecimal percentualComissao) {
         var indicador = buscarPorId(id);
         indicador.setNome(nome);
         indicador.setTelefone(telefone);
         indicador.setObservacoes(observacoes);
+        indicador.setPercentualComissao(percentualComissao);
         return indicadorRepository.save(indicador);
     }
 
@@ -58,6 +61,6 @@ public class IndicadorService {
 
     public Indicador buscarOuCriar(String nome, String telefone) {
         return indicadorRepository.findByNomeAndTelefone(nome, telefone)
-            .orElseGet(() -> criar(nome, telefone, null));
+            .orElseGet(() -> criar(nome, telefone, null, null));
     }
 }

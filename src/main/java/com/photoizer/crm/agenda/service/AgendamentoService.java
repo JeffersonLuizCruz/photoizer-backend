@@ -102,7 +102,9 @@ public class AgendamentoService {
 
         var duracao = command.duracaoMinutos() != null ? command.duracaoMinutos() : 60;
         var taxaDeslocamentoPadrao = configuracaoService.getValorDecimal("taxaDeslocamentoPadrao", BigDecimal.ZERO);
-        var taxaDeslocamento = command.taxaDeslocamento() != null ? command.taxaDeslocamento() : taxaDeslocamentoPadrao;
+        var custoDeslocamento = command.custoDeslocamento() != null ? command.custoDeslocamento() : taxaDeslocamentoPadrao;
+        var repassarDeslocamento = command.repassarDeslocamento() != null ? command.repassarDeslocamento() : true;
+        var taxaDeslocamento = repassarDeslocamento ? custoDeslocamento : BigDecimal.ZERO;
         var autorizaUsoImagem = command.autorizaUsoImagem() != null ? command.autorizaUsoImagem() : false;
 
         validarConflitoAgenda(pacote, dataHoraEnsaio, duracao, command.localEnsaio());
@@ -133,6 +135,8 @@ public class AgendamentoService {
             .valorRestante(valorRestante)
             .valorExtras(valorExtras)
             .taxaDeslocamento(taxaDeslocamento)
+            .custoDeslocamento(custoDeslocamento)
+            .repassarDeslocamento(repassarDeslocamento)
             .valorTotalFinal(valorTotalFinal)
             .percentualEntrada(percentualEntrada)
             .status(StatusAgendamento.CONFIRMADO)
@@ -297,8 +301,10 @@ public class AgendamentoService {
         var duracao = agendamento.getDuracaoMinutos();
         validarConflitoAgenda(pacote, request.dataHoraEnsaio(), duracao, request.localEnsaio(), agendamento.getId());
 
-        var taxaDeslocamento = request.taxaDeslocamento() != null ? request.taxaDeslocamento()
-            : configuracaoService.getValorDecimal("taxaDeslocamentoPadrao", BigDecimal.ZERO);
+        var taxaDeslocamentoPadrao = configuracaoService.getValorDecimal("taxaDeslocamentoPadrao", BigDecimal.ZERO);
+        var custoDeslocamento = request.custoDeslocamento() != null ? request.custoDeslocamento() : taxaDeslocamentoPadrao;
+        var repassarDeslocamento = request.repassarDeslocamento() != null ? request.repassarDeslocamento() : true;
+        var taxaDeslocamento = repassarDeslocamento ? custoDeslocamento : BigDecimal.ZERO;
 
         var percentualEntrada = configuracaoService.getValorDecimal("percentualEntrada", new BigDecimal("30.00"));
         var fatorEntrada = percentualEntrada.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
@@ -314,6 +320,8 @@ public class AgendamentoService {
         agendamento.setLocalEnsaio(request.localEnsaio());
         agendamento.setEnderecoCompleto(request.enderecoCompleto());
         agendamento.setTaxaDeslocamento(taxaDeslocamento);
+        agendamento.setCustoDeslocamento(custoDeslocamento);
+        agendamento.setRepassarDeslocamento(repassarDeslocamento);
         agendamento.setAutorizaUsoImagem(request.autorizaUsoImagem() != null ? request.autorizaUsoImagem() : agendamento.getAutorizaUsoImagem());
         agendamento.setObservacoes(request.observacoes());
 
