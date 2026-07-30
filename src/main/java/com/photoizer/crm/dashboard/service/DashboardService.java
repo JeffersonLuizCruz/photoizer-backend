@@ -2,9 +2,7 @@ package com.photoizer.crm.dashboard.service;
 
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
-import com.photoizer.crm.agenda.model.StatusTarefa;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
-import com.photoizer.crm.agenda.repository.TarefaRepository;
 import com.photoizer.crm.cliente.repository.ClienteRepository;
 import com.photoizer.crm.comissao.model.Indicacao;
 import com.photoizer.crm.comissao.repository.IndicacaoRepository;
@@ -53,20 +51,17 @@ public class DashboardService {
     private final DespesaRepository despesaRepository;
     private final CompraExtraRepository compraExtraRepository;
     private final ClienteRepository clienteRepository;
-    private final TarefaRepository tarefaRepository;
 
     public DashboardService(AgendamentoRepository agendamentoRepository,
                             IndicacaoRepository indicacaoRepository,
                             DespesaRepository despesaRepository,
                             CompraExtraRepository compraExtraRepository,
-                            ClienteRepository clienteRepository,
-                            TarefaRepository tarefaRepository) {
+                            ClienteRepository clienteRepository) {
         this.agendamentoRepository = agendamentoRepository;
         this.indicacaoRepository = indicacaoRepository;
         this.despesaRepository = despesaRepository;
         this.compraExtraRepository = compraExtraRepository;
         this.clienteRepository = clienteRepository;
-        this.tarefaRepository = tarefaRepository;
     }
 
     public DashboardMensalResponse calcularFinanceiroMensal(int mesesHistorico) {
@@ -296,10 +291,6 @@ public class DashboardService {
 
         var novosClientesMes = clienteRepository.countByDataCadastroBetween(inicioMes, fimMes);
 
-        var tarefasPendentes = tarefaRepository.findAll().stream()
-            .filter(t -> t.getStatus() == StatusTarefa.PENDENTE)
-            .count();
-
         var totalAgendamentos = agendamentoRepository.count();
         var taxaConversao = totalAgendamentos > 0
             ? (double) agendamentosMes / totalAgendamentos
@@ -307,7 +298,7 @@ public class DashboardService {
 
         return new DashboardKpisResponse(
             agendamentosMes, receitaMes, taxaConversao,
-            novosClientesMes, tarefasPendentes, agendamentosHoje
+            novosClientesMes, agendamentosHoje
         );
     }
 

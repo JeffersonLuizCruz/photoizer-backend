@@ -7,6 +7,5 @@ public record DashboardKpisResponse(
     BigDecimal receitaMes,
     double taxaConversao,
     long novosClientesMes,
-    long tarefasPendentes,
     long agendamentosHoje
 ) {}

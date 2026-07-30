@@ -2,11 +2,8 @@ package com.photoizer.crm.ecommerce.api;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 
 public record EcommerceAnalyticsResponse(
-    int totalPedidos,
-    Map<String, Integer> pedidosPorStatus,
     BigDecimal receitaTotal,
     BigDecimal receitaExtras,
     int totalFotosSelecionadas,

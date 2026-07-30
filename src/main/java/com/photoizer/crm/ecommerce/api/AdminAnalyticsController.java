@@ -2,7 +2,6 @@ package com.photoizer.crm.ecommerce.api;
 
 import com.photoizer.crm.ecommerce.model.StatusCompraExtra;
 import com.photoizer.crm.ecommerce.repository.CompraExtraRepository;
-import com.photoizer.crm.ecommerce.repository.PedidoRepository;
 import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,26 +12,18 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
-/**
- * Analytics do e-commerce (FA011): receita, conversão e fotos populares.
- */
 @RestController
 @RequestMapping("/api/v1/admin/ecommerce/analytics")
 @Tag(name = "Admin Analytics", description = "Métricas e analytics do ecommerce")
 public class AdminAnalyticsController {
 
-    private final PedidoRepository pedidoRepository;
     private final CompraExtraRepository compraExtraRepository;
     private final FotoEnsaioRepository fotoEnsaioRepository;
 
-    public AdminAnalyticsController(PedidoRepository pedidoRepository,
-                                    CompraExtraRepository compraExtraRepository,
+    public AdminAnalyticsController(CompraExtraRepository compraExtraRepository,
                                     FotoEnsaioRepository fotoEnsaioRepository) {
-        this.pedidoRepository = pedidoRepository;
         this.compraExtraRepository = compraExtraRepository;
         this.fotoEnsaioRepository = fotoEnsaioRepository;
     }
@@ -40,18 +31,7 @@ public class AdminAnalyticsController {
     @GetMapping
     @Operation(summary = "Dashboard de analytics do ecommerce")
     public ResponseEntity<EcommerceAnalyticsResponse> analytics() {
-        var pedidos = pedidoRepository.findAll();
         var fotos = fotoEnsaioRepository.findAll();
-
-        Map<String, Integer> pedidosPorStatus = new LinkedHashMap<>();
-        for (var pedido : pedidos) {
-            pedidosPorStatus.merge(pedido.getStatus() != null ? pedido.getStatus() : "DESCONHECIDO", 1, Integer::sum);
-        }
-
-        var receitaPedidos = pedidos.stream()
-            .filter(p -> "PAGO".equals(p.getStatus()) || "CONCLUIDO".equals(p.getStatus()))
-            .map(p -> p.getTotal() != null ? p.getTotal() : BigDecimal.ZERO)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         var receitaExtras = compraExtraRepository.totalPorStatus(StatusCompraExtra.PAGA);
 
@@ -78,9 +58,7 @@ public class AdminAnalyticsController {
             .toList();
 
         return ResponseEntity.ok(new EcommerceAnalyticsResponse(
-            pedidos.size(),
-            pedidosPorStatus,
-            receitaPedidos.add(receitaExtras),
+            receitaExtras,
             receitaExtras,
             totalSelecionadas,
             totalVendidasExtras,

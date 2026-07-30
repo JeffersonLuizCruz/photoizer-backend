@@ -8,8 +8,7 @@ import com.photoizer.crm.agenda.exception.EditorNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.EnsaioNaoFinalizadoException;
 import com.photoizer.crm.pacote.exception.PacoteInativoException;
 import com.photoizer.crm.pacote.exception.PacoteNaoEncontradoException;
-import com.photoizer.crm.agenda.exception.TarefaNaoEncontradaException;
-import com.photoizer.crm.agenda.exception.TarefaNaoPodeSerExcluidaException;
+
 import com.photoizer.crm.cliente.exception.ClienteNaoEncontradoException;
 import com.photoizer.crm.comissao.exception.IndicacaoNaoEncontradaException;
 import com.photoizer.crm.edicao.exception.EdicaoNaoEncontradaException;
@@ -69,18 +68,6 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleAgendamentoNoPassado(AgendamentoNoPassadoException e) {
         log.warn("Agendamento no passado: {}", e.getMessage());
         return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
-    }
-
-    @ExceptionHandler(TarefaNaoEncontradaException.class)
-    public ResponseEntity<ErrorResponse> handleTarefaNaoEncontrada(TarefaNaoEncontradaException e) {
-        log.warn("Tarefa nao encontrada: {}", e.getMessage());
-        return build(HttpStatus.NOT_FOUND, e);
-    }
-
-    @ExceptionHandler(TarefaNaoPodeSerExcluidaException.class)
-    public ResponseEntity<ErrorResponse> handleTarefaNaoPodeSerExcluida(TarefaNaoPodeSerExcluidaException e) {
-        log.warn("Tarefa nao pode ser excluida: {}", e.getMessage());
-        return build(HttpStatus.CONFLICT, e);
     }
 
     @ExceptionHandler(IndicacaoNaoEncontradaException.class)
