@@ -112,7 +112,7 @@ public class AgendamentoService {
         var percentualEntrada = configuracaoService.getValorDecimal("percentualEntrada", new BigDecimal("30.00"));
         var fatorEntrada = percentualEntrada.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
         var valorTotal = pacote.getValorBase().add(taxaDeslocamento);
-        var valorEntradaExigido = pacote.getValorBase().multiply(fatorEntrada)
+        var valorEntradaExigido = valorTotal.multiply(fatorEntrada)
             .setScale(2, RoundingMode.HALF_UP);
         var valorEntradaPago = valorEntradaExigido;
         var valorRestante = valorTotal.subtract(valorEntradaPago);
@@ -161,7 +161,7 @@ public class AgendamentoService {
             command.indicadorNome(),
             command.indicadorTelefone(),
             null,
-            agendamento.getValorTotal()
+            pacote.getValorBase()
         ));
 
         eventPublisher.publishEvent(new AgendamentoConfirmadoEvent(
@@ -309,7 +309,7 @@ public class AgendamentoService {
         var percentualEntrada = configuracaoService.getValorDecimal("percentualEntrada", new BigDecimal("30.00"));
         var fatorEntrada = percentualEntrada.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
         var novoValorTotal = pacote.getValorBase().add(taxaDeslocamento);
-        var novoValorEntradaExigido = pacote.getValorBase().multiply(fatorEntrada)
+        var novoValorEntradaExigido = novoValorTotal.multiply(fatorEntrada)
             .setScale(2, RoundingMode.HALF_UP);
         var novoValorRestante = novoValorTotal.subtract(agendamento.getValorEntradaPago());
         var novoValorTotalFinal = novoValorTotal.add(agendamento.getValorExtras());

@@ -74,7 +74,7 @@ public class FinanceiroService {
         var percentualEntrada = configuracaoService.getValorDecimal("percentualEntrada", new BigDecimal("30.00"));
         var fatorEntrada = percentualEntrada.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
         var valorTotal = pacote.getValorBase().add(taxa);
-        var valorEntradaExigido = pacote.getValorBase().multiply(fatorEntrada)
+        var valorEntradaExigido = valorTotal.multiply(fatorEntrada)
             .setScale(2, RoundingMode.HALF_UP);
         var valorRestante = valorTotal.subtract(valorEntradaExigido);
         var valorTotalFinal = valorTotal;
