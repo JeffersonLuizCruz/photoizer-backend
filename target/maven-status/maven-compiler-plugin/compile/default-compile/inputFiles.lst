@@ -4,6 +4,8 @@
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/agenda/api/AtualizarAgendamentoRequest.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/agenda/api/AtualizarTarefaRequest.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/agenda/api/DisponibilidadeResponse.java
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/agenda/api/RascunhoAgendamentoController.java
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/agenda/api/RascunhoAgendamentoResponse.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/agenda/api/TarefaController.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/agenda/api/TarefaResponse.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/agenda/event/AgendamentoCanceladoEvent.java
@@ -19,14 +21,17 @@
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/agenda/exception/TarefaNaoEncontradaException.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/agenda/exception/TarefaNaoPodeSerExcluidaException.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/agenda/model/Agendamento.java
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/agenda/model/RascunhoAgendamento.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/agenda/model/StatusAgendamento.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/agenda/model/StatusTarefa.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/agenda/model/Tarefa.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/agenda/model/TipoTarefa.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/agenda/repository/AgendamentoRepository.java
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/agenda/repository/RascunhoAgendamentoRepository.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/agenda/repository/TarefaRepository.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/agenda/service/AgendamentoService.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/agenda/service/CriarAgendamentoCommand.java
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/agenda/service/RascunhoAgendamentoService.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/agenda/service/TarefaService.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/auth/api/AuthController.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/auth/api/CriarUserRequest.java

@@ -23,6 +23,7 @@ com/photoizer/crm/ecommerce/repository/SessaoRepository.class
 com/photoizer/crm/ecommerce/model/ItemCarrinho$ItemCarrinhoBuilder.class
 com/photoizer/crm/edicao/repository/FotoEdicaoRepository.class
 com/photoizer/crm/ecommerce/api/AdminEcommerceController.class
+com/photoizer/crm/agenda/model/RascunhoAgendamento$RascunhoAgendamentoBuilder.class
 com/photoizer/crm/edicao/repository/EdicaoRepository.class
 com/photoizer/crm/ecommerce/exception/TokenExpiradoException.class
 com/photoizer/crm/agenda/api/AgendamentoController.class
@@ -53,6 +54,7 @@ com/photoizer/crm/auth/api/UserResponse.class
 com/photoizer/crm/despesa/repository/DespesaRepository.class
 com/photoizer/crm/auth/api/UserController.class
 com/photoizer/crm/auth/config/JwtTokenProvider.class
+com/photoizer/crm/agenda/service/RascunhoAgendamentoService.class
 com/photoizer/crm/cliente/repository/ClienteRepository.class
 com/photoizer/crm/ecommerce/model/Sessao$SessaoBuilderImpl.class
 com/photoizer/crm/notificacao/repository/NotificacaoRepository.class
@@ -88,6 +90,7 @@ com/photoizer/crm/agenda/exception/EnsaioNaoFinalizadoException.class
 com/photoizer/crm/financeiro/api/FinanceiroRelatoriosResponse.class
 com/photoizer/crm/agenda/model/Agendamento.class
 com/photoizer/crm/ecommerce/model/Avaliacao$AvaliacaoBuilderImpl.class
+com/photoizer/crm/agenda/model/RascunhoAgendamento$RascunhoAgendamentoBuilderImpl.class
 com/photoizer/crm/ecommerce/api/AvaliacaoRequest.class
 com/photoizer/crm/ecommerce/model/Cupom$CupomBuilderImpl.class
 com/photoizer/crm/ecommerce/model/ItemCarrinho$ItemCarrinhoBuilderImpl.class
@@ -156,6 +159,7 @@ com/photoizer/crm/despesa/model/Despesa$DespesaBuilderImpl.class
 com/photoizer/crm/ecommerce/api/CheckoutRequest.class
 com/photoizer/crm/ecommerce/event/CompraExtraCriadaEvent.class
 com/photoizer/crm/ecommerce/model/ItemCarrinho.class
+com/photoizer/crm/agenda/model/RascunhoAgendamento.class
 com/photoizer/crm/agenda/exception/TarefaNaoEncontradaException.class
 com/photoizer/crm/agenda/service/CriarAgendamentoCommand.class
 com/photoizer/crm/comissao/api/IndicacaoResponse.class
@@ -192,6 +196,7 @@ com/photoizer/crm/ecommerce/repository/ItemCarrinhoRepository.class
 com/photoizer/crm/ecommerce/repository/FavoritoRepository.class
 com/photoizer/crm/agenda/model/Tarefa.class
 com/photoizer/crm/shared/config/OpenApiConfig.class
+com/photoizer/crm/agenda/api/RascunhoAgendamentoController.class
 com/photoizer/crm/ecommerce/api/CarrinhoResponse.class
 com/photoizer/crm/notificacao/scheduler/LembreteAgendamentoJob.class
 com/photoizer/crm/financeiro/api/FinanceiroPreviewResponse.class
@@ -228,6 +233,7 @@ com/photoizer/crm/despesa/model/Despesa.class
 com/photoizer/crm/ecommerce/model/Pedido.class
 com/photoizer/crm/ecommerce/api/EcommerceAnalyticsResponse$FotoPopularResponse.class
 com/photoizer/crm/cliente/service/ClienteAuthService.class
+com/photoizer/crm/agenda/repository/RascunhoAgendamentoRepository.class
 com/photoizer/crm/despesa/service/DespesaService.class
 com/photoizer/crm/financeiro/listener/FinanceiroEventListener.class
 com/photoizer/crm/cliente/api/AtualizarPerfilRequest.class
@@ -237,6 +243,7 @@ com/photoizer/crm/ecommerce/model/StatusCompraExtra.class
 com/photoizer/crm/shared/exception/ErrorResponse$FieldError.class
 com/photoizer/crm/edicao/exception/FotoSemRawException.class
 com/photoizer/crm/agenda/repository/TarefaRepository.class
+com/photoizer/crm/agenda/api/RascunhoAgendamentoResponse.class
 com/photoizer/crm/indicador/service/IndicadorService.class
 com/photoizer/crm/comissao/service/IndicacaoListener.class
 com/photoizer/crm/ecommerce/api/AdminEcommerceResumoResponse.class
