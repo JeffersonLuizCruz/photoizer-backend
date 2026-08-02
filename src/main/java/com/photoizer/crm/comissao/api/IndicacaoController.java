@@ -97,10 +97,13 @@ public class IndicacaoController {
         var todosTelefones = indicacaoRepository.findAllDistinctTelefones();
         var indicadorCache = new HashMap<String, BigDecimal>();
         var resultado = new ArrayList<Map<String, Object>>();
+        var telefonesComComissao = new java.util.HashSet<String>();
 
         for (var telefone : todosTelefones) {
             var indicacoes = indicacaoRepository.findByIndicadorTelefoneOrderByCreatedAtDesc(telefone);
             if (indicacoes.isEmpty()) continue;
+
+            telefonesComComissao.add(telefone);
 
             var primeira = indicacoes.get(0);
             var totalPendente = indicacoes.stream()
@@ -131,6 +134,23 @@ public class IndicacaoController {
             entry.put("totalIndicacoes", indicacoes.size());
             entry.put("percentualComissao", percentualComissao);
             resultado.add(entry);
+        }
+
+        // Adicionar indicadores cadastrados que NÃO têm comissões ainda
+        var todosIndicadoresCadastrados = indicadorRepository.findAll();
+        for (var indicador : todosIndicadoresCadastrados) {
+            if (!telefonesComComissao.contains(indicador.getTelefone())) {
+                var entry = new HashMap<String, Object>();
+                entry.put("indicadorId", indicador.getId().toString());
+                entry.put("indicadorNome", indicador.getNome());
+                entry.put("indicadorTelefone", indicador.getTelefone());
+                entry.put("totalPendente", BigDecimal.ZERO);
+                entry.put("totalPago", BigDecimal.ZERO);
+                entry.put("totalCancelado", BigDecimal.ZERO);
+                entry.put("totalIndicacoes", 0);
+                entry.put("percentualComissao", indicador.getPercentualComissao());
+                resultado.add(entry);
+            }
         }
 
         return ResponseEntity.ok(resultado);

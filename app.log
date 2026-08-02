@@ -1,0 +1,94 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -------------------------< com.photoizer:crm >--------------------------
+[INFO] Building  0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] >>> spring-boot:4.1.0:run (default-cli) > test-compile @ crm >>>
+[INFO] 
+[INFO] --- resources:3.5.0:resources (default-resources) @ crm ---
+[INFO] Copying 4 resources from src/main/resources to target/classes
+[INFO] Copying 2 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.15.0:compile (default-compile) @ crm ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.5.0:testResources (default-testResources) @ crm ---
+[INFO] skip non existing resourceDirectory /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/test/resources
+[INFO] 
+[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ crm ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] <<< spring-boot:4.1.0:run (default-cli) < test-compile @ crm <<<
+[INFO] 
+[INFO] 
+[INFO] --- spring-boot:4.1.0:run (default-cli) @ crm ---
+[INFO] Attaching agents: []
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.1.0)
+
+2026-08-02 15:33:48.596 [background-preinit] [34mINFO [0;39m o.h.validator.internal.util.Version [] - HV000001: Hibernate Validator 9.1.0.Final
+2026-08-02 15:33:48.607 [main] [34mINFO [0;39m com.photoizer.crm.CrmApplication [] - Starting CrmApplication using Java 26.0.1 with PID 27709 (/Users/hugo/Documents/Workspace/crm/photoizer-backend/target/classes started by hugo in /Users/hugo/Documents/Workspace/crm/photoizer-backend)
+2026-08-02 15:33:48.608 [main] [39mDEBUG[0;39m com.photoizer.crm.CrmApplication [] - Running with Spring Boot v4.1.0, Spring v7.0.8
+2026-08-02 15:33:48.608 [main] [34mINFO [0;39m com.photoizer.crm.CrmApplication [] - No active profile set, falling back to 1 default profile: "default"
+2026-08-02 15:33:48.931 [main] [34mINFO [0;39m o.s.d.r.c.RepositoryConfigurationDelegate [] - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-08-02 15:33:48.968 [main] [34mINFO [0;39m o.s.d.r.c.RepositoryConfigurationDelegate [] - Finished Spring Data repository scanning in 33 ms. Found 21 JPA repository interfaces.
+2026-08-02 15:33:49.238 [main] [34mINFO [0;39m o.s.boot.tomcat.TomcatWebServer [] - Tomcat initialized with port 8080 (http)
+2026-08-02 15:33:49.241 [main] [34mINFO [0;39m o.a.coyote.http11.Http11NioProtocol [] - Initializing ProtocolHandler ["http-nio-8080"]
+2026-08-02 15:33:49.242 [main] [34mINFO [0;39m o.a.catalina.core.StandardService [] - Starting service [Tomcat]
+2026-08-02 15:33:49.242 [main] [34mINFO [0;39m o.a.catalina.core.StandardEngine [] - Starting Servlet engine: [Apache Tomcat/11.0.22]
+2026-08-02 15:33:49.257 [main] [34mINFO [0;39m o.s.b.w.c.s.WebApplicationContextInitializer [] - Root WebApplicationContext: initialization completed in 635 ms
+2026-08-02 15:33:49.337 [main] [39mDEBUG[0;39m c.p.c.a.c.JwtAuthenticationFilter [] - Filter 'jwtAuthenticationFilter' configured for use
+2026-08-02 15:33:49.407 [main] [34mINFO [0;39m org.hibernate.orm.jpa [] - HHH008540: Processing PersistenceUnitInfo [name: default]
+2026-08-02 15:33:49.422 [main] [34mINFO [0;39m org.hibernate.orm.core [] - HHH000001: Hibernate ORM core version 7.4.1.Final
+2026-08-02 15:33:49.530 [main] [34mINFO [0;39m o.s.o.j.p.SpringPersistenceUnitInfo [] - No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-08-02 15:33:49.539 [main] [34mINFO [0;39m com.zaxxer.hikari.HikariDataSource [] - HikariPool-1 - Starting...
+2026-08-02 15:33:49.614 [main] [34mINFO [0;39m com.zaxxer.hikari.pool.HikariPool [] - HikariPool-1 - Added connection conn0: url=jdbc:h2:file:./data/crmdb user=SA
+2026-08-02 15:33:49.615 [main] [34mINFO [0;39m com.zaxxer.hikari.HikariDataSource [] - HikariPool-1 - Start completed.
+2026-08-02 15:33:49.621 [main] [31mWARN [0;39m org.hibernate.orm.deprecation [] - HHH90000025: H2Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-08-02 15:33:49.628 [main] [34mINFO [0;39m o.hibernate.orm.connections.pooling [] - HHH10001005: Database info:
+	Database JDBC URL [jdbc:h2:file:./data/crmdb]
+	Database driver: H2 JDBC Driver
+	Database dialect: H2Dialect
+	Database version: 2.4.240
+	Default catalog/schema: CRMDB/PUBLIC
+	Autocommit mode: undefined/unknown
+	Isolation level: READ_COMMITTED [default READ_COMMITTED]
+	JDBC fetch size: 100
+	Pool: DataSourceConnectionProvider
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-08-02 15:33:50.074 [main] [34mINFO [0;39m org.hibernate.orm.core [] - HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-08-02 15:33:50.097 [main] [34mINFO [0;39m o.s.o.j.LocalContainerEntityManagerFactoryBean [] - Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-08-02 15:33:50.147 [main] [34mINFO [0;39m o.s.d.j.r.q.QueryEnhancerFactories [] - Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-08-02 15:33:50.935 [main] [31mWARN [0;39m o.s.b.j.a.JpaBaseConfiguration$JpaWebConfiguration [] - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-08-02 15:33:50.998 [main] [31mWARN [0;39m o.s.b.s.a.UserDetailsServiceAutoConfiguration [] - 
+
+Using generated security password: ef873def-7e04-4288-9062-854e01719e23
+
+This generated password is for development use only. Your security configuration must be updated before running your application in production.
+
+2026-08-02 15:33:51.001 [main] [34mINFO [0;39m o.s.s.c.a.a.c.InitializeUserDetailsBeanManagerConfigurer$InitializeUserDetailsManagerConfigurer [] - Global AuthenticationManager configured with UserDetailsService bean with name inMemoryUserDetailsManager
+2026-08-02 15:33:51.326 [main] [34mINFO [0;39m o.s.b.h.a.H2ConsoleAutoConfiguration [] - H2 console available at '/h2-console'. Database available at 'jdbc:h2:file:./data/crmdb'
+2026-08-02 15:33:51.380 [main] [34mINFO [0;39m o.s.b.a.e.web.EndpointLinksResolver [] - Exposing 1 endpoint beneath base path '/actuator'
+2026-08-02 15:33:51.423 [main] [34mINFO [0;39m o.a.coyote.http11.Http11NioProtocol [] - Starting ProtocolHandler ["http-nio-8080"]
+2026-08-02 15:33:51.429 [main] [34mINFO [0;39m o.s.boot.tomcat.TomcatWebServer [] - Tomcat started on port 8080 (http) with context path '/'
+2026-08-02 15:33:51.436 [main] [34mINFO [0;39m com.photoizer.crm.CrmApplication [] - Started CrmApplication in 2.967 seconds (process running for 3.07)
+2026-08-02 15:33:56.941 [http-nio-8080-exec-1] [34mINFO [0;39m o.a.c.c.C.[Tomcat].[localhost].[/] [] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-08-02 15:33:56.941 [http-nio-8080-exec-1] [34mINFO [0;39m o.s.web.servlet.DispatcherServlet [] - Initializing Servlet 'dispatcherServlet'
+2026-08-02 15:33:56.943 [http-nio-8080-exec-1] [34mINFO [0;39m o.s.web.servlet.DispatcherServlet [] - Completed initialization in 2 ms
+2026-08-02 15:33:56.997 [http-nio-8080-exec-1] [31mWARN [0;39m c.p.c.s.e.GlobalExceptionHandler [] - Erro de validacao: Validation failed for argument [0] in public org.springframework.http.ResponseEntity<com.photoizer.crm.auth.api.LoginResponse> com.photoizer.crm.auth.api.AuthController.login(com.photoizer.crm.auth.api.LoginRequest): [Field error in object 'loginRequest' on field 'password': rejected value [null]; codes [NotBlank.loginRequest.password,NotBlank.password,NotBlank.java.lang.String,NotBlank]; arguments [org.springframework.context.support.DefaultMessageSourceResolvable: codes [loginRequest.password,password]; arguments []; default message [password]]; default message [não deve estar em branco]] 
+2026-08-02 15:38:36.883 [SpringApplicationShutdownHook] [34mINFO [0;39m o.s.boot.tomcat.GracefulShutdown [] - Commencing graceful shutdown. Waiting for active requests to complete
+2026-08-02 15:38:36.888 [tomcat-shutdown] [34mINFO [0;39m o.s.boot.tomcat.GracefulShutdown [] - Graceful shutdown complete
+2026-08-02 15:38:36.893 [SpringApplicationShutdownHook] [34mINFO [0;39m o.s.m.e.c.DefaultEventPublicationRegistry [] - No publications outstanding!
+2026-08-02 15:38:36.897 [SpringApplicationShutdownHook] [34mINFO [0;39m o.s.o.j.LocalContainerEntityManagerFactoryBean [] - Closing JPA EntityManagerFactory for persistence unit 'default'
+2026-08-02 15:38:36.898 [SpringApplicationShutdownHook] [34mINFO [0;39m com.zaxxer.hikari.HikariDataSource [] - HikariPool-1 - Shutdown initiated...
+2026-08-02 15:38:36.969 [SpringApplicationShutdownHook] [34mINFO [0;39m com.zaxxer.hikari.HikariDataSource [] - HikariPool-1 - Shutdown completed.
