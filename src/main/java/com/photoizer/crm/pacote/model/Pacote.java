@@ -1,12 +1,8 @@
 package com.photoizer.crm.pacote.model;
 
-import com.photoizer.crm.auth.model.User;
 import com.photoizer.crm.shared.model.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -20,7 +16,6 @@ import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
 import java.math.BigDecimal;
-import java.util.List;
 
 @Entity
 @Table(name = "pacotes")
@@ -76,14 +71,6 @@ public class Pacote extends BaseEntity {
     @NotNull
     @Column(nullable = false)
     private Boolean ativo;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "fotografo_id")
-    private User fotografo;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "editor_responsavel_id")
-    private User editorResponsavel;
 
     @PositiveOrZero
     @Column

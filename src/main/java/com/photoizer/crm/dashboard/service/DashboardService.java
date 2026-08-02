@@ -113,8 +113,8 @@ public class DashboardService {
             int qtdFinalizados = 0;
 
             for (var a : lista) {
-                var taxa = a.getTaxaDeslocamento() != null ? a.getTaxaDeslocamento() : BigDecimal.ZERO;
-                deslocamento = deslocamento.add(taxa);
+                var custo = a.getCustoDeslocamento() != null ? a.getCustoDeslocamento() : BigDecimal.ZERO;
+                deslocamento = deslocamento.add(custo);
 
                 var c = comissaoPorAgendamento.getOrDefault(a.getId(), BigDecimal.ZERO);
                 comissao = comissao.add(c);

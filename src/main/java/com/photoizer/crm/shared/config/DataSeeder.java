@@ -69,10 +69,7 @@ public class DataSeeder implements CommandLineRunner {
             var c5 = new Configuracao();
             c5.setChave("taxaDeslocamentoPadrao");
             c5.setValor("0.00");
-            var c6 = new Configuracao();
-            c6.setChave("notificarAutomaticamente");
-            c6.setValor("true");
-            configuracaoRepository.saveAll(List.of(c1, c2, c3, c4, c5, c6));
+            configuracaoRepository.saveAll(List.of(c1, c2, c3, c4, c5));
         }
 
         limparIndicadoresDuplicados();

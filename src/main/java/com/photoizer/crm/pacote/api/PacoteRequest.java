@@ -5,7 +5,6 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 
 import java.math.BigDecimal;
-import java.util.UUID;
 
 public record PacoteRequest(
     @NotBlank String nome,
@@ -19,8 +18,6 @@ public record PacoteRequest(
     String duracaoEstimada,
     boolean bloqueiaDiaInteiro,
     boolean ativo,
-    UUID fotografoId,
-    UUID editorResponsavelId,
     @PositiveOrZero Integer diasParaEntrega
 ) {
 }

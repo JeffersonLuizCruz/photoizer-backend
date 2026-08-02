@@ -112,8 +112,8 @@ public class FinanceiroService {
             totalExtras = totalExtras.add(a.getValorExtras());
             faturamentoTotal = faturamentoTotal.add(a.getValorTotalFinal());
 
-            var taxa = a.getTaxaDeslocamento() != null ? a.getTaxaDeslocamento() : BigDecimal.ZERO;
-            deslocamento = deslocamento.add(taxa);
+            var custo = a.getCustoDeslocamento() != null ? a.getCustoDeslocamento() : BigDecimal.ZERO;
+            deslocamento = deslocamento.add(custo);
 
             if (statusPagamentoFinal.contains(a.getStatus())) {
                 totalFinal = totalFinal.add(a.getValorRestante());

@@ -1,7 +1,5 @@
 package com.photoizer.crm.pacote.service;
 
-import com.photoizer.crm.auth.model.User;
-import com.photoizer.crm.auth.repository.UserRepository;
 import com.photoizer.crm.pacote.api.PacoteRequest;
 import com.photoizer.crm.pacote.api.PacoteResponse;
 import com.photoizer.crm.pacote.exception.PacoteInativoException;
@@ -23,15 +21,9 @@ import java.util.UUID;
 public class PacoteService {
 
     private final PacoteRepository pacoteRepository;
-    private final UserRepository userRepository;
 
-    public PacoteService(PacoteRepository pacoteRepository, UserRepository userRepository) {
+    public PacoteService(PacoteRepository pacoteRepository) {
         this.pacoteRepository = pacoteRepository;
-        this.userRepository = userRepository;
-    }
-
-    private User buscarUsuario(UUID id) {
-        return id != null ? userRepository.findById(id).orElse(null) : null;
     }
 
     @Transactional(readOnly = true)
@@ -78,8 +70,6 @@ public class PacoteService {
             .duracaoEstimada(request.duracaoEstimada())
             .bloqueiaDiaInteiro(request.bloqueiaDiaInteiro())
             .ativo(request.ativo())
-            .fotografo(buscarUsuario(request.fotografoId()))
-            .editorResponsavel(buscarUsuario(request.editorResponsavelId()))
             .diasParaEntrega(request.diasParaEntrega())
             .build();
         return PacoteResponse.of(pacoteRepository.save(pacote));
@@ -99,8 +89,6 @@ public class PacoteService {
         pacote.setDuracaoEstimada(request.duracaoEstimada());
         pacote.setBloqueiaDiaInteiro(request.bloqueiaDiaInteiro());
         pacote.setAtivo(request.ativo());
-        pacote.setFotografo(buscarUsuario(request.fotografoId()));
-        pacote.setEditorResponsavel(buscarUsuario(request.editorResponsavelId()));
         pacote.setDiasParaEntrega(request.diasParaEntrega());
         return PacoteResponse.of(pacoteRepository.save(pacote));
     }
