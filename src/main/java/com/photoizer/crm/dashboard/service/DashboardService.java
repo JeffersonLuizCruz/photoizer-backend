@@ -125,6 +125,7 @@ public class DashboardService {
                 }
 
                 if (a.getStatus() == StatusAgendamento.CONFIRMADO
+                    || a.getStatus() == StatusAgendamento.REALIZADO
                     || a.getStatus() == StatusAgendamento.AGUARDANDO_PAGAMENTO_FINAL
                     || STATUS_FINALIZADOS.contains(a.getStatus())) {
                     qtdConfirmados++;
