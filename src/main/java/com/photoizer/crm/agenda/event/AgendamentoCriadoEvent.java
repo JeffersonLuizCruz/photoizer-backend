@@ -9,6 +9,7 @@ public record AgendamentoCriadoEvent(
     UUID clienteId,
     UUID pacoteId,
     LocalDateTime dataHoraEnsaio,
+    UUID indicadorId,
     String indicadorNome,
     String indicadorTelefone,
     BigDecimal percentualComissao,

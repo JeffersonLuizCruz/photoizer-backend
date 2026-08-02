@@ -4,7 +4,6 @@ import com.photoizer.crm.agenda.event.AgendamentoCanceladoEvent;
 import com.photoizer.crm.agenda.event.AgendamentoCriadoEvent;
 import com.photoizer.crm.agenda.event.PagamentoFinalRegistradoEvent;
 import com.photoizer.crm.config.service.ConfiguracaoService;
-import com.photoizer.crm.indicador.repository.IndicadorRepository;
 import com.photoizer.crm.indicador.service.IndicadorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,16 +20,13 @@ public class IndicacaoListener {
 
     private final IndicacaoService indicacaoService;
     private final IndicadorService indicadorService;
-    private final IndicadorRepository indicadorRepository;
     private final ConfiguracaoService configuracaoService;
 
     public IndicacaoListener(IndicacaoService indicacaoService,
                               IndicadorService indicadorService,
-                              IndicadorRepository indicadorRepository,
                               ConfiguracaoService configuracaoService) {
         this.indicacaoService = indicacaoService;
         this.indicadorService = indicadorService;
-        this.indicadorRepository = indicadorRepository;
         this.configuracaoService = configuracaoService;
     }
 
@@ -40,16 +36,15 @@ public class IndicacaoListener {
         if (event.indicadorNome() == null || event.indicadorNome().isBlank()) return;
         if (event.indicadorTelefone() == null || event.indicadorTelefone().isBlank()) return;
 
-        boolean indicadorJaExiste = indicadorRepository.existsByNomeAndTelefone(
-            event.indicadorNome(), event.indicadorTelefone());
-
-        var indicador = indicadorService.buscarOuCriar(event.indicadorNome(), event.indicadorTelefone());
+        var indicador = event.indicadorId() != null
+            ? indicadorService.buscarPorId(event.indicadorId())
+            : indicadorService.buscarOuCriar(event.indicadorNome(), event.indicadorTelefone());
 
         var percentual = indicador.getPercentualComissao() != null
             ? indicador.getPercentualComissao()
             : configuracaoService.getValorDecimal("percentualComissao", BigDecimal.TEN);
 
-        var origem = indicadorJaExiste ? "INDICADOR" : "PACOTE";
+        var origem = event.indicadorId() != null ? "INDICADOR" : "PACOTE";
 
         log.info("Criando indicação ({}) para agendamento {}: indicador={}, percentual={}%",
             origem, event.agendamentoId(), event.indicadorNome(), percentual);

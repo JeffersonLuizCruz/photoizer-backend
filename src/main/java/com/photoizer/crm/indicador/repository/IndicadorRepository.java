@@ -13,6 +13,8 @@ public interface IndicadorRepository extends JpaRepository<Indicador, UUID> {
 
     Optional<Indicador> findByNomeAndTelefone(String nome, String telefone);
 
+    List<Indicador> findAllByNomeAndTelefone(String nome, String telefone);
+
     boolean existsByNomeAndTelefone(String nome, String telefone);
 
     List<Indicador> findByTelefone(String telefone);

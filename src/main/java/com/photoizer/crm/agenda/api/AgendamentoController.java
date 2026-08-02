@@ -81,6 +81,7 @@ public class AgendamentoController {
             @RequestParam(required = false) String autorizaUsoImagem,
             @RequestParam(required = false) String clausulasPersonalizadas,
             @RequestParam(required = false) String observacoes,
+            @RequestParam(required = false) String indicadorId,
             @RequestParam(required = false) String indicadorNome,
             @RequestParam(required = false) String indicadorTelefone
     ) {
@@ -105,12 +106,14 @@ public class AgendamentoController {
             );
         }
 
+        var parsedIndicadorId = indicadorId != null && !indicadorId.isBlank() ? UUID.fromString(indicadorId) : null;
+
         var command = new CriarAgendamentoCommand(
             parsedClienteId, nome, telefone, email, cpf, cidade, estado, origem,
             parsedPacoteId, parsedEditorId, parsedDataHora, null, null, parsedDuracao,
             localEnsaio, enderecoCompleto, parsedTaxa, parsedCusto, parsedRepassar,
             comprovanteEntrada, parsedAutoriza, clausulasPersonalizadas, observacoes,
-            indicadorNome, indicadorTelefone
+            parsedIndicadorId, indicadorNome, indicadorTelefone
         );
 
         var agendamento = agendamentoService.criarAgendamento(command);

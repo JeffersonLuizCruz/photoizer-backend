@@ -31,6 +31,7 @@ public record CriarAgendamentoCommand(
     Boolean autorizaUsoImagem,
     String clausulasPersonalizadas,
     String observacoes,
+    UUID indicadorId,
     String indicadorNome,
     String indicadorTelefone
 ) {

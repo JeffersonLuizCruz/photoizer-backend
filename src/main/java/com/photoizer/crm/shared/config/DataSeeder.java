@@ -15,7 +15,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Component
 public class DataSeeder implements CommandLineRunner {
@@ -77,21 +80,27 @@ public class DataSeeder implements CommandLineRunner {
 
     private void limparIndicadoresDuplicados() {
         var duplicados = entityManager.createQuery(
-            "SELECT i.telefone FROM Indicador i GROUP BY i.telefone HAVING COUNT(i) > 1",
-            String.class
+            "SELECT i.nome, i.telefone FROM Indicador i GROUP BY i.nome, i.telefone HAVING COUNT(i) > 1",
+            Object[].class
         ).getResultList();
 
         if (!duplicados.isEmpty()) {
-            for (var telefone : duplicados) {
-                var indicadores = indicadorRepository.findByTelefone(telefone);
-                var manter = indicadores.getFirst();
-                for (var i = 1; i < indicadores.size(); i++) {
-                    indicadorRepository.delete(indicadores.get(i));
+            int totalRemovidos = 0;
+            for (var par : duplicados) {
+                var nome = (String) ((Object[]) par)[0];
+                var telefone = (String) ((Object[]) par)[1];
+                var indicadores = indicadorRepository.findAllByNomeAndTelefone(nome, telefone);
+                indicadores.sort(Comparator.comparing(
+                    i -> i.getCreatedAt() != null ? i.getCreatedAt() : LocalDateTime.MIN));
+                var manter = indicadores.removeLast();
+                for (var remover : indicadores) {
+                    indicadorRepository.delete(remover);
                 }
-                log.warn("Indicadores duplicados com telefone {}: mantido ID {} ({}), removidos {} registro(s)",
-                    telefone, manter.getId(), manter.getNome(), indicadores.size() - 1);
+                log.warn("Indicadores duplicados '{}' ({}): mantido ID {}, removidos {} registro(s)",
+                    nome, telefone, manter.getId(), indicadores.size());
+                totalRemovidos += indicadores.size();
             }
-            log.info("Limpeza de indicadores duplicados concluída: {} telefone(s) com duplicatas", duplicados.size());
+            log.info("Limpeza de indicadores duplicados concluída: {} registros removidos", totalRemovidos);
         }
     }
 }

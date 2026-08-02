@@ -250,7 +250,10 @@ public class FinanceiroService {
 
         if (id == null) return;
 
-        var percentual = configuracaoService.getValorDecimal("percentualComissao", BigDecimal.TEN);
+        var indicador = indicadorService.buscarPorId(id);
+        var percentual = indicador.getPercentualComissao() != null
+            ? indicador.getPercentualComissao()
+            : configuracaoService.getValorDecimal("percentualComissao", BigDecimal.TEN);
 
         var comissao = valorReferencia.multiply(percentual).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
 

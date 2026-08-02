@@ -158,6 +158,7 @@ public class AgendamentoService {
             agendamento.getCliente().getId(),
             agendamento.getPacote().getId(),
             agendamento.getDataHoraEnsaio(),
+            command.indicadorId(),
             command.indicadorNome(),
             command.indicadorTelefone(),
             null,

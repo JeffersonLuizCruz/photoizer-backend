@@ -34,6 +34,13 @@ public class IndicadorService {
     }
 
     public Indicador criar(String nome, String telefone, String observacoes, BigDecimal percentualComissao) {
+        var existente = indicadorRepository.findByNomeAndTelefone(nome, telefone);
+        if (existente.isPresent()) {
+            var indicador = existente.get();
+            if (observacoes != null) indicador.setObservacoes(observacoes);
+            if (percentualComissao != null) indicador.setPercentualComissao(percentualComissao);
+            return indicadorRepository.save(indicador);
+        }
         var indicador = Indicador.builder()
             .nome(nome)
             .telefone(telefone)
@@ -61,6 +68,13 @@ public class IndicadorService {
 
     public Indicador buscarOuCriar(String nome, String telefone) {
         return indicadorRepository.findByNomeAndTelefone(nome, telefone)
-            .orElseGet(() -> criar(nome, telefone, null, null));
+            .orElseGet(() -> {
+                try {
+                    return criar(nome, telefone, null, null);
+                } catch (Exception e) {
+                    return indicadorRepository.findByNomeAndTelefone(nome, telefone)
+                        .orElseThrow(() -> new RuntimeException("Falha ao criar/recuperar indicador: " + nome));
+                }
+            });
     }
 }
