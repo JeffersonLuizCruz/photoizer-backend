@@ -336,11 +336,7 @@ public class AgendamentoService {
         return AgendamentoResponse.of(agendamento);
     }
 
-    public DisponibilidadeResponse verificarDisponibilidade(LocalDate data, String hora, Integer duracaoMinutos, UUID excluirAgendamentoId) {
-        var time = LocalTime.parse(hora, DateTimeFormatter.ofPattern("HH:mm"));
-        var dataHora = LocalDateTime.of(data, time);
-        var duracao = duracaoMinutos != null ? duracaoMinutos : 60;
-
+    public DisponibilidadeResponse verificarDisponibilidade(LocalDate data, String hora, Integer duracaoMinutos, UUID excluirAgendamentoId, Boolean bloqueiaDiaInteiro) {
         var inicioDia = data.atStartOfDay();
         var fimDia = data.atTime(23, 59, 59);
         var statusesIgnorados = List.of(StatusAgendamento.CANCELADO, StatusAgendamento.NO_SHOW);
@@ -353,17 +349,31 @@ public class AgendamentoService {
             agendamentosNoDia = agendamentoRepository.findByDataBetween(inicioDia, fimDia, statusesIgnorados);
         }
 
-        var novoFim = dataHora.plusMinutes(duracao);
         var conflitos = new ArrayList<DisponibilidadeResponse.Conflito>();
 
-        for (var existente : agendamentosNoDia) {
-            var fimExistente = existente.getDataHoraEnsaio().plusMinutes(existente.getDuracaoMinutos());
-            if (dataHora.isBefore(fimExistente) && novoFim.isAfter(existente.getDataHoraEnsaio())) {
+        if (Boolean.TRUE.equals(bloqueiaDiaInteiro)) {
+            for (var existente : agendamentosNoDia) {
                 conflitos.add(new DisponibilidadeResponse.Conflito(
                     existente.getId(),
                     existente.getDataHoraEnsaio().toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm")),
                     existente.getCliente().getNome()
                 ));
+            }
+        } else {
+            var time = LocalTime.parse(hora, DateTimeFormatter.ofPattern("HH:mm"));
+            var dataHora = LocalDateTime.of(data, time);
+            var duracao = duracaoMinutos != null ? duracaoMinutos : 60;
+            var novoFim = dataHora.plusMinutes(duracao);
+
+            for (var existente : agendamentosNoDia) {
+                var fimExistente = existente.getDataHoraEnsaio().plusMinutes(existente.getDuracaoMinutos());
+                if (dataHora.isBefore(fimExistente) && novoFim.isAfter(existente.getDataHoraEnsaio())) {
+                    conflitos.add(new DisponibilidadeResponse.Conflito(
+                        existente.getId(),
+                        existente.getDataHoraEnsaio().toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm")),
+                        existente.getCliente().getNome()
+                    ));
+                }
             }
         }
 

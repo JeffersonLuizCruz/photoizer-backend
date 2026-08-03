@@ -155,8 +155,9 @@ public class AgendamentoController {
             @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate data,
             @RequestParam String hora,
             @RequestParam(defaultValue = "60") Integer duracaoMinutos,
-            @RequestParam(required = false) UUID excluirAgendamentoId) {
-        return ResponseEntity.ok(agendamentoService.verificarDisponibilidade(data, hora, duracaoMinutos, excluirAgendamentoId));
+            @RequestParam(required = false) UUID excluirAgendamentoId,
+            @RequestParam(defaultValue = "false") Boolean bloqueiaDiaInteiro) {
+        return ResponseEntity.ok(agendamentoService.verificarDisponibilidade(data, hora, duracaoMinutos, excluirAgendamentoId, bloqueiaDiaInteiro));
     }
 
     @GetMapping("/{id}")
