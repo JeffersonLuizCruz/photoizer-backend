@@ -2,7 +2,10 @@ package com.photoizer.crm.financeiro.api;
 
 import com.photoizer.crm.financeiro.model.FotoExtra;
 import com.photoizer.crm.financeiro.model.Pagamento;
+import com.photoizer.crm.financeiro.model.StatusReceita;
+import com.photoizer.crm.financeiro.model.TipoServico;
 import com.photoizer.crm.financeiro.model.VideoExtra;
+import com.photoizer.crm.financeiro.service.FinanceiroDashboardService;
 import com.photoizer.crm.financeiro.service.FinanceiroService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,9 +33,12 @@ import java.util.UUID;
 public class FinanceiroController {
 
     private final FinanceiroService financeiroService;
+    private final FinanceiroDashboardService financeiroDashboardService;
 
-    public FinanceiroController(FinanceiroService financeiroService) {
+    public FinanceiroController(FinanceiroService financeiroService,
+                                FinanceiroDashboardService financeiroDashboardService) {
         this.financeiroService = financeiroService;
+        this.financeiroDashboardService = financeiroDashboardService;
     }
 
     @PostMapping("/agendamentos/{agendamentoId}/pagamentos")
@@ -78,12 +84,40 @@ public class FinanceiroController {
         return ResponseEntity.ok(financeiroService.listarPagamentos(agendamentoId));
     }
 
+    @GetMapping("/agendamentos/{agendamentoId}/financeiro")
+    @Operation(summary = "Resumo financeiro do trabalho (valores, despesas vinculadas, lucro e margem)")
+    public ResponseEntity<FinanceiroTrabalhoResponse> resumoFinanceiroTrabalho(@PathVariable UUID agendamentoId) {
+        return ResponseEntity.ok(financeiroService.resumoPorAgendamento(agendamentoId));
+    }
+
     @PostMapping("/preview")
     @Operation(summary = "Calcular preview de valores financeiros")
     public ResponseEntity<FinanceiroPreviewResponse> preview(
             @RequestParam UUID pacoteId,
             @RequestParam(required = false) BigDecimal taxaDeslocamento) {
         return ResponseEntity.ok(financeiroService.calcularPreview(pacoteId, taxaDeslocamento));
+    }
+
+    @GetMapping("/dashboard")
+    @Operation(summary = "Dashboard financeiro agregado (cards, gráficos e últimos lançamentos)")
+    public ResponseEntity<FinanceiroDashboardResponse> dashboard(
+            @RequestParam(required = false) LocalDate dataInicio,
+            @RequestParam(required = false) LocalDate dataFim,
+            @RequestParam(required = false) TipoServico tipoServico,
+            @RequestParam(required = false) StatusReceita status,
+            @RequestParam(required = false) UUID clienteId,
+            @RequestParam(required = false) String formaPagamento) {
+        return ResponseEntity.ok(financeiroDashboardService.calcular(
+            dataInicio, dataFim, tipoServico, status, clienteId, formaPagamento));
+    }
+
+    @GetMapping("/fluxo-caixa")
+    @Operation(summary = "Fluxo de caixa projetado (entradas/saídas previstas por período)")
+    public ResponseEntity<FluxoCaixaResponse> fluxoCaixa(
+            @RequestParam(required = false) LocalDate dataInicio,
+            @RequestParam(required = false) LocalDate dataFim,
+            @RequestParam(required = false, defaultValue = "MENSAL") String visao) {
+        return ResponseEntity.ok(financeiroService.calcularFluxoCaixa(dataInicio, dataFim, visao));
     }
 
     @GetMapping("/resumo")

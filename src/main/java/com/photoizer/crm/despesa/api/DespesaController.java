@@ -1,12 +1,24 @@
 package com.photoizer.crm.despesa.api;
 
+import com.photoizer.crm.despesa.model.StatusDespesa;
 import com.photoizer.crm.despesa.service.DespesaService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -14,7 +26,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/despesas")
-@Tag(name = "Despesas", description = "Despesas manuais (manutenção, compras etc.)")
+@Tag(name = "Despesas", description = "Despesas, categorias e comprovantes")
 public class DespesaController {
 
     private final DespesaService despesaService;
@@ -24,13 +36,18 @@ public class DespesaController {
     }
 
     @GetMapping
-    @Operation(summary = "Listar despesas (com filtro opcional de data)")
+    @Operation(summary = "Listar despesas com filtros e ordenação")
     public ResponseEntity<List<DespesaResponse>> listar(
             @RequestParam(required = false) LocalDate dataInicio,
-            @RequestParam(required = false) LocalDate dataFim) {
-        var despesas = despesaService.listar(dataInicio, dataFim).stream()
-            .map(DespesaResponse::of)
-            .toList();
+            @RequestParam(required = false) LocalDate dataFim,
+            @RequestParam(required = false) UUID categoriaId,
+            @RequestParam(required = false) StatusDespesa status,
+            @RequestParam(required = false) UUID agendamentoId,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false) String sortDir) {
+        var despesas = despesaService
+            .listar(dataInicio, dataFim, categoriaId, status, agendamentoId, sortBy, sortDir)
+            .stream().map(DespesaResponse::of).toList();
         return ResponseEntity.ok(despesas);
     }
 
@@ -43,29 +60,86 @@ public class DespesaController {
     @PostMapping
     @Operation(summary = "Criar nova despesa")
     public ResponseEntity<DespesaResponse> criar(@Valid @RequestBody DespesaRequest request) {
-        var despesa = despesaService.criar(
-            request.descricao(), request.valor(), request.categoria(),
-            request.data(), request.observacao()
-        );
-        return ResponseEntity.status(HttpStatus.CREATED).body(DespesaResponse.of(despesa));
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(DespesaResponse.of(despesaService.criar(request)));
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Atualizar despesa")
-    public ResponseEntity<DespesaResponse> atualizar(
-            @PathVariable UUID id,
-            @Valid @RequestBody DespesaRequest request) {
-        var despesa = despesaService.atualizar(
-            id, request.descricao(), request.valor(), request.categoria(),
-            request.data(), request.observacao()
-        );
-        return ResponseEntity.ok(DespesaResponse.of(despesa));
+    public ResponseEntity<DespesaResponse> atualizar(@PathVariable UUID id,
+                                                     @Valid @RequestBody DespesaRequest request) {
+        return ResponseEntity.ok(DespesaResponse.of(despesaService.atualizar(id, request)));
     }
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Remover despesa")
     public ResponseEntity<Void> remover(@PathVariable UUID id) {
         despesaService.remover(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{id}/pagar")
+    @Operation(summary = "Marcar despesa como paga")
+    public ResponseEntity<DespesaResponse> marcarComoPaga(@PathVariable UUID id) {
+        return ResponseEntity.ok(DespesaResponse.of(despesaService.marcarComoPaga(id)));
+    }
+
+    @PatchMapping("/{id}/agendamento")
+    @Operation(summary = "Vincular ou desvincular despesa de um trabalho (agendamento)")
+    public ResponseEntity<DespesaResponse> vincularAgendamento(@PathVariable UUID id,
+                                                               @RequestBody DespesaAgendamentoRequest request) {
+        return ResponseEntity.ok(DespesaResponse.of(despesaService.vincularAgendamento(id, request.agendamentoId())));
+    }
+
+    @PostMapping("/{id}/comprovante")
+    @Operation(summary = "Anexar comprovante de despesa")
+    public ResponseEntity<DespesaResponse> anexarComprovante(
+            @PathVariable UUID id,
+            @RequestPart("arquivo") MultipartFile arquivo) {
+        return ResponseEntity.ok(DespesaResponse.of(despesaService.anexarComprovante(id, arquivo)));
+    }
+
+    @GetMapping("/recorrentes-proximas")
+    @Operation(summary = "Despesas recorrentes com vencimento nos próximos dias")
+    public ResponseEntity<List<DespesaResponse>> recorrentesProximas(
+            @RequestParam(defaultValue = "7") int dias) {
+        var despesas = despesaService.recorrentesProximas(dias).stream()
+            .map(DespesaResponse::of).toList();
+        return ResponseEntity.ok(despesas);
+    }
+
+    // ---- Categorias ----
+
+    @GetMapping("/categorias")
+    @Operation(summary = "Listar categorias de despesa")
+    public ResponseEntity<List<DespesaCategoriaResponse>> listarCategorias(
+            @RequestParam(required = false, defaultValue = "true") Boolean ativas) {
+        var categorias = despesaService.listarCategorias(ativas).stream()
+            .map(c -> DespesaCategoriaResponse.of(c, despesaService.contarDespesas(c.getId())))
+            .toList();
+        return ResponseEntity.ok(categorias);
+    }
+
+    @PostMapping("/categorias")
+    @Operation(summary = "Criar categoria de despesa")
+    public ResponseEntity<DespesaCategoriaResponse> criarCategoria(@Valid @RequestBody DespesaCategoriaRequest request) {
+        var categoria = despesaService.criarCategoria(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(DespesaCategoriaResponse.of(categoria, 0));
+    }
+
+    @PutMapping("/categorias/{id}")
+    @Operation(summary = "Atualizar categoria de despesa")
+    public ResponseEntity<DespesaCategoriaResponse> atualizarCategoria(@PathVariable UUID id,
+                                                                       @Valid @RequestBody DespesaCategoriaRequest request) {
+        var categoria = despesaService.atualizarCategoria(id, request);
+        return ResponseEntity.ok(DespesaCategoriaResponse.of(categoria, 0));
+    }
+
+    @DeleteMapping("/categorias/{id}")
+    @Operation(summary = "Remover ou inativar categoria de despesa")
+    public ResponseEntity<Void> removerCategoria(@PathVariable UUID id) {
+        despesaService.removerCategoria(id);
         return ResponseEntity.noContent().build();
     }
 }
