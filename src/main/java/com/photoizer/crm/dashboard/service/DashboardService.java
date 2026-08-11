@@ -14,10 +14,15 @@ import com.photoizer.crm.dashboard.api.DashboardKpisResponse;
 import com.photoizer.crm.dashboard.api.DashboardMensalResponse;
 import com.photoizer.crm.dashboard.api.DashboardMensalResponse.DadosMensais;
 import com.photoizer.crm.dashboard.api.DashboardMensalResponse.ResumoMesAtual;
+import com.photoizer.crm.despesa.model.Despesa;
+import com.photoizer.crm.despesa.model.StatusDespesa;
 import com.photoizer.crm.despesa.repository.DespesaRepository;
 import com.photoizer.crm.ecommerce.model.CompraExtra;
 import com.photoizer.crm.ecommerce.model.StatusCompraExtra;
 import com.photoizer.crm.ecommerce.repository.CompraExtraRepository;
+import com.photoizer.crm.financeiro.model.Receita;
+import com.photoizer.crm.financeiro.model.StatusReceita;
+import com.photoizer.crm.financeiro.repository.ReceitaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,22 +51,28 @@ public class DashboardService {
         StatusAgendamento.FINALIZADO
     );
 
+    private static final String STATUS_COMISSAO_CANCELADA = "CANCELADA";
+    private static final String STATUS_COMISSAO_PAGA = "PAGA";
+
     private final AgendamentoRepository agendamentoRepository;
     private final IndicacaoRepository indicacaoRepository;
     private final DespesaRepository despesaRepository;
     private final CompraExtraRepository compraExtraRepository;
     private final ClienteRepository clienteRepository;
+    private final ReceitaRepository receitaRepository;
 
     public DashboardService(AgendamentoRepository agendamentoRepository,
                             IndicacaoRepository indicacaoRepository,
                             DespesaRepository despesaRepository,
                             CompraExtraRepository compraExtraRepository,
-                            ClienteRepository clienteRepository) {
+                            ClienteRepository clienteRepository,
+                            ReceitaRepository receitaRepository) {
         this.agendamentoRepository = agendamentoRepository;
         this.indicacaoRepository = indicacaoRepository;
         this.despesaRepository = despesaRepository;
         this.compraExtraRepository = compraExtraRepository;
         this.clienteRepository = clienteRepository;
+        this.receitaRepository = receitaRepository;
     }
 
     public DashboardMensalResponse calcularFinanceiroMensal(int mesesHistorico) {
@@ -84,18 +95,31 @@ public class DashboardService {
         var todosIds = agendamentos.stream().map(Agendamento::getId).toList();
         var indicacoes = indicacaoRepository.findByAgendamentoIdIn(todosIds);
         Map<UUID, BigDecimal> comissaoPorAgendamento = new HashMap<>();
+        Map<UUID, BigDecimal> comissaoPagaPorAgendamento = new HashMap<>();
         for (var ind : indicacoes) {
+            if (STATUS_COMISSAO_CANCELADA.equals(ind.getStatus())) continue;
             comissaoPorAgendamento.put(ind.getAgendamentoId(), ind.getValorComissao());
+            if (STATUS_COMISSAO_PAGA.equals(ind.getStatus())) {
+                comissaoPagaPorAgendamento.put(ind.getAgendamentoId(), ind.getValorComissao());
+            }
         }
 
         var primeiroDia = inicio.toLocalDate();
         var ultimoDia = fim.toLocalDate();
         var todasDespesas = despesaRepository.findByDataBetweenOrderByDataDesc(primeiroDia, ultimoDia);
         Map<YearMonth, BigDecimal> despesasPorMes = new HashMap<>();
+        Map<YearMonth, BigDecimal> despesasPagasPorMes = new HashMap<>();
         for (var d : todasDespesas) {
             var ym = YearMonth.from(d.getData());
             despesasPorMes.merge(ym, d.getValor(), BigDecimal::add);
+            if (d.getStatus() == StatusDespesa.PAGO) {
+                despesasPagasPorMes.merge(ym, d.getValor(), BigDecimal::add);
+            }
         }
+
+        var receitasAvulsas = receitaRepository.findAll().stream()
+            .filter(r -> r.getAgendamentoId() == null)
+            .toList();
 
         var historico = new ArrayList<DadosMensais>();
         ResumoMesAtual resumoMesAtual = null;
@@ -104,20 +128,25 @@ public class DashboardService {
             var ym = mesAtual.minusMonths(i);
             var lista = porMes.getOrDefault(ym, List.of());
 
-            var valorConfirmados = BigDecimal.ZERO;
+            var valorEnsaiosConfirmados = BigDecimal.ZERO;
             var valorFinalizados = BigDecimal.ZERO;
-            var deslocamento = BigDecimal.ZERO;
+            var deslocamentoEfetivo = BigDecimal.ZERO;
+            var deslocamentoEfetivoPago = BigDecimal.ZERO;
             var comissao = BigDecimal.ZERO;
+            var comissaoPaga = BigDecimal.ZERO;
             var entradasRecebidas = BigDecimal.ZERO;
             int qtdConfirmados = 0;
             int qtdFinalizados = 0;
 
             for (var a : lista) {
-                var custo = a.getCustoDeslocamento() != null ? a.getCustoDeslocamento() : BigDecimal.ZERO;
-                deslocamento = deslocamento.add(custo);
+                var desloc = deslocamentoEfetivo(a);
+                deslocamentoEfetivo = deslocamentoEfetivo.add(desloc);
+                if (a.getValorRestante() != null && a.getValorRestante().compareTo(BigDecimal.ZERO) <= 0) {
+                    deslocamentoEfetivoPago = deslocamentoEfetivoPago.add(desloc);
+                }
 
-                var c = comissaoPorAgendamento.getOrDefault(a.getId(), BigDecimal.ZERO);
-                comissao = comissao.add(c);
+                comissao = comissao.add(comissaoPorAgendamento.getOrDefault(a.getId(), BigDecimal.ZERO));
+                comissaoPaga = comissaoPaga.add(comissaoPagaPorAgendamento.getOrDefault(a.getId(), BigDecimal.ZERO));
 
                 if (STATUS_FINALIZADOS.contains(a.getStatus())) {
                     qtdFinalizados++;
@@ -129,26 +158,45 @@ public class DashboardService {
                     || a.getStatus() == StatusAgendamento.AGUARDANDO_PAGAMENTO_FINAL
                     || STATUS_FINALIZADOS.contains(a.getStatus())) {
                     qtdConfirmados++;
-                    valorConfirmados = valorConfirmados.add(a.getValorTotalFinal());
+                    valorEnsaiosConfirmados = valorEnsaiosConfirmados.add(a.getValorTotalFinal());
                     entradasRecebidas = entradasRecebidas.add(
                         a.getValorEntradaPago() != null ? a.getValorEntradaPago() : BigDecimal.ZERO
                     );
                 }
             }
 
+            var avulsasBruto = BigDecimal.ZERO;
+            var avulsasRecebidas = BigDecimal.ZERO;
+            for (var r : receitasAvulsas) {
+                if (r.getStatus() == StatusReceita.CANCELADO) continue;
+                if (r.getDataPrevisaoRecebimento() != null
+                    && ym.equals(YearMonth.from(r.getDataPrevisaoRecebimento()))) {
+                    avulsasBruto = avulsasBruto.add(r.getValorBruto());
+                }
+                if (r.getDataRecebimentoReal() != null
+                    && ym.equals(YearMonth.from(r.getDataRecebimentoReal()))) {
+                    avulsasRecebidas = avulsasRecebidas.add(r.getValorRecebido());
+                }
+            }
+
+            var valorConfirmados = valorEnsaiosConfirmados.add(avulsasBruto);
+            entradasRecebidas = entradasRecebidas.add(avulsasRecebidas);
+
             var despesasManuais = despesasPorMes.getOrDefault(ym, BigDecimal.ZERO);
-            var totalDespesas = deslocamento.add(comissao).add(despesasManuais);
+            var despesasManuaisPagas = despesasPagasPorMes.getOrDefault(ym, BigDecimal.ZERO);
+            var totalDespesas = deslocamentoEfetivo.add(comissao).add(despesasManuais);
+            var totalDespesasPagas = deslocamentoEfetivoPago.add(comissaoPaga).add(despesasManuaisPagas);
 
             var dados = new DadosMensais(
                 ym.format(DateTimeFormatter.ofPattern("yyyy-MM")),
                 lista.size(),
                 valorConfirmados,
                 valorFinalizados,
-                deslocamento,
+                deslocamentoEfetivo,
                 comissao,
                 despesasManuais,
                 entradasRecebidas,
-                entradasRecebidas.subtract(totalDespesas),
+                entradasRecebidas.subtract(totalDespesasPagas),
                 valorConfirmados.subtract(totalDespesas)
             );
             historico.add(dados);
@@ -157,23 +205,24 @@ public class DashboardService {
                 var saldoRestante = valorConfirmados.subtract(entradasRecebidas);
                 var saldoLiquido = entradasRecebidas.subtract(totalDespesas);
                 var receitaProjetada = valorFinalizados.subtract(totalDespesas);
-                var liquidoPrevisto = valorConfirmados.subtract(totalDespesas);
 
                 resumoMesAtual = new ResumoMesAtual(
                     lista.size(),
                     qtdConfirmados,
                     valorConfirmados,
+                    valorEnsaiosConfirmados,
                     entradasRecebidas,
                     saldoRestante,
                     qtdFinalizados,
                     valorFinalizados,
-                    deslocamento,
+                    valorFinalizados,
+                    deslocamentoEfetivo,
                     comissao,
                     despesasManuais,
                     saldoLiquido,
                     receitaProjetada,
-                    saldoLiquido,
-                    liquidoPrevisto
+                    entradasRecebidas.subtract(totalDespesasPagas),
+                    valorConfirmados.subtract(totalDespesas)
                 );
             }
         }
@@ -301,6 +350,11 @@ public class DashboardService {
             agendamentosMes, receitaMes, taxaConversao,
             novosClientesMes, agendamentosHoje
         );
+    }
+
+    private BigDecimal deslocamentoEfetivo(Agendamento a) {
+        if (Boolean.TRUE.equals(a.getRepassarDeslocamento())) return BigDecimal.ZERO;
+        return a.getCustoDeslocamento() != null ? a.getCustoDeslocamento() : BigDecimal.ZERO;
     }
 
     private record CompraAgg(int qtd, BigDecimal total) {}
