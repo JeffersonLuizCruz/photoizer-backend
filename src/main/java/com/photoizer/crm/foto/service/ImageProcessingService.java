@@ -30,8 +30,24 @@ public class ImageProcessingService {
         var target = targetDir.resolve("wm_" + source.getFileName().toString());
 
         var original = ImageIO.read(source.toFile());
+
         int width = original.getWidth();
         int height = original.getHeight();
+
+        // Limita a resolução do preview (proteção adicional contra uso sem pagamento)
+        int maxDim = 1600;
+        if (Math.max(width, height) > maxDim) {
+            double scale = (double) maxDim / Math.max(width, height);
+            width = (int) (width * scale);
+            height = (int) (height * scale);
+            var scaled = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+            var g = scaled.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g.drawImage(original, 0, 0, width, height, null);
+            g.dispose();
+            original = scaled;
+        }
 
         var watermarked = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         var g2d = watermarked.createGraphics();
@@ -39,15 +55,15 @@ public class ImageProcessingService {
         g2d.drawImage(original, 0, 0, null);
 
         g2d.setColor(new Color(255, 255, 255, (int) (opacidade * 255)));
-        var font = g2d.getFont().deriveFont(24f);
+        var font = g2d.getFont().deriveFont(48f);
         g2d.setFont(font);
 
         var fm = g2d.getFontMetrics();
         var textWidth = fm.stringWidth(texto);
         var textHeight = fm.getHeight();
 
-        for (int x = 0; x < width; x += textWidth + 80) {
-            for (int y = textHeight; y < height; y += textHeight + 80) {
+        for (int x = 0; x < width; x += textWidth + 60) {
+            for (int y = textHeight; y < height; y += textHeight + 60) {
                 g2d.drawString(texto, x, y);
             }
         }

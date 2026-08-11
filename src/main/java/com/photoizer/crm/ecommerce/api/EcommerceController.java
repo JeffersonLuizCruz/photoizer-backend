@@ -3,7 +3,10 @@ package com.photoizer.crm.ecommerce.api;
 import com.photoizer.crm.ecommerce.model.ItemCarrinho;
 import com.photoizer.crm.ecommerce.model.MetodoPagamento;
 import com.photoizer.crm.ecommerce.service.EcommerceService;
+import com.photoizer.crm.ecommerce.service.SessionService;
 import com.photoizer.crm.foto.api.FotoEnsaioResponse;
+import com.photoizer.crm.foto.model.FotoEnsaio;
+import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.service.FotoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -39,14 +42,25 @@ public class EcommerceController {
 
     private final EcommerceService ecommerceService;
     private final FotoService fotoService;
+    private final SessionService sessionService;
 
-    public EcommerceController(EcommerceService ecommerceService, FotoService fotoService) {
+    public EcommerceController(EcommerceService ecommerceService, FotoService fotoService, SessionService sessionService) {
         this.ecommerceService = ecommerceService;
         this.fotoService = fotoService;
+        this.sessionService = sessionService;
     }
 
-    private UUID resolverSessionId(@RequestHeader(HEADER_SESSION) UUID sessionId) {
-        return sessionId;
+    @PostMapping("/sessao")
+    @Operation(summary = "Emitir sessão assinada para o carrinho da galeria")
+    public ResponseEntity<SessaoCarrinhoResponse> criarSessao() {
+        return ResponseEntity.ok(new SessaoCarrinhoResponse(sessionService.emitir()));
+    }
+
+    private UUID resolverSessionId(@RequestHeader(value = HEADER_SESSION, required = false) String sessionId) {
+        if (sessionId == null || sessionId.isBlank() || !sessionService.valida(sessionId)) {
+            throw new IllegalArgumentException("Sessão inválida");
+        }
+        return UUID.fromString(sessionId.substring(0, sessionId.indexOf('.')));
     }
 
     @GetMapping("/galeria/{token}")
@@ -55,9 +69,9 @@ public class EcommerceController {
         var agendamento = ecommerceService.buscarAgendamento(token);
         var fotos = ecommerceService.listarFotosPublicadas(token);
         var response = new GaleriaResponse(
-            fotos.stream().map(FotoEnsaioResponse::of).toList(),
+            fotos.stream().map(FotoEnsaioResponse::ofPublic).toList(),
             agendamento.getPacote().getQuantidadeFotos(),
-            ecommerceService.getValorUnitarioFotoExtra(),
+            ecommerceService.getValorUnitarioFotoExtra(agendamento.getId()),
             agendamento.getPacote().getNome(),
             agendamento.getLocalEnsaio()
         );
@@ -70,16 +84,16 @@ public class EcommerceController {
             @PathVariable UUID token,
             @RequestBody SelecionarRequest request) {
         var fotos = ecommerceService.selecionarFotos(token, request.fotoIds(), request.selecionada());
-        return ResponseEntity.ok(fotos.stream().map(FotoEnsaioResponse::of).toList());
+        return ResponseEntity.ok(fotos.stream().map(FotoEnsaioResponse::ofPublic).toList());
     }
 
     @PostMapping("/galeria/{token}/carrinho")
     @Operation(summary = "Adicionar foto ao carrinho")
     public ResponseEntity<Void> adicionarAoCarrinho(
             @PathVariable UUID token,
-            @RequestHeader(HEADER_SESSION) UUID sessionId,
+            @RequestHeader(value = HEADER_SESSION, required = false) String sessionId,
             @RequestBody AdicionarAoCarrinhoRequest request) {
-        ecommerceService.adicionarAoCarrinho(token, sessionId, request.fotoId());
+        ecommerceService.adicionarAoCarrinho(token, resolverSessionId(sessionId), request.fotoId());
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
@@ -87,9 +101,9 @@ public class EcommerceController {
     @Operation(summary = "Remover foto do carrinho")
     public ResponseEntity<Void> removerDoCarrinho(
             @PathVariable UUID token,
-            @RequestHeader(HEADER_SESSION) UUID sessionId,
+            @RequestHeader(value = HEADER_SESSION, required = false) String sessionId,
             @PathVariable UUID fotoId) {
-        ecommerceService.removerDoCarrinho(token, sessionId, fotoId);
+        ecommerceService.removerDoCarrinho(token, resolverSessionId(sessionId), fotoId);
         return ResponseEntity.ok().build();
     }
 
@@ -97,13 +111,13 @@ public class EcommerceController {
     @Operation(summary = "Listar itens do carrinho")
     public ResponseEntity<CarrinhoResponse> listarCarrinho(
             @PathVariable UUID token,
-            @RequestHeader(HEADER_SESSION) UUID sessionId) {
-        var itens = ecommerceService.listarCarrinho(token, sessionId);
-        var valorUnitario = ecommerceService.getValorUnitarioFotoExtra();
+            @RequestHeader(value = HEADER_SESSION, required = false) String sessionId) {
+        var itens = ecommerceService.listarCarrinho(token, resolverSessionId(sessionId));
+        var valorUnitario = ecommerceService.getValorUnitarioFotoExtraPorToken(token);
         var itensResponse = itens.stream()
             .map(ItemCarrinho::getFotoId)
             .map(fotoService::buscarPorId)
-            .map(FotoEnsaioResponse::of)
+            .map(FotoEnsaioResponse::ofPublic)
             .map(fotoResponse -> CarrinhoItemResponse.of(fotoResponse, itens.size(), 0, valorUnitario))
             .toList();
         return ResponseEntity.ok(CarrinhoResponse.of(itensResponse, valorUnitario));
@@ -113,36 +127,36 @@ public class EcommerceController {
     @Operation(summary = "Obter quantidade de itens no carrinho")
     public ResponseEntity<Integer> contarCarrinho(
             @PathVariable UUID token,
-            @RequestHeader(HEADER_SESSION) UUID sessionId) {
-        return ResponseEntity.ok(ecommerceService.contarCarrinho(token, sessionId));
+            @RequestHeader(value = HEADER_SESSION, required = false) String sessionId) {
+        return ResponseEntity.ok(ecommerceService.contarCarrinho(token, resolverSessionId(sessionId)));
     }
 
     @GetMapping("/galeria/{token}/calcular")
     @Operation(summary = "Calcular valor do carrinho (preview antes do checkout)")
     public ResponseEntity<CalculoCarrinhoResponse> calcular(
             @PathVariable UUID token,
-            @RequestHeader(HEADER_SESSION) UUID sessionId) {
-        return ResponseEntity.ok(ecommerceService.calcularCarrinho(token, sessionId));
+            @RequestHeader(value = HEADER_SESSION, required = false) String sessionId) {
+        return ResponseEntity.ok(ecommerceService.calcularCarrinho(token, resolverSessionId(sessionId)));
     }
 
     @PostMapping("/galeria/{token}/checkout")
     @Operation(summary = "Finalizar compra usando itens do carrinho")
     public ResponseEntity<CompraExtraResponse> checkout(
             @PathVariable UUID token,
-            @RequestHeader(HEADER_SESSION) UUID sessionId,
+            @RequestHeader(value = HEADER_SESSION, required = false) String sessionId,
             @RequestBody(required = false) CheckoutRequest request) {
         var metodo = request != null && request.metodoPagamento() != null
             ? MetodoPagamento.valueOf(request.metodoPagamento().toUpperCase())
             : null;
-        var compra = ecommerceService.checkout(token, sessionId, metodo);
-        return ResponseEntity.status(HttpStatus.CREATED).body(CompraExtraResponse.of(compra));
+        var compra = ecommerceService.checkout(token, resolverSessionId(sessionId), metodo);
+        return ResponseEntity.status(HttpStatus.CREATED).body(CompraExtraResponse.ofPublic(compra));
     }
 
     @GetMapping("/galeria/{token}/compras")
     @Operation(summary = "Listar compras do agendamento (via token)")
     public ResponseEntity<List<CompraExtraResponse>> listarCompras(@PathVariable UUID token) {
         var compras = ecommerceService.listarComprasPorToken(token).stream()
-            .map(CompraExtraResponse::of)
+            .map(CompraExtraResponse::ofPublic)
             .toList();
         return ResponseEntity.ok(compras);
     }
@@ -158,11 +172,11 @@ public class EcommerceController {
     @Operation(summary = "Servir comprovante da compra (via token)")
     public ResponseEntity<Resource> comprovanteCompra(
             @PathVariable UUID token, @PathVariable UUID compraId) {
-        var detalhe = ecommerceService.buscarCompraDetalhePorToken(token, compraId);
-        if (detalhe.urlComprovante() == null) {
+        var comprovantePath = ecommerceService.buscarComprovantePath(token, compraId);
+        if (comprovantePath == null) {
             return ResponseEntity.notFound().build();
         }
-        var file = new FileSystemResource(detalhe.urlComprovante());
+        var file = new FileSystemResource(comprovantePath);
         return ResponseEntity.ok()
             .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"comprovante\"")
             .body(file);
@@ -175,7 +189,16 @@ public class EcommerceController {
             @RequestParam UUID compraExtraId,
             @RequestParam MultipartFile comprovante) {
         var compra = ecommerceService.uploadComprovante(token, compraExtraId, comprovante);
-        return ResponseEntity.ok(CompraExtraResponse.of(compra));
+        return ResponseEntity.ok(CompraExtraResponse.ofPublic(compra));
+    }
+
+    @PostMapping("/galeria/{token}/compras/{compraExtraId}/simular-pagamento")
+    @Operation(summary = "Simular pagamento da compra de extras e liberar as fotos (substitui gateway)")
+    public ResponseEntity<CompraExtraResponse> simularPagamento(
+            @PathVariable UUID token,
+            @PathVariable UUID compraExtraId) {
+        var compra = ecommerceService.simularPagamento(token, compraExtraId);
+        return ResponseEntity.ok(CompraExtraResponse.ofPublic(compra));
     }
 
     @PatchMapping("/admin/compras/{compraExtraId}/confirmar")
@@ -189,9 +212,9 @@ public class EcommerceController {
     @Operation(summary = "Adicionar foto aos favoritos (wishlist)")
     public ResponseEntity<Void> adicionarFavorito(
             @PathVariable UUID token,
-            @RequestHeader(HEADER_SESSION) UUID sessionId,
+            @RequestHeader(value = HEADER_SESSION, required = false) String sessionId,
             @PathVariable UUID fotoId) {
-        ecommerceService.adicionarFavorito(token, sessionId, fotoId);
+        ecommerceService.adicionarFavorito(token, resolverSessionId(sessionId), fotoId);
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
@@ -199,9 +222,9 @@ public class EcommerceController {
     @Operation(summary = "Remover foto dos favoritos")
     public ResponseEntity<Void> removerFavorito(
             @PathVariable UUID token,
-            @RequestHeader(HEADER_SESSION) UUID sessionId,
+            @RequestHeader(value = HEADER_SESSION, required = false) String sessionId,
             @PathVariable UUID fotoId) {
-        ecommerceService.removerFavorito(token, sessionId, fotoId);
+        ecommerceService.removerFavorito(token, resolverSessionId(sessionId), fotoId);
         return ResponseEntity.ok().build();
     }
 
@@ -209,8 +232,8 @@ public class EcommerceController {
     @Operation(summary = "Listar favoritos da sessão")
     public ResponseEntity<List<UUID>> listarFavoritos(
             @PathVariable UUID token,
-            @RequestHeader(HEADER_SESSION) UUID sessionId) {
-        return ResponseEntity.ok(ecommerceService.listarFavoritos(token, sessionId));
+            @RequestHeader(value = HEADER_SESSION, required = false) String sessionId) {
+        return ResponseEntity.ok(ecommerceService.listarFavoritos(token, resolverSessionId(sessionId)));
     }
 
     @GetMapping("/galeria/{token}/download/{fotoId}")
@@ -241,10 +264,31 @@ public class EcommerceController {
     @Operation(summary = "Servir foto com marca d'água (cache desabilitado)")
     public ResponseEntity<Resource> servirWatermarked(@PathVariable UUID fotoId) {
         var foto = fotoService.buscarPorId(fotoId);
+        if (!podeServirPublicamente(foto)) {
+            return ResponseEntity.notFound().build();
+        }
         var file = new FileSystemResource(Path.of(foto.getWatermarkedPath()));
         return ResponseEntity.ok()
             .cacheControl(CacheControl.noStore())
             .contentType(MediaType.IMAGE_JPEG)
             .body(file);
+    }
+
+    @GetMapping("/fotos/{fotoId}/thumb")
+    @Operation(summary = "Servir thumbnail público")
+    public ResponseEntity<Resource> servirThumb(@PathVariable UUID fotoId) {
+        var foto = fotoService.buscarPorId(fotoId);
+        if (!podeServirPublicamente(foto)) {
+            return ResponseEntity.notFound().build();
+        }
+        var file = new FileSystemResource(Path.of(foto.getThumbPath()));
+        return ResponseEntity.ok()
+            .contentType(MediaType.IMAGE_JPEG)
+            .body(file);
+    }
+
+    private boolean podeServirPublicamente(FotoEnsaio foto) {
+        return foto.isVisivel()
+            && (foto.getStatus() == StatusFoto.PUBLICADA || foto.getStatus() == StatusFoto.PAGA);
     }
 }

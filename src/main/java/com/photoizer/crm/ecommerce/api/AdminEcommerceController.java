@@ -47,7 +47,7 @@ public class AdminEcommerceController {
         var selecionadas = (int) fotos.stream().filter(f -> f.isSelecionadaPacote()).count();
         var pagas = (int) fotos.stream().filter(f -> f.getStatus() == StatusFoto.PAGA).count();
         var aguardando = (int) fotos.stream()
-            .filter(f -> f.getStatus() == StatusFoto.AGUARDANDO_COMPROVANTE || f.getStatus() == StatusFoto.AGUARDANDO_CONFIRMACAO)
+            .filter(f -> f.getCompraExtraId() != null && f.getStatus() == StatusFoto.PUBLICADA)
             .count();
 
         var valorTotalExtras = compras.stream()
@@ -56,7 +56,7 @@ public class AdminEcommerceController {
             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         var fotosResponse = fotos.stream().map(FotoEnsaioResponse::of).toList();
-        var comprasResponse = compras.stream().map(CompraExtraResponse::of).toList();
+        var comprasResponse = compras.stream().map(CompraExtraResponse::ofAdmin).toList();
         var linkGaleria = "/g/" + agendamento.getTokenGaleria();
 
         return ResponseEntity.ok(new AdminEcommerceResumoResponse(

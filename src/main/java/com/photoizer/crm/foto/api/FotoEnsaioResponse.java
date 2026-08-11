@@ -17,6 +17,7 @@ public record FotoEnsaioResponse(
     int ordem,
     String status,
     boolean selecionadaPacote,
+    boolean downloadada,
     UUID compraExtraId,
     LocalDateTime createdAt,
     String titulo,
@@ -40,6 +41,7 @@ public record FotoEnsaioResponse(
             f.getOrdem(),
             f.getStatus().name(),
             f.isSelecionadaPacote(),
+            f.getDataDownload() != null,
             f.getCompraExtraId(),
             f.getCreatedAt(),
             f.getTitulo(),
@@ -48,6 +50,36 @@ public record FotoEnsaioResponse(
             f.getCategoria(),
             f.getDataSessao(),
             f.getMetadataExif(),
+            f.isDestaque(),
+            f.getFotoEdicaoId(),
+            f.isVisivel()
+        );
+    }
+
+    /**
+     * Mapeamento seguro para respostas públicas (galeria do cliente).
+     * Oculta a URL do arquivo original e os metadados EXIF.
+     */
+    public static FotoEnsaioResponse ofPublic(FotoEnsaio f) {
+        return new FotoEnsaioResponse(
+            f.getId(),
+            f.getAgendamentoId(),
+            f.getFileName(),
+            null,
+            "/api/v1/ecommerce/fotos/" + f.getId() + "/watermarked",
+            "/api/v1/ecommerce/fotos/" + f.getId() + "/thumb",
+            f.getOrdem(),
+            f.getStatus().name(),
+            f.isSelecionadaPacote(),
+            f.getDataDownload() != null,
+            f.getCompraExtraId(),
+            f.getCreatedAt(),
+            f.getTitulo(),
+            f.getDescricao(),
+            f.getTags(),
+            f.getCategoria(),
+            f.getDataSessao(),
+            null,
             f.isDestaque(),
             f.getFotoEdicaoId(),
             f.isVisivel()

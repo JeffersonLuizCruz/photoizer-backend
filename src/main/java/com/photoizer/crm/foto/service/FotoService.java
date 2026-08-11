@@ -24,7 +24,7 @@ import java.util.UUID;
 public class FotoService {
 
     private static final String TEXTO_MARCA_DAGUA = "© Photoizer Studio";
-    private static final float OPACIDADE_MARCA = 0.15f;
+    private static final float OPACIDADE_MARCA = 0.35f;
 
     private static final List<StatusAgendamento> STATUS_ALLOW_UPLOAD = List.of(
         StatusAgendamento.EM_EDICAO,

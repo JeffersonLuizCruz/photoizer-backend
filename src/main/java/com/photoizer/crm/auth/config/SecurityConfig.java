@@ -1,6 +1,7 @@
 package com.photoizer.crm.auth.config;
 
 import com.photoizer.crm.shared.config.CorsConfig;
+import com.photoizer.crm.shared.config.RateLimitFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,10 +22,12 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtFilter;
     private final CorsConfig corsConfig;
+    private final RateLimitFilter rateLimitFilter;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtFilter, CorsConfig corsConfig) {
+    public SecurityConfig(JwtAuthenticationFilter jwtFilter, CorsConfig corsConfig, RateLimitFilter rateLimitFilter) {
         this.jwtFilter = jwtFilter;
         this.corsConfig = corsConfig;
+        this.rateLimitFilter = rateLimitFilter;
     }
 
     @Bean
@@ -39,6 +42,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/auth/cliente/registro").permitAll()
                 .requestMatchers("/api/v1/ecommerce/galeria/**").permitAll()
                 .requestMatchers("/api/v1/ecommerce/fotos/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/ecommerce/sessao").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/ecommerce/admin/compras/**").authenticated()
                 .requestMatchers("/api/v1/ecommerce/admin/**").authenticated()
                 .requestMatchers("/h2-console/**").permitAll()
@@ -56,6 +60,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.PATCH, "/api/v1/edicao/fotos/reordenar").hasAnyRole("ADMIN", "EDITOR")
                 .requestMatchers(HttpMethod.GET, "/api/v1/edicao/**").authenticated()
                 .requestMatchers("/api/v1/edicao/**").hasAnyRole("ADMIN", "FOTOGRAFO", "EDITOR")
+                .requestMatchers(HttpMethod.GET, "/api/v1/agendamentos/*/fotos/*/original")
+                    .hasAnyRole("ADMIN", "FOTOGRAFO", "EDITOR", "AGENDADOR")
                 .requestMatchers("/api/v1/agendamentos/**").authenticated()
                 .requestMatchers("/api/v1/clientes/**").authenticated()
                 .requestMatchers("/api/v1/pacotes/**").authenticated()
@@ -70,6 +76,10 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/notificacoes/**").authenticated()
                 .requestMatchers("/api/v1/usuarios/**").authenticated()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/avaliacoes/depoimentos").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/avaliacoes").permitAll()
+                .requestMatchers("/api/v1/avaliacoes/**").authenticated()
+                .requestMatchers("/api/v1/sessoes/**").hasAnyRole("ADMIN", "FOTOGRAFO", "EDITOR", "AGENDADOR")
                 .anyRequest().denyAll()
             )
             .headers(h -> h.frameOptions(f -> f.sameOrigin()))
@@ -78,7 +88,8 @@ public class SecurityConfig {
                     response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized"))
                 .accessDeniedHandler((request, response, accessDeniedException) ->
                     response.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden")))
-            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

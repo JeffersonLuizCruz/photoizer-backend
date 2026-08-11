@@ -24,4 +24,33 @@ public record CompraExtraResponse(
             c.getMetodoPagamento() != null ? c.getMetodoPagamento().name() : null
         );
     }
+
+    /**
+     * Mapeamento seguro para respostas públicas (galeria do cliente).
+     * Oculta o caminho absoluto do comprovante no filesystem do servidor.
+     */
+    public static CompraExtraResponse ofPublic(CompraExtra c) {
+        return new CompraExtraResponse(
+            c.getId(), c.getAgendamentoId(), c.getValorTotal(),
+            c.getStatus().name(), null, c.getDataPagamento(),
+            c.getQuantidadeFotos(),
+            c.getMetodoPagamento() != null ? c.getMetodoPagamento().name() : null
+        );
+    }
+
+    /**
+     * Mapeamento para respostas administrativas.
+     * Expõe apenas a URL autenticada do comprovante, nunca o caminho do filesystem.
+     */
+    public static CompraExtraResponse ofAdmin(CompraExtra c) {
+        var comprovanteUrl = c.getUrlComprovante() != null
+            ? "/api/v1/admin/ecommerce/compras/" + c.getId() + "/comprovante"
+            : null;
+        return new CompraExtraResponse(
+            c.getId(), c.getAgendamentoId(), c.getValorTotal(),
+            c.getStatus().name(), comprovanteUrl, c.getDataPagamento(),
+            c.getQuantidadeFotos(),
+            c.getMetodoPagamento() != null ? c.getMetodoPagamento().name() : null
+        );
+    }
 }
