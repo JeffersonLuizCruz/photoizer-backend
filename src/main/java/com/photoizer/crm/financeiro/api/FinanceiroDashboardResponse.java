@@ -23,7 +23,19 @@ public record FinanceiroDashboardResponse(
         BigDecimal margemLucro,
         BigDecimal ticketMedio,
         int qtdTrabalhos,
-        VariacaoCards variacoes
+        VariacaoCards variacoes,
+        Detalhamento detalhamento
+    ) {}
+
+    public record Detalhamento(
+        BigDecimal recebido,
+        BigDecimal entradaEnsaios,
+        BigDecimal restanteEnsaios,
+        BigDecimal receitasEcommerce,
+        BigDecimal receitasAvulsas,
+        BigDecimal comissao,
+        BigDecimal deslocamento,
+        BigDecimal despesas
     ) {}
 
     public record VariacaoCards(

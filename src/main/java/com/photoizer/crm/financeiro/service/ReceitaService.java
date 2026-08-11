@@ -1,8 +1,6 @@
 package com.photoizer.crm.financeiro.service;
 
-import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.cliente.repository.ClienteRepository;
-import com.photoizer.crm.comissao.repository.IndicacaoRepository;
 import com.photoizer.crm.config.service.ConfiguracaoService;
 import com.photoizer.crm.financeiro.api.ReceitaRequest;
 import com.photoizer.crm.financeiro.model.Receita;
@@ -28,26 +26,20 @@ import java.util.UUID;
 public class ReceitaService {
 
     private final ReceitaRepository receitaRepository;
-    private final AgendamentoRepository agendamentoRepository;
     private final ClienteRepository clienteRepository;
-    private final IndicacaoRepository indicacaoRepository;
     private final ConfiguracaoService configuracaoService;
 
     public ReceitaService(ReceitaRepository receitaRepository,
-                          AgendamentoRepository agendamentoRepository,
                           ClienteRepository clienteRepository,
-                          IndicacaoRepository indicacaoRepository,
                           ConfiguracaoService configuracaoService) {
         this.receitaRepository = receitaRepository;
-        this.agendamentoRepository = agendamentoRepository;
         this.clienteRepository = clienteRepository;
-        this.indicacaoRepository = indicacaoRepository;
         this.configuracaoService = configuracaoService;
     }
 
     public Receita criar(ReceitaRequest request) {
         var receita = Receita.builder()
-            .agendamentoId(request.agendamentoId())
+            .agendamentoId(null)
             .tipoServico(request.tipoServico() != null ? request.tipoServico() : TipoServico.ENSAIO)
             .descricao(request.descricao())
             .valorBruto(request.valorBruto())
@@ -69,7 +61,7 @@ public class ReceitaService {
         var receita = receitaRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("Receita não encontrada: " + id));
 
-        receita.setAgendamentoId(request.agendamentoId());
+        receita.setAgendamentoId(null);
         receita.setTipoServico(request.tipoServico() != null ? request.tipoServico() : TipoServico.ENSAIO);
         receita.setDescricao(request.descricao());
         receita.setValorBruto(request.valorBruto());
@@ -106,7 +98,7 @@ public class ReceitaService {
         var origem = receitaRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("Receita não encontrada: " + id));
         var copia = Receita.builder()
-            .agendamentoId(origem.getAgendamentoId())
+            .agendamentoId(null)
             .clienteId(origem.getClienteId())
             .clienteNome(origem.getClienteNome())
             .tipoServico(origem.getTipoServico())
@@ -162,15 +154,8 @@ public class ReceitaService {
     }
 
     private void preencherCliente(Receita receita, ReceitaRequest request) {
-        if (request.agendamentoId() != null) {
-            var agendamento = agendamentoRepository.findById(request.agendamentoId())
-                .orElseThrow(() -> new IllegalArgumentException("Trabalho não encontrado: " + request.agendamentoId()));
-            receita.setClienteId(agendamento.getCliente().getId());
-            receita.setClienteNome(agendamento.getCliente().getNome());
-            return;
-        }
         if (request.clienteId() == null) {
-            throw new IllegalArgumentException("Informe um trabalho vinculado ou um cliente");
+            throw new IllegalArgumentException("Informe um cliente para a receita");
         }
         var cliente = clienteRepository.findById(request.clienteId())
             .orElseThrow(() -> new IllegalArgumentException("Cliente não encontrado: " + request.clienteId()));
@@ -180,17 +165,7 @@ public class ReceitaService {
 
     private void preencherComissao(Receita receita) {
         var bruto = receita.getValorBruto();
-        BigDecimal percentual = null;
-
-        if (receita.getAgendamentoId() != null) {
-            var indicacoes = indicacaoRepository.findByAgendamentoIdIn(List.of(receita.getAgendamentoId()));
-            if (!indicacoes.isEmpty()) {
-                percentual = indicacoes.get(0).getPercentual();
-            }
-        }
-        if (percentual == null) {
-            percentual = configuracaoService.getValorDecimal("percentualComissao", BigDecimal.TEN);
-        }
+        var percentual = configuracaoService.getValorDecimal("percentualComissao", BigDecimal.TEN);
 
         var comissao = bruto.multiply(percentual).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
         receita.setValorComissao(comissao);

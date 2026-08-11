@@ -22,7 +22,6 @@ public record FinanceiroTrabalhoResponse(
     BigDecimal custoTotal,
     BigDecimal lucroBruto,
     BigDecimal margemLucro,
-    List<ReceitaResponse> receitas,
     List<DespesaResponse> despesas,
     List<Pagamento> pagamentos
 ) {}

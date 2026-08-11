@@ -19,7 +19,6 @@ import com.photoizer.crm.financeiro.api.FinanceiroRelatoriosResponse;
 import com.photoizer.crm.financeiro.api.FinanceiroResumoResponse;
 import com.photoizer.crm.financeiro.api.FinanceiroTrabalhoResponse;
 import com.photoizer.crm.financeiro.api.FluxoCaixaResponse;
-import com.photoizer.crm.financeiro.api.ReceitaResponse;
 import com.photoizer.crm.financeiro.model.FotoExtra;
 import com.photoizer.crm.financeiro.model.Pagamento;
 import com.photoizer.crm.financeiro.model.Receita;
@@ -196,7 +195,6 @@ public class FinanceiroService {
         var agendamento = agendamentoRepository.findById(agendamentoId)
             .orElseThrow(() -> new IllegalArgumentException("Agendamento não encontrado: " + agendamentoId));
 
-        var receitas = receitaRepository.findByAgendamentoIdOrderByDataPrevisaoRecebimentoDesc(agendamentoId);
         var despesas = despesaRepository.findByAgendamentoIdOrderByDataDesc(agendamentoId);
         var pagamentos = pagamentoRepository.findByAgendamentoId(agendamentoId);
 
@@ -216,11 +214,6 @@ public class FinanceiroService {
         var totalRecebido = agendamento.getValorEntradaPago() != null
             ? agendamento.getValorEntradaPago()
             : BigDecimal.ZERO;
-        for (var r : receitas) {
-            if (r.getStatus() != StatusReceita.CANCELADO) {
-                totalRecebido = totalRecebido.add(r.getValorRecebido());
-            }
-        }
 
         var saldoDevedor = valorCobrado.subtract(totalRecebido);
         var statusPagamento = saldoDevedor.compareTo(BigDecimal.ZERO) <= 0
@@ -247,7 +240,6 @@ public class FinanceiroService {
             custoTotal,
             lucroBruto,
             margemLucro,
-            receitas.stream().map(ReceitaResponse::of).toList(),
             despesas.stream().map(DespesaResponse::of).toList(),
             pagamentos
         );
