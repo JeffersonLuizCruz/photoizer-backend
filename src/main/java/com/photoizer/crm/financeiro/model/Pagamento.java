@@ -19,6 +19,7 @@ import lombok.experimental.SuperBuilder;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "pagamentos")
@@ -49,4 +50,7 @@ public class Pagamento extends BaseEntity {
     @Size(max = 255)
     @Column(length = 255)
     private String observacao;
+
+    @Column(name = "compra_extra_id")
+    private UUID compraExtraId;
 }

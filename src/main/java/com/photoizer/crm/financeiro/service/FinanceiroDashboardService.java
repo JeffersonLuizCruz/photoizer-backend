@@ -8,9 +8,6 @@ import com.photoizer.crm.comissao.repository.IndicacaoRepository;
 import com.photoizer.crm.despesa.model.Despesa;
 import com.photoizer.crm.despesa.model.StatusDespesa;
 import com.photoizer.crm.despesa.repository.DespesaRepository;
-import com.photoizer.crm.ecommerce.model.CompraExtra;
-import com.photoizer.crm.ecommerce.model.StatusCompraExtra;
-import com.photoizer.crm.ecommerce.repository.CompraExtraRepository;
 import com.photoizer.crm.financeiro.api.FinanceiroDashboardResponse;
 import com.photoizer.crm.financeiro.model.Receita;
 import com.photoizer.crm.financeiro.model.StatusReceita;
@@ -52,18 +49,15 @@ public class FinanceiroDashboardService {
     private final DespesaRepository despesaRepository;
     private final AgendamentoRepository agendamentoRepository;
     private final IndicacaoRepository indicacaoRepository;
-    private final CompraExtraRepository compraExtraRepository;
 
     public FinanceiroDashboardService(ReceitaRepository receitaRepository,
                                       DespesaRepository despesaRepository,
                                       AgendamentoRepository agendamentoRepository,
-                                      IndicacaoRepository indicacaoRepository,
-                                      CompraExtraRepository compraExtraRepository) {
+                                      IndicacaoRepository indicacaoRepository) {
         this.receitaRepository = receitaRepository;
         this.despesaRepository = despesaRepository;
         this.agendamentoRepository = agendamentoRepository;
         this.indicacaoRepository = indicacaoRepository;
-        this.compraExtraRepository = compraExtraRepository;
     }
 
     public FinanceiroDashboardResponse calcular(LocalDate dataInicio, LocalDate dataFim,
@@ -76,22 +70,21 @@ public class FinanceiroDashboardService {
             .filter(a -> clienteId == null || a.getCliente().getId().equals(clienteId))
             .toList();
         var indicacoes = indicacaoRepository.findAll();
-        var compras = compraExtraRepository.findAll();
 
         boolean temPeriodo = dataInicio != null && dataFim != null;
         var inicio = dataInicio != null ? dataInicio : LocalDate.of(1970, 1, 1);
         var fim = dataFim != null ? dataFim : MAX_FIM;
 
-        var cards = calcularCards(inicio, fim, receitas, despesas, agendamentos, indicacoes, compras, temPeriodo);
+        var cards = calcularCards(inicio, fim, receitas, despesas, agendamentos, indicacoes, temPeriodo);
         var meses = mesesNoRange(temPeriodo ? inicio : YearMonth.now().minusMonths(5).atDay(1),
             temPeriodo ? fim : YearMonth.now().atEndOfMonth());
 
-        var barraMensal = calcularBarraMensal(meses, inicio, fim, receitas, despesas, agendamentos, indicacoes, compras, temPeriodo);
+        var barraMensal = calcularBarraMensal(meses, inicio, fim, receitas, despesas, agendamentos, indicacoes, temPeriodo);
         var despesasPorCategoria = calcularDespesasPorCategoria(inicio, fim, despesas);
-        var lucroMensal = calcularLucroMensal(meses, inicio, fim, receitas, despesas, agendamentos, indicacoes, compras, temPeriodo);
+        var lucroMensal = calcularLucroMensal(meses, inicio, fim, receitas, despesas, agendamentos, indicacoes, temPeriodo);
         var rentabilidadePorServico = calcularRentabilidadePorServico(inicio, fim, receitas, despesas, agendamentos, indicacoes);
         var rentabilidadePorTrabalho = calcularRentabilidadePorTrabalho(inicio, fim, despesas, agendamentos, indicacoes);
-        var ultimosLancamentos = calcularUltimosLancamentos(inicio, fim, receitas, despesas, agendamentos, compras);
+        var ultimosLancamentos = calcularUltimosLancamentos(inicio, fim, receitas, despesas, agendamentos);
 
         return new FinanceiroDashboardResponse(cards, barraMensal, despesasPorCategoria, lucroMensal,
             rentabilidadePorServico, rentabilidadePorTrabalho, ultimosLancamentos);
@@ -116,10 +109,10 @@ public class FinanceiroDashboardService {
 
     private FinanceiroDashboardResponse.CardsResumo calcularCards(
             LocalDate inicio, LocalDate fim, List<Receita> receitas, List<Despesa> despesas,
-            List<Agendamento> agendamentos, List<Indicacao> indicacoes, List<CompraExtra> compras,
+            List<Agendamento> agendamentos, List<Indicacao> indicacoes,
             boolean temPeriodo) {
 
-        var agg = calcularAgregados(inicio, fim, receitas, despesas, agendamentos, indicacoes, compras);
+        var agg = calcularAgregados(inicio, fim, receitas, despesas, agendamentos, indicacoes);
 
         var margemLucro = agg.valorBruto().signum() > 0
             ? agg.liquidoPrevisto().multiply(BigDecimal.valueOf(100)).divide(agg.valorBruto(), 2, RoundingMode.HALF_UP)
@@ -129,14 +122,14 @@ public class FinanceiroDashboardService {
             : BigDecimal.ZERO;
 
         var variacoes = temPeriodo
-            ? calcularVariacoes(inicio, fim, receitas, despesas, agendamentos, indicacoes, compras)
+            ? calcularVariacoes(inicio, fim, receitas, despesas, agendamentos, indicacoes)
             : null;
 
         var detalhamento = new FinanceiroDashboardResponse.Detalhamento(
             agg.realizadas(),
             agg.entradaEnsaios(),
             agg.restanteEnsaios(),
-            agg.receitasEcommerce(),
+            BigDecimal.ZERO,
             agg.receitasAvulsasBruto(),
             agg.comissao(),
             agg.deslocamentoEfetivo(),
@@ -151,7 +144,7 @@ public class FinanceiroDashboardService {
 
     private Agregados calcularAgregados(
             LocalDate inicio, LocalDate fim, List<Receita> receitas, List<Despesa> despesas,
-            List<Agendamento> agendamentos, List<Indicacao> indicacoes, List<CompraExtra> compras) {
+            List<Agendamento> agendamentos, List<Indicacao> indicacoes) {
 
         var ensaiosPeriodo = agendamentos.stream()
             .filter(a -> emPeriodo(a.getDataHoraEnsaio() != null ? a.getDataHoraEnsaio().toLocalDate() : null, inicio, fim))
@@ -193,34 +186,18 @@ public class FinanceiroDashboardService {
             }
         }
 
-        var ecommercePrevisto = BigDecimal.ZERO;
-        var ecommerceRealizadas = BigDecimal.ZERO;
-        var ecommerceAReceber = BigDecimal.ZERO;
-        for (var c : compras) {
-            if (c.getStatus() == StatusCompraExtra.CANCELADA) continue;
-            var data = dataReferencia(c);
-            if (data == null || !emPeriodo(data, inicio, fim)) continue;
-            if (c.getStatus() == StatusCompraExtra.PAGA) {
-                ecommerceRealizadas = ecommerceRealizadas.add(c.getValorTotal());
-            } else {
-                ecommerceAReceber = ecommerceAReceber.add(c.getValorTotal());
-            }
-            ecommercePrevisto = ecommercePrevisto.add(c.getValorTotal());
-        }
-
         var despesasPeriodo = somar(despesas.stream()
             .filter(d -> emPeriodo(d.getData(), inicio, fim)).toList(), Despesa::getValor);
         var despesasPagas = somar(despesas.stream()
             .filter(d -> d.getStatus() == StatusDespesa.PAGO && emPeriodo(d.getData(), inicio, fim)).toList(),
             Despesa::getValor);
 
-        var valorBruto = entradaEnsaios.add(restanteEnsaios).add(avulsasBruto).add(ecommercePrevisto);
-        var realizadas = entradaEnsaios.add(avulsasRealizadas).add(ecommerceRealizadas);
-        var aReceber = restanteEnsaios.add(aReceberAvulsas).add(ecommerceAReceber);
+        var valorBruto = entradaEnsaios.add(restanteEnsaios).add(avulsasBruto);
+        var realizadas = entradaEnsaios.add(avulsasRealizadas);
+        var aReceber = restanteEnsaios.add(aReceberAvulsas);
 
         return new Agregados(
             entradaEnsaios, restanteEnsaios, avulsasBruto, avulsasRealizadas, aReceberAvulsas,
-            ecommercePrevisto, ecommerceRealizadas, ecommerceAReceber,
             comissao, comissaoPaga, deslocamentoEfetivo, deslocamentoEfetivoPago,
             despesasPeriodo, despesasPagas, qtdTrabalhos, valorBruto, realizadas, aReceber
         );
@@ -228,12 +205,12 @@ public class FinanceiroDashboardService {
 
     private FinanceiroDashboardResponse.VariacaoCards calcularVariacoes(
             LocalDate inicio, LocalDate fim, List<Receita> receitas, List<Despesa> despesas,
-            List<Agendamento> agendamentos, List<Indicacao> indicacoes, List<CompraExtra> compras) {
+            List<Agendamento> agendamentos, List<Indicacao> indicacoes) {
         var tamanho = fim.toEpochDay() - inicio.toEpochDay() + 1;
         var prevInicio = inicio.minusDays(tamanho);
         var prevFim = inicio.minusDays(1);
 
-        var agg = calcularAgregados(prevInicio, prevFim, receitas, despesas, agendamentos, indicacoes, compras);
+        var agg = calcularAgregados(prevInicio, prevFim, receitas, despesas, agendamentos, indicacoes);
 
         return new FinanceiroDashboardResponse.VariacaoCards(
             agg.valorBruto(), agg.despesasTotais(), agg.liquidoPrevisto(), agg.liquidoRealizado()
@@ -243,7 +220,7 @@ public class FinanceiroDashboardService {
     private List<FinanceiroDashboardResponse.DadoMensal> calcularBarraMensal(
             List<YearMonth> meses, LocalDate inicio, LocalDate fim,
             List<Receita> receitas, List<Despesa> despesas, List<Agendamento> agendamentos,
-            List<Indicacao> indicacoes, List<CompraExtra> compras, boolean temPeriodo) {
+            List<Indicacao> indicacoes, boolean temPeriodo) {
         var receitasPorMes = new HashMap<YearMonth, BigDecimal>();
         var despesasPorMes = new HashMap<YearMonth, BigDecimal>();
         var dataEnsaioPorId = dataEnsaioPorId(agendamentos);
@@ -266,12 +243,6 @@ public class FinanceiroDashboardService {
             var data = r.getDataPrevisaoRecebimento();
             if (data == null || (temPeriodo && !emPeriodo(data, inicio, fim))) continue;
             receitasPorMes.merge(YearMonth.from(data), r.getValorBruto(), BigDecimal::add);
-        }
-        for (var c : compras) {
-            if (c.getStatus() == StatusCompraExtra.CANCELADA) continue;
-            var data = dataReferencia(c);
-            if (data == null || (temPeriodo && !emPeriodo(data, inicio, fim))) continue;
-            receitasPorMes.merge(YearMonth.from(data), c.getValorTotal(), BigDecimal::add);
         }
         for (var d : despesas) {
             if (temPeriodo && !emPeriodo(d.getData(), inicio, fim)) continue;
@@ -310,7 +281,7 @@ public class FinanceiroDashboardService {
     private List<FinanceiroDashboardResponse.DadoLucroMensal> calcularLucroMensal(
             List<YearMonth> meses, LocalDate inicio, LocalDate fim,
             List<Receita> receitas, List<Despesa> despesas, List<Agendamento> agendamentos,
-            List<Indicacao> indicacoes, List<CompraExtra> compras, boolean temPeriodo) {
+            List<Indicacao> indicacoes, boolean temPeriodo) {
         var recebidoPorMes = new HashMap<YearMonth, BigDecimal>();
         var despesasPorMes = new HashMap<YearMonth, BigDecimal>();
         var dataEnsaioPorId = dataEnsaioPorId(agendamentos);
@@ -333,12 +304,6 @@ public class FinanceiroDashboardService {
             var data = r.getDataRecebimentoReal().toLocalDate();
             if (temPeriodo && !emPeriodo(data, inicio, fim)) continue;
             recebidoPorMes.merge(YearMonth.from(data), r.getValorRecebido(), BigDecimal::add);
-        }
-        for (var c : compras) {
-            if (c.getStatus() != StatusCompraExtra.PAGA) continue;
-            var data = dataReferencia(c);
-            if (data == null || (temPeriodo && !emPeriodo(data, inicio, fim))) continue;
-            recebidoPorMes.merge(YearMonth.from(data), c.getValorTotal(), BigDecimal::add);
         }
         for (var d : despesas) {
             if (d.getStatus() != StatusDespesa.PAGO) continue;
@@ -423,7 +388,7 @@ public class FinanceiroDashboardService {
 
     private List<FinanceiroDashboardResponse.Lancamento> calcularUltimosLancamentos(
             LocalDate inicio, LocalDate fim, List<Receita> receitas,
-            List<Despesa> despesas, List<Agendamento> agendamentos, List<CompraExtra> compras) {
+            List<Despesa> despesas, List<Agendamento> agendamentos) {
         var lancamentos = new ArrayList<FinanceiroDashboardResponse.Lancamento>();
 
         for (var a : agendamentos) {
@@ -455,16 +420,6 @@ public class FinanceiroDashboardService {
                 r.getId().toString(), "RECEITA", data, descricao,
                 labelServico(r.getTipoServico()), r.getValorFinal(),
                 r.getStatus().name(), "MANUAL"
-            ));
-        }
-
-        for (var c : compras) {
-            if (c.getStatus() == StatusCompraExtra.CANCELADA) continue;
-            var data = dataReferencia(c);
-            if (data == null || !emPeriodo(data, inicio, fim)) continue;
-            lancamentos.add(new FinanceiroDashboardResponse.Lancamento(
-                c.getId().toString(), "RECEITA", data, "E-commerce — fotos/vídeos extras",
-                "E-commerce", c.getValorTotal(), c.getStatus().name(), "ECOMMERCE"
             ));
         }
 
@@ -515,13 +470,6 @@ public class FinanceiroDashboardService {
         return a.getCustoDeslocamento() != null ? a.getCustoDeslocamento() : BigDecimal.ZERO;
     }
 
-    private LocalDate dataReferencia(CompraExtra c) {
-        if (c.getStatus() == StatusCompraExtra.PAGA && c.getDataPagamento() != null) {
-            return c.getDataPagamento().toLocalDate();
-        }
-        return c.getCreatedAt() != null ? c.getCreatedAt().toLocalDate() : null;
-    }
-
     private <T> BigDecimal somar(List<T> itens, Function<T, BigDecimal> mapper) {
         var total = BigDecimal.ZERO;
         for (var item : itens) {
@@ -563,9 +511,6 @@ public class FinanceiroDashboardService {
         BigDecimal receitasAvulsasBruto,
         BigDecimal receitasAvulsasRealizadas,
         BigDecimal aReceberAvulsas,
-        BigDecimal receitasEcommerce,
-        BigDecimal ecommerceRealizadas,
-        BigDecimal ecommerceAReceber,
         BigDecimal comissao,
         BigDecimal comissaoPaga,
         BigDecimal deslocamentoEfetivo,

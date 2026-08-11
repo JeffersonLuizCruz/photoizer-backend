@@ -394,6 +394,26 @@ public class FinanceiroService {
         return pagamentoRepository.save(pagamento);
     }
 
+    public void registrarPagamentoExtraEcommerce(UUID agendamentoId, BigDecimal valor, UUID compraExtraId) {
+        var agendamento = agendamentoRepository.findById(agendamentoId)
+            .orElseThrow(() -> new IllegalArgumentException("Agendamento não encontrado: " + agendamentoId));
+
+        agendamento.setValorExtras(agendamento.getValorExtras().add(valor));
+        agendamento.setValorTotalFinal(agendamento.getValorTotal().add(agendamento.getValorExtras()));
+        agendamento.setValorEntradaPago(agendamento.getValorEntradaPago().add(valor));
+        agendamento.setValorRestante(agendamento.getValorTotalFinal().subtract(agendamento.getValorEntradaPago()));
+        agendamentoRepository.save(agendamento);
+
+        var pagamento = Pagamento.builder()
+            .agendamento(agendamento)
+            .valor(valor)
+            .dataPagamento(LocalDateTime.now())
+            .compraExtraId(compraExtraId)
+            .observacao("Fotos extras (e-commerce)")
+            .build();
+        pagamentoRepository.save(pagamento);
+    }
+
     public FotoExtra adicionarFotoExtra(UUID agendamentoId, int quantidade, BigDecimal valorUnitario,
                                         String indicadorNome, String indicadorTelefone, UUID indicadorId) {
         var agendamento = agendamentoRepository.findById(agendamentoId).orElseThrow();
