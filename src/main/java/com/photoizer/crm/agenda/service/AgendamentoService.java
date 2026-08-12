@@ -412,42 +412,148 @@ public class AgendamentoService {
         return agendamento;
     }
 
-    private Cliente resolverCliente(CriarAgendamentoCommand command) {
-        if (command.clienteId() != null) {
-            return clienteRepository.findById(command.clienteId())
-                .orElseThrow(() -> new ClienteNaoEncontradoException(command.clienteId()));
+    public Agendamento criarAgendamentoDeContrato(com.photoizer.crm.contrato.event.ContratoAprovadoEvent event) {
+        var pacote = pacoteRepository.findById(event.pacoteId())
+            .orElseThrow(() -> new PacoteNaoEncontradoException(event.pacoteId()));
+
+        if (!pacote.getAtivo()) {
+            throw new PacoteInativoException(pacote.getId());
         }
 
-        if (command.telefone() != null && !command.telefone().isBlank()) {
-            var clienteExistente = clienteRepository.findByTelefone(command.telefone());
+        var editor = event.editorId() != null
+            ? userRepository.findById(event.editorId())
+                .orElseThrow(() -> new EditorNaoEncontradoException(event.editorId()))
+            : null;
+
+        if (event.dataHoraEnsaio().isBefore(LocalDateTime.now())) {
+            throw new AgendamentoNoPassadoException();
+        }
+
+        var duracao = event.duracaoMinutos() != null ? event.duracaoMinutos() : 60;
+        validarConflitoAgenda(pacote, event.dataHoraEnsaio(), duracao, event.localEnsaio());
+
+        var cliente = resolverCliente(
+            event.clienteId(), event.nome(), event.telefone(), event.email(),
+            event.cpf(), event.cidade(), event.estado(), null);
+
+        var custoDeslocamento = event.custoDeslocamento() != null
+            ? event.custoDeslocamento()
+            : BigDecimal.ZERO;
+        var repassarDeslocamento = event.repassarDeslocamento() != null
+            ? event.repassarDeslocamento()
+            : true;
+        var taxaDeslocamento = repassarDeslocamento ? custoDeslocamento : BigDecimal.ZERO;
+        var percentualEntrada = event.percentualEntrada() != null
+            ? event.percentualEntrada()
+            : configuracaoService.getValorDecimal("percentualEntrada", new BigDecimal("30.00"));
+        var valorTotal = event.valorTotal();
+        var valorEntradaExigido = event.valorEntradaExigido();
+        var valorEntradaPago = valorEntradaExigido;
+        var valorRestante = valorTotal.subtract(valorEntradaPago);
+        var valorExtras = BigDecimal.ZERO;
+        var valorTotalFinal = valorTotal.add(valorExtras);
+
+        var agendamento = Agendamento.builder()
+            .cliente(cliente)
+            .pacote(pacote)
+            .editor(editor)
+            .dataHoraEnsaio(event.dataHoraEnsaio())
+            .duracaoMinutos(duracao)
+            .localEnsaio(event.localEnsaio())
+            .enderecoCompleto(event.enderecoCompleto())
+            .valorTotal(valorTotal)
+            .valorEntradaExigido(valorEntradaExigido)
+            .valorEntradaPago(valorEntradaPago)
+            .valorRestante(valorRestante)
+            .valorExtras(valorExtras)
+            .taxaDeslocamento(taxaDeslocamento)
+            .custoDeslocamento(custoDeslocamento)
+            .repassarDeslocamento(repassarDeslocamento)
+            .valorTotalFinal(valorTotalFinal)
+            .percentualEntrada(percentualEntrada)
+            .status(StatusAgendamento.CONFIRMADO)
+            .dataConfirmacao(LocalDateTime.now())
+            .urlComprovanteEntrada(event.urlComprovanteEntrada())
+            .autorizaUsoImagem(event.autorizaUsoImagem() != null ? event.autorizaUsoImagem() : false)
+            .contratoGerado(false)
+            .ensaioDestaque(false)
+            .observacoes(event.observacoes())
+            .tokenGaleria(UUID.randomUUID())
+            .tokenExpiracao(LocalDateTime.now().plusDays(15))
+            .build();
+
+        agendamento = agendamentoRepository.save(agendamento);
+
+        eventPublisher.publishEvent(new AgendamentoCriadoEvent(
+            agendamento.getId(),
+            agendamento.getCliente().getId(),
+            agendamento.getPacote().getId(),
+            agendamento.getDataHoraEnsaio(),
+            event.indicadorId(),
+            event.indicadorNome(),
+            event.indicadorTelefone(),
+            null,
+            event.valorBasePacote()
+        ));
+
+        eventPublisher.publishEvent(new AgendamentoConfirmadoEvent(
+            agendamento.getId(),
+            agendamento.getCliente().getId()
+        ));
+
+        return agendamento;
+    }
+
+    private Cliente resolverCliente(CriarAgendamentoCommand command) {
+        return resolverCliente(
+            command.clienteId(), command.nome(), command.telefone(), command.email(),
+            command.cpf(), command.cidade(), command.estado(), command.origem());
+    }
+
+    private Cliente resolverCliente(UUID clienteId, String nome, String telefone, String email,
+                                    String cpf, String cidade, String estado, String origem) {
+        if (clienteId != null) {
+            return clienteRepository.findById(clienteId)
+                .orElseThrow(() -> new ClienteNaoEncontradoException(clienteId));
+        }
+
+        if (telefone != null && !telefone.isBlank()) {
+            var clienteExistente = clienteRepository.findByTelefone(telefone);
             if (clienteExistente.isPresent()) {
                 return clienteExistente.get();
             }
         }
 
-        if (command.nome() == null || command.nome().isBlank()) {
+        if (nome == null || nome.isBlank()) {
             throw new IllegalArgumentException("Nome do cliente é obrigatório quando não informado um clienteId");
         }
-        if (command.telefone() == null || command.telefone().isBlank()) {
+        if (telefone == null || telefone.isBlank()) {
             throw new IllegalArgumentException("Telefone do cliente é obrigatório quando não informado um clienteId");
         }
 
         OrigemCliente origemCliente = OrigemCliente.OUTROS;
-        if (command.origem() != null && !command.origem().isBlank()) {
+        if (origem != null && !origem.isBlank()) {
             try {
-                origemCliente = OrigemCliente.valueOf(command.origem());
+                origemCliente = OrigemCliente.valueOf(origem);
             } catch (IllegalArgumentException e) {
                 origemCliente = OrigemCliente.OUTROS;
             }
         }
 
+        if (cpf != null && !cpf.isBlank()) {
+            var porCpf = clienteRepository.findByCpf(cpf);
+            if (porCpf.isPresent()) {
+                return porCpf.get();
+            }
+        }
+
         var cliente = Cliente.builder()
-            .nome(command.nome())
-            .telefone(command.telefone())
-            .email(command.email())
-            .cpf(command.cpf())
-            .cidade(command.cidade())
-            .estado(command.estado())
+            .nome(nome)
+            .telefone(telefone)
+            .email(email)
+            .cpf(cpf)
+            .cidade(cidade)
+            .estado(estado)
             .origem(origemCliente)
             .build();
 

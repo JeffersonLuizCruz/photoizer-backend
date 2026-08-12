@@ -43,6 +43,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/ecommerce/galeria/**").permitAll()
                 .requestMatchers("/api/v1/ecommerce/fotos/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/ecommerce/sessao").permitAll()
+                .requestMatchers("/api/v1/contratos/publico/**").permitAll()
+                .requestMatchers("/api/v1/contratos/**").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/ecommerce/admin/compras/**").authenticated()
                 .requestMatchers("/api/v1/ecommerce/admin/**").authenticated()
                 .requestMatchers("/h2-console/**").permitAll()

@@ -90,6 +90,25 @@ public class DataSeeder implements CommandLineRunner {
         limparIndicadoresDuplicados();
         seedCategoriasDespesa();
         backfillDespesasLegadas();
+        seedConfigsContrato();
+    }
+
+    private void seedConfigsContrato() {
+        List.of(
+            new String[]{"nomeContratada", "Ana Carolina de Oliveira Cruz - Carol Oliva Fotografia"},
+            new String[]{"cnpjContratada", "62.017.385/0001-57"},
+            new String[]{"enderecoContratada", "Ipojuca - PE"},
+            new String[]{"pixChave", "62.017.385/0001-57"},
+            new String[]{"pixTipoChave", "CNPJ"},
+            new String[]{"contratoDiasValidade", "7"}
+        ).forEach(chaveValor -> {
+            if (!configuracaoRepository.existsById(chaveValor[0])) {
+                var config = new Configuracao();
+                config.setChave(chaveValor[0]);
+                config.setValor(chaveValor[1]);
+                configuracaoRepository.save(config);
+            }
+        });
     }
 
     private void limparIndicadoresDuplicados() {

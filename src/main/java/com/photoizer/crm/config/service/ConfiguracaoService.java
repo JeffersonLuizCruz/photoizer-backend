@@ -48,4 +48,19 @@ public class ConfiguracaoService {
             .map(c -> new BigDecimal(c.getValor()))
             .orElse(valorPadrao);
     }
+
+    @Transactional(readOnly = true)
+    public int getValorInteiro(String chave, int valorPadrao) {
+        return configuracaoRepository.findById(chave)
+            .map(c -> Integer.parseInt(c.getValor()))
+            .orElse(valorPadrao);
+    }
+
+    @Transactional(readOnly = true)
+    public String getValorTexto(String chave, String valorPadrao) {
+        return configuracaoRepository.findById(chave)
+            .map(c -> c.getValor())
+            .filter(v -> v != null && !v.isBlank())
+            .orElse(valorPadrao);
+    }
 }

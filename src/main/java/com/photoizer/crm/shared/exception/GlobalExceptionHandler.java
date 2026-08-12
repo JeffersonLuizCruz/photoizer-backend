@@ -16,6 +16,9 @@ import com.photoizer.crm.edicao.exception.FotoEdicaoNaoEncontradaException;
 import com.photoizer.crm.edicao.exception.FotoSemRawException;
 import com.photoizer.crm.edicao.exception.StatusEdicaoInvalidoException;
 import com.photoizer.crm.ecommerce.exception.TokenExpiradoException;
+import com.photoizer.crm.contrato.exception.ContratoEstadoInvalidoException;
+import com.photoizer.crm.contrato.exception.ContratoNaoEncontradoException;
+import com.photoizer.crm.contrato.exception.ContratoTokenExpiradoException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -103,6 +106,24 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(TokenExpiradoException.class)
     public ResponseEntity<ErrorResponse> handleTokenExpirado(TokenExpiradoException e) {
         log.warn("Token da galeria expirado: {}", e.getMessage());
+        return build(HttpStatus.GONE, e);
+    }
+
+    @ExceptionHandler(ContratoNaoEncontradoException.class)
+    public ResponseEntity<ErrorResponse> handleContratoNaoEncontrado(ContratoNaoEncontradoException e) {
+        log.warn("Contrato nao encontrado: {}", e.getMessage());
+        return build(HttpStatus.NOT_FOUND, e);
+    }
+
+    @ExceptionHandler(ContratoEstadoInvalidoException.class)
+    public ResponseEntity<ErrorResponse> handleContratoEstadoInvalido(ContratoEstadoInvalidoException e) {
+        log.warn("Estado invalido do contrato: {}", e.getMessage());
+        return build(HttpStatus.CONFLICT, e);
+    }
+
+    @ExceptionHandler(ContratoTokenExpiradoException.class)
+    public ResponseEntity<ErrorResponse> handleContratoTokenExpirado(ContratoTokenExpiradoException e) {
+        log.warn("Token do contrato expirado: {}", e.getMessage());
         return build(HttpStatus.GONE, e);
     }
 
