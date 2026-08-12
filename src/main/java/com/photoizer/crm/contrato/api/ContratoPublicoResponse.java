@@ -26,7 +26,8 @@ public record ContratoPublicoResponse(
     BigDecimal percentualEntrada,
     BigDecimal valorTotal,
     BigDecimal valorEntradaExigido,
-    BigDecimal valorRestante
+    BigDecimal valorRestante,
+    String clausulasHtml
 ) {
     public static ContratoPublicoResponse of(
         Contrato c,
@@ -34,7 +35,8 @@ public record ContratoPublicoResponse(
         String contratadaCnpj,
         String contratadaCidade,
         String pixChave,
-        String pixTipoChave
+        String pixTipoChave,
+        String clausulasHtml
     ) {
         boolean podeAssinar = c.getStatus() == StatusContrato.PUBLICADO
             || c.getStatus() == StatusContrato.DEVOLVIDO;
@@ -47,7 +49,8 @@ public record ContratoPublicoResponse(
             c.getDataHoraEnsaio(), c.getDuracaoMinutos(),
             c.getLocalEnsaio(), c.getEnderecoCompleto(),
             c.getTaxaDeslocamento(), c.getPercentualEntrada(),
-            c.getValorTotal(), c.getValorEntradaExigido(), c.getValorRestante()
+            c.getValorTotal(), c.getValorEntradaExigido(), c.getValorRestante(),
+            clausulasHtml
         );
     }
 }

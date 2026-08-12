@@ -40,6 +40,7 @@ public class ContratoPublicoService {
     private final FileStorageService fileStorageService;
     private final ContratoPdfWriter pdfWriter;
     private final ConfiguracaoService configuracaoService;
+    private final ContratoTemplateService templateService;
     private final ApplicationEventPublisher eventPublisher;
 
     public ContratoPublicoService(ContratoRepository contratoRepository,
@@ -47,12 +48,14 @@ public class ContratoPublicoService {
                                   FileStorageService fileStorageService,
                                   ContratoPdfWriter pdfWriter,
                                   ConfiguracaoService configuracaoService,
+                                  ContratoTemplateService templateService,
                                   ApplicationEventPublisher eventPublisher) {
         this.contratoRepository = contratoRepository;
         this.assinaturaRepository = assinaturaRepository;
         this.fileStorageService = fileStorageService;
         this.pdfWriter = pdfWriter;
         this.configuracaoService = configuracaoService;
+        this.templateService = templateService;
         this.eventPublisher = eventPublisher;
     }
 
@@ -61,13 +64,55 @@ public class ContratoPublicoService {
         var contrato = buscarPorToken(token);
         validarExpiracao(contrato);
 
+        var html = renderizarClausulasHtml(contrato);
+
         return ContratoPublicoResponse.of(
             contrato,
             configuracaoService.getValorTexto("nomeContratada", "Carol Oliva Fotografia"),
             configuracaoService.getValorTexto("cnpjContratada", ""),
             configuracaoService.getValorTexto("enderecoContratada", ""),
             configuracaoService.getValorTexto("pixChave", ""),
-            configuracaoService.getValorTexto("pixTipoChave", "CNPJ")
+            configuracaoService.getValorTexto("pixTipoChave", "CNPJ"),
+            html
+        );
+    }
+
+    private String renderizarClausulasHtml(Contrato c) {
+        var template = templateService.carregarTemplate();
+        if (template == null) return "";
+        var vals = montarPlaceholders(c, null, null, null, null, null, null, false, null, null);
+        return templateService.renderizarHtml(template, vals);
+    }
+
+    private java.util.Map<String, String> montarPlaceholders(
+            Contrato c, String nome, String telefone, String email,
+            String cpf, String cidade, String estado, boolean autoriza,
+            String nomeAssina, String ip) {
+        var dataHora = c.getDataHoraEnsaio();
+        var pixChave = configuracaoService.getValorTexto("pixChave", "");
+        var pixTipo = configuracaoService.getValorTexto("pixTipoChave", "CNPJ");
+        var contratadaNome = configuracaoService.getValorTexto("nomeContratada", "");
+        var contratadaCnpj = configuracaoService.getValorTexto("cnpjContratada", "");
+        var contratadaCidade = configuracaoService.getValorTexto("enderecoContratada", "");
+
+        var autorizaTexto = !autoriza ? "( ) AUTORIZO\n( ) NÃO AUTORIZO"
+            : autoriza ? "(X) AUTORIZO\n( ) NÃO AUTORIZO"
+            : "( ) AUTORIZO\n( ) NÃO AUTORIZO";
+
+        return templateService.buildPlaceholders(
+            nome, cpf, telefone, email, cidade, estado,
+            dataHora.format(FMT_DATA), dataHora.format(FMT_HORA),
+            c.getLocalEnsaio(), c.getEnderecoCompleto(),
+            c.getPacoteNome(),
+            "R$ " + money(c.getPrecoFotoExtra()),
+            "R$ " + money(c.getValorTotal()),
+            "R$ " + money(c.getValorEntradaExigido()),
+            c.getPercentualEntrada().stripTrailingZeros().toPlainString(),
+            "R$ " + money(c.getValorRestante()),
+            contratadaNome, contratadaCnpj, contratadaCidade,
+            pixChave, pixTipo,
+            autorizaTexto,
+            "R$ " + money(c.getTaxaDeslocamento())
         );
     }
 
@@ -260,70 +305,13 @@ public class ContratoPublicoService {
                                      String cpf, String cidade, String estado, boolean autoriza,
                                      String nomeAssina, LocalDateTime dataAssinatura, String ip,
                                      String hash) {
-        var linhas = new ArrayList<String>();
-        linhas.add("");
-        linhas.add("1. Dados do Cliente");
-        linhas.add("Nome completo: " + segurar(nome));
-        linhas.add("CPF: " + segurar(cpf));
-        linhas.add("E-mail: " + segurar(email));
-        linhas.add("Telefone: " + segurar(telefone));
-        linhas.add("Cidade / Estado: " + segurar(cidade) + " / " + segurar(estado));
-        linhas.add("");
-        linhas.add("Contratada: " + configuracaoService.getValorTexto("nomeContratada", "")
-            + ", inscrita no CNPJ nº " + configuracaoService.getValorTexto("cnpjContratada", "")
-            + ", com sede em " + configuracaoService.getValorTexto("enderecoContratada", "") + ".");
-        linhas.add("");
-        linhas.add("2. Informações do Ensaio");
-        linhas.add("Data do ensaio: " + c.getDataHoraEnsaio().format(FMT_DATA));
-        linhas.add("Horário do ensaio: " + c.getDataHoraEnsaio().format(FMT_HORA));
-        linhas.add("Local do ensaio: " + segurar(c.getLocalEnsaio()));
-        if (c.getEnderecoCompleto() != null && !c.getEnderecoCompleto().isBlank()) {
-            linhas.add("Endereço completo: " + c.getEnderecoCompleto());
+        var template = templateService.carregarTemplate();
+        if (template == null || template.isBlank()) {
+            return List.of("Contrato sem template definido.");
         }
-        linhas.add("");
-        linhas.add("3. Pacote Contratado");
-        linhas.add("Pacote: " + c.getPacoteNome());
-        linhas.add("Inclui: serviço conforme pacote contratado.");
-        linhas.add("");
-        linhas.add("4. Valores");
-        linhas.add("Valor total do serviço: R$ " + money(c.getValorTotal()));
-        linhas.add("Valor pago como reserva (" + c.getPercentualEntrada().stripTrailingZeros().toPlainString()
-            + "%): R$ " + money(c.getValorEntradaExigido()));
-        linhas.add("Valor restante a pagar no final do ensaio: R$ " + money(c.getValorRestante()));
-        linhas.add("O pagamento da reserva garante o bloqueio da data e horário na agenda da Contratada.");
-        linhas.add("O valor restante deverá ser pago ao final da realização do ensaio fotográfico.");
-        linhas.add("");
-        linhas.add("Dados para pagamento (PIX)");
-        linhas.add("Chave PIX (" + configuracaoService.getValorTexto("pixTipoChave", "CNPJ")
-            + "): " + configuracaoService.getValorTexto("pixChave", ""));
-        linhas.add("");
-        linhas.add("5. Entrega das Fotografias");
-        linhas.add("As fotos do ensaio serão enviadas ao Cliente em até 2 dias após a realização do ensaio para que ele faça a seleção das imagens desejadas.");
-        linhas.add("Após a seleção, a entrega final das fotografias ocorrerá em até 2 dias.");
-        linhas.add("As fotos serão entregues em formato digital, em alta resolução.");
-        linhas.add("Caso o Cliente opte por fotos extras além do pacote contratado, será cobrado o valor de R$ "
-            + money(c.getPrecoFotoExtra()) + " por foto adicional.");
-        linhas.add("");
-        linhas.add("6. Cancelamento");
-        linhas.add("Caso o Cliente cancele o ensaio por qualquer motivo, o valor pago como reserva não será reembolsado, pois garante a reserva da data na agenda da Contratada.");
-        linhas.add("Caso ocorra algum imprevisto que impeça a presença da Contratada, poderá haver a substituição por outro fotógrafo profissional de padrão equivalente.");
-        linhas.add("Caso não seja possível a substituição, o valor pago será devolvido integralmente ao Cliente.");
-        linhas.add("Se houver algum imprevisto relacionado à antecipação de voo, chuva ou doença, o ensaio será cancelado e haverá o reembolso completo do valor da reserva.");
-        linhas.add("");
-        linhas.add("7. USO DE IMAGEM (OPCIONAL)");
-        linhas.add(autoriza ? "(X) AUTORIZO" : "( ) AUTORIZO");
-        linhas.add(autoriza ? "( ) NÃO AUTORIZO" : "(X) NÃO AUTORIZO");
-        linhas.add("");
-        linhas.add("8. Disposições Gerais");
-        linhas.add("Este contrato passa a vigorar a partir da assinatura das partes.");
-        linhas.add("Qualquer alteração neste contrato deverá ser realizada por escrito.");
-        linhas.add("");
-        linhas.add("9. Assinatura Digital");
-        linhas.add("Ao assinar este documento, o Cliente declara que leu e concorda com todos os termos acima descritos.");
-        linhas.add("Resposta do cliente sobre uso de imagem: " + (autoriza ? "AUTORIZADO" : "NÃO autorizado"));
-        linhas.add("");
-        linhas.add("Assinatura do contratante: " + segurar(nomeAssina));
-        linhas.add("Assinatura da Contratada: Carol Oliva Fotografia");
+        var vals = montarPlaceholders(c, nome, telefone, email, cpf, cidade, estado, autoriza, nomeAssina, ip);
+        var texto = templateService.renderizarTexto(template, vals);
+        var linhas = new ArrayList<>(List.of(texto.split("\n", -1)));
         linhas.add("");
         linhas.add("Assinado digitalmente em " + dataAssinatura.format(FMT_DATA_HORA)
             + " (IP " + segurar(ip) + ")");

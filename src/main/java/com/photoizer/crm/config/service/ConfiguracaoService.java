@@ -13,6 +13,8 @@ import java.util.Map;
 @Transactional
 public class ConfiguracaoService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ConfiguracaoService.class);
+
     private final ConfiguracaoRepository configuracaoRepository;
 
     public ConfiguracaoService(ConfiguracaoRepository configuracaoRepository) {
@@ -62,5 +64,17 @@ public class ConfiguracaoService {
             .map(c -> c.getValor())
             .filter(v -> v != null && !v.isBlank())
             .orElse(valorPadrao);
+    }
+
+    public void atualizarValorTexto(String chave, String valor) {
+        var config = configuracaoRepository.findById(chave)
+            .orElseGet(() -> {
+                var nova = new com.photoizer.crm.config.model.Configuracao();
+                nova.setChave(chave);
+                return nova;
+            });
+        config.setValor(valor);
+        configuracaoRepository.save(config);
+        log.info("Configuracao atualizada: {} = {} ({} chars)", chave, valor.length() > 100 ? valor.substring(0, 100) + "..." : valor, valor.length());
     }
 }
