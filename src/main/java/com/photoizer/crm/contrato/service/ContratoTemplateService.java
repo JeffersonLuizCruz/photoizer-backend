@@ -31,6 +31,31 @@ public class ContratoTemplateService {
         return resultado;
     }
 
+    public String renderizarHtmlPublico(String template, Map<String, String> valores) {
+        var textoSemSecoesCliente = removerSecoesCliente(template);
+        return renderizarHtml(textoSemSecoesCliente, valores);
+    }
+
+    private String removerSecoesCliente(String template) {
+        var linhas = template.split("\n", -1);
+        var resultado = new StringBuilder();
+        var ignorar = false;
+        for (var linha : linhas) {
+            var trim = linha.trim();
+            if (trim.startsWith("# ")) {
+                ignorar = trim.contains("1. Dados do Cliente")
+                    || trim.contains("7. USO DE IMAGEM")
+                    || trim.contains("9. Assinatura Digital");
+                if (!ignorar) {
+                    resultado.append(linha).append("\n");
+                }
+            } else if (!ignorar) {
+                resultado.append(linha).append("\n");
+            }
+        }
+        return resultado.toString();
+    }
+
     public String renderizarHtml(String template, Map<String, String> valores) {
         var texto = renderizarTexto(template, valores);
         var linhas = texto.split("\n", -1);

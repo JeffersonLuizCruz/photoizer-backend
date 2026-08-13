@@ -55,4 +55,7 @@ public class CompraExtra extends BaseEntity {
 
     @Column(columnDefinition = "TEXT")
     private String observacao;
+
+    @Column(columnDefinition = "TEXT")
+    private String motivoRecusa;
 }

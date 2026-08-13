@@ -14,14 +14,16 @@ public record CompraExtraResponse(
     String urlComprovante,
     LocalDateTime dataPagamento,
     Integer quantidadeFotos,
-    String metodoPagamento
+    String metodoPagamento,
+    String motivoRecusa
 ) {
     public static CompraExtraResponse of(CompraExtra c) {
         return new CompraExtraResponse(
             c.getId(), c.getAgendamentoId(), c.getValorTotal(),
             c.getStatus().name(), c.getUrlComprovante(), c.getDataPagamento(),
             c.getQuantidadeFotos(),
-            c.getMetodoPagamento() != null ? c.getMetodoPagamento().name() : null
+            c.getMetodoPagamento() != null ? c.getMetodoPagamento().name() : null,
+            c.getMotivoRecusa()
         );
     }
 
@@ -34,7 +36,8 @@ public record CompraExtraResponse(
             c.getId(), c.getAgendamentoId(), c.getValorTotal(),
             c.getStatus().name(), null, c.getDataPagamento(),
             c.getQuantidadeFotos(),
-            c.getMetodoPagamento() != null ? c.getMetodoPagamento().name() : null
+            c.getMetodoPagamento() != null ? c.getMetodoPagamento().name() : null,
+            c.getMotivoRecusa()
         );
     }
 
@@ -50,7 +53,8 @@ public record CompraExtraResponse(
             c.getId(), c.getAgendamentoId(), c.getValorTotal(),
             c.getStatus().name(), comprovanteUrl, c.getDataPagamento(),
             c.getQuantidadeFotos(),
-            c.getMetodoPagamento() != null ? c.getMetodoPagamento().name() : null
+            c.getMetodoPagamento() != null ? c.getMetodoPagamento().name() : null,
+            c.getMotivoRecusa()
         );
     }
 }

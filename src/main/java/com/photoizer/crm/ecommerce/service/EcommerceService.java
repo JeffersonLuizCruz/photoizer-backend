@@ -409,7 +409,8 @@ public class EcommerceService {
             compra.getStatus().name(), null, compra.getDataPagamento(),
             compra.getQuantidadeFotos(),
             compra.getMetodoPagamento() != null ? compra.getMetodoPagamento().name() : null,
-            fotos, compra.getCreatedAt(), compra.getUpdatedAt()
+            fotos, compra.getCreatedAt(), compra.getUpdatedAt(),
+            compra.getMotivoRecusa()
         );
     }
 
@@ -475,23 +476,32 @@ public class EcommerceService {
             compra.getStatus().name(), comprovanteUrl, compra.getDataPagamento(),
             compra.getQuantidadeFotos(),
             compra.getMetodoPagamento() != null ? compra.getMetodoPagamento().name() : null,
-            fotos, compra.getCreatedAt(), compra.getUpdatedAt()
+            fotos, compra.getCreatedAt(), compra.getUpdatedAt(), compra.getMotivoRecusa()
         );
     }
 
     public void cancelarCompra(UUID compraId) {
+        cancelarCompra(compraId, null);
+    }
+
+    public void cancelarCompra(UUID compraId, String motivoRecusa) {
         var compra = compraExtraRepository.findById(compraId)
             .orElseThrow(() -> new RuntimeException("Compra não encontrada"));
         if (compra.getStatus() == StatusCompraExtra.PAGA) {
             throw new IllegalStateException("Compra já paga não pode ser cancelada");
         }
         compra.setStatus(StatusCompraExtra.CANCELADA);
+        if (motivoRecusa != null && !motivoRecusa.isBlank()) {
+            compra.setMotivoRecusa(motivoRecusa.trim());
+        }
         compraExtraRepository.save(compra);
         var fotos = fotoEnsaioRepository.findAll().stream()
             .filter(f -> compra.getId().equals(f.getCompraExtraId()))
             .toList();
         for (var foto : fotos) {
             foto.setCompraExtraId(null);
+            foto.setStatus(StatusFoto.PUBLICADA);
+            foto.setVisivel(true);
         }
         fotoEnsaioRepository.saveAll(fotos);
     }

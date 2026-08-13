@@ -2,6 +2,7 @@ package com.photoizer.crm.ecommerce.api;
 
 import com.photoizer.crm.ecommerce.model.ItemCarrinho;
 import com.photoizer.crm.ecommerce.model.MetodoPagamento;
+import com.photoizer.crm.ecommerce.service.ComentarioService;
 import com.photoizer.crm.ecommerce.service.EcommerceService;
 import com.photoizer.crm.ecommerce.service.SessionService;
 import com.photoizer.crm.foto.api.FotoEnsaioResponse;
@@ -10,6 +11,7 @@ import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.service.FotoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.CacheControl;
@@ -43,11 +45,13 @@ public class EcommerceController {
     private final EcommerceService ecommerceService;
     private final FotoService fotoService;
     private final SessionService sessionService;
+    private final ComentarioService comentarioService;
 
-    public EcommerceController(EcommerceService ecommerceService, FotoService fotoService, SessionService sessionService) {
+    public EcommerceController(EcommerceService ecommerceService, FotoService fotoService, SessionService sessionService, ComentarioService comentarioService) {
         this.ecommerceService = ecommerceService;
         this.fotoService = fotoService;
         this.sessionService = sessionService;
+        this.comentarioService = comentarioService;
     }
 
     @PostMapping("/sessao")
@@ -258,6 +262,24 @@ public class EcommerceController {
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"fotos.zip\"")
             .contentType(MediaType.APPLICATION_OCTET_STREAM)
             .body(file);
+    }
+
+    @PostMapping("/galeria/{token}/fotos/{fotoId}/comentarios")
+    @Operation(summary = "Comentar em uma foto da galeria (cliente)")
+    public ResponseEntity<ComentarioResponse> comentar(
+            @PathVariable UUID token,
+            @PathVariable UUID fotoId,
+            @Valid @RequestBody ComentarioRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(comentarioService.comentarCliente(token, fotoId, request));
+    }
+
+    @GetMapping("/galeria/{token}/fotos/{fotoId}/comentarios")
+    @Operation(summary = "Listar comentários de uma foto (cliente)")
+    public ResponseEntity<List<ComentarioResponse>> listarComentarios(
+            @PathVariable UUID token,
+            @PathVariable UUID fotoId) {
+        return ResponseEntity.ok(comentarioService.listarCliente(token, fotoId));
     }
 
     @GetMapping("/fotos/{fotoId}/watermarked")

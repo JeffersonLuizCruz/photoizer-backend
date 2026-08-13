@@ -81,7 +81,7 @@ public class ContratoPublicoService {
         var template = templateService.carregarTemplate();
         if (template == null) return "";
         var vals = montarPlaceholders(c, null, null, null, null, null, null, false, null, null);
-        return templateService.renderizarHtml(template, vals);
+        return templateService.renderizarHtmlPublico(template, vals);
     }
 
     private java.util.Map<String, String> montarPlaceholders(

@@ -18,5 +18,6 @@ public record AdminCompraDetalheResponse(
     String metodoPagamento,
     List<FotoEnsaioResponse> fotos,
     LocalDateTime createdAt,
-    LocalDateTime updatedAt
+    LocalDateTime updatedAt,
+    String motivoRecusa
 ) {}

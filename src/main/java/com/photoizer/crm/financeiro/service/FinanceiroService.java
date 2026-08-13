@@ -129,8 +129,10 @@ public class FinanceiroService {
             totalExtras = totalExtras.add(a.getValorExtras());
             faturamentoTotal = faturamentoTotal.add(a.getValorTotalFinal());
 
-            var custo = a.getCustoDeslocamento() != null ? a.getCustoDeslocamento() : BigDecimal.ZERO;
-            deslocamento = deslocamento.add(custo);
+            if (!Boolean.TRUE.equals(a.getRepassarDeslocamento())) {
+                var custo = a.getCustoDeslocamento() != null ? a.getCustoDeslocamento() : BigDecimal.ZERO;
+                deslocamento = deslocamento.add(custo);
+            }
 
             if (statusPagamentoFinal.contains(a.getStatus())) {
                 totalFinal = totalFinal.add(a.getValorRestante());
@@ -201,9 +203,9 @@ public class FinanceiroService {
         var totalDespesas = despesas.stream()
             .map(Despesa::getValor)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
-        var custoDeslocamento = agendamento.getCustoDeslocamento() != null
-            ? agendamento.getCustoDeslocamento()
-            : BigDecimal.ZERO;
+        var custoDeslocamento = Boolean.TRUE.equals(agendamento.getRepassarDeslocamento())
+            ? BigDecimal.ZERO
+            : (agendamento.getCustoDeslocamento() != null ? agendamento.getCustoDeslocamento() : BigDecimal.ZERO);
         var comissao = indicacaoRepository.findByAgendamentoIdIn(List.of(agendamentoId)).stream()
             .map(Indicacao::getValorComissao)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
