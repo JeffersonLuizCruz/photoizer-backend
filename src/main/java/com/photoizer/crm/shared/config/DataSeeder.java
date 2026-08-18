@@ -221,7 +221,7 @@ Assinatura da Contratada: {{contratadaNome}}
             new String[]{"Software e Assinaturas", "#6366f1"},
             new String[]{"Marketing e Publicidade", "#f59e0b"},
             new String[]{"Deslocamento", "#10b981"},
-            new String[]{"Alimentação", "#ef4444"},
+            new String[]{"Alimentação", "#e1749a"},
             new String[]{"Assistente / Equipe", "#8b5cf6"},
             new String[]{"Local / Estúdio", "#ec4899"},
             new String[]{"Material de Entrega", "#14b8a6"},

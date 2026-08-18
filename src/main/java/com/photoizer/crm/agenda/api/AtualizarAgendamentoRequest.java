@@ -16,7 +16,7 @@ public record AtualizarAgendamentoRequest(
     @NotBlank String localEnsaio,
     String enderecoCompleto,
     UUID editorId,
-    @NotNull java.math.BigDecimal custoDeslocamento,
+    java.math.BigDecimal custoDeslocamento,
     Boolean repassarDeslocamento,
     Boolean autorizaUsoImagem,
     String observacoes,
