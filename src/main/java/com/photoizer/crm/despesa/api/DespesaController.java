@@ -43,10 +43,11 @@ public class DespesaController {
             @RequestParam(required = false) UUID categoriaId,
             @RequestParam(required = false) StatusDespesa status,
             @RequestParam(required = false) UUID agendamentoId,
+            @RequestParam(required = false) UUID fotografoId,
             @RequestParam(required = false) String sortBy,
             @RequestParam(required = false) String sortDir) {
         var despesas = despesaService
-            .listar(dataInicio, dataFim, categoriaId, status, agendamentoId, sortBy, sortDir)
+            .listar(dataInicio, dataFim, categoriaId, status, agendamentoId, fotografoId, sortBy, sortDir)
             .stream().map(DespesaResponse::of).toList();
         return ResponseEntity.ok(despesas);
     }
@@ -89,6 +90,13 @@ public class DespesaController {
     public ResponseEntity<DespesaResponse> vincularAgendamento(@PathVariable UUID id,
                                                                @RequestBody DespesaAgendamentoRequest request) {
         return ResponseEntity.ok(DespesaResponse.of(despesaService.vincularAgendamento(id, request.agendamentoId())));
+    }
+
+    @PatchMapping("/{id}/fotografo")
+    @Operation(summary = "Vincular ou desvincular despesa de um fotógrafo")
+    public ResponseEntity<DespesaResponse> vincularFotografo(@PathVariable UUID id,
+                                                             @RequestBody DespesaFotografoRequest request) {
+        return ResponseEntity.ok(DespesaResponse.of(despesaService.vincularFotografo(id, request.fotografoId())));
     }
 
     @PostMapping("/{id}/comprovante")

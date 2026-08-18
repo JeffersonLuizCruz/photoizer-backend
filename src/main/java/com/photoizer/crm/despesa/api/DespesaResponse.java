@@ -24,6 +24,7 @@ public record DespesaResponse(
     LocalDate dataProximaGeracao,
     UUID geradaDeId,
     UUID agendamentoId,
+    UUID fotografoId,
     LocalDateTime dataPagamento,
     String urlComprovante,
     String observacao
@@ -44,6 +45,7 @@ public record DespesaResponse(
             d.getDataProximaGeracao(),
             d.getGeradaDeId(),
             d.getAgendamentoId(),
+            d.getFotografoId(),
             d.getDataPagamento(),
             d.getUrlComprovante(),
             d.getObservacao()

@@ -79,6 +79,9 @@ public class Despesa extends BaseEntity {
     private UUID agendamentoId;
 
     @Column
+    private UUID fotografoId;
+
+    @Column
     private LocalDateTime dataPagamento;
 
     @Size(max = 500)

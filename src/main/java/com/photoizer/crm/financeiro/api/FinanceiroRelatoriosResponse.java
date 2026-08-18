@@ -15,6 +15,7 @@ public record FinanceiroRelatoriosResponse(
         BigDecimal entrada,
         BigDecimal restante,
         BigDecimal extras,
-        BigDecimal totalFinal
+        BigDecimal totalFinal,
+        BigDecimal repasses
     ) {}
 }

@@ -1,11 +1,14 @@
 package com.photoizer.crm.contrato.model;
 
 import com.photoizer.crm.shared.model.BaseEntity;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -20,6 +23,8 @@ import lombok.experimental.SuperBuilder;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -73,6 +78,13 @@ public class Contrato extends BaseEntity {
 
     @Column
     private UUID editorId;
+
+    @Column
+    private UUID fotografoId;
+
+    @PositiveOrZero
+    @Column(precision = 10, scale = 2)
+    private BigDecimal valorRepassarFotografo;
 
     @NotNull
     @Column(nullable = false)
@@ -200,4 +212,13 @@ public class Contrato extends BaseEntity {
 
     @Column(columnDefinition = "TEXT")
     private String observacoes;
+
+    @OneToMany(mappedBy = "contrato", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<ContratoFotografo> fotografos;
+
+    public void addFotografo(ContratoFotografo link) {
+        if (this.fotografos == null) this.fotografos = new ArrayList<>();
+        this.fotografos.add(link);
+        link.setContrato(this);
+    }
 }

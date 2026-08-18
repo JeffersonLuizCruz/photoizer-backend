@@ -46,7 +46,8 @@ public class DespesaService {
 
     @Transactional(readOnly = true)
     public List<Despesa> listar(LocalDate dataInicio, LocalDate dataFim, UUID categoriaId,
-                                StatusDespesa status, UUID agendamentoId, String sortBy, String sortDir) {
+                                StatusDespesa status, UUID agendamentoId, UUID fotografoId,
+                                String sortBy, String sortDir) {
         Specification<Despesa> spec = (root, query, cb) -> {
             var predicates = new ArrayList<Predicate>();
             if (dataInicio != null) predicates.add(cb.greaterThanOrEqualTo(root.get("data"), dataInicio));
@@ -54,6 +55,7 @@ public class DespesaService {
             if (categoriaId != null) predicates.add(cb.equal(root.get("categoriaRef").get("id"), categoriaId));
             if (status != null) predicates.add(cb.equal(root.get("status"), status));
             if (agendamentoId != null) predicates.add(cb.equal(root.get("agendamentoId"), agendamentoId));
+            if (fotografoId != null) predicates.add(cb.equal(root.get("fotografoId"), fotografoId));
             return cb.and(predicates.toArray(new Predicate[0]));
         };
 
@@ -89,6 +91,7 @@ public class DespesaService {
             .status(status)
             .recorrencia(recorrencia)
             .agendamentoId(request.agendamentoId())
+            .fotografoId(request.fotografoId())
             .observacao(request.observacao())
             .build();
 
@@ -119,6 +122,7 @@ public class DespesaService {
         despesa.setStatus(status);
         despesa.setRecorrencia(recorrencia);
         despesa.setAgendamentoId(request.agendamentoId());
+        despesa.setFotografoId(request.fotografoId());
         despesa.setObservacao(request.observacao());
 
         if (status == StatusDespesa.RECORRENTE) {
@@ -144,6 +148,26 @@ public class DespesaService {
         }
         despesa.setAgendamentoId(agendamentoId);
         return despesaRepository.save(despesa);
+    }
+
+    public Despesa vincularFotografo(UUID id, UUID fotografoId) {
+        var despesa = buscarPorId(id);
+        despesa.setFotografoId(fotografoId);
+        return despesaRepository.save(despesa);
+    }
+
+    public BigDecimal somarCustosFotografo(UUID agendamentoId, UUID fotografoId) {
+        return despesaRepository.findByAgendamentoIdOrderByDataDesc(agendamentoId).stream()
+            .filter(d -> fotografoId.equals(d.getFotografoId()))
+            .map(Despesa::getValor)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    public BigDecimal somarCustosTodosFotografos(UUID agendamentoId) {
+        return despesaRepository.findByAgendamentoIdOrderByDataDesc(agendamentoId).stream()
+            .filter(d -> d.getFotografoId() != null)
+            .map(Despesa::getValor)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     public Despesa marcarComoPaga(UUID id) {
@@ -194,6 +218,7 @@ public class DespesaService {
                 .recorrencia(RecorrenciaDespesa.UNICA)
                 .geradaDeId(origem.getId())
                 .agendamentoId(origem.getAgendamentoId())
+                .fotografoId(origem.getFotografoId())
                 .observacao(origem.getObservacao())
                 .build();
             despesaRepository.save(gerada);

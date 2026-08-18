@@ -9,9 +9,14 @@ import com.photoizer.crm.agenda.exception.AgendamentoNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.AgendamentoNoPassadoException;
 import com.photoizer.crm.agenda.exception.ConflitoDeAgendaException;
 import com.photoizer.crm.agenda.exception.EditorNaoEncontradoException;
+import com.photoizer.crm.agenda.exception.FotografoNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.EnsaioNaoFinalizadoException;
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
+import com.photoizer.crm.agenda.model.AgendamentoFotografo;
+import com.photoizer.crm.agenda.model.RepasseStatus;
+import com.photoizer.crm.shared.model.TipoRepasse;
+import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.auth.repository.UserRepository;
 import com.photoizer.crm.pacote.exception.PacoteInativoException;
@@ -32,6 +37,7 @@ import com.photoizer.crm.agenda.api.AtualizarAgendamentoRequest;
 import com.photoizer.crm.agenda.api.AgendamentoResponse;
 import com.photoizer.crm.agenda.api.DisponibilidadeResponse;
 import com.photoizer.crm.cliente.api.AgendamentoClienteResponse;
+import com.photoizer.crm.despesa.service.DespesaService;
 import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
 
@@ -46,6 +52,7 @@ import java.util.List;
 import java.util.UUID;
 
 import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Subquery;
 import org.springframework.data.jpa.domain.Specification;
 
 @Service
@@ -60,6 +67,8 @@ public class AgendamentoService {
     private final ApplicationEventPublisher eventPublisher;
     private final FotoEnsaioRepository fotoEnsaioRepository;
     private final ConfiguracaoService configuracaoService;
+    private final DespesaService despesaService;
+    private final AgendamentoFotografoRepository agendamentoFotografoRepository;
 
     public AgendamentoService(ClienteRepository clienteRepository,
                               PacoteRepository pacoteRepository,
@@ -68,7 +77,9 @@ public class AgendamentoService {
                               FileStorageService fileStorageService,
                               ApplicationEventPublisher eventPublisher,
                               FotoEnsaioRepository fotoEnsaioRepository,
-                              ConfiguracaoService configuracaoService) {
+                              ConfiguracaoService configuracaoService,
+                              DespesaService despesaService,
+                              AgendamentoFotografoRepository agendamentoFotografoRepository) {
         this.clienteRepository = clienteRepository;
         this.pacoteRepository = pacoteRepository;
         this.userRepository = userRepository;
@@ -77,6 +88,8 @@ public class AgendamentoService {
         this.eventPublisher = eventPublisher;
         this.fotoEnsaioRepository = fotoEnsaioRepository;
         this.configuracaoService = configuracaoService;
+        this.despesaService = despesaService;
+        this.agendamentoFotografoRepository = agendamentoFotografoRepository;
     }
 
     public Agendamento criarAgendamento(CriarAgendamentoCommand command) {
@@ -152,6 +165,8 @@ public class AgendamentoService {
             .build();
 
         agendamento = agendamentoRepository.save(agendamento);
+        criarFotografosNoAgendamento(agendamento, command.fotografos());
+        calcularPartilhaFotografo(agendamento);
 
         eventPublisher.publishEvent(new AgendamentoCriadoEvent(
             agendamento.getId(),
@@ -174,13 +189,24 @@ public class AgendamentoService {
     }
 
     @Transactional(readOnly = true)
-    public List<Agendamento> listarTodos(UUID editorId, StatusAgendamento status,
+    public List<Agendamento> listarTodos(UUID editorId, UUID fotografoId,
+                                         StatusAgendamento status,
                                          LocalDateTime dataInicio, LocalDateTime dataFim, String search) {
         Specification<Agendamento> spec = (root, query, cb) -> {
             var predicates = new java.util.ArrayList<Predicate>();
 
             if (editorId != null) {
                 predicates.add(cb.equal(root.get("editor").get("id"), editorId));
+            }
+            if (fotografoId != null) {
+                Subquery<Long> subquery = query.subquery(Long.class);
+                var subRoot = subquery.from(com.photoizer.crm.agenda.model.AgendamentoFotografo.class);
+                subquery.select(cb.literal(1L));
+                subquery.where(cb.and(
+                    cb.equal(subRoot.get("agendamento").get("id"), root.get("id")),
+                    cb.equal(subRoot.get("fotografo").get("id"), fotografoId)
+                ));
+                predicates.add(cb.exists(subquery));
             }
             if (status != null) {
                 predicates.add(cb.equal(root.get("status"), status));
@@ -333,7 +359,10 @@ public class AgendamentoService {
         agendamento.setValorTotalFinal(novoValorTotalFinal);
 
         agendamento = agendamentoRepository.save(agendamento);
-        return AgendamentoResponse.of(agendamento);
+        sincronizarFotografosNoAgendamento(agendamento, request.fotografos());
+        calcularPartilhaFotografo(agendamento);
+        var links = agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(agendamento.getId());
+        return AgendamentoResponse.of(agendamento, links, null, null, null);
     }
 
     public DisponibilidadeResponse verificarDisponibilidade(LocalDate data, String hora, Integer duracaoMinutos, UUID excluirAgendamentoId, Boolean bloqueiaDiaInteiro) {
@@ -483,6 +512,11 @@ public class AgendamentoService {
             .build();
 
         agendamento = agendamentoRepository.save(agendamento);
+        criarFotografosNoAgendamento(agendamento, event.fotografos().stream()
+            .map(f -> new CriarAgendamentoCommand.FotografoRepasse(
+                f.fotografoId(), f.valorRepassar(), f.tipoValor(), f.percentual()))
+            .toList());
+        calcularPartilhaFotografo(agendamento);
 
         eventPublisher.publishEvent(new AgendamentoCriadoEvent(
             agendamento.getId(),
@@ -502,6 +536,103 @@ public class AgendamentoService {
         ));
 
         return agendamento;
+    }
+
+    public void calcularPartilhaFotografo(Agendamento agendamento) {
+        var links = agendamentoFotografoRepository.findByAgendamentoId(agendamento.getId());
+        if (links.isEmpty()) {
+            agendamento.setValorPartilhaGlobal(null);
+            agendamento.setValorLucroCrm(null);
+            return;
+        }
+
+        var custosTotais = despesaService.somarCustosTodosFotografos(agendamento.getId());
+        var partilhaGlobal = agendamento.getValorTotalFinal().subtract(custosTotais);
+        var somaRepasses = agendamentoFotografoRepository.findByAgendamentoId(agendamento.getId()).stream()
+            .filter(l -> l.getStatus() != RepasseStatus.CANCELADO)
+            .map(AgendamentoFotografo::getValorRepassar)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (somaRepasses.compareTo(partilhaGlobal) > 0) {
+            throw new IllegalArgumentException(
+                "A soma dos repasses (R$ " + somaRepasses.toPlainString() + ") excede a partilha do ensaio (R$ "
+                    + partilhaGlobal.toPlainString() + ")");
+        }
+        var lucro = partilhaGlobal.subtract(somaRepasses);
+
+        agendamento.setValorPartilhaGlobal(partilhaGlobal);
+        agendamento.setValorLucroCrm(lucro);
+        agendamentoRepository.save(agendamento);
+    }
+
+    private void criarFotografosNoAgendamento(Agendamento agendamento, List<CriarAgendamentoCommand.FotografoRepasse> fotografos) {
+        if (fotografos == null) return;
+        for (var f : fotografos) {
+            var fotografo = userRepository.findById(f.fotografoId())
+                .orElseThrow(() -> new FotografoNaoEncontradoException(f.fotografoId()));
+            var tipo = f.tipoValor() != null ? f.tipoValor() : TipoRepasse.FIXO;
+            var link = AgendamentoFotografo.builder()
+                .agendamento(agendamento)
+                .fotografo(fotografo)
+                .tipoValor(tipo)
+                .percentual(tipo == TipoRepasse.PERCENTUAL ? f.percentual() : null)
+                .papelParceiro(fotografo.getPapel())
+                .valorRepassar(valorRepasseEfetivo(agendamento, tipo, f.valorRepassar(), f.percentual()))
+                .status(RepasseStatus.PENDENTE)
+                .build();
+            agendamentoFotografoRepository.save(link);
+        }
+    }
+
+    private void sincronizarFotografosNoAgendamento(Agendamento agendamento, List<com.photoizer.crm.agenda.api.AtualizarAgendamentoRequest.FotografoRepasse> fotografos) {
+        if (fotografos == null) return;
+        var existentes = agendamentoFotografoRepository.findByAgendamentoId(agendamento.getId());
+
+        var novosIds = fotografos.stream()
+            .map(com.photoizer.crm.agenda.api.AtualizarAgendamentoRequest.FotografoRepasse::fotografoId)
+            .toList();
+
+        for (var existente : existentes) {
+            if (!novosIds.contains(existente.getFotografo().getId())) {
+                agendamentoFotografoRepository.delete(existente);
+            }
+        }
+
+        for (var f : fotografos) {
+            var match = existentes.stream()
+                .filter(e -> e.getFotografo().getId().equals(f.fotografoId()))
+                .findFirst();
+            if (match.isPresent()) {
+                var link = match.get();
+                var tipo = f.tipoValor() != null ? f.tipoValor() : TipoRepasse.FIXO;
+                link.setTipoValor(tipo);
+                link.setPercentual(tipo == TipoRepasse.PERCENTUAL ? f.percentual() : null);
+                link.setValorRepassar(valorRepasseEfetivo(agendamento, tipo, f.valorRepassar(), f.percentual()));
+                agendamentoFotografoRepository.save(link);
+            } else {
+                var fotografo = userRepository.findById(f.fotografoId())
+                    .orElseThrow(() -> new FotografoNaoEncontradoException(f.fotografoId()));
+                var tipo = f.tipoValor() != null ? f.tipoValor() : TipoRepasse.FIXO;
+                var link = AgendamentoFotografo.builder()
+                    .agendamento(agendamento)
+                    .fotografo(fotografo)
+                    .tipoValor(tipo)
+                    .percentual(tipo == TipoRepasse.PERCENTUAL ? f.percentual() : null)
+                    .papelParceiro(fotografo.getPapel())
+                    .valorRepassar(valorRepasseEfetivo(agendamento, tipo, f.valorRepassar(), f.percentual()))
+                    .status(RepasseStatus.PENDENTE)
+                    .build();
+                agendamentoFotografoRepository.save(link);
+            }
+        }
+    }
+
+    private BigDecimal valorRepasseEfetivo(Agendamento agendamento, TipoRepasse tipo, BigDecimal valorRepassar, BigDecimal percentual) {
+        if (tipo == TipoRepasse.PERCENTUAL) {
+            var base = agendamento.getValorTotal() != null ? agendamento.getValorTotal() : BigDecimal.ZERO;
+            var pct = percentual != null ? percentual : BigDecimal.ZERO;
+            return base.multiply(pct).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        }
+        return valorRepassar != null ? valorRepassar : BigDecimal.ZERO;
     }
 
     private Cliente resolverCliente(CriarAgendamentoCommand command) {

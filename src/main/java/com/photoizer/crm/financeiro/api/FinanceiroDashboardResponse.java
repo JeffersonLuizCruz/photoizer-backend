@@ -35,6 +35,7 @@ public record FinanceiroDashboardResponse(
         BigDecimal receitasAvulsas,
         BigDecimal comissao,
         BigDecimal deslocamento,
+        BigDecimal repasses,
         BigDecimal despesas
     ) {}
 

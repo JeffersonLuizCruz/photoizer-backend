@@ -66,6 +66,14 @@ public class ContratoPublicoService {
 
         var html = renderizarClausulasHtml(contrato);
 
+        var profissionais = contrato.getFotografos() == null
+            ? List.<ContratoPublicoResponse.ProfissionalEnsaio>of()
+            : contrato.getFotografos().stream()
+                .map(cf -> new ContratoPublicoResponse.ProfissionalEnsaio(
+                    cf.getFotografo().getNome(),
+                    cf.getPapelParceiro() != null ? cf.getPapelParceiro().name() : null))
+                .toList();
+
         return ContratoPublicoResponse.of(
             contrato,
             configuracaoService.getValorTexto("nomeContratada", "Carol Oliva Fotografia"),
@@ -73,7 +81,8 @@ public class ContratoPublicoService {
             configuracaoService.getValorTexto("enderecoContratada", ""),
             configuracaoService.getValorTexto("pixChave", ""),
             configuracaoService.getValorTexto("pixTipoChave", "CNPJ"),
-            html
+            html,
+            profissionais
         );
     }
 
@@ -99,6 +108,12 @@ public class ContratoPublicoService {
             : autoriza ? "(X) AUTORIZO\n( ) NÃO AUTORIZO"
             : "( ) AUTORIZO\n( ) NÃO AUTORIZO";
 
+        var nomesParceiros = c.getFotografos() == null ? "-"
+            : c.getFotografos().stream()
+                .map(cf -> cf.getFotografo().getNome()
+                    + (cf.getPapelParceiro() != null ? " (" + cf.getPapelParceiro().name() + ")" : ""))
+                .collect(java.util.stream.Collectors.joining(", "));
+
         return templateService.buildPlaceholders(
             nome, cpf, telefone, email, cidade, estado,
             dataHora.format(FMT_DATA), dataHora.format(FMT_HORA),
@@ -112,7 +127,8 @@ public class ContratoPublicoService {
             contratadaNome, contratadaCnpj, contratadaCidade,
             pixChave, pixTipo,
             autorizaTexto,
-            "R$ " + money(c.getTaxaDeslocamento())
+            "R$ " + money(c.getTaxaDeslocamento()),
+            nomesParceiros
         );
     }
 
@@ -312,6 +328,15 @@ public class ContratoPublicoService {
         var vals = montarPlaceholders(c, nome, telefone, email, cpf, cidade, estado, autoriza, nomeAssina, ip);
         var texto = templateService.renderizarTexto(template, vals);
         var linhas = new ArrayList<>(List.of(texto.split("\n", -1)));
+        if (!template.contains("{{fotografosEnsaio}}")
+                && c.getFotografos() != null && !c.getFotografos().isEmpty()) {
+            linhas.add("");
+            linhas.add("Profissionais envolvidos no ensaio:");
+            for (var cf : c.getFotografos()) {
+                linhas.add("- " + cf.getFotografo().getNome()
+                    + (cf.getPapelParceiro() != null ? " (" + cf.getPapelParceiro().name() + ")" : ""));
+            }
+        }
         linhas.add("");
         linhas.add("Assinado digitalmente em " + dataAssinatura.format(FMT_DATA_HORA)
             + " (IP " + segurar(ip) + ")");

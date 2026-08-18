@@ -21,4 +21,6 @@ public interface DespesaRepository extends JpaRepository<Despesa, UUID>, JpaSpec
         StatusDespesa status, LocalDate dataLimite);
 
     long countByCategoriaRefId(UUID categoriaId);
+
+    List<Despesa> findByFotografoIdOrderByDataDesc(UUID fotografoId);
 }

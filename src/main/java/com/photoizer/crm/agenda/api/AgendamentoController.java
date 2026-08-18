@@ -1,6 +1,7 @@
 package com.photoizer.crm.agenda.api;
 
 import com.photoizer.crm.agenda.model.StatusAgendamento;
+import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
 import com.photoizer.crm.agenda.service.AgendamentoService;
 import com.photoizer.crm.agenda.service.CriarAgendamentoCommand;
 import com.photoizer.crm.comissao.repository.IndicacaoRepository;
@@ -26,11 +27,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.json.JsonMapper;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -42,11 +46,17 @@ public class AgendamentoController {
 
     private final AgendamentoService agendamentoService;
     private final IndicacaoRepository indicacaoRepository;
+    private final AgendamentoFotografoRepository agendamentoFotografoRepository;
+    private final JsonMapper objectMapper;
 
     public AgendamentoController(AgendamentoService agendamentoService,
-                                  IndicacaoRepository indicacaoRepository) {
+                                  IndicacaoRepository indicacaoRepository,
+                                  AgendamentoFotografoRepository agendamentoFotografoRepository,
+                                  JsonMapper objectMapper) {
         this.agendamentoService = agendamentoService;
         this.indicacaoRepository = indicacaoRepository;
+        this.agendamentoFotografoRepository = agendamentoFotografoRepository;
+        this.objectMapper = objectMapper;
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -83,7 +93,10 @@ public class AgendamentoController {
             @RequestParam(required = false) String observacoes,
             @RequestParam(required = false) String indicadorId,
             @RequestParam(required = false) String indicadorNome,
-            @RequestParam(required = false) String indicadorTelefone
+            @RequestParam(required = false) String indicadorTelefone,
+            @RequestParam(required = false) String fotografoId,
+            @RequestParam(required = false) String valorRepassarFotografo,
+            @RequestParam(required = false) String fotografos
     ) {
         validarComprovante(comprovanteEntrada);
 
@@ -108,12 +121,28 @@ public class AgendamentoController {
 
         var parsedIndicadorId = indicadorId != null && !indicadorId.isBlank() ? UUID.fromString(indicadorId) : null;
 
+        List<CriarAgendamentoCommand.FotografoRepasse> fotografosList = null;
+        if (fotografos != null && !fotografos.isBlank()) {
+            try {
+                fotografosList = objectMapper.readValue(fotografos,
+                    new TypeReference<List<CriarAgendamentoCommand.FotografoRepasse>>() {});
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Formato inválido para o campo 'fotografos'. Use JSON array.", e);
+            }
+        } else if (fotografoId != null && !fotografoId.isBlank()) {
+            var parsedFotografoId = UUID.fromString(fotografoId);
+            var parsedValorRepassar = valorRepassarFotografo != null && !valorRepassarFotografo.isBlank()
+                ? new BigDecimal(valorRepassarFotografo) : BigDecimal.ZERO;
+            fotografosList = List.of(new CriarAgendamentoCommand.FotografoRepasse(parsedFotografoId, parsedValorRepassar));
+        }
+
         var command = new CriarAgendamentoCommand(
             parsedClienteId, nome, telefone, email, cpf, cidade, estado, origem,
             parsedPacoteId, parsedEditorId, parsedDataHora, null, null, parsedDuracao,
             localEnsaio, enderecoCompleto, parsedTaxa, parsedCusto, parsedRepassar,
             comprovanteEntrada, parsedAutoriza, clausulasPersonalizadas, observacoes,
-            parsedIndicadorId, indicadorNome, indicadorTelefone
+            parsedIndicadorId, indicadorNome, indicadorTelefone,
+            fotografosList
         );
 
         var agendamento = agendamentoService.criarAgendamento(command);
@@ -126,6 +155,7 @@ public class AgendamentoController {
     public ResponseEntity<List<AgendamentoResponse>> listar(
             @RequestParam(required = false) @Parameter(description = "Filtrar por status") String status,
             @RequestParam(required = false) @Parameter(description = "Filtrar por editor") UUID editorId,
+            @RequestParam(required = false) @Parameter(description = "Filtrar por fotógrafo") UUID fotografoId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
             @Parameter(description = "Data início") LocalDateTime dataInicio,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
@@ -135,7 +165,7 @@ public class AgendamentoController {
         if (status != null && !status.isBlank()) {
             statusEnum = StatusAgendamento.valueOf(status);
         }
-        var agendamentos = agendamentoService.listarTodos(editorId, statusEnum, dataInicio, dataFim, search).stream()
+        var agendamentos = agendamentoService.listarTodos(editorId, fotografoId, statusEnum, dataInicio, dataFim, search).stream()
             .map(AgendamentoResponse::of)
             .toList();
         return ResponseEntity.ok(agendamentos);
@@ -169,13 +199,14 @@ public class AgendamentoController {
     public ResponseEntity<AgendamentoResponse> buscarPorId(
             @PathVariable @Parameter(description = "ID do agendamento") UUID id) {
         var agendamento = agendamentoService.buscarPorId(id);
+        var links = agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(id);
         var indicacoes = indicacaoRepository.findAllByAgendamentoId(id);
         if (indicacoes.isEmpty()) {
-            return ResponseEntity.ok(AgendamentoResponse.of(agendamento));
+            return ResponseEntity.ok(AgendamentoResponse.of(agendamento, links, null, null, null));
         }
         var primeira = indicacoes.getFirst();
         return ResponseEntity.ok(AgendamentoResponse.of(
-            agendamento, primeira.getValorComissao(), primeira.getIndicadorNome(), primeira.getStatus()));
+            agendamento, links, primeira.getValorComissao(), primeira.getIndicadorNome(), primeira.getStatus()));
     }
 
     @PatchMapping("/{id}/status")

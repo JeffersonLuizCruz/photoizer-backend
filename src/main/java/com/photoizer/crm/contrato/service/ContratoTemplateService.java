@@ -94,7 +94,8 @@ public class ContratoTemplateService {
             String contratadaNome, String contratadaCnpj, String contratadaCidade,
             String pixChave, String pixTipoChave,
             String autorizaUsoImagem,
-            String taxaDeslocamento) {
+            String taxaDeslocamento,
+            String profissionaisEnsaio) {
         return Map.ofEntries(
             Map.entry("clienteNome", nuloVazio(clienteNome)),
             Map.entry("clienteCPF", nuloVazio(clienteCpf)),
@@ -118,7 +119,8 @@ public class ContratoTemplateService {
             Map.entry("pixChave", nuloVazio(pixChave)),
             Map.entry("pixTipoChave", nuloVazio(pixTipoChave)),
             Map.entry("autorizaUsoImagem", nuloVazio(autorizaUsoImagem)),
-            Map.entry("taxaDeslocamento", nuloVazio(taxaDeslocamento))
+            Map.entry("taxaDeslocamento", nuloVazio(taxaDeslocamento)),
+            Map.entry("fotografosEnsaio", nuloVazio(profissionaisEnsaio))
         );
     }
 

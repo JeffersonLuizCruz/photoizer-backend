@@ -54,6 +54,14 @@ public class Agendamento extends BaseEntity {
     @JoinColumn(name = "editor_id")
     private User editor;
 
+    @PositiveOrZero
+    @Column(name = "valor_partilha_fotografo", precision = 10, scale = 2)
+    private BigDecimal valorPartilhaGlobal;
+
+    @PositiveOrZero
+    @Column(precision = 10, scale = 2)
+    private BigDecimal valorLucroCrm;
+
     @NotNull
     @Column(nullable = false)
     private LocalDateTime dataHoraEnsaio;

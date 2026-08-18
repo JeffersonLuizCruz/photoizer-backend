@@ -1,8 +1,8 @@
 package com.photoizer.crm.contrato.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.photoizer.crm.agenda.exception.AgendamentoNoPassadoException;
 import com.photoizer.crm.agenda.exception.EditorNaoEncontradoException;
+import com.photoizer.crm.agenda.exception.FotografoNaoEncontradoException;
 import com.photoizer.crm.config.service.ConfiguracaoService;
 import com.photoizer.crm.contrato.api.CriarContratoRequest;
 import com.photoizer.crm.contrato.api.DevolverContratoRequest;
@@ -13,12 +13,14 @@ import com.photoizer.crm.contrato.event.ContratoDevolvidoEvent;
 import com.photoizer.crm.contrato.exception.ContratoEstadoInvalidoException;
 import com.photoizer.crm.contrato.exception.ContratoNaoEncontradoException;
 import com.photoizer.crm.contrato.model.Contrato;
+import com.photoizer.crm.contrato.model.ContratoFotografo;
 import com.photoizer.crm.contrato.model.StatusContrato;
 import com.photoizer.crm.contrato.repository.ContratoRepository;
 import com.photoizer.crm.pacote.exception.PacoteInativoException;
 import com.photoizer.crm.pacote.exception.PacoteNaoEncontradoException;
 import com.photoizer.crm.pacote.repository.PacoteRepository;
 import com.photoizer.crm.auth.repository.UserRepository;
+import com.photoizer.crm.shared.model.TipoRepasse;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +31,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
@@ -89,6 +92,8 @@ public class GestaoContratoService {
         var valorEntradaExigido = valorTotal.multiply(fatorEntrada).setScale(2, RoundingMode.HALF_UP);
         var valorRestante = valorTotal.subtract(valorEntradaExigido);
 
+        var fotografos = resolverFotografos(request, valorTotal);
+
         var contrato = Contrato.builder()
             .status(StatusContrato.RASCUNHO)
             .pacoteId(pacote.getId())
@@ -112,9 +117,56 @@ public class GestaoContratoService {
             .indicadorId(request.indicadorId())
             .indicadorNome(request.indicadorNome())
             .indicadorTelefone(request.indicadorTelefone())
+            .fotografoId(fotografos.isEmpty() ? null : fotografos.getFirst().getFotografo().getId())
+            .valorRepassarFotografo(fotografos.isEmpty() ? null : fotografos.getFirst().getValorRepassar())
             .build();
 
+        fotografos.forEach(contrato::addFotografo);
         return contratoRepository.save(contrato);
+    }
+
+    private List<ContratoFotografo> resolverFotografos(CriarContratoRequest request, BigDecimal valorTotal) {
+        var links = new ArrayList<ContratoFotografo>();
+        if (request.fotografos() != null && !request.fotografos().isEmpty()) {
+            for (var f : request.fotografos()) {
+                links.add(montarLink(f.fotografoId(), f.tipoValor(), f.valorRepassar(), f.percentual(), valorTotal));
+            }
+        } else if (request.fotografoId() != null) {
+            links.add(montarLink(request.fotografoId(), TipoRepasse.FIXO,
+                request.valorRepassarFotografo(), null, valorTotal));
+        }
+
+        var soma = links.stream()
+            .map(ContratoFotografo::getValorRepassar)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (soma.compareTo(valorTotal) > 0) {
+            throw new IllegalArgumentException(
+                "A soma dos repasses (R$ " + soma.toPlainString() + ") excede o valor total do ensaio (R$ "
+                    + valorTotal.toPlainString() + ")");
+        }
+        return links;
+    }
+
+    private ContratoFotografo montarLink(UUID fotografoId, TipoRepasse tipo, BigDecimal valorRepassar,
+                                         BigDecimal percentual, BigDecimal base) {
+        var user = userRepository.findById(fotografoId)
+            .orElseThrow(() -> new FotografoNaoEncontradoException(fotografoId));
+        var tipoEfetivo = tipo != null ? tipo : TipoRepasse.FIXO;
+        return ContratoFotografo.builder()
+            .fotografo(user)
+            .tipoValor(tipoEfetivo)
+            .percentual(tipoEfetivo == TipoRepasse.PERCENTUAL ? percentual : null)
+            .papelParceiro(user.getPapel())
+            .valorRepassar(valorRepasseEfetivo(base, tipoEfetivo, valorRepassar, percentual))
+            .build();
+    }
+
+    private BigDecimal valorRepasseEfetivo(BigDecimal base, TipoRepasse tipo, BigDecimal valorRepassar, BigDecimal percentual) {
+        if (tipo == TipoRepasse.PERCENTUAL) {
+            var pct = percentual != null ? percentual : BigDecimal.ZERO;
+            return base.multiply(pct).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        }
+        return valorRepassar != null ? valorRepassar : BigDecimal.ZERO;
     }
 
     public PublicarContratoResponse publicar(UUID id) {
@@ -183,6 +235,16 @@ public class GestaoContratoService {
         contrato.setDataAprovacao(LocalDateTime.now());
         contratoRepository.save(contrato);
 
+        var fotografos = contrato.getFotografos() == null
+            ? List.<ContratoAprovadoEvent.FotografoRepasse>of()
+            : contrato.getFotografos().stream()
+                .map(cf -> new ContratoAprovadoEvent.FotografoRepasse(
+                    cf.getFotografo().getId(),
+                    cf.getValorRepassar(),
+                    cf.getTipoValor() != null ? cf.getTipoValor() : TipoRepasse.FIXO,
+                    cf.getPercentual()))
+                .toList();
+
         eventPublisher.publishEvent(new ContratoAprovadoEvent(
             contrato.getId(),
             contrato.getClienteId(),
@@ -209,7 +271,8 @@ public class GestaoContratoService {
             contrato.getIndicadorTelefone(),
             contrato.getValorPacote(),
             contrato.getCustoDeslocamento(),
-            contrato.getRepassarDeslocamento()
+            contrato.getRepassarDeslocamento(),
+            fotografos
         ));
 
         return contrato;

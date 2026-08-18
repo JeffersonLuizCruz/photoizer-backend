@@ -49,5 +49,9 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID>,
 
     java.util.Optional<Agendamento> findByTokenGaleria(UUID tokenGaleria);
 
+    @Query("SELECT a FROM Agendamento a JOIN FETCH a.cliente LEFT JOIN FETCH a.pacote WHERE EXISTS (SELECT 1 FROM AgendamentoFotografo af WHERE af.agendamento = a AND af.fotografo.id = :fotografoId) ORDER BY a.dataHoraEnsaio DESC")
+    List<Agendamento> findByFotografoId(@Param("fotografoId") UUID fotografoId);
+
     long countByDataHoraEnsaioBetween(LocalDateTime start, LocalDateTime end);
+
 }

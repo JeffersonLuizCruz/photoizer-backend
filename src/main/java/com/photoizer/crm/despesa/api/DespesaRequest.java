@@ -20,5 +20,6 @@ public record DespesaRequest(
     StatusDespesa status,
     RecorrenciaDespesa recorrencia,
     UUID agendamentoId,
+    UUID fotografoId,
     String observacao
 ) {}

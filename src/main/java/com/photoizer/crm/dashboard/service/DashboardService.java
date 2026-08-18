@@ -1,7 +1,10 @@
 package com.photoizer.crm.dashboard.service;
 
 import com.photoizer.crm.agenda.model.Agendamento;
+import com.photoizer.crm.agenda.model.AgendamentoFotografo;
+import com.photoizer.crm.agenda.model.RepasseStatus;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
+import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.cliente.repository.ClienteRepository;
 import com.photoizer.crm.comissao.model.Indicacao;
@@ -55,6 +58,7 @@ public class DashboardService {
     private static final String STATUS_COMISSAO_PAGA = "PAGA";
 
     private final AgendamentoRepository agendamentoRepository;
+    private final AgendamentoFotografoRepository agendamentoFotografoRepository;
     private final IndicacaoRepository indicacaoRepository;
     private final DespesaRepository despesaRepository;
     private final CompraExtraRepository compraExtraRepository;
@@ -62,12 +66,14 @@ public class DashboardService {
     private final ReceitaRepository receitaRepository;
 
     public DashboardService(AgendamentoRepository agendamentoRepository,
+                            AgendamentoFotografoRepository agendamentoFotografoRepository,
                             IndicacaoRepository indicacaoRepository,
                             DespesaRepository despesaRepository,
                             CompraExtraRepository compraExtraRepository,
                             ClienteRepository clienteRepository,
                             ReceitaRepository receitaRepository) {
         this.agendamentoRepository = agendamentoRepository;
+        this.agendamentoFotografoRepository = agendamentoFotografoRepository;
         this.indicacaoRepository = indicacaoRepository;
         this.despesaRepository = despesaRepository;
         this.compraExtraRepository = compraExtraRepository;
@@ -117,6 +123,8 @@ public class DashboardService {
             }
         }
 
+        var repasses = carregarRepasses();
+
         var receitasAvulsas = receitaRepository.findAll().stream()
             .filter(r -> r.getAgendamentoId() == null)
             .toList();
@@ -134,6 +142,8 @@ public class DashboardService {
             var deslocamentoEfetivoPago = BigDecimal.ZERO;
             var comissao = BigDecimal.ZERO;
             var comissaoPaga = BigDecimal.ZERO;
+            var repasse = BigDecimal.ZERO;
+            var repassePago = BigDecimal.ZERO;
             var entradasRecebidas = BigDecimal.ZERO;
             int qtdConfirmados = 0;
             int qtdFinalizados = 0;
@@ -147,6 +157,9 @@ public class DashboardService {
 
                 comissao = comissao.add(comissaoPorAgendamento.getOrDefault(a.getId(), BigDecimal.ZERO));
                 comissaoPaga = comissaoPaga.add(comissaoPagaPorAgendamento.getOrDefault(a.getId(), BigDecimal.ZERO));
+
+                repasse = repasse.add(repasses.previstos().getOrDefault(a.getId(), BigDecimal.ZERO));
+                repassePago = repassePago.add(repasses.pagos().getOrDefault(a.getId(), BigDecimal.ZERO));
 
                 if (STATUS_FINALIZADOS.contains(a.getStatus())) {
                     qtdFinalizados++;
@@ -184,8 +197,8 @@ public class DashboardService {
 
             var despesasManuais = despesasPorMes.getOrDefault(ym, BigDecimal.ZERO);
             var despesasManuaisPagas = despesasPagasPorMes.getOrDefault(ym, BigDecimal.ZERO);
-            var totalDespesas = deslocamentoEfetivo.add(comissao).add(despesasManuais);
-            var totalDespesasPagas = deslocamentoEfetivoPago.add(comissaoPaga).add(despesasManuaisPagas);
+            var totalDespesas = deslocamentoEfetivo.add(comissao).add(repasse).add(despesasManuais);
+            var totalDespesasPagas = deslocamentoEfetivoPago.add(comissaoPaga).add(repassePago).add(despesasManuaisPagas);
 
             var dados = new DadosMensais(
                 ym.format(DateTimeFormatter.ofPattern("yyyy-MM")),
@@ -194,6 +207,7 @@ public class DashboardService {
                 valorFinalizados,
                 deslocamentoEfetivo,
                 comissao,
+                repasse,
                 despesasManuais,
                 entradasRecebidas,
                 entradasRecebidas.subtract(totalDespesasPagas),
@@ -218,6 +232,7 @@ public class DashboardService {
                     valorFinalizados,
                     deslocamentoEfetivo,
                     comissao,
+                    repasse,
                     despesasManuais,
                     saldoLiquido,
                     receitaProjetada,
@@ -356,6 +371,24 @@ public class DashboardService {
         if (Boolean.TRUE.equals(a.getRepassarDeslocamento())) return BigDecimal.ZERO;
         return a.getCustoDeslocamento() != null ? a.getCustoDeslocamento() : BigDecimal.ZERO;
     }
+
+    private RepassesResumo carregarRepasses() {
+        Map<UUID, BigDecimal> previstos = new HashMap<>();
+        Map<UUID, BigDecimal> pagos = new HashMap<>();
+        var linhas = agendamentoFotografoRepository.sumRepassesAtivosPorAgendamento(RepasseStatus.CANCELADO);
+        for (var linha : linhas) {
+            var agendamentoId = (UUID) linha[0];
+            var status = (RepasseStatus) linha[1];
+            var valor = (BigDecimal) linha[2];
+            if (status == RepasseStatus.PAGO) {
+                pagos.merge(agendamentoId, valor, BigDecimal::add);
+            }
+            previstos.merge(agendamentoId, valor, BigDecimal::add);
+        }
+        return new RepassesResumo(previstos, pagos);
+    }
+
+    private record RepassesResumo(Map<UUID, BigDecimal> previstos, Map<UUID, BigDecimal> pagos) {}
 
     private record CompraAgg(int qtd, BigDecimal total) {}
 }

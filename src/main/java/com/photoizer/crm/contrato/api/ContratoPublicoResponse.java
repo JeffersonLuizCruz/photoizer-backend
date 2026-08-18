@@ -5,6 +5,7 @@ import com.photoizer.crm.contrato.model.StatusContrato;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record ContratoPublicoResponse(
     StatusContrato status,
@@ -27,8 +28,11 @@ public record ContratoPublicoResponse(
     BigDecimal valorTotal,
     BigDecimal valorEntradaExigido,
     BigDecimal valorRestante,
-    String clausulasHtml
+    String clausulasHtml,
+    List<ProfissionalEnsaio> fotografos
 ) {
+    public record ProfissionalEnsaio(String nome, String papel) {}
+
     public static ContratoPublicoResponse of(
         Contrato c,
         String contratadaNome,
@@ -36,7 +40,8 @@ public record ContratoPublicoResponse(
         String contratadaCidade,
         String pixChave,
         String pixTipoChave,
-        String clausulasHtml
+        String clausulasHtml,
+        List<ProfissionalEnsaio> fotografos
     ) {
         boolean podeAssinar = c.getStatus() == StatusContrato.PUBLICADO
             || c.getStatus() == StatusContrato.DEVOLVIDO;
@@ -50,7 +55,8 @@ public record ContratoPublicoResponse(
             c.getLocalEnsaio(), c.getEnderecoCompleto(),
             c.getTaxaDeslocamento(), c.getPercentualEntrada(),
             c.getValorTotal(), c.getValorEntradaExigido(), c.getValorRestante(),
-            clausulasHtml
+            clausulasHtml,
+            fotografos
         );
     }
 }

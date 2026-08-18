@@ -1,7 +1,10 @@
 package com.photoizer.crm.financeiro.service;
 
 import com.photoizer.crm.agenda.model.Agendamento;
+import com.photoizer.crm.agenda.model.AgendamentoFotografo;
+import com.photoizer.crm.agenda.model.RepasseStatus;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
+import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.comissao.model.Indicacao;
 import com.photoizer.crm.comissao.repository.IndicacaoRepository;
@@ -43,6 +46,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -60,6 +64,7 @@ public class FinanceiroService {
     private final ConfiguracaoService configuracaoService;
     private final DespesaRepository despesaRepository;
     private final ReceitaRepository receitaRepository;
+    private final AgendamentoFotografoRepository agendamentoFotografoRepository;
 
     public FinanceiroService(PagamentoRepository pagamentoRepository,
                              FotoExtraRepository fotoExtraRepository,
@@ -70,7 +75,8 @@ public class FinanceiroService {
                              IndicadorService indicadorService,
                              ConfiguracaoService configuracaoService,
                              DespesaRepository despesaRepository,
-                             ReceitaRepository receitaRepository) {
+                             ReceitaRepository receitaRepository,
+                             AgendamentoFotografoRepository agendamentoFotografoRepository) {
         this.pagamentoRepository = pagamentoRepository;
         this.fotoExtraRepository = fotoExtraRepository;
         this.videoExtraRepository = videoExtraRepository;
@@ -81,6 +87,7 @@ public class FinanceiroService {
         this.configuracaoService = configuracaoService;
         this.despesaRepository = despesaRepository;
         this.receitaRepository = receitaRepository;
+        this.agendamentoFotografoRepository = agendamentoFotografoRepository;
     }
 
     @Transactional(readOnly = true)
@@ -123,11 +130,15 @@ public class FinanceiroService {
         var totalExtras = BigDecimal.ZERO;
         var faturamentoTotal = BigDecimal.ZERO;
         var deslocamento = BigDecimal.ZERO;
+        var repasse = BigDecimal.ZERO;
+
+        var repassesPorEnsaio = repassesPrevistosPorEnsaio();
 
         for (var a : agendamentos) {
             totalEntradas = totalEntradas.add(a.getValorEntradaPago());
             totalExtras = totalExtras.add(a.getValorExtras());
             faturamentoTotal = faturamentoTotal.add(a.getValorTotalFinal());
+            repasse = repasse.add(repassesPorEnsaio.getOrDefault(a.getId(), BigDecimal.ZERO));
 
             if (!Boolean.TRUE.equals(a.getRepassarDeslocamento())) {
                 var custo = a.getCustoDeslocamento() != null ? a.getCustoDeslocamento() : BigDecimal.ZERO;
@@ -153,7 +164,7 @@ public class FinanceiroService {
             despesasManuais = BigDecimal.ZERO;
         }
 
-        return new FinanceiroResumoResponse(totalEntradas, totalFinal, totalExtras, faturamentoTotal, deslocamento, comissao, despesasManuais);
+        return new FinanceiroResumoResponse(totalEntradas, totalFinal, totalExtras, faturamentoTotal, deslocamento, comissao, repasse, despesasManuais);
     }
 
     @Transactional(readOnly = true)
@@ -178,6 +189,9 @@ public class FinanceiroService {
         var restante = BigDecimal.ZERO;
         var extras = BigDecimal.ZERO;
         var totalFinal = BigDecimal.ZERO;
+        var repasse = BigDecimal.ZERO;
+
+        var repassesPorEnsaio = repassesPrevistosPorEnsaio();
 
         for (var a : sorted) {
             total = total.add(a.getValorTotal());
@@ -185,9 +199,10 @@ public class FinanceiroService {
             restante = restante.add(a.getValorRestante());
             extras = extras.add(a.getValorExtras());
             totalFinal = totalFinal.add(a.getValorTotalFinal());
+            repasse = repasse.add(repassesPorEnsaio.getOrDefault(a.getId(), BigDecimal.ZERO));
         }
 
-        var totais = new FinanceiroRelatoriosResponse.RelatoriosTotais(total, entrada, restante, extras, totalFinal);
+        var totais = new FinanceiroRelatoriosResponse.RelatoriosTotais(total, entrada, restante, extras, totalFinal, repasse);
         var responses = sorted.stream().map(AgendamentoResponse::of).toList();
         return new FinanceiroRelatoriosResponse(totais, responses, responses.size());
     }
@@ -227,6 +242,37 @@ public class FinanceiroService {
             ? lucroBruto.multiply(BigDecimal.valueOf(100)).divide(valorCobrado, 2, RoundingMode.HALF_UP)
             : BigDecimal.ZERO;
 
+        var links = agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(agendamentoId);
+        var fotosInfo = links.stream()
+            .map(af -> {
+                var custosF = despesas.stream()
+                    .filter(d -> af.getFotografo().getId().equals(d.getFotografoId()))
+                    .map(Despesa::getValor)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+                return new FinanceiroTrabalhoResponse.FotografoInfo(
+                    af.getFotografo().getId(),
+                    af.getFotografo().getNome(),
+                    custosF,
+                    af.getValorRepassar(),
+                    af.getStatus(),
+                    af.getDataPagamento(),
+                    af.getTipoValor() != null ? af.getTipoValor() : com.photoizer.crm.shared.model.TipoRepasse.FIXO,
+                    af.getPercentual(),
+                    af.getPapelParceiro()
+                );
+            })
+            .toList();
+
+        var totalCustosFotografo = fotosInfo.stream()
+            .map(FinanceiroTrabalhoResponse.FotografoInfo::custos)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        var custosFotografoDespesas = fotosInfo.stream()
+            .flatMap(fi -> despesas.stream()
+                .filter(d -> fi.fotografoId().equals(d.getFotografoId()))
+                .map(DespesaResponse::of))
+            .toList();
+
         return new FinanceiroTrabalhoResponse(
             agendamentoId,
             agendamento.getCliente().getNome(),
@@ -242,8 +288,13 @@ public class FinanceiroService {
             custoTotal,
             lucroBruto,
             margemLucro,
+            fotosInfo,
+            agendamento.getValorPartilhaGlobal(),
+            agendamento.getValorLucroCrm(),
+            totalCustosFotografo,
             despesas.stream().map(DespesaResponse::of).toList(),
-            pagamentos
+            custosFotografoDespesas,
+            pagamentos.stream().map(com.photoizer.crm.financeiro.api.PagamentoResponse::of).toList()
         );
     }
 
@@ -291,6 +342,31 @@ public class FinanceiroService {
             } else if (d.getStatus() == StatusDespesa.PAGO && emPeriodo(d.getData(), rangeInicio, rangeFim)) {
                 saidasRealizadas = saidasRealizadas.add(d.getValor());
             }
+        }
+
+        var linksRepasse = agendamentoFotografoRepository
+            .findByStatusWithAgendamento(RepasseStatus.PENDENTE);
+        for (var link : linksRepasse) {
+            var data = link.getAgendamento().getDataHoraEnsaio() != null
+                ? link.getAgendamento().getDataHoraEnsaio().toLocalDate()
+                : null;
+            if (!emPeriodo(data, rangeInicio, rangeFim)) continue;
+            var descricao = "Repasse — " + link.getFotografo().getNome()
+                + " (" + link.getAgendamento().getCliente().getNome() + ")";
+            itens.add(new FluxoCaixaResponse.FluxoCaixaItem(
+                link.getId(), "DESPESA", descricao, "Repasse parceiros",
+                data, link.getValorRepassar(), RepasseStatus.PENDENTE.name(), "AGENDAMENTO"));
+        }
+        var linksRepassePagos = agendamentoFotografoRepository
+            .findByStatusWithAgendamento(RepasseStatus.PAGO);
+        for (var link : linksRepassePagos) {
+            var data = link.getDataPagamento() != null
+                ? link.getDataPagamento().toLocalDate()
+                : (link.getAgendamento().getDataHoraEnsaio() != null
+                    ? link.getAgendamento().getDataHoraEnsaio().toLocalDate()
+                    : null);
+            if (!emPeriodo(data, rangeInicio, rangeFim)) continue;
+            saidasRealizadas = saidasRealizadas.add(link.getValorRepassar());
         }
 
         var buckets = montarBucketsFluxo(rangeInicio, rangeFim, semanal, itens);
@@ -368,6 +444,16 @@ public class FinanceiroService {
     private boolean emPeriodo(LocalDate data, LocalDate inicio, LocalDate fim) {
         if (data == null) return false;
         return !data.isBefore(inicio) && !data.isAfter(fim);
+    }
+
+    private Map<UUID, BigDecimal> repassesPrevistosPorEnsaio() {
+        var mapa = new HashMap<UUID, BigDecimal>();
+        for (var linha : agendamentoFotografoRepository.sumRepassesAtivosPorAgendamento(RepasseStatus.CANCELADO)) {
+            var agendamentoId = (UUID) linha[0];
+            var valor = (BigDecimal) linha[2];
+            mapa.merge(agendamentoId, valor, BigDecimal::add);
+        }
+        return mapa;
     }
 
     private String labelServico(TipoServico tipoServico) {

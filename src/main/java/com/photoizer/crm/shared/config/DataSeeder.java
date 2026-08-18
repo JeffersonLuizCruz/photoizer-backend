@@ -116,6 +116,16 @@ public class DataSeeder implements CommandLineRunner {
             template.setValor(TEMPLATO_PADRAO);
             configuracaoRepository.save(template);
         }
+
+        configuracaoRepository.findById("contratoTemplateTexto").ifPresent(t -> {
+            if (!t.getValor().contains("{{fotografosEnsaio}}")) {
+                t.setValor(t.getValor().replace(
+                    "Endereço completo: {{enderecoEnsaio}}",
+                    "Endereço completo: {{enderecoEnsaio}}\nProfissionais do ensaio: {{fotografosEnsaio}}"));
+                configuracaoRepository.save(t);
+                log.info("Template de contrato atualizado com placeholder de profissionais do ensaio");
+            }
+        });
     }
 
     public static final String TEMPLATO_PADRAO = """
@@ -135,6 +145,7 @@ Data do ensaio: {{dataEnsaio}}
 Horário do ensaio: {{horarioEnsaio}}
 Local do ensaio: {{localEnsaio}}
 Endereço completo: {{enderecoEnsaio}}
+Profissionais do ensaio: {{fotografosEnsaio}}
 
 # 3. Pacote Contratado
 Pacote: {{pacoteNome}}
