@@ -6,7 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,11 +14,6 @@ public interface AgendamentoFotografoRepository extends JpaRepository<Agendament
     List<AgendamentoFotografo> findByAgendamentoId(UUID agendamentoId);
 
     List<AgendamentoFotografo> findByFotografoIdOrderByAgendamentoDataHoraEnsaioDesc(UUID fotografoId);
-
-    long countByFotografoIdAndStatus(UUID fotografoId, RepasseStatus status);
-
-    @Query("SELECT COALESCE(SUM(af.valorRepassar), 0) FROM AgendamentoFotografo af WHERE af.agendamento.id = :agendamentoId")
-    BigDecimal sumRepassesByAgendamentoId(@Param("agendamentoId") UUID agendamentoId);
 
     @Query("""
         SELECT af.agendamento.id, af.status, COALESCE(SUM(af.valorRepassar), 0)

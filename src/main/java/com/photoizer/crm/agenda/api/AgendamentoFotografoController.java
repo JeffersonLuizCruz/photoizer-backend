@@ -1,13 +1,11 @@
 package com.photoizer.crm.agenda.api;
 
 import com.photoizer.crm.agenda.model.AgendamentoFotografo;
-import com.photoizer.crm.agenda.model.RepasseStatus;
 import com.photoizer.crm.shared.model.TipoRepasse;
 import com.photoizer.crm.agenda.service.AgendamentoFotografoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
