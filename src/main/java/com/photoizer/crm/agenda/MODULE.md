@@ -17,15 +17,21 @@ agenda/
 │   ├── AgendamentoFotografoRepository.java # JpaRepository + JOIN FETCH e SUMs agregados
 │   └── RascunhoAgendamentoRepository.java  # JpaRepository
 ├── service/
-│   ├── AgendamentoService.java       # ~768 linhas: criação, listagem, atualização, status, reagendar, conflitos, pagamento final, partilha, fotografos
-│   ├── AgendamentoFotografoService.java # ~208 linhas: repasses (pagar, cancelar, lote) + partilha
+│   ├── AgendamentoService.java       # ~532 linhas: criação, listagem, atualização, resolução de cliente, materialização via contrato
+│   ├── AgendamentoStatusLifecycle.java# ~125 linhas: máquina de estados (status, reagendar, destaque, pagamento final) + eventos [Fase 2]
+│   ├── AgendamentoValoresCalculator.java # ~69 linhas: cálculo financeiro único (novo/atualização) + valorRepasseEfetivo [Fase 2]
+│   ├── PartilhaService.java          # ~79 linhas: calcular/validar partilha de fotógrafos (usa DespesaService) [Fase 2]
+│   ├── DisponibilidadeService.java   # ~139 linhas: verificarDisponibilidade + validarConflitoAgenda (com/sem excluirId) [Fase 2]
+│   ├── AgendamentoFotografoService.java # ~177 linhas: repasses (pagar, cancelar, lote) + partilha
 │   ├── RascunhoAgendamentoService.java  # ~92 linhas: salvar/buscar/deletar rascunho por usuário
 │   └── CriarAgendamentoCommand.java      # Record com 27 campos (inclui MultipartFile)
 ├── api/
 │   ├── AgendamentoController.java     # REST: POST (multipart ~28 @RequestParam), GET, PUT, PATCH /status, PATCH /reagendar, PATCH /destaque, POST /pagamento-final, GET /verificar-disponibilidade
 │   ├── AgendamentoFotografoController.java # REST de repasses
 │   ├── RascunhoAgendamentoController.java  # REST de rascunhos
-│   ├── AgendamentoResponse.java       # Record com 30+ campos, 3 factories static of()
+│   ├── AgendamentoMapper.java         # MapStruct multi-source: agendamento + fotografos + valorComissao + indicador + statusComissao [Fase 2]
+│   ├── RascunhoAgendamentoMapper.java # MapStruct (AgendamentoResponse/RascunhoAgendamentoResponse) [Fase 2]
+│   ├── AgendamentoResponse.java       # Record com 30+ campos, sem factories of() (migrado p/ mappers)
 │   ├── AtualizarAgendamentoRequest.java  # Record com @Valid + nested FotografoRepasse
 │   └── DisponibilidadeResponse.java      # Record: disponivel boolean + List<Conflito>
 ├── event/
@@ -57,6 +63,12 @@ agenda/
 - **foto** → `FotoEnsaioRepository`, `StatusFoto` (contagem de fotos do cliente) — **repository de outro módulo**
 - **comissao** → `IndicacaoRepository` (usado no `AgendamentoController`) — **repository de outro módulo**
 - **contrato** → `ContratoAprovadoEvent` (consumir) + `ContratoRepository` usado no `ContratoAprovadoEventListener` — **repository de outro módulo**
+
+### Acoplamento reverso (outros módulos importam o `agenda`)
+- **financeiro** → `FinanceiroService` importa `AgendamentoMapper` (agenda) para converter `Agendamento` em `AgendamentoResponse` [Fase 2]
+- **cliente** → `ClienteController` importa `AgendamentoMapper` (agenda) para o mesmo fim [Fase 2]
+
+> Sem testes Modulith de verificação no projeto; injeção cross-module de mappers não quebra o build.
 
 ### Eventos publicados (consumidores em outros módulos)
 | Evento | Consumidores |
@@ -100,12 +112,12 @@ CONFIRMADO ──realizar──▶ AGUARDANDO_PAGAMENTO_FINAL ──pagarFinal�
                                                                            ▼
                                                                     FINALIZADO
 ```
-- `atualizarStatus(id, String novoStatus)` (`:235-253`): `valueOf` direto, **sem validação de transição válida** (aceita qualquer enum; ex.: `FINALIZADO → CONFIRMADO`). Apenas dispara eventos/filtra datas para `REALIZADO`/`CANCELADO`/`NO_SHOW`.
-- `registrarPagamentoFinal` (`:412-442`): valida status ∈ {REALIZADO, AGUARDANDO_PAGAMENTO_FINAL}, exige comprovante, zera `valorRestante`, `EM_EDICAO`, publica evento.
+- `atualizarStatus(id, String novoStatus)` → delegado a `AgendamentoStatusLifecycle.atualizarStatus` → `agendamento.transicionarPara(status)`: `valueOf` direto, **sem validação de transição válida** (aceita qualquer enum; ex.: `FINALIZADO → CONFIRMADO`). Apenas dispara eventos/filtra datas para `REALIZADO`/`CANCELADO`/`NO_SHOW` — comportamento mantido (decisão: encapsular sem bloquear).
+- `registrarPagamentoFinal` → `AgendamentoStatusLifecycle.registrarPagamentoFinal` → `agendamento.aplicarPagamentoFinal(url)`: valida status ∈ {REALIZADO, AGUARDANDO_PAGAMENTO_FINAL}, exige comprovante, zera `valorRestante`, `EM_EDICAO`, publica evento.
 
 ### Fluxo 3: Repasses de Fotógrafos (partilha)
-- `AgendamentoFotografoService`: adicionar/atualizar/remover/pagar/cancelar repasse (`:48-153`), com **validação de partilha** (`validarPartilha`) que soma custos via `DespesaService` e repasses ativos, garantindo que a soma não exceda a partilha.
-- `AgendamentoService.calcularPartilhaFotografo` (`:541-565`) recalcula `valorPartilhaGlobal`/`valorLucroCrm` após cada mudança.
+- `AgendamentoFotografoService`: adicionar/atualizar/remover/pagar/cancelar repasse, delegando validação de partilha e método de domínio agrupados (`atualizarRepasse`/`pagar`/`cancelar` em `AgendamentoFotografo`) a `PartilhaService.calcularPartilhaFotografo/validarPartilha` (soma custos via `DespesaService` e repasses ativos, garantindo que a soma não exceda a partilha).
+- `AgendamentoService` recalcula `valorPartilhaGlobal`/`valorLucroCrm` via `AgendamentoValoresCalculator` após cada mudança.
 
 ### Fluxo 4: Rascunho de Agendamento
 - `RascunhoAgendamentoService.salvarRascunho` (`:23-82`) com **26 parâmetros posicionais**; upsert por `usuarioId` (1 rascunho por usuário).
@@ -115,67 +127,68 @@ CONFIRMADO ──realizar──▶ AGUARDANDO_PAGAMENTO_FINAL ──pagarFinal�
 
 ## 5. Regras Específicas
 1. **Controller com ~28 `@RequestParam`**: parsing manual e frágil; qualquer campo novo exige alteração em controller, command, service e entidade.
-2. **Resolução de cliente com efeito colateral**: o service cria `Cliente` quando inexistente (e silenciosamente faz `catch` de `OrigemCliente.valueOf` → `OUTROS`, `:665-672`).
-3. **Cálculo financeiro duplicado 3×**: `criarAgendamento` (`:125-133`), `atualizar` (`:336-342`), `criarAgendamentoDeContrato` (`:475-483`).
-4. **`validarConflitoAgenda` duplicada em 2 sobrecargas** (`:705-767`), com lógica copiada.
-5. **`atualizarStatus` sem state machine**: transições inválidas não são bloqueadas; `StatusAgendamento` é um enum sem comportamento.
-6. **tokenGaleria**: UUID com expiração fixa de 15 dias (`:164`) — hardcoded.
-7. **`listarAgendamentosCliente` faz 3 consultas ao módulo `foto` POR agendamento** (`:261-272`) — N+1 cross-module.
-8. **`AgendamentoController` usa repo de `comissao` + `AgendamentoFotografoRepository` diretamente** (`:48-49`) — controller acessando repositories de outra/infra.
+2. **Resolução de cliente com efeito colateral**: o service cria `Cliente` quando inexistente (e silenciosamente faz `catch` de `OrigemCliente.valueOf` → `OUTROS`).
+3. **Cálculo financeiro unificado** [Fase 2]: `AgendamentoValoresCalculator` é a fonte única de `novo`/`atualização` e `valorRepasseEfetivo`; não há mais 3 cópias (ver dívida 7.3).
+4. **Conflito de agenda consolidado** [Fase 2]: `DisponibilidadeService.validarConflitoAgenda(pacote, dataHora, duracao, local[, excluirId])` único, sem cópias de lógica.
+5. **Status sem validação de transição**: `AgendamentoStatusLifecycle`/`transicionarPara` centralizam a mudança, mas transições inválidas ainda não são bloqueadas (encapsulado, sem bloquear — decisão mantida).
+6. **tokenGaleria**: UUID com expiração fixa de 15 dias — hardcoded (ver 7.12).
+7. **`listarAgendamentosCliente` faz 3 consultas ao módulo `foto` POR agendamento** — N+1 cross-module (ver 7.6).
+8. **`AgendamentoController` usa repo de `comissao` + `AgendamentoFotografoRepository` diretamente** — controller acessando repositories de outra/infra.
 9. **`@Transactional` em nível de classe** em todos os services.
 10. **Assinatura com MUITOS parâmetros**: `RascunhoAgendamentoService.salvarRascunho` (26 args), `CriarAgendamentoCommand` (27 campos, inclui `MultipartFile` — vaza dependência de web para dentro da camada de serviço).
 
 ## 6. Testes
-Nenhum teste específico. Apenas `CrmApplicationTests` (smoke). Não há testes para fluxo de status, conflito, partilha ou repasses.
+Nenhum teste específico no módulo `agenda`. Tests existem em outros módulos que usam o agenda: `FinanceiroServiceTest`, `DashboardServiceTest`, `FinanceiroDashboardServiceTest` (48 testes, todos verdes). Não há testes para fluxo de status, conflito, partilha ou repasses.
 
 ## 7. Dívidas Técnicas e Melhorias Recomendadas
 
-### 7.1 `AgendamentoService` é god class (~768 linhas) — **P1**
-- **Problema**: 16+ responsabilidades em um service (criar, atualizar, listar, status, reagendar, disponibilidade, pagamento, partilha, fotografos, contrato, resolução de cliente).
-- **Solução (Clean Architecture + SRP)**:
-  - Separar em services de aplicação: `AgendamentoQueryService` (buscas), `AgendamentoCommandService` (criação/atualização), `AgendamentoStatusLifecycle` (máquina de estados), `PartilhaService` (partilha/repasse), `DisponibilidadeService`.
-  - Mover regras para **domínio**: cálculos de valor e transições de status para o próprio `Agendamento` (métodos `aplicarPagamentoFinal()`, `transicionarPara(novo)` — **State Pattern via enum**).
+> Status após Fase 2 (refactor de extração de services + encapsulamento de domínio + MapStruct). Resolvidos ⇒ ✅; parciais ⇒ ◐; pendentes ⇒ 🔴.
 
-### 7.2 Status machine sem validação — **P1**
-- `atualizarStatus` aceita qualquer status (`AgendamentoService.java:235-253`).
-- **Solução**: encapsular transições no enum `StatusAgendamento` com método `transicoesValidas()` ou método `transicionarPara(StatusAgendamento)` na entidade que valida e lança exceção de domínio (`StatusInvalidoException`). Elimina o parâmetro String solto e centraliza as regras (polimorfismo no enum, sem herança).
+### 7.1 `AgendamentoService` é god class (~768 linhas) — **P1** · ◐ parcial
+- **Problema**: 16+ responsabilidades em um service.
+- **Fase 2**: extraídos `AgendamentoStatusLifecycle` (status/reagendar/destaque/pagamento), `PartilhaService` (partilha/repasse), `DisponibilidadeService` (conflito/disponibilidade) e `AgendamentoValoresCalculator`. `AgendamentoService` caiu para ~532 linhas.
+- **Restam**: criação (multipart) ainda no service; resolução de cliente com efeito colateral; materialização via contrato (`criarAgendamentoDeContrato`).
 
-### 7.3 Duplicação de cálculo financeiro — **P1**
-- Cálculo de `valorTotal`/`valorEntradaExigido`/`valorRestante`/`valorTotalFinal` repetido 3× (`criar`, `atualizar`, `criarAgendamentoDeContrato`).
-- **Solução**: extrair um `CalculadoraFinanceira` (componente de domínio) com entrada `(pacote, taxa, percentual)`; ou um método `Agendamento.recalcularValores(pacote, taxaDeslocamento, percentualEntrada)`. Testável isoladamente.
+### 7.2 Status machine sem validação — **P1** · ◐ parcial
+- **Fase 2**: `Agendamento.transicionarPara(StatusAgendamento)` centraliza a mudança (seta `dataRealizacao` em REALIZADO); `AgendamentoStatusLifecycle.atualizarStatus` delega para ele, com eventos.
+- **Restam**: transições inválidas continuam aceitas (decisão do usuário: **encapsular sem bloquear** — comportamento de negócio preservado). Próximo passo opcional: `StatusInvalidoException` + validação no enum.
 
-### 7.4 Violações Modulith (services/repos de outros módulos) — **P1**
-- `DespesaService` e `ConfiguracaoService` chamados diretamente em `AgendamentoService` (`:69-70`); `FotoEnsaioRepository` (`:68`); `IndicacaoRepository` no controller (`:48`); `ContratoRepository` no listener (`:17`).
-- **Solução**: 
-  - chamada de custos (despesa) e foto → expor via **eventos de consulta** ou um módulo de API pública de leitura; 
-  - partilha de custos → mover responsabilidade de custos para dentro do fluxo de despesa (evento `PartilhaRequerida`) ou criar porta/interface no domínio (Dependency Inversion) implementada pelo módulo dono dos dados.
+### 7.3 Duplicação de cálculo financeiro — **P1** · ✅ resolvido
+- **Fase 2**: `AgendamentoValoresCalculator.calcularValoresAgendamento(...)` (novo/atualização) + `calcularValorRepasse`/`valorRepasseEfetivo` como fonte única (testável isoladamente).
 
-### 7.5 Vazamento de web na camada de serviço — **P1**
-- `CriarAgendamentoCommand` contém `MultipartFile` (`:32`) e `RascunhoAgendamentoService.salvarRascunho` recebe 26 args.
-- **Solução (Clean Architecture)**: definir `AgendamentoCommand`/registro de eventos com dados já processados (ex.: `urlComprovante`, `nomeArquivo`) — o upload deve acontecer na camada de infraestrutura (controller/gateway), não no domínio. Reduzir args com command objects agrupados (`DadosCliente`, `DadosEnsayo`, `Repasses`).
+### 7.4 Violações Modulith (services/repos de outros módulos) — **P1** · 🔴 pendente
+- `DespesaService`/`ConfiguracaoService`/`FotoEnsaioRepository`/`IndicacaoRepository`/`ContratoRepository` ainda importados. Além disso, **novo acoplamento reverso** (Fase 2): `financeiro.FinanceiroService` e `cliente.ClienteController` importam `AgendamentoMapper` do agenda.
+- **Solução**: eventos de consulta/facades públicas; mover custos para fluxo de despesa; porta/interface no domínio (Dependency Inversion).
 
-### 7.6 N+1 e queries por item em `listarAgendamentosCliente` — **P2**
-- 3 `count(...)` ao módulo `foto` por agendamento (`AgendamentoService.java:264-268`).
-- **Solução**: agregar contagens em uma única consulta agrupada (JPQL `GROUP BY agendamentoId`) no módulo `foto` e expor via API de consulta/evento; ou usar `@EntityGraph`/DTO projection com contagens.
+### 7.5 Vazamento de web na camada de serviço — **P1** · 🔴 pendente
+- `CriarAgendamentoCommand` contém `MultipartFile`; `RascunhoAgendamentoService.salvarRascunho` recebe 26 args; `AgendamentoStatusLifecycle.registrarPagamentoFinal` recebe `MultipartFile`.
+- **Solução**: command objects com dados já processados (`urlComprovante`, `nomeArquivo`); upload na camada de infraestrutura.
 
-### 7.7 Nome enganoso `findByLocalAndDataBetweenExcludingId` — **P3**
-- A JPQL ignora `local` (`AgendamentoRepository.java:39-45`). Renomear método (`findActiveBetweenExcludingId`) e corrigir o chamador.
+### 7.6 N+1 e queries por item em `listarAgendamentosCliente` — **P2** · 🔴 pendente
+- 3 `count(...)` ao módulo `foto` por agendamento (`AgendamentoService.listarAgendamentosCliente`).
+- **Solução**: agregar contagens em consulta agrupada (JPQL `GROUP BY agendamentoId`) no módulo `foto`; ou `@EntityGraph`/DTO projection.
 
-### 7.8 Rivals sem lógica de reaproveitamento — **P2**
-- `AgendamentoFotografoService.calcularValor` e `AgendamentoService.valorRepasseEfetivo` são a **mesma** regra duplicada em dois services (`AgendamentoFotografoService.java:174-181` vs `AgendamentoService.java:629-636`). Extrair para componente único de domínio.
+### 7.7 Nome enganoso `findByLocalAndDataBetweenExcludingId` — **P3** · ✅ resolvido
+- **Fase 2**: renomeado p/ `findActiveByLocalAndDataBetween` e `findActiveBetweenExcludingId` (JPQL ignora `local` apenas na versão `ExcludingId`; ambos renomeados para refletir que buscam agendamentos ativos).
 
-### 7.9 DTOs manuais — **P2**
-- `AgendamentoResponse` com 3 factories e ~200 linhas de `of()` manual (`AgendamentoResponse.java:76-205`).
-- **Solução**: **MapStruct** com `@Mapping(target="valorPacote", expression=...)`, `@Context` para comissão/indicador e componentiza o nested `FotografoNoAgendamento` (usando `AgendamentoFotografoMapper`).
+### 7.8 Regras de repasse duplicadas — **P2** · ✅ resolvido
+- **Fase 2**: `AgendamentoFotografoService.calcularValor` e `AgendamentoService.valorRepasseEfetivo` (duplicata) unificadas em `AgendamentoValoresCalculator.calcularValorRepasse`/`valorRepasseEfetivo`.
 
-### 7.10 Exceções — **P2**
-- 6 classes quase idênticas (ver `shared/MODULE.md §7.3`): consolidar em hierarquia central; `FotografoNaoEncontradoException` deveria residir onde `User` pertence (auth) ou ser proveito pela hierarquia `NotFoundException`.
+### 7.9 DTOs manuais — **P2** · ✅ resolvido (com observação)
+- **Fase 2**: **MapStruct** adotado (`pom.xml`: `mapstruct 1.6.3` + `lombok-mapstruct-binding 0.2.0`). Criados `AgendamentoMapper` (multi-source com `@Context`/expressões preservando `valorPacote`/`saldoDevedor`/`status`) e `RascunhoAgendamentoMapper`. Factories `of()` removidas de `AgendamentoResponse`/`RascunhoAgendamentoResponse`.
+- **Observação**: a resposta continua um record com 30+ campos; `AgendamentoMapper` é multi-source `(agendamento, fotografos, valorComissao, indicadorNome, statusComissao)` e virou acoplamento reverso p/ financeiro/cliente (ver 7.4).
 
-### 7.11 Lombok/setters expostos — **P2**
-- `@Setter` de classe em `Agendamento`/`RascunhoAgendamento`/`AgendamentoFotografo` permite mutação arbitrária. Restringir com `@Setter(AccessLevel.PRIVATE)` + métodos de domínio (transições e pagamentos) — ver `shared/MODULE.md §7.9`.
+### 7.10 Exceções — **P2** · 🔴 pendente
+- 6 classes quase idênticas: consolidar em hierarquia central (`BusinessException`); `FotografoNaoEncontradoException` deveria residir onde `User` pertence.
 
-### 7.12 Indices e tokenGaleria — **P3**
-- `tokenGaleria` é `unique` mas sem índice explícito? (verificar agendamento). Exportar expiração do token para `Config` (já existe `prazo_expiracao_token_galeria_dias` mas o código usa 15 hardcoded, `AgendamentoService.java:164`).
+### 7.11 Lombok/setters expostos — **P2** · ◐ parcial
+- **Fase 2**: `AgendamentoFotografo` com `@Setter(AccessLevel.PRIVATE)` + métodos de domínio (`atualizarRepasse`, `pagar`, `cancelar`); `Agendamento` ganhou métodos de domínio (`transicionarPara`, `reagendar`, `aplicarPagamentoFinal`, `alternarDestaque`).
+- **Restam**: `@Setter` de classe continua público em `Agendamento` e `RascunhoAgendamento` (mutação arbitrária ainda possível). Restringir p/ PRIVATE e migrar todas as escritas para métodos de domínio.
+
+### 7.12 Indices e tokenGaleria — **P3** · 🔴 pendente
+- `tokenGaleria` é `unique` sem índice explícito? (verificar); expiração do token hardcoded em 15 dias (usar `prazo_expiracao_token_galeria_dias` da config).
 
 ## 8. Exemplos de arquivos afetados
-- `AgendamentoService.java` (:69-70, :125-133, :235-253, :261-272, :336-342, :444-539, :705-767) — god class, duplicação, cross-module e state machine; `AgendamentoController.java:70-146` — 28 `@RequestParam`; `CriarAgendamentoCommand.java:32` — `MultipartFile` no command; `RascunhoAgendamentoService.java:23-82` — 26 args; `AgendamentoResponse.java:76-205` — mappers manuais; `AgendamentoRepository.java:39-45` — query mal nomeada.
+- **Fase 2 (novos)**: `service/AgendamentoStatusLifecycle.java`, `service/PartilhaService.java`, `service/DisponibilidadeService.java`, `service/AgendamentoValoresCalculator.java`, `api/AgendamentoMapper.java`, `api/RascunhoAgendamentoMapper.java`.
+- **Fase 2 (alterados)**: `service/AgendamentoService.java` (delegação; ~532 linhas), `service/AgendamentoFotografoService.java` (PartilhaService + domínio), `model/Agendamento.java` (métodos de domínio), `model/AgendamentoFotografo.java` (`@Setter(PRIVATE)` + domínio), `repository/AgendamentoRepository.java` (queries renomeadas), `api/AgendamentoController.java` + `api/RascunhoAgendamentoController.java` (lifecycle/disponibilidade/mappers), `api/AgendamentoResponse.java` + `api/RascunhoAgendamentoResponse.java` (sem `of()`), `pom.xml` (MapStruct 1.6.3).
+- **Pendências**: `service/AgendamentoService.java` (criação/criação-por-contrato/resolução de cliente), `service/CriarAgendamentoCommand.java` (`MultipartFile`), `service/RascunhoAgendamentoService.java` (26 args), `api/AgendamentoController.java` (~28 `@RequestParam`, `IndicacaoRepository` direto), `model/StatusAgendamento.java` (sem validação de transições), `model/Agendamento.java`/`RascunhoAgendamento.java` (`@Setter` público).

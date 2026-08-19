@@ -1,6 +1,6 @@
 # DEBT.md — Dívidas Técnicas Consolidadas (backend CRM Photoizer)
 
-> Documento executivo consolidando as dívidas P1/P2/P3 identificadas nos `MODULE.md` dos 18 módulos (Fase 1 — investigação e documentação; **nenhuma alteração de código** foi feita).
+> Documento executivo consolidando as dívidas P1/P2/P3 identificadas nos `MODULE.md` dos 18 módulos (Fase 1 — investigação e documentação) com status de refactor da Fase 2 (aplicada ao módulo `agenda`).
 > Detalhes e exemplos `arquivo:linha` em cada módulo: `src/main/java/com/photoizer/crm/{modulo}/MODULE.md`.
 
 **Prioridades** → P1: bloqueia qualidade/segurança/escalabilidade. P2: qualidade, refatoração. P3: cosmético/complementar.
@@ -84,6 +84,14 @@
 
 ### agenda
 - God class; máquina de estados sem validação (`StatusAgendamento` sem methods); duplicação de cálculo financeiro; violações Modulith (repos/services de outros módulos); vazamento de web (`HttpServletRequest`/`MultipartFile`) na camada de serviço.
+- **Fase 2 (refactor parcial concluído)** — ver `agenda/MODULE.md §7`:
+  - ✅ Extraídos `AgendamentoStatusLifecycle`, `PartilhaService`, `DisponibilidadeService`, `AgendamentoValoresCalculator` (`AgendamentoService` 768→532 linhas).
+  - ✅ Métodos de domínio em `Agendamento` (`transicionarPara`/`reagendar`/`aplicarPagamentoFinal`/`alternarDestaque`) e `AgendamentoFotografo` (`@Setter(PRIVATE)` + `atualizarRepasse`/`pagar`/`cancelar`).
+  - ✅ Cálculo financeiro unificado + `valorRepasseEfetivo` único (`AgendamentoValoresCalculator`).
+  - ✅ Queries renomeadas (`findActiveByLocalAndDataBetween`/`findActiveBetweenExcludingId`).
+  - ✅ **MapStruct** adotado: `AgendamentoMapper` + `RascunhoAgendamentoMapper`; factories `of()` removidas das Responses.
+  - ◐ Status: centralizado, mas transições inválidas ainda aceitas (decisão: encapsular sem bloquear).
+  - ◐ Módulo `agenda` agora tem **acoplamento reverso**: `financeiro.FinanceiroService` e `cliente.ClienteController` importam o `AgendamentoMapper` (sem testes Modulith para bloquear).
 
 ---
 
@@ -94,7 +102,7 @@
 | **Herança `BaseEntity`** | todos com entidades | `@Embeddable AuditInfo` + JPA Auditing (eliminar `@MappedSuperclass`/`@SuperBuilder`) |
 | **`status`/`origem` em `String`** | comissao, agenda, foto, despesa, contrato, ecommerce | enums com métodos de transição; nunca comparar `String.equals` |
 | **Exceções genéricas** | maioria | hierarquia central `BusinessException` + `HttpStatus`/código (decisão já aprovada) |
-| **DTOs manuais (`static of`/`Map`)** | quase todos | MapStruct (decisão já aprovada; Fase 2) |
+| **DTOs manuais (`static of`/`Map`)** | quase todos | MapStruct (decisão já aprovada; Fase 2) — **iniciado em `agenda`** (AgendamentoMapper/RascunhoAgendamentoMapper) |
 | **Escrita em entidade alheia** | ecommerce, edicao, foto, financeiro, comissao, documento, notificacao | eventos de domínio (`publica`/`@EventListener`/`@TransactionalEventListener`) — padrão já usado corretamente em alguns pontos |
 | **Agregação em memória** | dashboard, financeiro, comissao, indicador, agenda | queries agregadas SQL (`SUM`/`GROUP BY`/`COUNT`) nos repositórios donos |
 
@@ -113,4 +121,4 @@ Ordem proposta (valor × risco):
 7. **AuditInfo `@Embeddable` + Auditing** (substitui `BaseEntity`).
 8. **PDF unificado** (escolher lib; eliminar stub do documento e duplicação com contrato).
 
-> Nenhuma etapa desta lista foi executada; as decisões arquiteturais (layering, exceções, MapStruct) já foram aprovadas em conversa anterior e estão refletidas nos `MODULE.md`.
+> **Fase 2 em andamento**: extração de services + encapsulamento de domínio + MapStruct foram aplicados ao módulo `agenda` (ver `agenda/MODULE.md §7`). As demais etapas desta lista ainda não foram executadas; as decisões arquiteturais (layering, exceções, MapStruct) já foram aprovadas em conversa anterior e estão refletidas nos `MODULE.md`.

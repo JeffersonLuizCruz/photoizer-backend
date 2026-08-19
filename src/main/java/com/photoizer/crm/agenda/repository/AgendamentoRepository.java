@@ -23,7 +23,7 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID>,
     @Query("SELECT a FROM Agendamento a WHERE a.localEnsaio = :local " +
            "AND a.dataHoraEnsaio >= :diaInicio AND a.dataHoraEnsaio < :diaFim " +
            "AND a.status NOT IN :statusesIgnorados")
-    List<Agendamento> findByLocalAndDataBetween(
+    List<Agendamento> findActiveByLocalAndDataBetween(
         @Param("local") String local,
         @Param("diaInicio") LocalDateTime diaInicio,
         @Param("diaFim") LocalDateTime diaFim,
@@ -38,7 +38,7 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID>,
 
     @Query("SELECT a FROM Agendamento a WHERE a.dataHoraEnsaio >= :diaInicio AND a.dataHoraEnsaio < :diaFim " +
            "AND a.status NOT IN :statusesIgnorados AND a.id <> :excluirId")
-    List<Agendamento> findByLocalAndDataBetweenExcludingId(
+    List<Agendamento> findActiveBetweenExcludingId(
         @Param("diaInicio") LocalDateTime diaInicio,
         @Param("diaFim") LocalDateTime diaFim,
         @Param("statusesIgnorados") List<StatusAgendamento> statusesIgnorados,

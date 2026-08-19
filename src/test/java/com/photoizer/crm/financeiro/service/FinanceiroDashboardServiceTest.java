@@ -3,6 +3,7 @@ package com.photoizer.crm.financeiro.service;
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
+import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
 import com.photoizer.crm.cliente.model.Cliente;
 import com.photoizer.crm.comissao.repository.IndicacaoRepository;
 import com.photoizer.crm.despesa.repository.DespesaRepository;
@@ -29,6 +30,7 @@ class FinanceiroDashboardServiceTest {
     private final ReceitaRepository receitaRepository = mock(ReceitaRepository.class);
     private final DespesaRepository despesaRepository = mock(DespesaRepository.class);
     private final AgendamentoRepository agendamentoRepository = mock(AgendamentoRepository.class);
+    private final AgendamentoFotografoRepository agendamentoFotografoRepository = mock(AgendamentoFotografoRepository.class);
     private final IndicacaoRepository indicacaoRepository = mock(IndicacaoRepository.class);
 
     private FinanceiroDashboardService service;
@@ -36,7 +38,8 @@ class FinanceiroDashboardServiceTest {
     @BeforeEach
     void setUp() {
         service = new FinanceiroDashboardService(
-            receitaRepository, despesaRepository, agendamentoRepository, indicacaoRepository);
+            receitaRepository, despesaRepository, agendamentoRepository,
+            agendamentoFotografoRepository, indicacaoRepository);
         when(receitaRepository.findAll(any(Specification.class))).thenReturn(List.of());
         when(despesaRepository.findAll()).thenReturn(List.of());
         when(indicacaoRepository.findAll()).thenReturn(List.of());

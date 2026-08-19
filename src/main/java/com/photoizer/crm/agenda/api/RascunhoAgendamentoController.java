@@ -23,9 +23,11 @@ import java.util.UUID;
 public class RascunhoAgendamentoController {
 
     private final RascunhoAgendamentoService service;
+    private final RascunhoAgendamentoMapper mapper;
 
-    public RascunhoAgendamentoController(RascunhoAgendamentoService service) {
+    public RascunhoAgendamentoController(RascunhoAgendamentoService service, RascunhoAgendamentoMapper mapper) {
         this.service = service;
+        this.mapper = mapper;
     }
 
     private UUID getCurrentUserId() {
@@ -73,7 +75,7 @@ public class RascunhoAgendamentoController {
             indicadorId, indicadorNome, indicadorTelefone, observacoes,
             currentStep, comprovanteName, confirmado
         );
-        return ResponseEntity.ok(RascunhoAgendamentoResponse.of(draft));
+        return ResponseEntity.ok(mapper.toResponse(draft));
     }
 
     @GetMapping("/meu")
@@ -81,7 +83,7 @@ public class RascunhoAgendamentoController {
     public ResponseEntity<RascunhoAgendamentoResponse> buscarMeu() {
         var usuarioId = getCurrentUserId();
         return service.buscarPorUsuario(usuarioId)
-            .map(draft -> ResponseEntity.ok(RascunhoAgendamentoResponse.of(draft)))
+            .map(draft -> ResponseEntity.ok(mapper.toResponse(draft)))
             .orElse(ResponseEntity.noContent().build());
     }
 

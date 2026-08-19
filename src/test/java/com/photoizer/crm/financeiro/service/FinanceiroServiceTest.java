@@ -2,6 +2,7 @@ package com.photoizer.crm.financeiro.service;
 
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
+import com.photoizer.crm.agenda.api.AgendamentoMapper;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
 import com.photoizer.crm.comissao.repository.IndicacaoRepository;
@@ -44,6 +45,7 @@ class FinanceiroServiceTest {
     private final DespesaRepository despesaRepository = mock(DespesaRepository.class);
     private final ReceitaRepository receitaRepository = mock(ReceitaRepository.class);
     private final AgendamentoFotografoRepository agendamentoFotografoRepository = mock(AgendamentoFotografoRepository.class);
+    private final AgendamentoMapper agendamentoMapper = mock(AgendamentoMapper.class);
 
     private FinanceiroService service;
 
@@ -53,7 +55,7 @@ class FinanceiroServiceTest {
             pagamentoRepository, fotoExtraRepository, videoExtraRepository,
             agendamentoRepository, pacoteRepository, indicacaoRepository,
             indicadorService, configuracaoService, despesaRepository, receitaRepository,
-            agendamentoFotografoRepository);
+            agendamentoFotografoRepository, agendamentoMapper);
     }
 
     private Agendamento agendamentoCom(StatusAgendamento status) {

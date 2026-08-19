@@ -1,16 +1,11 @@
 package com.photoizer.crm.agenda.service;
 
-import com.photoizer.crm.agenda.event.AgendamentoCanceladoEvent;
 import com.photoizer.crm.agenda.event.AgendamentoConfirmadoEvent;
 import com.photoizer.crm.agenda.event.AgendamentoCriadoEvent;
-import com.photoizer.crm.agenda.event.AgendamentoRealizadoEvent;
-import com.photoizer.crm.agenda.event.PagamentoFinalRegistradoEvent;
 import com.photoizer.crm.agenda.exception.AgendamentoNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.AgendamentoNoPassadoException;
-import com.photoizer.crm.agenda.exception.ConflitoDeAgendaException;
 import com.photoizer.crm.agenda.exception.EditorNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.FotografoNaoEncontradoException;
-import com.photoizer.crm.agenda.exception.EnsaioNaoFinalizadoException;
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.model.AgendamentoFotografo;
@@ -34,20 +29,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.photoizer.crm.agenda.api.AtualizarAgendamentoRequest;
+import com.photoizer.crm.agenda.api.AgendamentoMapper;
 import com.photoizer.crm.agenda.api.AgendamentoResponse;
-import com.photoizer.crm.agenda.api.DisponibilidadeResponse;
 import com.photoizer.crm.cliente.api.AgendamentoClienteResponse;
-import com.photoizer.crm.despesa.service.DespesaService;
 import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -67,8 +58,11 @@ public class AgendamentoService {
     private final ApplicationEventPublisher eventPublisher;
     private final FotoEnsaioRepository fotoEnsaioRepository;
     private final ConfiguracaoService configuracaoService;
-    private final DespesaService despesaService;
     private final AgendamentoFotografoRepository agendamentoFotografoRepository;
+    private final DisponibilidadeService disponibilidadeService;
+    private final PartilhaService partilhaService;
+    private final AgendamentoValoresCalculator agendamentoValoresCalculator;
+    private final AgendamentoMapper agendamentoMapper;
 
     public AgendamentoService(ClienteRepository clienteRepository,
                               PacoteRepository pacoteRepository,
@@ -78,8 +72,11 @@ public class AgendamentoService {
                               ApplicationEventPublisher eventPublisher,
                               FotoEnsaioRepository fotoEnsaioRepository,
                               ConfiguracaoService configuracaoService,
-                              DespesaService despesaService,
-                              AgendamentoFotografoRepository agendamentoFotografoRepository) {
+                              AgendamentoFotografoRepository agendamentoFotografoRepository,
+                              DisponibilidadeService disponibilidadeService,
+                              PartilhaService partilhaService,
+                              AgendamentoValoresCalculator agendamentoValoresCalculator,
+                              AgendamentoMapper agendamentoMapper) {
         this.clienteRepository = clienteRepository;
         this.pacoteRepository = pacoteRepository;
         this.userRepository = userRepository;
@@ -88,8 +85,11 @@ public class AgendamentoService {
         this.eventPublisher = eventPublisher;
         this.fotoEnsaioRepository = fotoEnsaioRepository;
         this.configuracaoService = configuracaoService;
-        this.despesaService = despesaService;
         this.agendamentoFotografoRepository = agendamentoFotografoRepository;
+        this.disponibilidadeService = disponibilidadeService;
+        this.partilhaService = partilhaService;
+        this.agendamentoValoresCalculator = agendamentoValoresCalculator;
+        this.agendamentoMapper = agendamentoMapper;
     }
 
     public Agendamento criarAgendamento(CriarAgendamentoCommand command) {
@@ -120,17 +120,11 @@ public class AgendamentoService {
         var taxaDeslocamento = repassarDeslocamento ? custoDeslocamento : BigDecimal.ZERO;
         var autorizaUsoImagem = command.autorizaUsoImagem() != null ? command.autorizaUsoImagem() : false;
 
-        validarConflitoAgenda(pacote, dataHoraEnsaio, duracao, command.localEnsaio());
+        disponibilidadeService.validarConflitoAgenda(pacote, dataHoraEnsaio, duracao, command.localEnsaio());
 
         var percentualEntrada = configuracaoService.getValorDecimal("percentualEntrada", new BigDecimal("30.00"));
-        var fatorEntrada = percentualEntrada.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
-        var valorTotal = pacote.getValorBase().add(taxaDeslocamento);
-        var valorEntradaExigido = valorTotal.multiply(fatorEntrada)
-            .setScale(2, RoundingMode.HALF_UP);
-        var valorEntradaPago = valorEntradaExigido;
-        var valorRestante = valorTotal.subtract(valorEntradaPago);
-        var valorExtras = BigDecimal.ZERO;
-        var valorTotalFinal = valorTotal.add(valorExtras);
+        var valores = agendamentoValoresCalculator.calcularValoresNovo(
+            pacote.getValorBase(), taxaDeslocamento, percentualEntrada);
 
         var urlComprovante = fileStorageService.salvar(command.comprovanteEntrada());
 
@@ -142,15 +136,15 @@ public class AgendamentoService {
             .duracaoMinutos(duracao)
             .localEnsaio(command.localEnsaio())
             .enderecoCompleto(command.enderecoCompleto())
-            .valorTotal(valorTotal)
-            .valorEntradaExigido(valorEntradaExigido)
-            .valorEntradaPago(valorEntradaPago)
-            .valorRestante(valorRestante)
-            .valorExtras(valorExtras)
-            .taxaDeslocamento(taxaDeslocamento)
+            .valorTotal(valores.valorTotal())
+            .valorEntradaExigido(valores.valorEntradaExigido())
+            .valorEntradaPago(valores.valorEntradaPago())
+            .valorRestante(valores.valorRestante())
+            .valorExtras(valores.valorExtras())
+            .taxaDeslocamento(valores.taxaDeslocamento())
             .custoDeslocamento(custoDeslocamento)
             .repassarDeslocamento(repassarDeslocamento)
-            .valorTotalFinal(valorTotalFinal)
+            .valorTotalFinal(valores.valorTotalFinal())
             .percentualEntrada(percentualEntrada)
             .status(StatusAgendamento.CONFIRMADO)
             .dataConfirmacao(LocalDateTime.now())
@@ -166,7 +160,7 @@ public class AgendamentoService {
 
         agendamento = agendamentoRepository.save(agendamento);
         criarFotografosNoAgendamento(agendamento, command.fotografos());
-        calcularPartilhaFotografo(agendamento);
+        partilhaService.calcularPartilhaFotografo(agendamento);
 
         eventPublisher.publishEvent(new AgendamentoCriadoEvent(
             agendamento.getId(),
@@ -232,26 +226,6 @@ public class AgendamentoService {
             .orElseThrow(() -> new AgendamentoNaoEncontradoException(id));
     }
 
-    public Agendamento atualizarStatus(UUID id, String novoStatus) {
-        var agendamento = buscarPorId(id);
-        var status = StatusAgendamento.valueOf(novoStatus);
-        agendamento.setStatus(status);
-
-        if (status == StatusAgendamento.REALIZADO) {
-            agendamento.setDataRealizacao(LocalDateTime.now());
-            eventPublisher.publishEvent(new AgendamentoRealizadoEvent(
-                agendamento.getId(),
-                agendamento.getCliente().getId()
-            ));
-        }
-
-        if (status == StatusAgendamento.CANCELADO || status == StatusAgendamento.NO_SHOW) {
-            eventPublisher.publishEvent(new AgendamentoCanceladoEvent(agendamento.getId()));
-        }
-
-        return agendamentoRepository.save(agendamento);
-    }
-
     @Transactional(readOnly = true)
     public List<Agendamento> listarPorClienteId(UUID clienteId) {
         return agendamentoRepository.findByClienteId(clienteId);
@@ -269,42 +243,6 @@ public class AgendamentoService {
                 return AgendamentoClienteResponse.of(a, totalPublicadas, selecionadasPacote, pagas);
             })
             .toList();
-    }
-
-    public Agendamento reagendar(UUID id, LocalDate data, String hora, Integer duracaoMinutos) {
-        var agendamento = buscarPorId(id);
-
-        LocalTime time = (hora != null && !hora.isBlank())
-            ? LocalTime.parse(hora, DateTimeFormatter.ofPattern("HH:mm"))
-            : agendamento.getDataHoraEnsaio().toLocalTime();
-
-        LocalDate novaData = (data != null) ? data : agendamento.getDataHoraEnsaio().toLocalDate();
-        LocalDateTime novaDataHora = LocalDateTime.of(novaData, time);
-
-        int duracao = (duracaoMinutos != null) ? duracaoMinutos : agendamento.getDuracaoMinutos();
-
-        var pacote = agendamento.getPacote();
-        validarConflitoAgenda(pacote, novaDataHora, duracao, agendamento.getLocalEnsaio());
-
-        agendamento.setDataHoraEnsaio(novaDataHora);
-        agendamento.setDuracaoMinutos(duracao);
-        agendamento.setStatus(StatusAgendamento.CONFIRMADO);
-        agendamento.setDataConfirmacao(LocalDateTime.now());
-
-        agendamento = agendamentoRepository.save(agendamento);
-
-        eventPublisher.publishEvent(new AgendamentoConfirmadoEvent(
-            agendamento.getId(),
-            agendamento.getCliente().getId()
-        ));
-
-        return agendamento;
-    }
-
-    public Agendamento toggleDestaque(UUID id) {
-        var agendamento = buscarPorId(id);
-        agendamento.setEnsaioDestaque(!agendamento.getEnsaioDestaque());
-        return agendamentoRepository.save(agendamento);
     }
 
     public AgendamentoResponse atualizar(UUID id, AtualizarAgendamentoRequest request) {
@@ -326,7 +264,7 @@ public class AgendamentoService {
         }
 
         var duracao = agendamento.getDuracaoMinutos();
-        validarConflitoAgenda(pacote, request.dataHoraEnsaio(), duracao, request.localEnsaio(), agendamento.getId());
+        disponibilidadeService.validarConflitoAgenda(pacote, request.dataHoraEnsaio(), duracao, request.localEnsaio(), agendamento.getId());
 
         var taxaDeslocamentoPadrao = configuracaoService.getValorDecimal("taxaDeslocamentoPadrao", BigDecimal.ZERO);
         var custoDeslocamento = request.custoDeslocamento() != null ? request.custoDeslocamento() : taxaDeslocamentoPadrao;
@@ -334,12 +272,9 @@ public class AgendamentoService {
         var taxaDeslocamento = repassarDeslocamento ? custoDeslocamento : BigDecimal.ZERO;
 
         var percentualEntrada = configuracaoService.getValorDecimal("percentualEntrada", new BigDecimal("30.00"));
-        var fatorEntrada = percentualEntrada.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
-        var novoValorTotal = pacote.getValorBase().add(taxaDeslocamento);
-        var novoValorEntradaExigido = novoValorTotal.multiply(fatorEntrada)
-            .setScale(2, RoundingMode.HALF_UP);
-        var novoValorRestante = novoValorTotal.subtract(agendamento.getValorEntradaPago());
-        var novoValorTotalFinal = novoValorTotal.add(agendamento.getValorExtras());
+        var valores = agendamentoValoresCalculator.calcularValoresAtualizacao(
+            pacote.getValorBase(), taxaDeslocamento, percentualEntrada,
+            agendamento.getValorEntradaPago(), agendamento.getValorExtras());
 
         agendamento.setPacote(pacote);
         agendamento.setEditor(editor);
@@ -352,93 +287,17 @@ public class AgendamentoService {
         agendamento.setAutorizaUsoImagem(request.autorizaUsoImagem() != null ? request.autorizaUsoImagem() : agendamento.getAutorizaUsoImagem());
         agendamento.setObservacoes(request.observacoes());
 
-        agendamento.setValorTotal(novoValorTotal);
-        agendamento.setValorEntradaExigido(novoValorEntradaExigido);
+        agendamento.setValorTotal(valores.valorTotal());
+        agendamento.setValorEntradaExigido(valores.valorEntradaExigido());
         agendamento.setPercentualEntrada(percentualEntrada);
-        agendamento.setValorRestante(novoValorRestante);
-        agendamento.setValorTotalFinal(novoValorTotalFinal);
+        agendamento.setValorRestante(valores.valorRestante());
+        agendamento.setValorTotalFinal(valores.valorTotalFinal());
 
         agendamento = agendamentoRepository.save(agendamento);
         sincronizarFotografosNoAgendamento(agendamento, request.fotografos());
-        calcularPartilhaFotografo(agendamento);
+        partilhaService.calcularPartilhaFotografo(agendamento);
         var links = agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(agendamento.getId());
-        return AgendamentoResponse.of(agendamento, links, null, null, null);
-    }
-
-    public DisponibilidadeResponse verificarDisponibilidade(LocalDate data, String hora, Integer duracaoMinutos, UUID excluirAgendamentoId, Boolean bloqueiaDiaInteiro) {
-        var inicioDia = data.atStartOfDay();
-        var fimDia = data.atTime(23, 59, 59);
-        var statusesIgnorados = List.of(StatusAgendamento.CANCELADO, StatusAgendamento.NO_SHOW);
-
-        List<Agendamento> agendamentosNoDia;
-        if (excluirAgendamentoId != null) {
-            agendamentosNoDia = agendamentoRepository.findByLocalAndDataBetweenExcludingId(
-                inicioDia, fimDia, statusesIgnorados, excluirAgendamentoId);
-        } else {
-            agendamentosNoDia = agendamentoRepository.findByDataBetween(inicioDia, fimDia, statusesIgnorados);
-        }
-
-        var conflitos = new ArrayList<DisponibilidadeResponse.Conflito>();
-
-        if (Boolean.TRUE.equals(bloqueiaDiaInteiro)) {
-            for (var existente : agendamentosNoDia) {
-                conflitos.add(new DisponibilidadeResponse.Conflito(
-                    existente.getId(),
-                    existente.getDataHoraEnsaio().toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm")),
-                    existente.getCliente().getNome()
-                ));
-            }
-        } else {
-            var time = LocalTime.parse(hora, DateTimeFormatter.ofPattern("HH:mm"));
-            var dataHora = LocalDateTime.of(data, time);
-            var duracao = duracaoMinutos != null ? duracaoMinutos : 60;
-            var novoFim = dataHora.plusMinutes(duracao);
-
-            for (var existente : agendamentosNoDia) {
-                var fimExistente = existente.getDataHoraEnsaio().plusMinutes(existente.getDuracaoMinutos());
-                if (dataHora.isBefore(fimExistente) && novoFim.isAfter(existente.getDataHoraEnsaio())) {
-                    conflitos.add(new DisponibilidadeResponse.Conflito(
-                        existente.getId(),
-                        existente.getDataHoraEnsaio().toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm")),
-                        existente.getCliente().getNome()
-                    ));
-                }
-            }
-        }
-
-        return new DisponibilidadeResponse(conflitos.isEmpty(), conflitos);
-    }
-
-    public Agendamento registrarPagamentoFinal(UUID id, org.springframework.web.multipart.MultipartFile comprovante) {
-        var agendamento = buscarPorId(id);
-
-        if (agendamento.getStatus() != StatusAgendamento.REALIZADO
-            && agendamento.getStatus() != StatusAgendamento.AGUARDANDO_PAGAMENTO_FINAL) {
-            throw new EnsaioNaoFinalizadoException(
-                "O agendamento precisa estar como REALIZADO ou AGUARDANDO_PAGAMENTO_FINAL para registrar o pagamento final. Status atual: " + agendamento.getStatus()
-            );
-        }
-
-        if (comprovante == null || comprovante.isEmpty()) {
-            throw new IllegalArgumentException("Comprovante de pagamento é obrigatório para finalizar o ensaio");
-        }
-
-        var url = fileStorageService.salvar(comprovante);
-        agendamento.setUrlComprovanteFinal(url);
-
-        agendamento.setValorRestante(BigDecimal.ZERO);
-        agendamento.setValorEntradaPago(agendamento.getValorTotalFinal());
-        agendamento.setStatus(StatusAgendamento.EM_EDICAO);
-        agendamento.setDataEnvioSelecao(LocalDateTime.now());
-
-        agendamento = agendamentoRepository.save(agendamento);
-
-        eventPublisher.publishEvent(new PagamentoFinalRegistradoEvent(
-            agendamento.getId(),
-            agendamento.getValorTotalFinal()
-        ));
-
-        return agendamento;
+        return agendamentoMapper.toResponse(agendamento, links, null, null, null);
     }
 
     public Agendamento criarAgendamentoDeContrato(com.photoizer.crm.contrato.event.ContratoAprovadoEvent event) {
@@ -459,7 +318,7 @@ public class AgendamentoService {
         }
 
         var duracao = event.duracaoMinutos() != null ? event.duracaoMinutos() : 60;
-        validarConflitoAgenda(pacote, event.dataHoraEnsaio(), duracao, event.localEnsaio());
+        disponibilidadeService.validarConflitoAgenda(pacote, event.dataHoraEnsaio(), duracao, event.localEnsaio());
 
         var cliente = resolverCliente(
             event.clienteId(), event.nome(), event.telefone(), event.email(),
@@ -516,7 +375,7 @@ public class AgendamentoService {
             .map(f -> new CriarAgendamentoCommand.FotografoRepasse(
                 f.fotografoId(), f.valorRepassar(), f.tipoValor(), f.percentual()))
             .toList());
-        calcularPartilhaFotografo(agendamento);
+        partilhaService.calcularPartilhaFotografo(agendamento);
 
         eventPublisher.publishEvent(new AgendamentoCriadoEvent(
             agendamento.getId(),
@@ -538,32 +397,6 @@ public class AgendamentoService {
         return agendamento;
     }
 
-    public void calcularPartilhaFotografo(Agendamento agendamento) {
-        var links = agendamentoFotografoRepository.findByAgendamentoId(agendamento.getId());
-        if (links.isEmpty()) {
-            agendamento.setValorPartilhaGlobal(null);
-            agendamento.setValorLucroCrm(null);
-            return;
-        }
-
-        var custosTotais = despesaService.somarCustosTodosFotografos(agendamento.getId());
-        var partilhaGlobal = agendamento.getValorTotalFinal().subtract(custosTotais);
-        var somaRepasses = agendamentoFotografoRepository.findByAgendamentoId(agendamento.getId()).stream()
-            .filter(l -> l.getStatus() != RepasseStatus.CANCELADO)
-            .map(AgendamentoFotografo::getValorRepassar)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-        if (somaRepasses.compareTo(partilhaGlobal) > 0) {
-            throw new IllegalArgumentException(
-                "A soma dos repasses (R$ " + somaRepasses.toPlainString() + ") excede a partilha do ensaio (R$ "
-                    + partilhaGlobal.toPlainString() + ")");
-        }
-        var lucro = partilhaGlobal.subtract(somaRepasses);
-
-        agendamento.setValorPartilhaGlobal(partilhaGlobal);
-        agendamento.setValorLucroCrm(lucro);
-        agendamentoRepository.save(agendamento);
-    }
-
     private void criarFotografosNoAgendamento(Agendamento agendamento, List<CriarAgendamentoCommand.FotografoRepasse> fotografos) {
         if (fotografos == null) return;
         for (var f : fotografos) {
@@ -576,7 +409,8 @@ public class AgendamentoService {
                 .tipoValor(tipo)
                 .percentual(tipo == TipoRepasse.PERCENTUAL ? f.percentual() : null)
                 .papelParceiro(fotografo.getPapel())
-                .valorRepassar(valorRepasseEfetivo(agendamento, tipo, f.valorRepassar(), f.percentual()))
+                .valorRepassar(agendamentoValoresCalculator.valorRepasseEfetivo(
+                    agendamento.getValorTotal(), tipo, f.valorRepassar(), f.percentual()))
                 .status(RepasseStatus.PENDENTE)
                 .build();
             agendamentoFotografoRepository.save(link);
@@ -604,9 +438,11 @@ public class AgendamentoService {
             if (match.isPresent()) {
                 var link = match.get();
                 var tipo = f.tipoValor() != null ? f.tipoValor() : TipoRepasse.FIXO;
-                link.setTipoValor(tipo);
-                link.setPercentual(tipo == TipoRepasse.PERCENTUAL ? f.percentual() : null);
-                link.setValorRepassar(valorRepasseEfetivo(agendamento, tipo, f.valorRepassar(), f.percentual()));
+                link.atualizarRepasse(
+                    tipo,
+                    tipo == TipoRepasse.PERCENTUAL ? f.percentual() : null,
+                    agendamentoValoresCalculator.valorRepasseEfetivo(
+                        agendamento.getValorTotal(), tipo, f.valorRepassar(), f.percentual()));
                 agendamentoFotografoRepository.save(link);
             } else {
                 var fotografo = userRepository.findById(f.fotografoId())
@@ -618,21 +454,13 @@ public class AgendamentoService {
                     .tipoValor(tipo)
                     .percentual(tipo == TipoRepasse.PERCENTUAL ? f.percentual() : null)
                     .papelParceiro(fotografo.getPapel())
-                    .valorRepassar(valorRepasseEfetivo(agendamento, tipo, f.valorRepassar(), f.percentual()))
+                    .valorRepassar(agendamentoValoresCalculator.valorRepasseEfetivo(
+                        agendamento.getValorTotal(), tipo, f.valorRepassar(), f.percentual()))
                     .status(RepasseStatus.PENDENTE)
                     .build();
                 agendamentoFotografoRepository.save(link);
             }
         }
-    }
-
-    private BigDecimal valorRepasseEfetivo(Agendamento agendamento, TipoRepasse tipo, BigDecimal valorRepassar, BigDecimal percentual) {
-        if (tipo == TipoRepasse.PERCENTUAL) {
-            var base = agendamento.getValorTotal() != null ? agendamento.getValorTotal() : BigDecimal.ZERO;
-            var pct = percentual != null ? percentual : BigDecimal.ZERO;
-            return base.multiply(pct).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-        }
-        return valorRepassar != null ? valorRepassar : BigDecimal.ZERO;
     }
 
     private Cliente resolverCliente(CriarAgendamentoCommand command) {
@@ -700,69 +528,5 @@ public class AgendamentoService {
             return LocalDateTime.of(command.data(), time);
         }
         throw new IllegalArgumentException("Data e hora do ensaio são obrigatórias (dataHoraEnsaio ou data + hora)");
-    }
-
-    private void validarConflitoAgenda(Pacote pacote, LocalDateTime dataHora, int duracao, String local, UUID excluirId) {
-        if (pacote.getBloqueiaDiaInteiro()) {
-            var inicioDia = dataHora.toLocalDate().atStartOfDay();
-            var fimDia = dataHora.toLocalDate().atTime(23, 59, 59);
-            var conflito = agendamentoRepository.existsByDataHoraEnsaioBetweenAndStatusNotAndIdNot(
-                inicioDia, fimDia, StatusAgendamento.CANCELADO, excluirId);
-            if (conflito) {
-                throw new ConflitoDeAgendaException(
-                    "Já existe um agendamento nesta data. O pacote selecionado bloqueia o dia inteiro.");
-            }
-            return;
-        }
-
-        var inicioDia = dataHora.toLocalDate().atStartOfDay();
-        var fimDia = dataHora.toLocalDate().atTime(23, 59, 59);
-        var statusesIgnorados = List.of(StatusAgendamento.CANCELADO, StatusAgendamento.NO_SHOW);
-        var agendamentosNoDia = agendamentoRepository.findByLocalAndDataBetweenExcludingId(
-            inicioDia, fimDia, statusesIgnorados, excluirId);
-
-        var novoFim = dataHora.plusMinutes(duracao);
-
-        for (var existente : agendamentosNoDia) {
-            var fimExistente = existente.getDataHoraEnsaio()
-                .plusMinutes(existente.getDuracaoMinutos());
-            if (dataHora.isBefore(fimExistente) && novoFim.isAfter(existente.getDataHoraEnsaio())) {
-                throw new ConflitoDeAgendaException(
-                    "Já existe um agendamento neste horário e local: "
-                    + existente.getDataHoraEnsaio() + " às " + fimExistente);
-            }
-        }
-    }
-
-    private void validarConflitoAgenda(Pacote pacote, LocalDateTime dataHora, int duracao, String local) {
-        if (pacote.getBloqueiaDiaInteiro()) {
-            var inicioDia = dataHora.toLocalDate().atStartOfDay();
-            var fimDia = dataHora.toLocalDate().atTime(23, 59, 59);
-            var conflito = agendamentoRepository.existsByDataHoraEnsaioBetweenAndStatusNot(
-                inicioDia, fimDia, StatusAgendamento.CANCELADO);
-            if (conflito) {
-                throw new ConflitoDeAgendaException(
-                    "Já existe um agendamento nesta data. O pacote selecionado bloqueia o dia inteiro.");
-            }
-            return;
-        }
-
-        var inicioDia = dataHora.toLocalDate().atStartOfDay();
-        var fimDia = dataHora.toLocalDate().atTime(23, 59, 59);
-        var statusesIgnorados = List.of(StatusAgendamento.CANCELADO, StatusAgendamento.NO_SHOW);
-        var agendamentosNoDia = agendamentoRepository.findByLocalAndDataBetween(
-            local, inicioDia, fimDia, statusesIgnorados);
-
-        var novoFim = dataHora.plusMinutes(duracao);
-
-        for (var existente : agendamentosNoDia) {
-            var fimExistente = existente.getDataHoraEnsaio()
-                .plusMinutes(existente.getDuracaoMinutos());
-            if (dataHora.isBefore(fimExistente) && novoFim.isAfter(existente.getDataHoraEnsaio())) {
-                throw new ConflitoDeAgendaException(
-                    "Já existe um agendamento neste horário e local: "
-                    + existente.getDataHoraEnsaio() + " às " + fimExistente);
-            }
-        }
     }
 }

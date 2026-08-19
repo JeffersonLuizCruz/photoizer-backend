@@ -1,5 +1,6 @@
 package com.photoizer.crm.cliente.api;
 
+import com.photoizer.crm.agenda.api.AgendamentoMapper;
 import com.photoizer.crm.agenda.api.AgendamentoResponse;
 import com.photoizer.crm.agenda.service.AgendamentoService;
 import com.photoizer.crm.cliente.model.Cliente;
@@ -32,10 +33,13 @@ public class ClienteController {
 
     private final ClienteService clienteService;
     private final AgendamentoService agendamentoService;
+    private final AgendamentoMapper agendamentoMapper;
 
-    public ClienteController(ClienteService clienteService, AgendamentoService agendamentoService) {
+    public ClienteController(ClienteService clienteService, AgendamentoService agendamentoService,
+                             AgendamentoMapper agendamentoMapper) {
         this.clienteService = clienteService;
         this.agendamentoService = agendamentoService;
+        this.agendamentoMapper = agendamentoMapper;
     }
 
     @PostMapping
@@ -82,7 +86,9 @@ public class ClienteController {
     @Operation(summary = "Listar agendamentos do cliente")
     public ResponseEntity<List<AgendamentoResponse>> listarAgendamentos(@PathVariable UUID id) {
         var agendamentos = agendamentoService.listarPorClienteId(id);
-        var response = agendamentos.stream().map(AgendamentoResponse::of).toList();
+        var response = agendamentos.stream()
+            .map(a -> agendamentoMapper.toResponse(a, null, null, null, null))
+            .toList();
         return ResponseEntity.ok(response);
     }
 }

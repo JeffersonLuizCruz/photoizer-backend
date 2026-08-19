@@ -3,7 +3,9 @@ package com.photoizer.crm.agenda.api;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
 import com.photoizer.crm.agenda.service.AgendamentoService;
+import com.photoizer.crm.agenda.service.AgendamentoStatusLifecycle;
 import com.photoizer.crm.agenda.service.CriarAgendamentoCommand;
+import com.photoizer.crm.agenda.service.DisponibilidadeService;
 import com.photoizer.crm.comissao.repository.IndicacaoRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -45,15 +47,24 @@ import java.util.UUID;
 public class AgendamentoController {
 
     private final AgendamentoService agendamentoService;
+    private final AgendamentoStatusLifecycle agendamentoStatusLifecycle;
+    private final DisponibilidadeService disponibilidadeService;
+    private final AgendamentoMapper agendamentoMapper;
     private final IndicacaoRepository indicacaoRepository;
     private final AgendamentoFotografoRepository agendamentoFotografoRepository;
     private final JsonMapper objectMapper;
 
     public AgendamentoController(AgendamentoService agendamentoService,
+                                  AgendamentoStatusLifecycle agendamentoStatusLifecycle,
+                                  DisponibilidadeService disponibilidadeService,
+                                  AgendamentoMapper agendamentoMapper,
                                   IndicacaoRepository indicacaoRepository,
                                   AgendamentoFotografoRepository agendamentoFotografoRepository,
                                   JsonMapper objectMapper) {
         this.agendamentoService = agendamentoService;
+        this.agendamentoStatusLifecycle = agendamentoStatusLifecycle;
+        this.disponibilidadeService = disponibilidadeService;
+        this.agendamentoMapper = agendamentoMapper;
         this.indicacaoRepository = indicacaoRepository;
         this.agendamentoFotografoRepository = agendamentoFotografoRepository;
         this.objectMapper = objectMapper;
@@ -146,7 +157,8 @@ public class AgendamentoController {
         );
 
         var agendamento = agendamentoService.criarAgendamento(command);
-        return ResponseEntity.status(HttpStatus.CREATED).body(AgendamentoResponse.of(agendamento));
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(agendamentoMapper.toResponse(agendamento, null, null, null, null));
     }
 
     @GetMapping
@@ -166,7 +178,7 @@ public class AgendamentoController {
             statusEnum = StatusAgendamento.valueOf(status);
         }
         var agendamentos = agendamentoService.listarTodos(editorId, fotografoId, statusEnum, dataInicio, dataFim, search).stream()
-            .map(AgendamentoResponse::of)
+            .map(a -> agendamentoMapper.toResponse(a, null, null, null, null))
             .toList();
         return ResponseEntity.ok(agendamentos);
     }
@@ -187,7 +199,7 @@ public class AgendamentoController {
             @RequestParam(defaultValue = "60") Integer duracaoMinutos,
             @RequestParam(required = false) UUID excluirAgendamentoId,
             @RequestParam(defaultValue = "false") Boolean bloqueiaDiaInteiro) {
-        return ResponseEntity.ok(agendamentoService.verificarDisponibilidade(data, hora, duracaoMinutos, excluirAgendamentoId, bloqueiaDiaInteiro));
+        return ResponseEntity.ok(disponibilidadeService.verificarDisponibilidade(data, hora, duracaoMinutos, excluirAgendamentoId, bloqueiaDiaInteiro));
     }
 
     @GetMapping("/{id}")
@@ -202,10 +214,10 @@ public class AgendamentoController {
         var links = agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(id);
         var indicacoes = indicacaoRepository.findAllByAgendamentoId(id);
         if (indicacoes.isEmpty()) {
-            return ResponseEntity.ok(AgendamentoResponse.of(agendamento, links, null, null, null));
+            return ResponseEntity.ok(agendamentoMapper.toResponse(agendamento, links, null, null, null));
         }
         var primeira = indicacoes.getFirst();
-        return ResponseEntity.ok(AgendamentoResponse.of(
+        return ResponseEntity.ok(agendamentoMapper.toResponse(
             agendamento, links, primeira.getValorComissao(), primeira.getIndicadorNome(), primeira.getStatus()));
     }
 
@@ -215,8 +227,8 @@ public class AgendamentoController {
             @PathVariable @Parameter(description = "ID do agendamento") UUID id,
             @RequestBody Map<String, String> body) {
         var status = body.get("status");
-        var agendamento = agendamentoService.atualizarStatus(id, status);
-        return ResponseEntity.ok(AgendamentoResponse.of(agendamento));
+        var agendamento = agendamentoStatusLifecycle.atualizarStatus(id, status);
+        return ResponseEntity.ok(agendamentoMapper.toResponse(agendamento, null, null, null, null));
     }
 
     @PatchMapping("/{id}/reagendar")
@@ -227,16 +239,16 @@ public class AgendamentoController {
             @Parameter(description = "Nova data") LocalDate data,
             @RequestParam(required = false) @Parameter(description = "Novo horário (HH:mm)") String hora,
             @RequestParam(required = false) @Parameter(description = "Nova duração em minutos") Integer duracaoMinutos) {
-        var agendamento = agendamentoService.reagendar(id, data, hora, duracaoMinutos);
-        return ResponseEntity.ok(AgendamentoResponse.of(agendamento));
+        var agendamento = agendamentoStatusLifecycle.reagendar(id, data, hora, duracaoMinutos);
+        return ResponseEntity.ok(agendamentoMapper.toResponse(agendamento, null, null, null, null));
     }
 
     @PatchMapping("/{id}/destaque")
     @Operation(summary = "Alternar destaque do ensaio")
     public ResponseEntity<AgendamentoResponse> toggleDestaque(
             @PathVariable @Parameter(description = "ID do agendamento") UUID id) {
-        var agendamento = agendamentoService.toggleDestaque(id);
-        return ResponseEntity.ok(AgendamentoResponse.of(agendamento));
+        var agendamento = agendamentoStatusLifecycle.toggleDestaque(id);
+        return ResponseEntity.ok(agendamentoMapper.toResponse(agendamento, null, null, null, null));
     }
 
     @PostMapping("/{id}/pagamento-final")
@@ -244,8 +256,8 @@ public class AgendamentoController {
     public ResponseEntity<AgendamentoResponse> registrarPagamentoFinal(
             @PathVariable @Parameter(description = "ID do agendamento") UUID id,
             @RequestParam @Parameter(description = "Comprovante de pagamento final (obrigatório)") MultipartFile comprovanteFinal) {
-        var agendamento = agendamentoService.registrarPagamentoFinal(id, comprovanteFinal);
-        return ResponseEntity.ok(AgendamentoResponse.of(agendamento));
+        var agendamento = agendamentoStatusLifecycle.registrarPagamentoFinal(id, comprovanteFinal);
+        return ResponseEntity.ok(agendamentoMapper.toResponse(agendamento, null, null, null, null));
     }
 
     private void validarComprovante(MultipartFile arquivo) {

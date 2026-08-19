@@ -179,4 +179,30 @@ public class Agendamento extends BaseEntity {
 
     @Column
     private LocalDateTime tokenExpiracao;
+
+    public void transicionarPara(StatusAgendamento novoStatus) {
+        this.status = novoStatus;
+        if (novoStatus == StatusAgendamento.REALIZADO) {
+            this.dataRealizacao = LocalDateTime.now();
+        }
+    }
+
+    public void reagendar(LocalDateTime novaDataHora, int novaDuracaoMinutos) {
+        this.dataHoraEnsaio = novaDataHora;
+        this.duracaoMinutos = novaDuracaoMinutos;
+        this.status = StatusAgendamento.CONFIRMADO;
+        this.dataConfirmacao = LocalDateTime.now();
+    }
+
+    public void aplicarPagamentoFinal(String urlComprovanteFinal) {
+        this.urlComprovanteFinal = urlComprovanteFinal;
+        this.valorRestante = BigDecimal.ZERO;
+        this.valorEntradaPago = this.valorTotalFinal;
+        this.status = StatusAgendamento.EM_EDICAO;
+        this.dataEnvioSelecao = LocalDateTime.now();
+    }
+
+    public void alternarDestaque() {
+        this.ensaioDestaque = !this.ensaioDestaque;
+    }
 }

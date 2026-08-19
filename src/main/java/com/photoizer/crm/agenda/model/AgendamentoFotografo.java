@@ -29,7 +29,7 @@ import java.time.LocalDateTime;
     @UniqueConstraint(columnNames = {"agendamento_id", "fotografo_id"})
 })
 @Getter
-@Setter
+@Setter(AccessLevel.PRIVATE)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @SuperBuilder
 public class AgendamentoFotografo extends BaseEntity {
@@ -68,4 +68,20 @@ public class AgendamentoFotografo extends BaseEntity {
 
     @Column
     private LocalDateTime dataPagamento;
+
+    public void atualizarRepasse(TipoRepasse tipoValor, BigDecimal percentual, BigDecimal valorRepassar) {
+        this.tipoValor = tipoValor;
+        this.percentual = percentual;
+        this.valorRepassar = valorRepassar;
+    }
+
+    public void pagar(LocalDateTime momento) {
+        this.status = RepasseStatus.PAGO;
+        this.dataPagamento = momento;
+    }
+
+    public void cancelar() {
+        this.status = RepasseStatus.CANCELADO;
+        this.dataPagamento = null;
+    }
 }

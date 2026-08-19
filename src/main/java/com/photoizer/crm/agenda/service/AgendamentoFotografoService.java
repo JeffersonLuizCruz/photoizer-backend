@@ -8,12 +8,10 @@ import com.photoizer.crm.shared.model.TipoRepasse;
 import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.auth.repository.UserRepository;
-import com.photoizer.crm.despesa.service.DespesaService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -25,19 +23,19 @@ public class AgendamentoFotografoService {
     private final AgendamentoFotografoRepository agendamentoFotografoRepository;
     private final AgendamentoRepository agendamentoRepository;
     private final UserRepository userRepository;
-    private final DespesaService despesaService;
-    private final AgendamentoService agendamentoService;
+    private final PartilhaService partilhaService;
+    private final AgendamentoValoresCalculator agendamentoValoresCalculator;
 
     public AgendamentoFotografoService(AgendamentoFotografoRepository agendamentoFotografoRepository,
-                                        AgendamentoRepository agendamentoRepository,
-                                        UserRepository userRepository,
-                                        DespesaService despesaService,
-                                        AgendamentoService agendamentoService) {
+                                       AgendamentoRepository agendamentoRepository,
+                                       UserRepository userRepository,
+                                       PartilhaService partilhaService,
+                                       AgendamentoValoresCalculator agendamentoValoresCalculator) {
         this.agendamentoFotografoRepository = agendamentoFotografoRepository;
         this.agendamentoRepository = agendamentoRepository;
         this.userRepository = userRepository;
-        this.despesaService = despesaService;
-        this.agendamentoService = agendamentoService;
+        this.partilhaService = partilhaService;
+        this.agendamentoValoresCalculator = agendamentoValoresCalculator;
     }
 
     @Transactional(readOnly = true)
@@ -61,7 +59,8 @@ public class AgendamentoFotografoService {
 
         var tipo = tipoValor != null ? tipoValor : TipoRepasse.FIXO;
         validarPercentual(tipo, percentual);
-        var efetivo = calcularValor(agendamento, tipo, valorRepassar, percentual);
+        var efetivo = agendamentoValoresCalculator.calcularValorRepasse(
+            agendamento.getValorTotal(), tipo, valorRepassar, percentual);
 
         var link = AgendamentoFotografo.builder()
             .agendamento(agendamento)
@@ -73,8 +72,8 @@ public class AgendamentoFotografoService {
             .status(RepasseStatus.PENDENTE)
             .build();
         link = agendamentoFotografoRepository.save(link);
-        validarPartilha(agendamento.getId());
-        agendamentoService.calcularPartilhaFotografo(agendamento);
+        partilhaService.validarPartilha(agendamento.getId());
+        partilhaService.calcularPartilhaFotografo(agendamento);
         return link;
     }
 
@@ -86,18 +85,18 @@ public class AgendamentoFotografoService {
         var agendamento = agendamentoRepository.findById(agendamentoId).orElse(null);
 
         if (agendamento != null) {
-            var efetivo = calcularValor(agendamento, tipo, valorRepassar, percentual);
-            link.setValorRepassar(efetivo);
+            var efetivo = agendamentoValoresCalculator.calcularValorRepasse(
+                agendamento.getValorTotal(), tipo, valorRepassar, percentual);
+            link.atualizarRepasse(tipo, tipo == TipoRepasse.PERCENTUAL ? percentual : null, efetivo);
         } else {
-            link.setValorRepassar(valorRepassar != null ? valorRepassar : BigDecimal.ZERO);
+            link.atualizarRepasse(tipo, tipo == TipoRepasse.PERCENTUAL ? percentual : null,
+                valorRepassar != null ? valorRepassar : BigDecimal.ZERO);
         }
-        link.setTipoValor(tipo);
-        link.setPercentual(tipo == TipoRepasse.PERCENTUAL ? percentual : null);
         link = agendamentoFotografoRepository.save(link);
 
         if (agendamento != null) {
-            validarPartilha(agendamentoId);
-            agendamentoService.calcularPartilhaFotografo(agendamento);
+            partilhaService.validarPartilha(agendamentoId);
+            partilhaService.calcularPartilhaFotografo(agendamento);
         }
         return link;
     }
@@ -107,7 +106,7 @@ public class AgendamentoFotografoService {
         agendamentoFotografoRepository.delete(link);
         var agendamento = agendamentoRepository.findById(agendamentoId).orElse(null);
         if (agendamento != null) {
-            agendamentoService.calcularPartilhaFotografo(agendamento);
+            partilhaService.calcularPartilhaFotografo(agendamento);
         }
     }
 
@@ -119,8 +118,7 @@ public class AgendamentoFotografoService {
         if (link.getStatus() == RepasseStatus.CANCELADO) {
             throw new IllegalArgumentException("Repasse cancelado não pode ser pago");
         }
-        link.setStatus(RepasseStatus.PAGO);
-        link.setDataPagamento(LocalDateTime.now());
+        link.pagar(LocalDateTime.now());
         return agendamentoFotografoRepository.save(link);
     }
 
@@ -129,12 +127,11 @@ public class AgendamentoFotografoService {
         if (link.getStatus() == RepasseStatus.PAGO) {
             throw new IllegalArgumentException("Repasse já pago não pode ser cancelado");
         }
-        link.setStatus(RepasseStatus.CANCELADO);
-        link.setDataPagamento(null);
+        link.cancelar();
         link = agendamentoFotografoRepository.save(link);
         var agendamento = agendamentoRepository.findById(agendamentoId).orElse(null);
         if (agendamento != null) {
-            agendamentoService.calcularPartilhaFotografo(agendamento);
+            partilhaService.calcularPartilhaFotografo(agendamento);
         }
         return link;
     }
@@ -146,8 +143,7 @@ public class AgendamentoFotografoService {
                 throw new IllegalArgumentException("Repasse cancelado não pode ser pago: " + link.getId());
             }
             if (link.getStatus() == RepasseStatus.PAGO) continue;
-            link.setStatus(RepasseStatus.PAGO);
-            link.setDataPagamento(LocalDateTime.now());
+            link.pagar(LocalDateTime.now());
         }
         return agendamentoFotografoRepository.saveAll(links);
     }
@@ -171,38 +167,12 @@ public class AgendamentoFotografoService {
                 "Parceiro " + fotografoId + " não está vinculado ao agendamento " + agendamentoId));
     }
 
-    static BigDecimal calcularValor(Agendamento agendamento, TipoRepasse tipo, BigDecimal valorRepassar, BigDecimal percentual) {
-        if (tipo == TipoRepasse.PERCENTUAL) {
-            if (percentual == null) throw new IllegalArgumentException("Percentual é obrigatório quando o tipo é PERCENTUAL");
-            var base = agendamento.getValorTotal() != null ? agendamento.getValorTotal() : BigDecimal.ZERO;
-            return base.multiply(percentual).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-        }
-        return valorRepassar != null ? valorRepassar : BigDecimal.ZERO;
-    }
-
     private void validarPercentual(TipoRepasse tipo, BigDecimal percentual) {
         if (tipo == TipoRepasse.PERCENTUAL) {
             if (percentual == null) throw new IllegalArgumentException("Percentual é obrigatório para repasse percentual");
             if (percentual.signum() <= 0 || percentual.compareTo(BigDecimal.valueOf(100)) > 0) {
                 throw new IllegalArgumentException("Percentual deve estar entre 0 e 100");
             }
-        }
-    }
-
-    private void validarPartilha(UUID agendamentoId) {
-        var agendamento = agendamentoRepository.findById(agendamentoId).orElse(null);
-        if (agendamento == null) return;
-
-        var custosTotais = despesaService.somarCustosTodosFotografos(agendamentoId);
-        var partilhaGlobal = agendamento.getValorTotalFinal().subtract(custosTotais);
-        var somaRepasses = agendamentoFotografoRepository.findByAgendamentoId(agendamentoId).stream()
-            .filter(l -> l.getStatus() != RepasseStatus.CANCELADO)
-            .map(AgendamentoFotografo::getValorRepassar)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        if (somaRepasses.compareTo(partilhaGlobal) > 0) {
-            throw new IllegalArgumentException(
-                "A soma dos repasses (R$ " + somaRepasses + ") excede a partilha do ensaio (R$ " + partilhaGlobal + ")");
         }
     }
 }

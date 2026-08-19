@@ -16,7 +16,7 @@ import com.photoizer.crm.despesa.repository.DespesaRepository;
 import com.photoizer.crm.indicador.service.IndicadorService;
 import com.photoizer.crm.pacote.model.Pacote;
 import com.photoizer.crm.pacote.repository.PacoteRepository;
-import com.photoizer.crm.agenda.api.AgendamentoResponse;
+import com.photoizer.crm.agenda.api.AgendamentoMapper;
 import com.photoizer.crm.financeiro.api.FinanceiroPreviewResponse;
 import com.photoizer.crm.financeiro.api.FinanceiroRelatoriosResponse;
 import com.photoizer.crm.financeiro.api.FinanceiroResumoResponse;
@@ -65,6 +65,7 @@ public class FinanceiroService {
     private final DespesaRepository despesaRepository;
     private final ReceitaRepository receitaRepository;
     private final AgendamentoFotografoRepository agendamentoFotografoRepository;
+    private final AgendamentoMapper agendamentoMapper;
 
     public FinanceiroService(PagamentoRepository pagamentoRepository,
                              FotoExtraRepository fotoExtraRepository,
@@ -76,7 +77,8 @@ public class FinanceiroService {
                              ConfiguracaoService configuracaoService,
                              DespesaRepository despesaRepository,
                              ReceitaRepository receitaRepository,
-                             AgendamentoFotografoRepository agendamentoFotografoRepository) {
+                             AgendamentoFotografoRepository agendamentoFotografoRepository,
+                             AgendamentoMapper agendamentoMapper) {
         this.pagamentoRepository = pagamentoRepository;
         this.fotoExtraRepository = fotoExtraRepository;
         this.videoExtraRepository = videoExtraRepository;
@@ -88,6 +90,7 @@ public class FinanceiroService {
         this.despesaRepository = despesaRepository;
         this.receitaRepository = receitaRepository;
         this.agendamentoFotografoRepository = agendamentoFotografoRepository;
+        this.agendamentoMapper = agendamentoMapper;
     }
 
     @Transactional(readOnly = true)
@@ -203,7 +206,9 @@ public class FinanceiroService {
         }
 
         var totais = new FinanceiroRelatoriosResponse.RelatoriosTotais(total, entrada, restante, extras, totalFinal, repasse);
-        var responses = sorted.stream().map(AgendamentoResponse::of).toList();
+        var responses = sorted.stream()
+            .map(a -> agendamentoMapper.toResponse(a, null, null, null, null))
+            .toList();
         return new FinanceiroRelatoriosResponse(totais, responses, responses.size());
     }
 

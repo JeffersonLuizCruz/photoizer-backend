@@ -3,6 +3,7 @@ package com.photoizer.crm.dashboard.service;
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
+import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
 import com.photoizer.crm.cliente.repository.ClienteRepository;
 import com.photoizer.crm.comissao.model.Indicacao;
 import com.photoizer.crm.comissao.repository.IndicacaoRepository;
@@ -35,6 +36,7 @@ import static org.mockito.Mockito.when;
 class DashboardServiceTest {
 
     private final AgendamentoRepository agendamentoRepository = mock(AgendamentoRepository.class);
+    private final AgendamentoFotografoRepository agendamentoFotografoRepository = mock(AgendamentoFotografoRepository.class);
     private final IndicacaoRepository indicacaoRepository = mock(IndicacaoRepository.class);
     private final DespesaRepository despesaRepository = mock(DespesaRepository.class);
     private final CompraExtraRepository compraExtraRepository = mock(CompraExtraRepository.class);
@@ -46,7 +48,7 @@ class DashboardServiceTest {
     @BeforeEach
     void setUp() {
         service = new DashboardService(
-            agendamentoRepository, indicacaoRepository, despesaRepository,
+            agendamentoRepository, agendamentoFotografoRepository, indicacaoRepository, despesaRepository,
             compraExtraRepository, clienteRepository, receitaRepository);
         when(agendamentoRepository.findByDataBetween(any(), any(), anyList())).thenReturn(List.of());
         when(indicacaoRepository.findByAgendamentoIdIn(anyList())).thenReturn(List.of());
