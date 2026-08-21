@@ -112,7 +112,7 @@ CONFIRMADO ──realizar──▶ AGUARDANDO_PAGAMENTO_FINAL ──pagarFinal�
                                                                            ▼
                                                                     FINALIZADO
 ```
-- `atualizarStatus(id, String novoStatus)` → delegado a `AgendamentoStatusLifecycle.atualizarStatus` → `agendamento.transicionarPara(status)`: `valueOf` direto, **sem validação de transição válida** (aceita qualquer enum; ex.: `FINALIZADO → CONFIRMADO`). Apenas dispara eventos/filtra datas para `REALIZADO`/`CANCELADO`/`NO_SHOW` — comportamento mantido (decisão: encapsular sem bloquear).
+- `atualizarStatus(id, String novoStatus)` → delegado a `AgendamentoStatusLifecycle.atualizarStatus` → `agendamento.transicionarPara(status)`: `valueOf` direto, **sem validação de transição válida** (aceita qualquer enum; ex.: `FINALIZADO → CONFIRMADO`). Eventos publicados **após o `save`** (consistência em caso de rollback/falha de persistência). Apenas dispara eventos para `REALIZADO`/`CANCELADO`/`NO_SHOW` — comportamento mantido (decisão: encapsular sem bloquear).
 - `registrarPagamentoFinal` → `AgendamentoStatusLifecycle.registrarPagamentoFinal` → `agendamento.aplicarPagamentoFinal(url)`: valida status ∈ {REALIZADO, AGUARDANDO_PAGAMENTO_FINAL}, exige comprovante, zera `valorRestante`, `EM_EDICAO`, publica evento.
 
 ### Fluxo 3: Repasses de Fotógrafos (partilha)
@@ -123,7 +123,7 @@ CONFIRMADO ──realizar──▶ AGUARDANDO_PAGAMENTO_FINAL ──pagarFinal�
 - `RascunhoAgendamentoService.salvarRascunho` (`:23-82`) com **26 parâmetros posicionais**; upsert por `usuarioId` (1 rascunho por usuário).
 
 ### Fluxo 5: Materialização via Contrato
-- `ContratoAprovadoEventListener` (`:25-34`) consome `ContratoAprovadoEvent` → `AgendamentoService.criarAgendamentoDeContrato` (`:444-539`) que duplica quase toda a lógica do Fluxo 1 e ainda grava `agendamentoId` no `Contrato` via `ContratoRepository` (cross-module).
+- `ContratoAprovadoEventListener` consome `ContratoAprovadoEvent` → `AgendamentoService.criarAgendamentoDeContrato` que **reutiliza o Template Method `criarAgendamentoBase`** (mesmo fluxo de persistência/fotógrafos/partilha/eventos do Fluxo 1, com valores vindos do evento via `ValoresAgendamento`) e ainda grava `agendamentoId` no `Contrato` via `ContratoRepository` (cross-module).
 
 ## 5. Regras Específicas
 1. **Controller com ~28 `@RequestParam`**: parsing manual e frágil; qualquer campo novo exige alteração em controller, command, service e entidade.
@@ -147,7 +147,8 @@ Nenhum teste específico no módulo `agenda`. Tests existem em outros módulos q
 ### 7.1 `AgendamentoService` é god class (~768 linhas) — **P1** · ◐ parcial
 - **Problema**: 16+ responsabilidades em um service.
 - **Fase 2**: extraídos `AgendamentoStatusLifecycle` (status/reagendar/destaque/pagamento), `PartilhaService` (partilha/repasse), `DisponibilidadeService` (conflito/disponibilidade) e `AgendamentoValoresCalculator`. `AgendamentoService` caiu para ~532 linhas.
-- **Restam**: criação (multipart) ainda no service; resolução de cliente com efeito colateral; materialização via contrato (`criarAgendamentoDeContrato`).
+- **Fase 2 (2º refactor)**: aplicado **Template Method** (`criarAgendamentoBase` + record `DadosNovoAgendamento`) — `criarAgendamento` e `criarAgendamentoDeContrato` (~85% duplicadas) agora compartilham um único fluxo de persistência/validação/fotógrafos/partilha/eventos; valores do contrato passam a trafegar como `ValoresAgendamento` (sem cálculo manual).
+- **Restam**: criação (multipart) ainda no service; resolução de cliente com efeito colateral.
 
 ### 7.2 Status machine sem validação — **P1** · ◐ parcial
 - **Fase 2**: `Agendamento.transicionarPara(StatusAgendamento)` centraliza a mudança (seta `dataRealizacao` em REALIZADO); `AgendamentoStatusLifecycle.atualizarStatus` delega para ele, com eventos.

@@ -45,6 +45,11 @@ public class AgendamentoStatusLifecycle {
         var status = StatusAgendamento.valueOf(novoStatus);
         agendamento.transicionarPara(status);
 
+        // Consistência de eventos: publicar SOMENTE após a persistência bem-sucedida,
+        // para que listeners (financeiro, comissão, documento) não reajam a um estado
+        // que não foi salvo (ex.: rollback/falha de save).
+        agendamento = agendamentoRepository.save(agendamento);
+
         if (status == StatusAgendamento.REALIZADO) {
             eventPublisher.publishEvent(new AgendamentoRealizadoEvent(
                 agendamento.getId(),
@@ -56,7 +61,7 @@ public class AgendamentoStatusLifecycle {
             eventPublisher.publishEvent(new AgendamentoCanceladoEvent(agendamento.getId()));
         }
 
-        return agendamentoRepository.save(agendamento);
+        return agendamento;
     }
 
     public Agendamento reagendar(UUID id, LocalDate data, String hora, Integer duracaoMinutos) {

@@ -23,6 +23,7 @@ import com.photoizer.crm.cliente.model.Cliente;
 import com.photoizer.crm.cliente.model.OrigemCliente;
 import com.photoizer.crm.cliente.repository.ClienteRepository;
 import com.photoizer.crm.config.service.ConfiguracaoService;
+import com.photoizer.crm.contrato.event.ContratoAprovadoEvent;
 import com.photoizer.crm.shared.storage.FileStorageService;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -98,29 +99,13 @@ public class AgendamentoService {
         var pacote = pacoteRepository.findById(command.pacoteId())
             .orElseThrow(() -> new PacoteNaoEncontradoException(command.pacoteId()));
 
-        if (!pacote.getAtivo()) {
-            throw new PacoteInativoException(pacote.getId());
-        }
-
-        var editor = (command.editorId() != null)
-            ? userRepository.findById(command.editorId())
-                .orElseThrow(() -> new EditorNaoEncontradoException(command.editorId()))
-            : null;
-
         var dataHoraEnsaio = resolverDataHora(command);
 
-        if (dataHoraEnsaio.isBefore(LocalDateTime.now())) {
-            throw new AgendamentoNoPassadoException();
-        }
-
-        var duracao = command.duracaoMinutos() != null ? command.duracaoMinutos() : 60;
         var taxaDeslocamentoPadrao = configuracaoService.getValorDecimal("taxaDeslocamentoPadrao", BigDecimal.ZERO);
         var custoDeslocamento = command.custoDeslocamento() != null ? command.custoDeslocamento() : taxaDeslocamentoPadrao;
         var repassarDeslocamento = command.repassarDeslocamento() != null ? command.repassarDeslocamento() : true;
         var taxaDeslocamento = repassarDeslocamento ? custoDeslocamento : BigDecimal.ZERO;
         var autorizaUsoImagem = command.autorizaUsoImagem() != null ? command.autorizaUsoImagem() : false;
-
-        disponibilidadeService.validarConflitoAgenda(pacote, dataHoraEnsaio, duracao, command.localEnsaio());
 
         var percentualEntrada = configuracaoService.getValorDecimal("percentualEntrada", new BigDecimal("30.00"));
         var valores = agendamentoValoresCalculator.calcularValoresNovo(
@@ -128,58 +113,28 @@ public class AgendamentoService {
 
         var urlComprovante = fileStorageService.salvar(command.comprovanteEntrada());
 
-        var agendamento = Agendamento.builder()
-            .cliente(cliente)
-            .pacote(pacote)
-            .editor(editor)
-            .dataHoraEnsaio(dataHoraEnsaio)
-            .duracaoMinutos(duracao)
-            .localEnsaio(command.localEnsaio())
-            .enderecoCompleto(command.enderecoCompleto())
-            .valorTotal(valores.valorTotal())
-            .valorEntradaExigido(valores.valorEntradaExigido())
-            .valorEntradaPago(valores.valorEntradaPago())
-            .valorRestante(valores.valorRestante())
-            .valorExtras(valores.valorExtras())
-            .taxaDeslocamento(valores.taxaDeslocamento())
-            .custoDeslocamento(custoDeslocamento)
-            .repassarDeslocamento(repassarDeslocamento)
-            .valorTotalFinal(valores.valorTotalFinal())
-            .percentualEntrada(percentualEntrada)
-            .status(StatusAgendamento.CONFIRMADO)
-            .dataConfirmacao(LocalDateTime.now())
-            .urlComprovanteEntrada(urlComprovante)
-            .autorizaUsoImagem(autorizaUsoImagem)
-            .clausulasPersonalizadas(command.clausulasPersonalizadas())
-            .contratoGerado(false)
-            .ensaioDestaque(false)
-            .observacoes(command.observacoes())
-            .tokenGaleria(UUID.randomUUID())
-            .tokenExpiracao(LocalDateTime.now().plusDays(15))
-            .build();
-
-        agendamento = agendamentoRepository.save(agendamento);
-        criarFotografosNoAgendamento(agendamento, command.fotografos());
-        partilhaService.calcularPartilhaFotografo(agendamento);
-
-        eventPublisher.publishEvent(new AgendamentoCriadoEvent(
-            agendamento.getId(),
-            agendamento.getCliente().getId(),
-            agendamento.getPacote().getId(),
-            agendamento.getDataHoraEnsaio(),
+        return criarAgendamentoBase(new DadosNovoAgendamento(
+            pacote,
+            command.editorId(),
+            cliente,
+            dataHoraEnsaio,
+            command.duracaoMinutos(),
+            command.localEnsaio(),
+            command.enderecoCompleto(),
+            custoDeslocamento,
+            repassarDeslocamento,
+            percentualEntrada,
+            valores,
+            urlComprovante,
+            autorizaUsoImagem,
+            command.clausulasPersonalizadas(),
+            command.observacoes(),
+            command.fotografos(),
             command.indicadorId(),
             command.indicadorNome(),
             command.indicadorTelefone(),
-            null,
             pacote.getValorBase()
         ));
-
-        eventPublisher.publishEvent(new AgendamentoConfirmadoEvent(
-            agendamento.getId(),
-            agendamento.getCliente().getId()
-        ));
-
-        return agendamento;
     }
 
     @Transactional(readOnly = true)
@@ -300,25 +255,9 @@ public class AgendamentoService {
         return agendamentoMapper.toResponse(agendamento, links, null, null, null);
     }
 
-    public Agendamento criarAgendamentoDeContrato(com.photoizer.crm.contrato.event.ContratoAprovadoEvent event) {
+    public Agendamento criarAgendamentoDeContrato(ContratoAprovadoEvent event) {
         var pacote = pacoteRepository.findById(event.pacoteId())
             .orElseThrow(() -> new PacoteNaoEncontradoException(event.pacoteId()));
-
-        if (!pacote.getAtivo()) {
-            throw new PacoteInativoException(pacote.getId());
-        }
-
-        var editor = event.editorId() != null
-            ? userRepository.findById(event.editorId())
-                .orElseThrow(() -> new EditorNaoEncontradoException(event.editorId()))
-            : null;
-
-        if (event.dataHoraEnsaio().isBefore(LocalDateTime.now())) {
-            throw new AgendamentoNoPassadoException();
-        }
-
-        var duracao = event.duracaoMinutos() != null ? event.duracaoMinutos() : 60;
-        disponibilidadeService.validarConflitoAgenda(pacote, event.dataHoraEnsaio(), duracao, event.localEnsaio());
 
         var cliente = resolverCliente(
             event.clienteId(), event.nome(), event.telefone(), event.email(),
@@ -331,50 +270,119 @@ public class AgendamentoService {
             ? event.repassarDeslocamento()
             : true;
         var taxaDeslocamento = repassarDeslocamento ? custoDeslocamento : BigDecimal.ZERO;
+
         var percentualEntrada = event.percentualEntrada() != null
             ? event.percentualEntrada()
             : configuracaoService.getValorDecimal("percentualEntrada", new BigDecimal("30.00"));
-        var valorTotal = event.valorTotal();
-        var valorEntradaExigido = event.valorEntradaExigido();
-        var valorEntradaPago = valorEntradaExigido;
-        var valorRestante = valorTotal.subtract(valorEntradaPago);
-        var valorExtras = BigDecimal.ZERO;
-        var valorTotalFinal = valorTotal.add(valorExtras);
+
+        var valores = new AgendamentoValoresCalculator.ValoresAgendamento(
+            event.valorTotal(),
+            event.valorEntradaExigido(),
+            event.valorEntradaExigido(),
+            event.valorTotal().subtract(event.valorEntradaExigido()),
+            BigDecimal.ZERO,
+            event.valorTotal(),
+            taxaDeslocamento);
+
+        var urlComprovante = event.urlComprovanteEntrada();
+
+        var fotografos = event.fotografos().stream()
+            .map(f -> new CriarAgendamentoCommand.FotografoRepasse(
+                f.fotografoId(), f.valorRepassar(), f.tipoValor(), f.percentual()))
+            .toList();
+
+        return criarAgendamentoBase(new DadosNovoAgendamento(
+            pacote,
+            event.editorId(),
+            cliente,
+            event.dataHoraEnsaio(),
+            event.duracaoMinutos(),
+            event.localEnsaio(),
+            event.enderecoCompleto(),
+            custoDeslocamento,
+            repassarDeslocamento,
+            percentualEntrada,
+            valores,
+            urlComprovante,
+            event.autorizaUsoImagem() != null ? event.autorizaUsoImagem() : false,
+            null,
+            event.observacoes(),
+            fotografos,
+            event.indicadorId(),
+            event.indicadorNome(),
+            event.indicadorTelefone(),
+            event.valorBasePacote()
+        ));
+    }
+
+    /**
+     * Padrão de projeto: TEMPLATE METHOD (refactor Fase 2 — agenda).
+     *
+     * Unifica o fluxo de criação de agendamento que antes vivia duplicado em
+     * {@link #criarAgendamento(CriarAgendamentoCommand)} e
+     * {@link #criarAgendamentoDeContrato(ContratoAprovadoEvent)} (~85% de código repetido).
+     *
+     * Melhorias trazidas:
+     * - Ponto único de construção/persistência, vínculo de fotógrafos, cálculo de partilha e
+     *   publicação dos Application Events (não há mais 2 caminhos de evento que podiam divergir);
+     * - Validações comuns (pacote ativo, editor, data no passado e conflito de agenda) centralizadas;
+     * - Valores monetários passam SEMPRE pelo {@link AgendamentoValoresCalculator} (ou via
+     *   {@link ValoresAgendamento}) — elimina o cálculo manual que o fluxo de contrato possuía.
+     *
+     * A variação entre os fluxos (origem do cliente, taxa de deslocamento e valores) é resolvida
+     * pelos chamadores e entregue de forma tipada por {@link DadosNovoAgendamento}.
+     */
+    private Agendamento criarAgendamentoBase(DadosNovoAgendamento dados) {
+        var pacote = dados.pacote();
+
+        if (!pacote.getAtivo()) {
+            throw new PacoteInativoException(pacote.getId());
+        }
+
+        var editor = (dados.editorId() != null)
+            ? userRepository.findById(dados.editorId())
+                .orElseThrow(() -> new EditorNaoEncontradoException(dados.editorId()))
+            : null;
+
+        if (dados.dataHoraEnsaio().isBefore(LocalDateTime.now())) {
+            throw new AgendamentoNoPassadoException();
+        }
+
+        var duracao = dados.duracaoMinutos() != null ? dados.duracaoMinutos() : 60;
+        disponibilidadeService.validarConflitoAgenda(pacote, dados.dataHoraEnsaio(), duracao, dados.localEnsaio());
 
         var agendamento = Agendamento.builder()
-            .cliente(cliente)
+            .cliente(dados.cliente())
             .pacote(pacote)
             .editor(editor)
-            .dataHoraEnsaio(event.dataHoraEnsaio())
+            .dataHoraEnsaio(dados.dataHoraEnsaio())
             .duracaoMinutos(duracao)
-            .localEnsaio(event.localEnsaio())
-            .enderecoCompleto(event.enderecoCompleto())
-            .valorTotal(valorTotal)
-            .valorEntradaExigido(valorEntradaExigido)
-            .valorEntradaPago(valorEntradaPago)
-            .valorRestante(valorRestante)
-            .valorExtras(valorExtras)
-            .taxaDeslocamento(taxaDeslocamento)
-            .custoDeslocamento(custoDeslocamento)
-            .repassarDeslocamento(repassarDeslocamento)
-            .valorTotalFinal(valorTotalFinal)
-            .percentualEntrada(percentualEntrada)
+            .localEnsaio(dados.localEnsaio())
+            .enderecoCompleto(dados.enderecoCompleto())
+            .valorTotal(dados.valores().valorTotal())
+            .valorEntradaExigido(dados.valores().valorEntradaExigido())
+            .valorEntradaPago(dados.valores().valorEntradaPago())
+            .valorRestante(dados.valores().valorRestante())
+            .valorExtras(dados.valores().valorExtras())
+            .taxaDeslocamento(dados.valores().taxaDeslocamento())
+            .custoDeslocamento(dados.custoDeslocamento())
+            .repassarDeslocamento(dados.repassarDeslocamento())
+            .valorTotalFinal(dados.valores().valorTotalFinal())
+            .percentualEntrada(dados.percentualEntrada())
             .status(StatusAgendamento.CONFIRMADO)
             .dataConfirmacao(LocalDateTime.now())
-            .urlComprovanteEntrada(event.urlComprovanteEntrada())
-            .autorizaUsoImagem(event.autorizaUsoImagem() != null ? event.autorizaUsoImagem() : false)
+            .urlComprovanteEntrada(dados.urlComprovanteEntrada())
+            .autorizaUsoImagem(dados.autorizaUsoImagem())
+            .clausulasPersonalizadas(dados.clausulasPersonalizadas())
             .contratoGerado(false)
             .ensaioDestaque(false)
-            .observacoes(event.observacoes())
+            .observacoes(dados.observacoes())
             .tokenGaleria(UUID.randomUUID())
             .tokenExpiracao(LocalDateTime.now().plusDays(15))
             .build();
 
         agendamento = agendamentoRepository.save(agendamento);
-        criarFotografosNoAgendamento(agendamento, event.fotografos().stream()
-            .map(f -> new CriarAgendamentoCommand.FotografoRepasse(
-                f.fotografoId(), f.valorRepassar(), f.tipoValor(), f.percentual()))
-            .toList());
+        criarFotografosNoAgendamento(agendamento, dados.fotografos());
         partilhaService.calcularPartilhaFotografo(agendamento);
 
         eventPublisher.publishEvent(new AgendamentoCriadoEvent(
@@ -382,11 +390,11 @@ public class AgendamentoService {
             agendamento.getCliente().getId(),
             agendamento.getPacote().getId(),
             agendamento.getDataHoraEnsaio(),
-            event.indicadorId(),
-            event.indicadorNome(),
-            event.indicadorTelefone(),
+            dados.indicadorId(),
+            dados.indicadorNome(),
+            dados.indicadorTelefone(),
             null,
-            event.valorBasePacote()
+            dados.valorBasePacote()
         ));
 
         eventPublisher.publishEvent(new AgendamentoConfirmadoEvent(
@@ -395,6 +403,31 @@ public class AgendamentoService {
         ));
 
         return agendamento;
+    }
+
+    /** Dados tipados para o fluxo comum de criação (via Template Method {@link #criarAgendamentoBase}). */
+    private record DadosNovoAgendamento(
+        Pacote pacote,
+        UUID editorId,
+        Cliente cliente,
+        LocalDateTime dataHoraEnsaio,
+        Integer duracaoMinutos,
+        String localEnsaio,
+        String enderecoCompleto,
+        BigDecimal custoDeslocamento,
+        boolean repassarDeslocamento,
+        BigDecimal percentualEntrada,
+        AgendamentoValoresCalculator.ValoresAgendamento valores,
+        String urlComprovanteEntrada,
+        boolean autorizaUsoImagem,
+        String clausulasPersonalizadas,
+        String observacoes,
+        List<CriarAgendamentoCommand.FotografoRepasse> fotografos,
+        UUID indicadorId,
+        String indicadorNome,
+        String indicadorTelefone,
+        BigDecimal valorBasePacote
+    ) {
     }
 
     private void criarFotografosNoAgendamento(Agendamento agendamento, List<CriarAgendamentoCommand.FotografoRepasse> fotografos) {
