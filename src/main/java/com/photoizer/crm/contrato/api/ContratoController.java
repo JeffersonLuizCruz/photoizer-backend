@@ -37,13 +37,22 @@ public class ContratoController {
 
     @GetMapping
     @Operation(summary = "Listar contratos", description = "Filtra por status e busca por cliente/pacote")
-    public ResponseEntity<List<ContratoResponse>> listar(
+    public ResponseEntity<?> listar(
             @RequestParam(required = false) StatusContrato status,
-            @RequestParam(required = false) String search) {
-        var contratos = contratoService.listar(status, search).stream()
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        var result = contratoService.listar(status, search, page, size);
+        var contratos = result.getContent().stream()
             .map(ContratoResponse::of)
             .toList();
-        return ResponseEntity.ok(contratos);
+        return ResponseEntity.ok(new java.util.HashMap<String, Object>() {{
+            put("data", contratos);
+            put("total", result.getTotalElements());
+            put("page", result.getNumber());
+            put("size", result.getSize());
+            put("totalPages", result.getTotalPages());
+        }});
     }
 
     @PostMapping
@@ -98,14 +107,7 @@ public class ContratoController {
         if (contrato.getUrlPdf() == null) {
             return ResponseEntity.notFound().build();
         }
-        var file = new FileSystemResource(Path.of(contrato.getUrlPdf()));
-        if (!file.exists()) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.ok()
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=contrato_" + id + ".pdf")
-            .contentType(MediaType.APPLICATION_PDF)
-            .body(file);
+        return serveArquivo(contrato.getUrlPdf(), "contrato_" + id + ".pdf", MediaType.APPLICATION_PDF);
     }
 
     @GetMapping("/{id}/comprovante")
@@ -115,15 +117,30 @@ public class ContratoController {
         if (contrato.getUrlComprovanteEntrada() == null) {
             return ResponseEntity.notFound().build();
         }
-        var file = new FileSystemResource(Path.of(contrato.getUrlComprovanteEntrada()));
-        if (!file.exists()) {
+        var tipo = contentType(contrato.getUrlComprovanteEntrada());
+        return serveArquivo(contrato.getUrlComprovanteEntrada(), "comprovante",
+            tipo != null ? tipo : MediaType.APPLICATION_OCTET_STREAM);
+    }
+
+    /**
+     * Pattern: Defense in Depth — valida que o caminho esta dentro do diretorio
+     * de uploads antes de servir o arquivo, prevenindo path traversal se o banco
+     * for adulterado com um caminho como "../../etc/passwd".
+     */
+    private ResponseEntity<Resource> serveArquivo(String caminho, String filename, MediaType tipo) {
+        var uploadDir = Path.of("uploads").toAbsolutePath().normalize();
+        var file = Path.of(caminho).toAbsolutePath().normalize();
+        if (!file.startsWith(uploadDir)) {
+            return ResponseEntity.badRequest().build();
+        }
+        var resource = new FileSystemResource(file);
+        if (!resource.exists()) {
             return ResponseEntity.notFound().build();
         }
-        var tipo = contentType(contrato.getUrlComprovanteEntrada());
         return ResponseEntity.ok()
-            .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"comprovante\"")
-            .contentType(tipo != null ? tipo : MediaType.APPLICATION_OCTET_STREAM)
-            .body(file);
+            .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
+            .contentType(tipo)
+            .body(resource);
     }
 
     private MediaType contentType(String caminho) {

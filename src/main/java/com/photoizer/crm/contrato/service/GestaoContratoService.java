@@ -9,9 +9,6 @@ import com.photoizer.crm.contrato.api.CriarContratoRequest;
 import com.photoizer.crm.contrato.api.DevolverContratoRequest;
 import com.photoizer.crm.contrato.api.PublicarContratoResponse;
 import com.photoizer.crm.contrato.event.ContratoAprovadoEvent;
-import com.photoizer.crm.contrato.event.ContratoAssinadoEvent;
-import com.photoizer.crm.contrato.event.ContratoDevolvidoEvent;
-import com.photoizer.crm.contrato.exception.ContratoEstadoInvalidoException;
 import com.photoizer.crm.contrato.exception.ContratoNaoEncontradoException;
 import com.photoizer.crm.contrato.model.Contrato;
 import com.photoizer.crm.contrato.model.ContratoFotografo;
@@ -23,6 +20,10 @@ import com.photoizer.crm.pacote.repository.PacoteRepository;
 import com.photoizer.crm.auth.repository.UserRepository;
 import com.photoizer.crm.shared.model.TipoRepasse;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,7 +34,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
@@ -41,8 +41,6 @@ import java.util.UUID;
 @Service
 @Transactional
 public class GestaoContratoService {
-
-    private static final int DIAS_VALIDADE_PADRAO = 7;
 
     private final ContratoRepository contratoRepository;
     private final PacoteRepository pacoteRepository;
@@ -172,23 +170,11 @@ public class GestaoContratoService {
 
     public PublicarContratoResponse publicar(UUID id) {
         var contrato = buscar(id);
-
-        if (contrato.getStatus() != StatusContrato.RASCUNHO
-            && contrato.getStatus() != StatusContrato.PUBLICADO
-            && contrato.getStatus() != StatusContrato.CANCELADO
-            && contrato.getStatus() != StatusContrato.EXPIRADO) {
-            throw new ContratoEstadoInvalidoException("RASCUNHO, PUBLICADO, CANCELADO ou EXPIRADO",
-                contrato.getStatus().name());
-        }
-
         var token = UUID.randomUUID().toString();
         var diasValidade = configuracaoService.getValorInteiro(ConfigKey.CONTRATO_DIAS_VALIDADE);
 
-        contrato.setToken(token);
-        contrato.setTokenHash(sha256(token));
-        contrato.setStatus(StatusContrato.PUBLICADO);
-        contrato.setPublicadoEm(LocalDateTime.now());
-        contrato.setTokenExpiracao(LocalDateTime.now().plusDays(diasValidade));
+        // Delegate para o dominio: valida transicao E executa
+        contrato.publicar(sha256(token), diasValidade);
         contratoRepository.save(contrato);
 
         return new PublicarContratoResponse(contrato.getId(), "/contrato/" + token);
@@ -201,39 +187,35 @@ public class GestaoContratoService {
     }
 
     @Transactional(readOnly = true)
-    public List<Contrato> listar(StatusContrato status, String search) {
-        var contratos = status != null
-            ? contratoRepository.findByStatus(status)
-            : contratoRepository.findAll();
-        if (search == null || search.isBlank()) {
-            return contratos;
+    public Page<Contrato> listar(StatusContrato status, String search, int page, int size) {
+        Specification<Contrato> spec = (root, q, cb) -> null;
+
+        if (status != null) {
+            spec = spec.and((root, q, cb) -> cb.equal(root.get("status"), status));
         }
-        var termo = search.trim().toLowerCase();
-        return contratos.stream()
-            .filter(c -> (c.getClienteNome() != null && c.getClienteNome().toLowerCase().contains(termo))
-                || (c.getClienteTelefone() != null && c.getClienteTelefone().toLowerCase().contains(termo))
-                || c.getPacoteNome().toLowerCase().contains(termo))
-            .sorted(Comparator.comparing(Contrato::getCreatedAt).reversed())
-            .toList();
+
+        if (search != null && !search.isBlank()) {
+            var termo = "%" + search.trim().toLowerCase() + "%";
+            spec = spec.and((root, q, cb) -> cb.or(
+                cb.like(cb.lower(root.get("clienteNome")), termo),
+                cb.like(cb.lower(root.get("clienteTelefone")), termo),
+                cb.like(cb.lower(root.get("pacoteNome")), termo)
+            ));
+        }
+
+        var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return contratoRepository.findAll(spec, pageable);
     }
 
     public Contrato confirmarPagamento(UUID id) {
         var contrato = buscar(id);
-        if (contrato.getStatus() != StatusContrato.ASSINADO_PELO_CLIENTE) {
-            throw new ContratoEstadoInvalidoException("ASSINADO_PELO_CLIENTE", contrato.getStatus().name());
-        }
-        contrato.setStatus(StatusContrato.PAGAMENTO_CONFIRMADO);
-        contrato.setDataPagamentoConfirmado(LocalDateTime.now());
+        contrato.confirmarPagamento();
         return contratoRepository.save(contrato);
     }
 
     public Contrato aprovar(UUID id) {
         var contrato = buscar(id);
-        if (contrato.getStatus() != StatusContrato.PAGAMENTO_CONFIRMADO) {
-            throw new ContratoEstadoInvalidoException("PAGAMENTO_CONFIRMADO", contrato.getStatus().name());
-        }
-        contrato.setStatus(StatusContrato.APROVADO);
-        contrato.setDataAprovacao(LocalDateTime.now());
+        contrato.aprovar();
         contratoRepository.save(contrato);
 
         var fotografos = contrato.getFotografos() == null
@@ -281,18 +263,10 @@ public class GestaoContratoService {
 
     public Contrato devolver(UUID id, DevolverContratoRequest request) {
         var contrato = buscar(id);
-        if (contrato.getStatus() != StatusContrato.ASSINADO_PELO_CLIENTE
-            && contrato.getStatus() != StatusContrato.PAGAMENTO_CONFIRMADO) {
-            throw new ContratoEstadoInvalidoException("ASSINADO_PELO_CLIENTE ou PAGAMENTO_CONFIRMADO",
-                contrato.getStatus().name());
-        }
-        contrato.setStatus(StatusContrato.DEVOLVIDO);
-        contrato.setDataDevolucao(LocalDateTime.now());
-        contrato.setTipoMotivoDevolucao(request.tipoMotivo());
-        contrato.setMotivoDevolucao(request.motivo());
+        contrato.devolver(request.tipoMotivo(), request.motivo());
         contratoRepository.save(contrato);
 
-        eventPublisher.publishEvent(new ContratoDevolvidoEvent(
+        eventPublisher.publishEvent(new com.photoizer.crm.contrato.event.ContratoDevolvidoEvent(
             contrato.getId(), request.tipoMotivo(), request.motivo()));
 
         return contrato;
@@ -300,12 +274,7 @@ public class GestaoContratoService {
 
     public Contrato cancelar(UUID id) {
         var contrato = buscar(id);
-        if (contrato.getStatus() == StatusContrato.APROVADO
-                || contrato.getStatus() == StatusContrato.CANCELADO) {
-            throw new ContratoEstadoInvalidoException("estado anterior a APROVADO/CANCELADO",
-                contrato.getStatus().name());
-        }
-        contrato.setStatus(StatusContrato.CANCELADO);
+        contrato.cancelar();
         return contratoRepository.save(contrato);
     }
 

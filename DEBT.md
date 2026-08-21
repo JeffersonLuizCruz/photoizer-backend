@@ -50,7 +50,7 @@
 - Controller dependente de **4 módulos** + `Map<String,Object>`; N+1 na listagem de indicadores; **financeiro cria `Indicacao` diretamente** (escrita cross-module — comissao deveria ser dono).
 
 ### config
-- `PUT /config` aceita qualquer `Map<String,String>` (chaves órfãs / `NumberFormatException`); `ConfiguracaoController` usa `ContratoTemplateService` (config→contrato); nomes de chaves duplicados (`percentualComissao` vs `comissaoPercentual`).
+- **RESOLVIDO**: `ConfigKey` enum centraliza chaves/tipos/defaults; `ConfiguracaoInvalidaException` valida valores; `@Cacheable`/`@CacheEvict` no service; DTOs (`ConfiguracaoRequest`/`ConfiguracaoResponse`); cross-module removido (endpoints de template movidos para `ContratoTemplateController` no módulo contrato); `DataSeeder` usa `ConfigKey`.
 
 ### contrato
 - PDF manual (nakie lib); `ContratoFotografo` com `@ManyToOne User` (auth); estados validados por `if`; `listar` filtra em memória; **`EXPIRADO` nunca aplicado**; eventos `ContratoAssinado/Devolvido` sem consumidor.

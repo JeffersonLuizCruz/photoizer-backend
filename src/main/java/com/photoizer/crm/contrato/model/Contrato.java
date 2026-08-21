@@ -221,4 +221,85 @@ public class Contrato extends BaseEntity {
         this.fotografos.add(link);
         link.setContrato(this);
     }
+
+    // ════════════════════════════════════════════════════════════════
+    //  METHODS DE DOMINIO — Transicoes de estado
+    //  Pattern: Rich Domain Model — entidade com comportamento.
+    //  Cada transicao valida E executa, eliminando if espalhado no service.
+    // ════════════════════════════════════════════════════════════════
+
+    /**
+     * Publica o contrato: gera token, seta status PUBLICADO e expiracao.
+     */
+    public void publicar(String tokenHash, int diasValidade) {
+        this.status.validarTransicaoPara(StatusContrato.PUBLICADO);
+        this.tokenHash = tokenHash;
+        this.status = StatusContrato.PUBLICADO;
+        this.publicadoEm = LocalDateTime.now();
+        this.tokenExpiracao = LocalDateTime.now().plusDays(diasValidade);
+    }
+
+    /**
+     * Confirma pagamento da reserva.
+     */
+    public void confirmarPagamento() {
+        this.status.validarTransicaoPara(StatusContrato.PAGAMENTO_CONFIRMADO);
+        this.status = StatusContrato.PAGAMENTO_CONFIRMADO;
+        this.dataPagamentoConfirmado = LocalDateTime.now();
+    }
+
+    /**
+     * Aprova o contrato (apos pagamento confirmado).
+     */
+    public void aprovar() {
+        this.status.validarTransicaoPara(StatusContrato.APROVADO);
+        this.status = StatusContrato.APROVADO;
+        this.dataAprovacao = LocalDateTime.now();
+    }
+
+    /**
+     * Devolve o contrato ao cliente com motivo.
+     */
+    public void devolver(String tipoMotivo, String motivo) {
+        this.status.validarTransicaoPara(StatusContrato.DEVOLVIDO);
+        this.status = StatusContrato.DEVOLVIDO;
+        this.dataDevolucao = LocalDateTime.now();
+        this.tipoMotivoDevolucao = tipoMotivo;
+        this.motivoDevolucao = motivo;
+    }
+
+    /**
+     * Cancela o contrato.
+     */
+    public void cancelar() {
+        this.status.validarTransicaoPara(StatusContrato.CANCELADO);
+        this.status = StatusContrato.CANCELADO;
+    }
+
+    /**
+     * Assina o contrato (cliente preenche dados e anexa comprovante).
+     */
+    public void assinar(String nome, String telefone, String email, String cpf,
+                        String cidade, String estado, boolean autoriza,
+                        String urlComprovante, String snapshotJson, String snapshotHash,
+                        String urlPdf) {
+        this.status.validarTransicaoPara(StatusContrato.ASSINADO_PELO_CLIENTE);
+        this.clienteNome = nome;
+        this.clienteTelefone = telefone;
+        this.clienteEmail = email;
+        this.clienteCpf = cpf;
+        this.clienteCidade = cidade;
+        this.clienteEstado = estado;
+        this.autorizaUsoImagem = autoriza;
+        this.urlComprovanteEntrada = urlComprovante;
+        this.snapshotJson = snapshotJson;
+        this.snapshotHash = snapshotHash;
+        this.urlPdf = urlPdf;
+        this.dataAssinatura = LocalDateTime.now();
+        this.status = StatusContrato.ASSINADO_PELO_CLIENTE;
+        // Limpa dados de devolucao anterior (re-assinatura)
+        this.tipoMotivoDevolucao = null;
+        this.motivoDevolucao = null;
+        this.dataDevolucao = null;
+    }
 }

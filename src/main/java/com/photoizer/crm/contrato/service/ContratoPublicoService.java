@@ -1,5 +1,6 @@
 package com.photoizer.crm.contrato.service;
 
+import tools.jackson.databind.ObjectMapper;
 import com.photoizer.crm.config.model.ConfigKey;
 import com.photoizer.crm.config.service.ConfiguracaoService;
 import com.photoizer.crm.contrato.api.ContratoPublicoResponse;
@@ -24,7 +25,6 @@ import java.nio.file.Files;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -43,6 +43,7 @@ public class ContratoPublicoService {
     private final ConfiguracaoService configuracaoService;
     private final ContratoTemplateService templateService;
     private final ApplicationEventPublisher eventPublisher;
+    private final ObjectMapper objectMapper;
 
     public ContratoPublicoService(ContratoRepository contratoRepository,
                                   AssinaturaRepository assinaturaRepository,
@@ -50,7 +51,8 @@ public class ContratoPublicoService {
                                   ContratoPdfWriter pdfWriter,
                                   ConfiguracaoService configuracaoService,
                                   ContratoTemplateService templateService,
-                                  ApplicationEventPublisher eventPublisher) {
+                                  ApplicationEventPublisher eventPublisher,
+                                  ObjectMapper objectMapper) {
         this.contratoRepository = contratoRepository;
         this.assinaturaRepository = assinaturaRepository;
         this.fileStorageService = fileStorageService;
@@ -58,6 +60,7 @@ public class ContratoPublicoService {
         this.configuracaoService = configuracaoService;
         this.templateService = templateService;
         this.eventPublisher = eventPublisher;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional(readOnly = true)
@@ -184,22 +187,9 @@ public class ContratoPublicoService {
             .build();
         assinaturaRepository.save(assinatura);
 
-        contrato.setClienteNome(nome);
-        contrato.setClienteTelefone(telefone);
-        contrato.setClienteEmail(email);
-        contrato.setClienteCpf(cpf);
-        contrato.setClienteCidade(cidade);
-        contrato.setClienteEstado(estado);
-        contrato.setAutorizaUsoImagem(autoriza);
-        contrato.setUrlComprovanteEntrada(urlComprovante);
-        contrato.setSnapshotJson(snapshotJson);
-        contrato.setSnapshotHash(hash);
-        contrato.setUrlPdf(urlPdf);
-        contrato.setDataAssinatura(dataAssinatura);
-        contrato.setStatus(StatusContrato.ASSINADO_PELO_CLIENTE);
-        contrato.setTipoMotivoDevolucao(null);
-        contrato.setMotivoDevolucao(null);
-        contrato.setDataDevolucao(null);
+        // Delegate para o dominio: valida transicao E executa
+        contrato.assinar(nome, telefone, email, cpf, cidade, estado, autoriza,
+            urlComprovante, snapshotJson, hash, urlPdf);
         contrato = contratoRepository.save(contrato);
 
         eventPublisher.publishEvent(new ContratoAssinadoEvent(contrato.getId()));
@@ -245,7 +235,7 @@ public class ContratoPublicoService {
                                   String cpf, String cidade, String estado, boolean autoriza,
                                   String nomeAssina, LocalDateTime dataAssinatura, String ip,
                                    String urlComprovante) {
-        var mapa = new LinkedHashMap<String, Object>();
+        var mapa = new java.util.LinkedHashMap<String, Object>();
         mapa.put("contratoId", c.getId());
         mapa.put("pacoteNome", c.getPacoteNome());
         mapa.put("valorPacote", c.getValorPacote().toPlainString());
@@ -272,38 +262,11 @@ public class ContratoPublicoService {
         mapa.put("dataAssinatura", dataAssinatura.format(FMT_DATA_HORA));
         mapa.put("ip", ip);
         mapa.put("urlComprovanteEntrada", urlComprovante);
-        return toJson(mapa);
-    }
-
-    private String toJson(LinkedHashMap<String, Object> mapa) {
-        var sb = new StringBuilder("{");
-        var first = true;
-        for (var entry : mapa.entrySet()) {
-            if (!first) sb.append(",");
-            first = false;
-            sb.append('"').append(escapeJson(entry.getKey())).append('"').append(':');
-            var value = entry.getValue();
-            if (value instanceof String s) {
-                sb.append('"').append(escapeJson(s)).append('"');
-            } else if (value instanceof Boolean || value instanceof Number) {
-                sb.append(value);
-            } else if (value == null) {
-                sb.append("null");
-            } else {
-                sb.append('"').append(escapeJson(value.toString())).append('"');
-            }
+        try {
+            return objectMapper.writeValueAsString(mapa);
+        } catch (tools.jackson.core.JacksonException e) {
+            throw new IllegalStateException("Erro ao serializar snapshot do contrato", e);
         }
-        sb.append("}");
-        return sb.toString();
-    }
-
-    private String escapeJson(String value) {
-        if (value == null) return "";
-        return value.replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
-            .replace("\t", "\\t");
     }
 
     private String gravarPdf(java.util.UUID contratoId, List<String> linhas) {
