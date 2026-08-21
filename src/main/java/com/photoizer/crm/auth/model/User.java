@@ -1,6 +1,8 @@
 package com.photoizer.crm.auth.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -8,10 +10,17 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.util.UUID;
 
 @Entity
 @Table(name = "users")
+@Getter
+@NoArgsConstructor
 public class User {
 
     @Id
@@ -19,25 +28,34 @@ public class User {
     private UUID id;
 
     @Column(nullable = false, unique = true, length = 100)
+    @Setter
     private String email;
 
+    @JsonIgnore
     @Column(nullable = false)
+    @Setter
     private String password;
 
     @Column(nullable = false, length = 100)
+    @Setter
     private String nome;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
+    @Setter
     private Papel papel;
 
     @Column(length = 20)
+    @Setter
     private String telefone;
 
     @Column(nullable = false)
+    @Setter
     private boolean ativo = true;
 
-    public User() {}
+    @Embedded
+    @Setter
+    private AuditInfo auditInfo = new AuditInfo();
 
     public User(String email, String password, String nome, Papel papel) {
         this.email = email;
@@ -45,19 +63,4 @@ public class User {
         this.nome = nome;
         this.papel = papel;
     }
-
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
-    public String getPassword() { return password; }
-    public void setPassword(String password) { this.password = password; }
-    public String getNome() { return nome; }
-    public void setNome(String nome) { this.nome = nome; }
-    public Papel getPapel() { return papel; }
-    public void setPapel(Papel papel) { this.papel = papel; }
-    public String getTelefone() { return telefone; }
-    public void setTelefone(String telefone) { this.telefone = telefone; }
-    public boolean isAtivo() { return ativo; }
-    public void setAtivo(boolean ativo) { this.ativo = ativo; }
 }

@@ -5,6 +5,7 @@ import com.photoizer.crm.financeiro.model.TipoServico;
 import com.photoizer.crm.financeiro.service.ReceitaService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -59,6 +60,7 @@ public class ReceitaController {
 
     @PostMapping
     @Operation(summary = "Criar nova receita")
+    @RolesAllowed("ADMIN")
     public ResponseEntity<ReceitaResponse> criar(@Valid @RequestBody ReceitaRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(ReceitaResponse.of(receitaService.criar(request)));
@@ -66,6 +68,7 @@ public class ReceitaController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Atualizar receita")
+    @RolesAllowed("ADMIN")
     public ResponseEntity<ReceitaResponse> atualizar(@PathVariable UUID id,
                                                      @Valid @RequestBody ReceitaRequest request) {
         return ResponseEntity.ok(ReceitaResponse.of(receitaService.atualizar(id, request)));
@@ -73,6 +76,7 @@ public class ReceitaController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Excluir receita")
+    @RolesAllowed("ADMIN")
     public ResponseEntity<Void> excluir(@PathVariable UUID id) {
         receitaService.excluir(id);
         return ResponseEntity.noContent().build();
@@ -80,12 +84,14 @@ public class ReceitaController {
 
     @PatchMapping("/{id}/receber")
     @Operation(summary = "Marcar receita como recebida")
+    @RolesAllowed("ADMIN")
     public ResponseEntity<ReceitaResponse> receber(@PathVariable UUID id) {
         return ResponseEntity.ok(ReceitaResponse.of(receitaService.receber(id)));
     }
 
     @PostMapping("/{id}/duplicar")
     @Operation(summary = "Duplicar receita")
+    @RolesAllowed("ADMIN")
     public ResponseEntity<ReceitaResponse> duplicar(@PathVariable UUID id) {
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(ReceitaResponse.of(receitaService.duplicar(id)));

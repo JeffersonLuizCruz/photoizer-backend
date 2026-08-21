@@ -9,6 +9,7 @@ import com.photoizer.crm.financeiro.service.FinanceiroDashboardService;
 import com.photoizer.crm.financeiro.service.FinanceiroService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -43,6 +44,7 @@ public class FinanceiroController {
 
     @PostMapping("/agendamentos/{agendamentoId}/pagamentos")
     @Operation(summary = "Registrar pagamento")
+    @RolesAllowed("ADMIN")
     public ResponseEntity<Pagamento> registrarPagamento(
             @PathVariable UUID agendamentoId,
             @Valid @RequestBody Pagamento pagamento) {
@@ -52,6 +54,7 @@ public class FinanceiroController {
 
     @PostMapping("/agendamentos/{agendamentoId}/fotos-extras")
     @Operation(summary = "Adicionar fotos extras (com comissão opcional)")
+    @RolesAllowed("ADMIN")
     public ResponseEntity<FotoExtra> adicionarFotoExtra(
             @PathVariable UUID agendamentoId,
             @RequestParam int quantidade,
@@ -66,6 +69,7 @@ public class FinanceiroController {
 
     @PostMapping("/agendamentos/{agendamentoId}/videos-extras")
     @Operation(summary = "Adicionar vídeos extras (com comissão opcional)")
+    @RolesAllowed("ADMIN")
     public ResponseEntity<VideoExtra> adicionarVideoExtra(
             @PathVariable UUID agendamentoId,
             @RequestParam int quantidade,

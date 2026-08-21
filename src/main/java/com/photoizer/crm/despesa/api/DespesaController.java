@@ -4,6 +4,7 @@ import com.photoizer.crm.despesa.model.StatusDespesa;
 import com.photoizer.crm.despesa.service.DespesaService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +28,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/despesas")
 @Tag(name = "Despesas", description = "Despesas, categorias e comprovantes")
+@RolesAllowed({"ADMIN", "FOTOGRAFO", "EDITOR"})
 public class DespesaController {
 
     private final DespesaService despesaService;

@@ -14,13 +14,16 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final RefreshTokenService refreshTokenService;
 
     public AuthService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
-                       JwtTokenProvider jwtTokenProvider) {
+                       JwtTokenProvider jwtTokenProvider,
+                       RefreshTokenService refreshTokenService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
+        this.refreshTokenService = refreshTokenService;
     }
 
     public LoginResponse login(LoginRequest request) {
@@ -32,10 +35,13 @@ public class AuthService {
         }
 
         if (!user.isAtivo()) {
-            throw new BadCredentialsException("Usuário inativo");
+            throw new BadCredentialsException("Email ou senha inválidos");
         }
 
         var token = jwtTokenProvider.generateToken(user.getId(), user.getEmail(), user.getPapel().name());
-        return new LoginResponse(token, user.getNome(), user.getEmail(), user.getPapel(), user.getId().toString());
+        var refreshToken = refreshTokenService.createRefreshToken(
+            user.getId(), user.getEmail(), user.getPapel().name());
+        return new LoginResponse(token, refreshToken.getToken(),
+            user.getNome(), user.getEmail(), user.getPapel(), user.getId());
     }
 }

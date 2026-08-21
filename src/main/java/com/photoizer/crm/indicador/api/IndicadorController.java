@@ -6,6 +6,7 @@ import com.photoizer.crm.indicador.model.Indicador;
 import com.photoizer.crm.indicador.service.IndicadorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +19,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/indicadores")
 @Tag(name = "Indicadores", description = "CRUD de indicadores (pessoas que indicam clientes)")
+@RolesAllowed({"ADMIN", "FOTOGRAFO", "EDITOR"})
 public class IndicadorController {
 
     private final IndicadorService indicadorService;

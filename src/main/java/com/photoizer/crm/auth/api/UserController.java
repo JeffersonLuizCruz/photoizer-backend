@@ -3,6 +3,7 @@ package com.photoizer.crm.auth.api;
 import com.photoizer.crm.auth.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -41,6 +42,7 @@ public class UserController {
 
     @PostMapping
     @Operation(summary = "Criar usuário")
+    @RolesAllowed("ADMIN")
     public ResponseEntity<UserResponse> criar(@Valid @RequestBody CriarUserRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(userService.criar(request));
     }

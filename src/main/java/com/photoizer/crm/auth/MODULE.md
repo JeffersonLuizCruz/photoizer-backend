@@ -1,30 +1,36 @@
 # Módulo: Auth
 
 ## 1. Responsabilidade
-Gerencia autenticação e autorização. Responsável por login (admin e cliente), geração/validação de tokens JWT, controle de acesso via papéis e cadastro de usuários internos (admin, fotógrafo, editor, agendador).
+Gerencia autenticação e autorização. Responsável por login (admin e cliente), geração/validação de tokens JWT, refresh token, logout com blocklist, controle de acesso via papéis e cadastro de usuários internos (admin, fotógrafo, editor, agendador).
 
 ## 2. Estrutura
 ```
 auth/
 ├── model/
-│   ├── User.java           # Entidade JPA (email único, password BCrypt, papel, telefone, ativo)
-│   └── Papel.java          # Enum: ADMIN, FOTOGRAFO, EDITOR, AGENDADOR
+│   ├── User.java           # Entidade JPA com Lombok (email único, password BCrypt, papel, telefone, ativo, auditInfo)
+│   ├── Papel.java          # Enum: ADMIN, FOTOGRAFO, EDITOR, AGENDADOR
+│   ├── AuditInfo.java      # @Embeddable: createdAt, updatedAt, createdBy
+│   ├── RefreshToken.java   # Entidade JPA: token, userId, expiresAt
+│   └── TokenBlocklist.java # Entidade JPA: jti, expiresAt (tokens revogados)
 ├── repository/
-│   └── UserRepository.java # JpaRepository + findByEmail, existsByEmail, findByPapel
+│   ├── UserRepository.java         # JpaRepository + findByEmail, existsByEmail, findByPapel
+│   ├── RefreshTokenRepository.java # JpaRepository + findByToken, deleteByUserId
+│   └── TokenBlocklistRepository.java # JpaRepository + existsByJti
 ├── service/
-│   ├── AuthService.java    # Login: busca user, valida BCrypt + ativo, gera JWT
-│   └── UserService.java    # Lista (todos→UserResponse), busca por ID, cria com senha codificada
+│   ├── AuthService.java         # Login: busca user, valida BCrypt + ativo, gera JWT + refresh token
+│   ├── UserService.java         # CRUD de usuários, delegado pelo FotografoService
+│   └── RefreshTokenService.java # Refresh token, blocklist, revoke
 ├── api/
-│   ├── AuthController.java     # POST /api/v1/auth/login (público)
-│   ├── UserController.java     # GET /users, GET /users/{id}, POST /users
+│   ├── AuthController.java     # POST /login, POST /refresh, POST /logout
+│   ├── UserController.java     # GET /users, GET /users/{id}, POST /users (ADMIN)
 │   ├── LoginRequest.java       # Record: email, password
-│   ├── LoginResponse.java      # Record: token, nome, email, papel, userId
+│   ├── LoginResponse.java      # Record: token, refreshToken, nome, email, papel, userId (UUID)
 │   ├── CriarUserRequest.java   # Record: email, password, nome, papel, telefone (com @Valid)
 │   └── UserResponse.java       # Record: id, email, nome, papel, telefone, ativo + static of(User)
 └── config/
-    ├── SecurityConfig.java          # SecurityFilterChain: stateless JWT, rotas por papel
-    ├── JwtTokenProvider.java        # Geração/validação HMAC-SHA256 (24h), claims: sub, email, papel
-    └── JwtAuthenticationFilter.java # OncePerRequestFilter: valida token e monta Authentication pelo claim
+    ├── SecurityConfig.java          # SecurityFilterChain: stateless JWT, rotas públicas + authenticated default
+    ├── JwtTokenProvider.java        # Geração/validação HMAC-SHA256 (24h access, 7d refresh), claims: sub, email, papel, jti
+    └── JwtAuthenticationFilter.java # OncePerRequestFilter: valida token, checa blocklist, rejeita refresh tokens
 ```
 
 ## 3. Dependências Externas
@@ -39,6 +45,7 @@ auth/
 | agenda | `Agendamento` tem `@ManyToOne User editor` |
 | pacote | `Pacote` tem `@ManyToOne User fotografo/editorResponsavel` |
 | edicao/financeiro/foto/contrato/agenda | Referenciam `User` em relacionamentos |
+| fotografo | `FotografoService` delega CRUD para `UserService` |
 
 ### Eventos
 Nenhum. Módulo fundacional.
@@ -47,62 +54,98 @@ Nenhum. Módulo fundacional.
 
 ### Fluxo 1: Login Admin
 1. `POST /api/v1/auth/login` (público) → `AuthService.login()`
-2. Busca por email → `BadCredentialsException` se não encontrado/inválido
-3. Valida BCrypt e `isAtivo()` → `BadCredentialsException`
-4. Gera JWT via `JwtTokenProvider.generateToken(userId, email, papel.name())`
-5. Retorna `LoginResponse` (userId como String)
+2. Busca por email → `BadCredentialsException("Email ou senha inválidos")` se não encontrado
+3. Valida BCrypt → `BadCredentialsException("Email ou senha inválidos")` se senha inválida
+4. Verifica `isAtivo()` → `BadCredentialsException("Email ou senha inválidos")` se inativo
+5. Gera JWT via `JwtTokenProvider.generateToken()` + `RefreshToken.create()`
+6. Retorna `LoginResponse` com `token`, `refreshToken`, `userId` (UUID)
 
-### Fluxo 2: Autorização de Requisição
+### Fluxo 2: Refresh Token
+1. `POST /api/v1/auth/refresh` (público) → `RefreshTokenService.refreshAccessToken()`
+2. Valida refresh token JWT + verifica se está armazenado e não expirado
+3. Gera novo access token com mesmo userId/email/papel
+4. Retorna `Map<String, String>` com `accessToken`
+
+### Fluxo 3: Logout
+1. `POST /api/v1/auth/logout` (autenticado) → `RefreshTokenService`
+2. Bloqueia access token na blocklist (`TokenBlocklist` com `jti`)
+3. Remove refresh token do banco
+4. Retorna `204 No Content`
+
+### Fluxo 4: Autorização de Requisição
 1. `JwtAuthenticationFilter.doFilterInternal()`:
    - Extrai `Bearer` token; se ausente/inválido → segue sem auth
-   - Usa `getUserIdFromToken` + `getPapelFromToken` **apenas das claims** (sem consulta ao banco)
+   - Rejeita refresh tokens (não autentica)
+   - Verifica blocklist → se bloqueado, retorna 401
    - Cria `UsernamePasswordAuthenticationToken` com `ROLE_<papel>` e seta no `SecurityContextHolder`
-2. `SecurityConfig.filterChain()` aplica `requestMatchers` por papel e termina com `anyRequest().denyAll()`
+2. `SecurityConfig.filterChain()` aplica `anyRequest().authenticated()` como default
+3. Controle de acesso por role delegado para `@RolesAllowed` nos controllers
 
-### Fluxo 3: CRUD de Usuários
+### Fluxo 5: CRUD de Usuários
 - `GET /api/v1/users` → lista (`UserResponse.of`) — qualquer autenticado
-- `GET /api/v1/users/{id}` → `RuntimeException` genérica se não encontrado
-- `POST /api/v1/users` → cria (ADMIN). Valida email duplicado, codifica BCrypt
+- `GET /api/v1/users/{id}` → `ResponseStatusException(404)` se não encontrado
+- `POST /api/v1/users` → cria (ADMIN). Valida email duplicado (`ResponseStatusException(409)`)
+- `FotografoService` delega CRUD para `UserService` (métodos `criarFotografo`, `atualizarFotografo`, `toggleStatus`, `remover`)
 
 ## 5. Regras Específicas
-1. **`User` é a única entidade que não usa Lombok nem auditoria**: getters/setters manuais, sem `createdAt`/`updatedAt`, sem herança de `BaseEntity`, `@GeneratedValue(GenerationType.UUID)` (`User.java:18`).
-2. **`SecurityConfig` centraliza regras de TODOS os módulos**: ~55 `requestMatchers` (`SecurityConfig.java:39-94`) acoplam auth a cada rota dos outros módulos.
-3. **Filter não consulta o banco**: monta a autorização 100% das claims. Token continua válido mesmo se o usuário for desativado após o login (a checagem de `ativo` só ocorre no login).
-4. **Token de cliente usa papel `"CLIENTE"`** — string que não existe no enum `Papel`; rotas do cliente são protegidas por `permitAll`/`authenticated`, não por `hasRole("CLIENTE")`.
+1. **`User` usa Lombok** (`@Getter/@Setter/@NoArgsConstructor`) + `@Embeddable AuditInfo`. Não estende `BaseEntity`.
+2. **`SecurityConfig` simplificado**: apenas rotas públicas (`permitAll`) + `anyRequest().authenticated()`. Autorização por role delegada para `@RolesAllowed` nos controllers.
+3. **Refresh token**: armazenado em banco (`RefreshToken`), expira em 7 dias, renovado a cada uso.
+4. **Blocklist**: tokens revogados armazenados em `TokenBlocklist` (JPA), verificados a cada request.
+5. **`@JsonIgnore` em `getPassword()`** — barreira adicional contra vazamento de hash BCrypt.
+6. **Secret JWT**: variável de ambiente `JWT_SECRET` com fallback para dev (`application.properties`).
 
 ## 6. Testes
-Nenhum teste específico. Apenas `CrmApplicationTests` (smoke). Não há teste do `SecurityConfig`/`JwtAuthenticationFilter`/`JwtTokenProvider`.
+Nenhum teste específico. Apenas `CrmApplicationTests` (smoke).
 
 ## 7. Dívidas Técnicas e Melhorias Recomendadas
 
-### 7.1 `SecurityConfig` god config — acoplamento com todos os módulos — **P1**
-- **Problema**: ~55 `requestMatchers` enumerando rotas de agenda, edicao, financeiro, ecommerce, etc. (`SecurityConfig.java:39-94`). Qualquer nova rota exige editar este arquivo; qualquer módulo novo exige saber dele.
-- **Solução**: `@EnableMethodSecurity` já está ativo (`SecurityConfig.java:20`) mas **nunca é usado** (`@Secured`/`@RolesAllowed`/`@PreAuthorize` ausentes em todo o projeto). Mover a autorização para anotações nos controllers/endpoints de cada módulo (`@RolesAllowed("ADMIN")`, `@PreAuthorize("hasAnyRole(...)")`), mantendo no `SecurityConfig` apenas o fluxo público/`authenticated` default.
+### 7.1 ~~`SecurityConfig` god config~~ — **RESOLVIDO**
+- ~~55 `requestMatchers`~~ → simplificado para `anyRequest().authenticated()` + `@RolesAllowed` nos controllers.
 
-### 7.2 `User` sem Lombok, sem auditoria, sem consistência — **P1**
-- `User.java` possui ~60 linhas de boilerplate manual (getters/setters) (`User.java:49-62`), sem campos de auditoria (`createdAt`/`updatedAt`), divergente das demais entidades.
-- **Solução**: adotar Lombok (`@Getter/@Setter/@NoArgsConstructor/@Builder`) + compor `AuditInfo` (pós-remoção da herança `BaseEntity`, ver `shared/MODULE.md §7.1`) para rastreabilidade.
+### 7.2 ~~`User` sem Lombok, sem auditoria~~ — **RESOLVIDO**
+- Adotado Lombok (`@Getter/@Setter/@NoArgsConstructor`) + `@Embeddable AuditInfo` com `@PrePersist`/`@PreUpdate`.
 
-### 7.3 Tratamento de erros inconsistente — **P1**
-- `UserService.buscarPorId` lança `RuntimeException` genérica (`UserService.java:34`) → cai no handler 500 em vez de 404.
-- `AuthService.login` lança `BadCredentialsException` com mensagem de erro de autenticação. A mensagem `"Usuário inativo"` é distinta da de senha errada — permite **enumeração de usuários** por diferença de resposta (`AuthService.java:34-36`).
-- **Solução** (integra com `shared/MODULE.md §7.3 — hierarquia central): criar `NotFoundException` em `shared`, usar no `UserService`; unificar a mensagem de login em uma única `BadCredentialsException("Email ou senha inválidos")` (mesmo para inativo).
+### 7.3 ~~Tratamento de erros inconsistente~~ — **RESOLVIDO**
+- `UserService.buscarPorId` → `ResponseStatusException(404)` em vez de `RuntimeException`
+- `UserService.criar` → `ResponseStatusException(409)` para email duplicado
+- `AuthService.login` → mensagem uniforme `"Email ou senha inválidos"` (inclusive para inativo)
 
-### 7.4 Modelo de segurança JWT — **P2**
-- `JwtTokenProvider.generateToken` (`:28-38`) inclui `email` e `papel` como claims sem expiração curta para senha; token de 24h sem refresh token, logout ou revogação (`auth/MODULE.md` §5 do original não cobre; no código não há endpoint de logout).
-- **Solução**: implementar refresh token (rota `/auth/refresh`) e logout com blocklist/`jti`; checar `ativo` a cada requisição autenticada (ou aceitar trade-off documentado) quando a desativação imediata for requisito.
+### 7.4 ~~Modelo de segurança JWT~~ — **RESOLVIDO**
+- Refresh token (7 dias) + blocklist para logout + rejeição de refresh tokens no filter.
 
-### 7.5 `LoginResponse.userId` tipado como String — **P3**
-- `LoginResponse.userId` é `String` (`LoginResponse.java:10`) embora `User.id` seja `UUID`. Trocar para `UUID` para consistência com os demais IDs da API.
+### 7.5 ~~`LoginResponse.userId` tipado como String~~ — **RESOLVIDO**
+- Trocado para `UUID` para consistência com os demais IDs da API.
 
-### 7.6 Entidade `User` expõe o hash de senha — **P3**
-- `getPassword()` público (`User.java:53`) permite que qualquer componente com a entidade acesse o hash BCrypt. Garantir que o hash nunca saia em respostas e considerar `@JsonIgnore` como barreira adicional de defesa.
+### 7.6 ~~Entidade `User` expõe o hash de senha~~ — **RESOLVIDO**
+- Adicionado `@JsonIgnore` em `getPassword()`. `FotografoController` e `ParceiroController` agora retornam `UserResponse`.
 
-### 7.7 Configuração da secret JWT — **P2**
-- `Keys.hmacShaKeyFor` exige segredo ≥ 32 bytes e lança erro de startup se for curto. A secret em `application.properties` deve vir de variável de ambiente/secret manager — nunca versionada.
+### 7.7 ~~Configuração da secret JWT~~ — **RESOLVIDO**
+- Variável de ambiente `JWT_SECRET` com fallback para dev.
 
 ### 7.8 DTOs manuais — **P3**
-- `UserResponse.of(User)` (`UserResponse.java:15-17`) é uma factory manual — candidata a **MapStruct** quando o mapper central for criado (ver plano geral).
+- `UserResponse.of(User)` é uma factory manual — candidata a **MapStruct** quando o mapper central for criado.
 
-## 8. Exemplos de arquivos afetados
-- `SecurityConfig.java:39-94` — `requestMatchers` a migrar para anotações; `UserService.java:34` — `RuntimeException` → `NotFoundException`; `AuthService.java:30-36` — mensagens de login a unificar; `User.java:49-62` — boilerplate a trocar por Lombok; `LoginResponse.java:10` — tipo do `userId`.
+### 7.9 ~~`FotografoService` duplica CRUD de User~~ — **RESOLVIDO**
+- `FotografoService` agora delega CRUD para `UserService` (métodos `criarFotografo`, `atualizarFotografo`, `toggleStatus`, `remover`).
+
+## 8. Exemplos de arquivos afetados (refatoração Fase 1 + P2)
+- `SecurityConfig.java` — simplificado de ~55 para ~15 requestMatchers
+- `User.java` — Lombok + AuditInfo (eliminadas ~20 linhas de boilerplate)
+- `AuditInfo.java` — novo arquivo @Embeddable
+- `RefreshToken.java` — novo arquivo (refresh token storage)
+- `TokenBlocklist.java` — novo arquivo (logout blocklist)
+- `RefreshTokenRepository.java` — novo repositório
+- `TokenBlocklistRepository.java` — novo repositório
+- `RefreshTokenService.java` — novo service (refresh + blocklist)
+- `JwtTokenProvider.java` — jti claim + refresh token generation
+- `JwtAuthenticationFilter.java` — blocklist check + rejeição de refresh tokens
+- `AuthController.java` — endpoints /refresh e /logout
+- `LoginResponse.java` — adicionado `refreshToken` + `userId` como UUID
+- `AuthService.java` — gera refresh token no login
+- `UserService.java` — métodos para CRUD de fotógrafos
+- `FotografoService.java` — delega CRUD para UserService
+- `UserService.java` — `RuntimeException` → `ResponseStatusException(404/409)`
+- `FotografoController.java` — retorna `UserResponse` em vez de `User`
+- `ParceiroController.java` — retorna `UserResponse` em vez de `User`
+- `application.properties` — `JWT_SECRET` via env + `refresh-expiration`

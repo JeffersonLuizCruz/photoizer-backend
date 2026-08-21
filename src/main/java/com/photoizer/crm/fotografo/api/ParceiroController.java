@@ -1,6 +1,6 @@
 package com.photoizer.crm.fotografo.api;
 
-import com.photoizer.crm.auth.model.User;
+import com.photoizer.crm.auth.api.UserResponse;
 import com.photoizer.crm.fotografo.service.FotografoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,7 +24,7 @@ public class ParceiroController {
 
     @GetMapping
     @Operation(summary = "Listar parceiros elegíveis (FOTOGRAFO, EDITOR, AGENDADOR)")
-    public ResponseEntity<List<User>> listar() {
+    public ResponseEntity<List<UserResponse>> listar() {
         return ResponseEntity.ok(fotografoService.listarParceiros());
     }
 }

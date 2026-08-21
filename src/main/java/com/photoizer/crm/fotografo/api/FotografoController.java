@@ -1,10 +1,11 @@
 package com.photoizer.crm.fotografo.api;
 
-import com.photoizer.crm.auth.model.User;
+import com.photoizer.crm.auth.api.UserResponse;
 import com.photoizer.crm.fotografo.service.FotografoCsvExporter;
 import com.photoizer.crm.fotografo.service.FotografoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -38,15 +39,15 @@ public class FotografoController {
 
     @GetMapping
     @Operation(summary = "Listar todos os fotógrafos")
-    public ResponseEntity<List<User>> listar() {
+    public ResponseEntity<List<UserResponse>> listar() {
         return ResponseEntity.ok(fotografoService.listarFotografos());
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Buscar fotógrafo por ID")
-    public ResponseEntity<User> buscarPorId(@PathVariable UUID id) {
+    public ResponseEntity<UserResponse> buscarPorId(@PathVariable UUID id) {
         var fotografo = fotografoService.listarFotografos().stream()
-            .filter(u -> u.getId().equals(id))
+            .filter(u -> u.id().equals(id))
             .findFirst()
             .orElseThrow(() -> new IllegalArgumentException("Fotógrafo não encontrado: " + id));
         return ResponseEntity.ok(fotografo);
@@ -54,19 +55,22 @@ public class FotografoController {
 
     @PostMapping
     @Operation(summary = "Criar novo fotógrafo")
-    public ResponseEntity<User> criar(@Valid @RequestBody CriarFotografoRequest request) {
+    @RolesAllowed("ADMIN")
+    public ResponseEntity<UserResponse> criar(@Valid @RequestBody CriarFotografoRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(fotografoService.criar(request));
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Atualizar dados do fotógrafo")
-    public ResponseEntity<User> atualizar(@PathVariable UUID id,
-                                          @Valid @RequestBody AtualizarFotografoRequest request) {
+    @RolesAllowed("ADMIN")
+    public ResponseEntity<UserResponse> atualizar(@PathVariable UUID id,
+                                           @Valid @RequestBody AtualizarFotografoRequest request) {
         return ResponseEntity.ok(fotografoService.atualizar(id, request));
     }
 
     @PatchMapping("/{id}/status")
     @Operation(summary = "Ativar/desativar fotógrafo")
+    @RolesAllowed("ADMIN")
     public ResponseEntity<Void> toggleStatus(@PathVariable UUID id) {
         fotografoService.toggleStatus(id);
         return ResponseEntity.noContent().build();
@@ -74,6 +78,7 @@ public class FotografoController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Remover fotógrafo (apenas se sem ensaios)")
+    @RolesAllowed("ADMIN")
     public ResponseEntity<Void> remover(@PathVariable UUID id) {
         fotografoService.remover(id);
         return ResponseEntity.noContent().build();
@@ -116,14 +121,14 @@ public class FotografoController {
     @Operation(summary = "Exportar finanças do fotógrafo em CSV")
     public ResponseEntity<byte[]> exportarCsv(@PathVariable UUID id) {
         var fotografo = fotografoService.listarFotografos().stream()
-            .filter(u -> u.getId().equals(id))
+            .filter(u -> u.id().equals(id))
             .findFirst()
             .orElseThrow(() -> new IllegalArgumentException("Fotógrafo não encontrado: " + id));
 
         var ensaios = fotografoService.listarEnsaios(id);
-        var csv = csvExporter.exportar(ensaios, fotografo.getNome());
+        var csv = csvExporter.exportar(ensaios, fotografo.nome());
 
-        var filename = "financas-" + fotografo.getNome().replaceAll("\\s+", "-").toLowerCase() + ".csv";
+        var filename = "financas-" + fotografo.nome().replaceAll("\\s+", "-").toLowerCase() + ".csv";
 
         return ResponseEntity.ok()
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")

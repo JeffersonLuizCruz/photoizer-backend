@@ -4,6 +4,7 @@ import com.photoizer.crm.edicao.model.StatusEdicao;
 import com.photoizer.crm.edicao.service.EdicaoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.security.RolesAllowed;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -65,6 +66,7 @@ public class EdicaoController {
 
     @PostMapping("/{agendamentoId}/raw")
     @Operation(summary = "Upload de fotos RAW (fotógrafo)")
+    @RolesAllowed({"ADMIN", "FOTOGRAFO"})
     public ResponseEntity<List<FotoEdicaoResponse>> uploadRaw(
             @PathVariable UUID agendamentoId,
             @RequestParam("arquivos") List<MultipartFile> arquivos) {
@@ -77,6 +79,7 @@ public class EdicaoController {
 
     @PostMapping("/{agendamentoId}/editadas")
     @Operation(summary = "Upload de fotos editadas (editor)")
+    @RolesAllowed({"ADMIN", "EDITOR"})
     public ResponseEntity<List<FotoEdicaoResponse>> uploadEditadas(
             @PathVariable UUID agendamentoId,
             @RequestParam("arquivos") List<MultipartFile> arquivos) {
@@ -89,18 +92,21 @@ public class EdicaoController {
 
     @PatchMapping("/{agendamentoId}/concluir")
     @Operation(summary = "Concluir edição")
+    @RolesAllowed({"ADMIN", "EDITOR"})
     public ResponseEntity<EdicaoResponse> concluirEdicao(@PathVariable UUID agendamentoId) {
         return ResponseEntity.ok(edicaoService.concluirEdicao(agendamentoId));
     }
 
     @PatchMapping("/{agendamentoId}/publicar-loja")
     @Operation(summary = "Publicar fotos aprovadas na loja virtual (fotógrafo)")
+    @RolesAllowed({"ADMIN", "FOTOGRAFO"})
     public ResponseEntity<EdicaoResponse> publicarLoja(@PathVariable UUID agendamentoId) {
         return ResponseEntity.ok(edicaoService.publicarLoja(agendamentoId));
     }
 
     @PatchMapping("/{agendamentoId}/publicar")
     @Operation(summary = "Publicar fotos editadas no ecommerce")
+    @RolesAllowed("ADMIN")
     public ResponseEntity<List<FotoEdicaoResponse>> publicarNoEcommerce(@PathVariable UUID agendamentoId) {
         return ResponseEntity.ok(edicaoService.publicarNoEcommerce(agendamentoId));
     }
@@ -135,6 +141,7 @@ public class EdicaoController {
 
     @DeleteMapping("/fotos/{fotoId}")
     @Operation(summary = "Deletar uma foto do processo de edição")
+    @RolesAllowed({"ADMIN", "EDITOR"})
     public ResponseEntity<Void> deletarFoto(@PathVariable UUID fotoId) {
         edicaoService.deletarFoto(fotoId);
         return ResponseEntity.noContent().build();
@@ -166,6 +173,7 @@ public class EdicaoController {
 
     @PatchMapping("/{agendamentoId}/observacoes")
     @Operation(summary = "Atualizar observacoes da edicao")
+    @RolesAllowed({"ADMIN", "EDITOR"})
     public ResponseEntity<EdicaoResponse> atualizarObservacoes(
             @PathVariable UUID agendamentoId,
             @RequestBody Map<String, String> body) {
@@ -184,6 +192,7 @@ public class EdicaoController {
 
     @PatchMapping("/fotos/reordenar")
     @Operation(summary = "Reordenar fotos da edicao")
+    @RolesAllowed({"ADMIN", "EDITOR"})
     public ResponseEntity<List<FotoEdicaoResponse>> reordenarFotos(
             @RequestBody List<Map<String, Object>> fotos) {
         var response = edicaoService.reordenarFotos(fotos);
@@ -192,6 +201,7 @@ public class EdicaoController {
 
     @GetMapping("/{agendamentoId}/download-raw")
     @Operation(summary = "Download de todas as RAW em ZIP")
+    @RolesAllowed({"ADMIN", "EDITOR"})
     public ResponseEntity<Resource> downloadRawZip(@PathVariable UUID agendamentoId) {
         try {
             var zipPath = edicaoService.gerarZipRaw(agendamentoId);
@@ -208,6 +218,7 @@ public class EdicaoController {
 
     @GetMapping("/{agendamentoId}/download-editadas")
     @Operation(summary = "Download de todas as editadas em ZIP")
+    @RolesAllowed({"ADMIN", "EDITOR"})
     public ResponseEntity<Resource> downloadEditadasZip(@PathVariable UUID agendamentoId) {
         try {
             var zipPath = edicaoService.gerarZipEditadas(agendamentoId);

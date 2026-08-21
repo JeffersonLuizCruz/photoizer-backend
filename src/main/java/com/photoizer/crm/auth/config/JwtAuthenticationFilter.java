@@ -1,5 +1,6 @@
 package com.photoizer.crm.auth.config;
 
+import com.photoizer.crm.auth.service.RefreshTokenService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,9 +21,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String PREFIX = "Bearer ";
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final RefreshTokenService refreshTokenService;
 
-    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider) {
+    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider,
+                                    RefreshTokenService refreshTokenService) {
         this.jwtTokenProvider = jwtTokenProvider;
+        this.refreshTokenService = refreshTokenService;
     }
 
     @Override
@@ -44,11 +48,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
+        if (jwtTokenProvider.isRefreshToken(token)) {
+            chain.doFilter(request, response);
+            return;
+        }
+
+        if (refreshTokenService.isTokenBlocked(token)) {
+            SecurityContextHolder.clearContext();
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token revogado");
+            return;
+        }
+
         var userId = jwtTokenProvider.getUserIdFromToken(token);
         var papel = jwtTokenProvider.getPapelFromToken(token);
 
         var authentication = new UsernamePasswordAuthenticationToken(
-            userId, null, List.of(() -> "ROLE_" + papel));
+            userId, token, List.of(() -> "ROLE_" + papel));
         authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
         SecurityContextHolder.getContext().setAuthentication(authentication);

@@ -4,9 +4,11 @@ import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.AgendamentoFotografo;
 import com.photoizer.crm.agenda.model.RepasseStatus;
 import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
+import com.photoizer.crm.auth.api.UserResponse;
 import com.photoizer.crm.auth.model.Papel;
 import com.photoizer.crm.auth.model.User;
 import com.photoizer.crm.auth.repository.UserRepository;
+import com.photoizer.crm.auth.service.UserService;
 import com.photoizer.crm.despesa.model.Despesa;
 import com.photoizer.crm.despesa.repository.DespesaRepository;
 import com.photoizer.crm.fotografo.api.AtualizarFotografoRequest;
@@ -15,7 +17,6 @@ import com.photoizer.crm.fotografo.api.FotografoDashboardResponse;
 import com.photoizer.crm.fotografo.api.FotografoEnsaiosResponse;
 import com.photoizer.crm.fotografo.api.FotografoRelatorioGlobalResponse;
 import com.photoizer.crm.fotografo.api.FotografoResumoFinanceiroResponse;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,78 +35,58 @@ public class FotografoService {
     private final UserRepository userRepository;
     private final AgendamentoFotografoRepository agendamentoFotografoRepository;
     private final DespesaRepository despesaRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final UserService userService;
 
     public FotografoService(UserRepository userRepository,
                             AgendamentoFotografoRepository agendamentoFotografoRepository,
                             DespesaRepository despesaRepository,
-                            PasswordEncoder passwordEncoder) {
+                            UserService userService) {
         this.userRepository = userRepository;
         this.agendamentoFotografoRepository = agendamentoFotografoRepository;
         this.despesaRepository = despesaRepository;
-        this.passwordEncoder = passwordEncoder;
+        this.userService = userService;
     }
 
-    public List<User> listarFotografos() {
-        return userRepository.findByPapel(Papel.FOTOGRAFO);
+    public List<UserResponse> listarFotografos() {
+        return userRepository.findByPapel(Papel.FOTOGRAFO).stream()
+            .map(UserResponse::of)
+            .toList();
     }
 
-    public List<User> listarParceiros() {
+    public List<UserResponse> listarParceiros() {
         var papéis = List.of(Papel.FOTOGRAFO, Papel.EDITOR, Papel.AGENDADOR);
         return papéis.stream()
             .map(userRepository::findByPapel)
             .flatMap(List::stream)
             .distinct()
+            .map(UserResponse::of)
             .toList();
     }
 
     @Transactional
-    public User criar(CriarFotografoRequest request) {
-        if (userRepository.existsByEmail(request.email())) {
-            throw new IllegalArgumentException("Já existe um usuário com este email: " + request.email());
-        }
-        var user = new User(
-            request.email(),
-            passwordEncoder.encode(request.senha()),
-            request.nome(),
-            Papel.FOTOGRAFO
-        );
-        if (request.telefone() != null && !request.telefone().isBlank()) {
-            user.setTelefone(request.telefone());
-        }
-        return userRepository.save(user);
+    public UserResponse criar(CriarFotografoRequest request) {
+        return userService.criarFotografo(
+            request.email(), request.senha(), request.nome(), request.telefone());
     }
 
     @Transactional
-    public User atualizar(UUID id, AtualizarFotografoRequest request) {
-        var user = userRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Fotógrafo não encontrado: " + id));
-        user.setNome(request.nome());
-        user.setEmail(request.email());
-        if (request.telefone() != null) {
-            user.setTelefone(request.telefone());
-        }
-        return userRepository.save(user);
+    public UserResponse atualizar(UUID id, AtualizarFotografoRequest request) {
+        return userService.atualizarFotografo(id, request.nome(), request.email(), request.telefone());
     }
 
     @Transactional
     public void toggleStatus(UUID id) {
-        var user = userRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Fotógrafo não encontrado: " + id));
-        user.setAtivo(!user.isAtivo());
-        userRepository.save(user);
+        userService.toggleStatus(id);
     }
 
     @Transactional
     public void remover(UUID id) {
-        var user = userRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Fotógrafo não encontrado: " + id));
         var links = agendamentoFotografoRepository.findByFotografoIdOrderByAgendamentoDataHoraEnsaioDesc(id);
         if (!links.isEmpty()) {
             throw new IllegalArgumentException(
                 "Fotógrafo possui " + links.size() + " ensaio(s) vinculado(s). Desative-o em vez de remover.");
         }
-        userRepository.delete(user);
+        userService.remover(id);
     }
 
     public FotografoDashboardResponse dashboard(UUID fotografoId) {
