@@ -2,8 +2,8 @@ package com.photoizer.crm.documento.api;
 
 import com.photoizer.crm.agenda.exception.AgendamentoNaoEncontradoException;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
-import com.photoizer.crm.documento.service.ContratoService;
-import com.photoizer.crm.shared.storage.FileStorageService;
+import com.photoizer.crm.documento.model.TipoComprovante;
+import com.photoizer.crm.documento.service.DocumentoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.core.io.FileSystemResource;
@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.io.File;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
 
@@ -25,34 +25,33 @@ import java.util.UUID;
 @Tag(name = "Documentos", description = "Geração de contratos e recibos")
 public class DocumentoController {
 
-    private final ContratoService contratoService;
+    private final DocumentoService documentoService;
     private final AgendamentoRepository agendamentoRepository;
-    private final FileStorageService fileStorageService;
 
-    public DocumentoController(ContratoService contratoService,
-                               AgendamentoRepository agendamentoRepository,
-                               FileStorageService fileStorageService) {
-        this.contratoService = contratoService;
+    public DocumentoController(DocumentoService documentoService,
+                               AgendamentoRepository agendamentoRepository) {
+        this.documentoService = documentoService;
         this.agendamentoRepository = agendamentoRepository;
-        this.fileStorageService = fileStorageService;
     }
 
     @GetMapping("/contratos/{agendamentoId}")
-    @Operation(summary = "Baixar contrato")
+    @Operation(summary = "Baixar contrato em PDF")
     public ResponseEntity<byte[]> downloadContrato(@PathVariable UUID agendamentoId) {
-        var pdf = contratoService.gerarContrato(agendamentoId);
+        var pdf = documentoService.gerarContrato(agendamentoId);
         return ResponseEntity.ok()
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=contrato_" + agendamentoId + ".pdf")
+            .header(HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=contrato_" + agendamentoId + ".pdf")
             .contentType(MediaType.APPLICATION_PDF)
             .body(pdf);
     }
 
     @GetMapping("/recibos/{agendamentoId}")
-    @Operation(summary = "Baixar recibo")
+    @Operation(summary = "Baixar recibo em PDF")
     public ResponseEntity<byte[]> downloadRecibo(@PathVariable UUID agendamentoId) {
-        var pdf = contratoService.gerarRecibo(agendamentoId);
+        var pdf = documentoService.gerarRecibo(agendamentoId);
         return ResponseEntity.ok()
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=recibo_" + agendamentoId + ".pdf")
+            .header(HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=recibo_" + agendamentoId + ".pdf")
             .contentType(MediaType.APPLICATION_PDF)
             .body(pdf);
     }
@@ -62,16 +61,15 @@ public class DocumentoController {
     public ResponseEntity<Resource> downloadComprovante(
             @PathVariable UUID agendamentoId,
             @PathVariable String tipo) {
+
+        var tipoComprovante = TipoComprovante.fromValor(tipo);
+
         var agendamento = agendamentoRepository.findById(agendamentoId)
             .orElseThrow(() -> new AgendamentoNaoEncontradoException(agendamentoId));
 
-        var caminho = switch (tipo) {
-            case "entrada" -> agendamento.getUrlComprovanteEntrada();
-            case "final" -> agendamento.getUrlComprovanteFinal();
-            default -> throw new IllegalArgumentException("Tipo inválido: " + tipo + ". Use 'entrada' ou 'final'.");
-        };
+        var caminho = tipoComprovante.extrairUrl(agendamento);
 
-        if (caminho == null || caminho.isBlank()) {
+        if (!tipoComprovante.urlValida(caminho)) {
             return ResponseEntity.notFound().build();
         }
 
@@ -80,10 +78,30 @@ public class DocumentoController {
             return ResponseEntity.notFound().build();
         }
 
-        var filename = "comprovante_" + tipo + "_" + agendamentoId + ".jpg";
+        var contentType = resolverContentType(caminho);
+        var filename = "comprovante_" + tipo + "_" + agendamentoId + extensaoDoArquivo(caminho);
+
         return ResponseEntity.ok()
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
-            .contentType(MediaType.IMAGE_JPEG)
+            .contentType(contentType)
             .body(file);
+    }
+
+    private MediaType resolverContentType(String caminho) {
+        try {
+            var probe = Files.probeContentType(Path.of(caminho));
+            if (probe != null) {
+                return MediaType.parseMediaType(probe);
+            }
+        } catch (Exception ignored) {
+        }
+        return MediaType.APPLICATION_OCTET_STREAM;
+    }
+
+    private String extensaoDoArquivo(String caminho) {
+        if (caminho == null) return ".bin";
+        var nome = Path.of(caminho).getFileName().toString();
+        var idx = nome.lastIndexOf('.');
+        return idx >= 0 ? nome.substring(idx) : ".bin";
     }
 }

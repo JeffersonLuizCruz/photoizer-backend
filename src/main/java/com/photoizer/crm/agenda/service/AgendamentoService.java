@@ -182,6 +182,18 @@ public class AgendamentoService {
             .orElseThrow(() -> new AgendamentoNaoEncontradoException(id));
     }
 
+    /**
+     * Marca o flag contratoGerado = true no agendamento.
+     * Chamado pelo módulo 'agenda' ao consumir o ContratoGeradoEvent,
+     * mantendo a máquina de estados do agendamento sob domínio deste módulo.
+     */
+    public void marcarContratoGerado(UUID agendamentoId) {
+        var agendamento = agendamentoRepository.findById(agendamentoId)
+            .orElseThrow(() -> new AgendamentoNaoEncontradoException(agendamentoId));
+        agendamento.setContratoGerado(true);
+        agendamentoRepository.save(agendamento);
+    }
+
     @Transactional(readOnly = true)
     public List<Agendamento> listarPorClienteId(UUID clienteId) {
         return agendamentoRepository.findByClienteId(clienteId);

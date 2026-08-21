@@ -1,4 +1,4 @@
-package com.photoizer.crm.contrato.service;
+package com.photoizer.crm.shared.pdf;
 
 import org.springframework.stereotype.Component;
 
@@ -9,12 +9,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Gera PDFs simples (texto) de forma nativa, sem dependências externas.
- * Saída em padrão A4 com encoding WinAnsi (cobre acentuação do português).
- * Responsável por materializar o snapshot imutável do contrato.
+ * PATTERN: Facade Pattern
+ * Motivo: Centraliza a geração de PDF nativo (bytes PDF 1.4) em um único serviço compartilhado.
+ * Elimina duplicação entre módulos 'documento' (que tinha stub) e 'contrato' (que implementava manualmente).
+ * Todos os módulos que precisam gerar PDF delegam para esta classe, escondendo a complexidade
+ * de montagem de bytes no formato PDF 1.4 com encoding WinAnsi.
  */
 @Component
-public class ContratoPdfWriter {
+public class PdfWriter {
 
     private static final int PAGINA_LARGURA = 595;
     private static final int PAGINA_ALTURA = 842;
@@ -134,7 +136,7 @@ public class ContratoPdfWriter {
 
             return out.toByteArray();
         } catch (IOException e) {
-            throw new RuntimeException("Erro ao gerar PDF do contrato", e);
+            throw new RuntimeException("Erro ao gerar PDF", e);
         }
     }
 

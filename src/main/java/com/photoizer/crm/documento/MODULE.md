@@ -3,29 +3,27 @@
 ## 1. Responsabilidade
 Geração de **contratos e recibos em PDF** para agendamentos e servir **comprovantes de pagamento** (entrada/final). Reage ao `AgendamentoConfirmadoEvent` para gerar o contrato automaticamente.
 
-> **Estado real**: a geração de PDF é um **stub** (`PdfGeneratorService` retorna `byte[0]`), e **nenhum endpoint é alcançável** pela segurança — ver 7.1 e 7.2 (módulo na prática **morto**).
-
 ## 2. Estrutura
 ```
 documento/
+├── model/
+│   └── TipoComprovante.java         # Enum: ENTRADA, FINAL — substitui magic strings
 ├── service/
-│   ├── ContratoService.java        # 34 linhas: gerarContrato/gerarRecibo (seta contratoGerado=true no Agendamento)
-│   └── PdfGeneratorService.java    # 22 linhas: STUB — gerarContrato/gerarRecibo retornam new byte[0]
+│   └── DocumentoService.java        # Orquestração: gerarContrato/gerarRecibo (delega para PdfWriter)
 ├── api/
-│   └── DocumentoController.java    # GET /contratos/{id}, /recibos/{id}, /comprovantes/{id}/{tipo}
+│   └── DocumentoController.java     # GET /contratos/{id}, /recibos/{id}, /comprovantes/{id}/{tipo}
 └── listener/
-    └── DocumentoEventListener.java # Consome AgendamentoConfirmadoEvent → gerarContrato
+    └── DocumentoEventListener.java  # Consome AgendamentoConfirmadoEvent → gerarContrato
 ```
 
 ## 3. Dependências Externas
 
-### Módulos internos importados — **[VIOLAÇÕES Modulith]**
+### Módulos internos importados
 | Módulo | Onde | Uso |
 |--------|------|-----|
-| **agenda** | `ContratoService`, `DocumentoController` | `Agendamento`, `AgendamentoRepository`, `AgendamentoNaoEncontradoException` |
-| **agenda** | `ContratoService.java:25-26` | **escrita cross-module**: `agendamento.setContratoGerado(true)` + `save` |
-| **agenda (evento)** | `DocumentoEventListener` | `AgendamentoConfirmadoEvent` (uso correto) |
-| **shared** | `DocumentoController` | `FileStorageService` injetado, mas **sem uso** |
+| **agenda** | `DocumentoService`, `DocumentoController` | `AgendamentoRepository` (leitura), `AgendamentoNaoEncontradoException` |
+| **agenda (evento)** | `DocumentoEventListener` | `AgendamentoConfirmadoEvent` (consumo), `ContratoGeradoEvent` (publicação) |
+| **shared** | `DocumentoService` | `PdfWriter` (geração de PDF) |
 
 ### Módulos que dependem deste
 Nenhum.
@@ -33,65 +31,71 @@ Nenhum.
 ### Eventos consumidos
 | Evento (agenda) | Ação |
 |------------------|------|
-| `AgendamentoConfirmadoEvent` | `DocumentoEventListener.handleAgendamentoConfirmado` → `ContratoService.gerarContrato` (gera PDF **vazio** e marca `contratoGerado=true`) |
+| `AgendamentoConfirmadoEvent` | `DocumentoEventListener.handleAgendamentoConfirmado` → `DocumentoService.gerarContrato` |
 
 ### Eventos publicados
-Nenhum.
+| Evento | Consumidor |
+|--------|-----------|
+| `ContratoGeradoEvent` | `agenda:ContratoGeradoEventListener` → `AgendamentoService.marcarContratoGerado()` |
 
 ## 4. Fluxos Principais
 
 ### Fluxo 1: Geração automática de contrato
 1. `agenda` publica `AgendamentoConfirmadoEvent` ao confirmar o agendamento.
-2. `DocumentoEventListener.handleAgendamentoConfirmado` (`DocumentoEventListener.java:21-25`) chama `ContratoService.gerarContrato`.
-3. `ContratoService.gerarContrato` (`ContratoService.java:23-28`): `orElseThrow()` sem mensagem, seta `contratoGerado = true` no agendamento (outro módulo), salva e retorna `PdfGeneratorService.gerarContrato` → **byte[0]** (PDF vazio).
+2. `DocumentoEventListener.handleAgendamentoConfirmado` chama `DocumentoService.gerarContrato`.
+3. `DocumentoService.gerarContrato`: busca agendamento (com `AgendamentoNaoEncontradoException`), monta linhas, delega para `PdfWriter.gerar()`, publica `ContratoGeradoEvent`.
+4. `agenda:ContratoGeradoEventListener` consome o evento e chama `AgendamentoService.marcarContratoGerado()` → seta `contratoGerado = true`.
 
 ### Fluxo 2: Downloads
-- `GET /api/v1/documentos/contratos/{agendamentoId}` → `gerarContrato` (PDF vazio).
-- `GET /api/v1/documentos/recibos/{agendamentoId}` → `gerarRecibo` (PDF vazio).
-- `GET /api/v1/documentos/comprovantes/{agendamentoId}/{tipo}` → serve o comprovante (`entrada`/`final`) do filesystem via `FileSystemResource`.
+- `GET /api/v1/documentos/contratos/{agendamentoId}` → `gerarContrato` (PDF via `PdfWriter`).
+- `GET /api/v1/documentos/recibos/{agendamentoId}` → `gerarRecibo` (PDF via `PdfWriter`).
+- `GET /api/v1/documentos/comprovantes/{agendamentoId}/{tipo}` → serve o comprovante (`entrada`/`final`) do filesystem via `FileSystemResource` com content-type resolvido.
 
-## 5. Regras Específicas
-1. **`PdfGeneratorService` é stub**: `gerarContrato`/`gerarRecibo` apenas logam e retornam `new byte[0]` (`PdfGeneratorService.java:13-21`) — todo PDF baixado tem 0 bytes.
-2. **`contratoGerado` marcado mesmo com PDF vazio**: `ContratoService.gerarContrato` seta a flag **antes** de saber se o PDF foi gerado; não verifica se já foi gerado antes.
-3. **Conflito de nome com o módulo `contrato`**: aqui existe `ContratoService`/`PdfGeneratorService` (stub) enquanto o módulo `contrato` tem o fluxo completo + `ContratoPdfWriter` funcional — dois conceitos de "contrato" competindo.
-4. **`FilePath` servido como `.jpg` cravado**: `DocumentoController.java:83-86` define `filename="comprovante_...jpg"` e `MediaType.IMAGE_JPEG` independente do tipo real armazenado.
-5. **`criarEndpoints` sem cobertura de segurança** — nenhuma regra em `SecurityConfig` (ver 7.1).
+## 5. Patterns Aplicados
+
+| Pattern | Classe | Motivo |
+|---------|--------|--------|
+| **Facade** | `shared/pdf/PdfWriter` | Interface simples para geração de PDF, esconde complexidade de bytes PDF nativos. Elimina duplicação com módulo `contrato`. |
+| **Enum Type Safety** | `documento/model/TipoComprovante` | Substitui magic strings por tipo seguro com compile-time checking. |
+| **Event-Driven Decoupling** | `DocumentoEventListener` + `ContratoGeradoEvent` | Desacopla geração de PDF da transação do evento original. Flag `contratoGerado` fica sob domínio do módulo `agenda`. |
 
 ## 6. Testes
 Nenhum teste específico. Apenas `CrmApplicationTests` (smoke de contexto).
 
-## 7. Dívidas Técnicas e Melhorias Recomendadas
+## 7. Dívidas Resolvidas (refatoração atual)
 
-### 7.1 Endpoints inacessíveis (SecurityConfig sem regra) — **[CRÍTICO] P1**
-- `/api/v1/documentos/**` **não tem nenhum `requestMatchers`** no `SecurityConfig` — cai no `anyRequest().denyAll()` (`SecurityConfig.java:94`). Todo endpoint do módulo retorna **403/denyAll**.
-- **Solução**: definir intenção de acesso (ex.: `@PreAuthorize` por papel, ou `authenticated`/`permitAll` por rota) e adicionar regra explícita no `SecurityConfig`; alinhar com o papel que precisa baixar contrato/recibo/comprovante.
+| Dívida | Status | Solução |
+|--------|--------|---------|
+| PDF stub (`byte[0]`) | **RESOLVIDO** | Delega para `PdfWriter` no shared (movido de `contrato`) |
+| Escrita cross-module (`contratoGerado`) | **RESOLVIDO** | Evento `ContratoGeradoEvent` → `AgendamentoService.marcarContratoGerado()` |
+| `FileStorageService` injetado sem uso | **RESOLVIDO** | Removido do controller |
+| Magic strings `"entrada"`/`"final"` | **RESOLVIDO** | Enum `TipoComprovante` com factory method `fromValor()` |
+| Extensão `.jpg` cravada | **RESOLVIDO** | Resolução via `Files.probeContentType()` + extensão do arquivo |
+| `orElseThrow()` sem mensagem | **RESOLVIDO** | `AgendamentoNaoEncontradoException` |
+| Conflito de nome (`ContratoService`) | **RESOLVIDO** | Renomeado para `DocumentoService` |
+| Listener sem tratamento de erro | **RESOLVIDO** | `try/catch` com log no `DocumentoEventListener` |
 
-### 7.2 Geração de PDF não implementada (stub) — **[CRÍTICO] P1**
-- `PdfGeneratorService` retorna `byte[0]`: contratos/recibos baixados são **PDFs vazios**, e o `contratoGerado=true` mascara o problema.
-- **Solução**: implementar com biblioteca real (OpenPDF/PDFBox/Flying Saucer) **ou** eliminar este módulo em favor do `contrato` (`ContratoPdfWriter` já funciona) — unificar a geração de PDF num serviço único (ver contrato/MODULE.md 7.1).
+## 8. Dívidas Remanescentes
 
-### 7.3 Escrita cross-module no `Agendamento` — **P1**
-- `ContratoService.gerarContrato` seta `contratoGerado` via `AgendamentoRepository` (`ContratoService.java:24-26`) — o dono da máquina de estados do agendamento deve expor essa transição.
-- **Solução**: o módulo `agenda` deve ser o dono do flag (por exemplo, método público `marcarContratoGerado` no `AgendamentoService`, ou evento `ContratoGeradoEvent` consumido pela agenda).
+### 8.1 Segurança — **P1** (pendente)
+- `/api/v1/documentos/**` cai em `anyRequest().authenticated()` (não `denyAll`). Endpoints são acessíveis para qualquer autenticado.
+- **Solução futura**: definir papéis específicos via `@PreAuthorize` ou regras no `SecurityConfig`.
 
-### 7.4 Duplicação de "comprovante" com o módulo contrato — **P2**
-- `DocumentoController.downloadComprovante` (`:60-88`) duplica a lógica de servir comprovante do `ContratoController.downloadComprovante` (`contrato/api/ContratoController.java:111-127`), mas com magic strings `"entrada"`/`"final"` e extensão/metadata fixa.
-- **Solução**: centralizar em `shared/storage` um serviço de upload/serve de comprovantes com content-type resolvido (`Files.probeContentType`).
+### 8.2 PDF nativo sem biblioteca — **P1** (pendente)
+- `PdfWriter` gera bytes PDF 1.4 manualmente (herdado do módulo `contrato`). Frágil, sem suporte a layout complexo.
+- **Solução futura**: migrar para OpenPDF/PDFBox/Flying Saucer.
 
-### 7.5 `orElseThrow()` sem mensagem — **P2**
-- `ContratoService.java:24,31` (gera `NoSuchElementException` crua).
-- **Solução**: `AgendamentoNaoEncontradoException` (já usada no controller) + hierarquia central `BusinessException`.
+### 8.3 Duplicação de comprovante com módulo contrato — **P2** (pendente)
+- `downloadComprovante` pode duplicar lógica do `ContratoController`.
+- **Solução futura**: centralizar em `shared/storage`.
 
-### 7.6 Listener gera documento com efeito colateral no confirm — **P2**
-- `DocumentoEventListener` roda no `AgendamentoConfirmadoEvent` e grava no banco — se o PDF for vazio, a flag ainda é gravada; sem `@Transactional` próprio e sem tratamento de erro (exceção do listener abortaria o publish do evento original? risco de efeito cascata).
-- **Solução**: desacoplar (ouvir após commit / `@TransactionalEventListener(PHASE=AFTER_COMMIT`) e só marcar a flag quando o PDF real for gerado.
-
-### 7.7 Sem filtros de hora/papel no controller — **P3**
-- Endpoints sem `@Operation` sensível, sem validação de `tipo` via enum.
-
-## 8. Exemplos de arquivos afetados
-- `PdfGeneratorService.java:13-21` — retorna `byte[0]` (stub).
-- `ContratoService.java:23-28,30-33` — escrita cross-module + `orElseThrow`.
-- `DocumentoController.java:40-88` — endpoints bloqueados por segurança; filename `.jpg` cravado.
-- `DocumentoEventListener.java:21-25` — gera documento vazio no confirm.
-- `auth/config/SecurityConfig.java:94` — `anyRequest().denyAll()` deixa `/api/v1/documentos/**` sem regra.
+## 9. Arquivos afetados (refatoração)
+- `documento/service/DocumentoService.java` — novo (substitui `ContratoService` + `PdfGeneratorService`)
+- `documento/model/TipoComprovante.java` — novo enum
+- `documento/api/DocumentoController.java` — removido `FileStorageService`, usa enum, content-type resolvido
+- `documento/listener/DocumentoEventListener.java` — usa `DocumentoService`, trata erros
+- `shared/pdf/PdfWriter.java` — movido de `contrato/service/ContratoPdfWriter.java`
+- `agenda/event/ContratoGeradoEvent.java` — novo
+- `agenda/service/AgendamentoService.java` — novo método `marcarContratoGerado()`
+- `agenda/listener/ContratoGeradoEventListener.java` — novo
+- `contrato/service/ContratoPublicoService.java` — import atualizado para `PdfWriter`

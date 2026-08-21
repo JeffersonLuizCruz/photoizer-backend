@@ -2,6 +2,7 @@ package com.photoizer.crm.agenda.repository;
 
 import com.photoizer.crm.agenda.model.AgendamentoFotografo;
 import com.photoizer.crm.agenda.model.RepasseStatus;
+import com.photoizer.crm.agenda.repository.projection.RepasseAggregation;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -16,12 +17,12 @@ public interface AgendamentoFotografoRepository extends JpaRepository<Agendament
     List<AgendamentoFotografo> findByFotografoIdOrderByAgendamentoDataHoraEnsaioDesc(UUID fotografoId);
 
     @Query("""
-        SELECT af.agendamento.id, af.status, COALESCE(SUM(af.valorRepassar), 0)
+        SELECT af.agendamento.id AS agendamentoId, af.status AS status, COALESCE(SUM(af.valorRepassar), 0) AS valor
         FROM AgendamentoFotografo af
         WHERE af.status <> :statusCancelado
         GROUP BY af.agendamento.id, af.status
         """)
-    List<Object[]> sumRepassesAtivosPorAgendamento(@Param("statusCancelado") RepasseStatus statusCancelado);
+    List<RepasseAggregation> sumRepassesAtivosPorAgendamento(@Param("statusCancelado") RepasseStatus statusCancelado);
 
     @Query("SELECT af FROM AgendamentoFotografo af JOIN FETCH af.agendamento a JOIN FETCH a.cliente LEFT JOIN FETCH a.pacote WHERE af.fotografo.id = :fotografoId ORDER BY a.dataHoraEnsaio DESC")
     List<AgendamentoFotografo> findByFotografoIdWithAgendamento(@Param("fotografoId") UUID fotografoId);

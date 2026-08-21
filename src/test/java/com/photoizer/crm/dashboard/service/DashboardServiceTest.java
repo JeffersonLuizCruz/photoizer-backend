@@ -1,22 +1,26 @@
 package com.photoizer.crm.dashboard.service;
 
 import com.photoizer.crm.agenda.model.Agendamento;
+import com.photoizer.crm.agenda.model.AgendamentoFotografo;
+import com.photoizer.crm.agenda.model.RepasseStatus;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
-import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
-import com.photoizer.crm.cliente.repository.ClienteRepository;
+import com.photoizer.crm.agenda.repository.projection.RepasseAggregation;
+import com.photoizer.crm.agenda.service.AgendamentoQueryService;
+import com.photoizer.crm.cliente.service.ClienteQueryService;
 import com.photoizer.crm.comissao.model.Indicacao;
-import com.photoizer.crm.comissao.repository.IndicacaoRepository;
+import com.photoizer.crm.comissao.model.StatusIndicacao;
+import com.photoizer.crm.comissao.service.ComissaoQueryService;
 import com.photoizer.crm.dashboard.api.DashboardMensalResponse;
 import com.photoizer.crm.despesa.model.Despesa;
 import com.photoizer.crm.despesa.model.StatusDespesa;
-import com.photoizer.crm.despesa.repository.DespesaRepository;
-import com.photoizer.crm.ecommerce.model.StatusCompraExtra;
-import com.photoizer.crm.ecommerce.repository.CompraExtraRepository;
+import com.photoizer.crm.despesa.service.DespesaQueryService;
+import com.photoizer.crm.ecommerce.service.EcommerceQueryService;
 import com.photoizer.crm.financeiro.model.Receita;
 import com.photoizer.crm.financeiro.model.StatusReceita;
 import com.photoizer.crm.financeiro.model.TipoServico;
-import com.photoizer.crm.financeiro.repository.ReceitaRepository;
+import com.photoizer.crm.financeiro.service.ReceitaQueryService;
+import com.photoizer.crm.shared.service.FinanceCalculator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -25,6 +29,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -35,26 +40,31 @@ import static org.mockito.Mockito.when;
 
 class DashboardServiceTest {
 
-    private final AgendamentoRepository agendamentoRepository = mock(AgendamentoRepository.class);
+    private final AgendamentoQueryService agendamentoQueryService = mock(AgendamentoQueryService.class);
+    private final ComissaoQueryService comissaoQueryService = mock(ComissaoQueryService.class);
+    private final DespesaQueryService despesaQueryService = mock(DespesaQueryService.class);
+    private final ReceitaQueryService receitaQueryService = mock(ReceitaQueryService.class);
+    private final EcommerceQueryService ecommerceQueryService = mock(EcommerceQueryService.class);
+    private final ClienteQueryService clienteQueryService = mock(ClienteQueryService.class);
+    private final FinanceCalculator financeCalculator = new FinanceCalculator();
     private final AgendamentoFotografoRepository agendamentoFotografoRepository = mock(AgendamentoFotografoRepository.class);
-    private final IndicacaoRepository indicacaoRepository = mock(IndicacaoRepository.class);
-    private final DespesaRepository despesaRepository = mock(DespesaRepository.class);
-    private final CompraExtraRepository compraExtraRepository = mock(CompraExtraRepository.class);
-    private final ClienteRepository clienteRepository = mock(ClienteRepository.class);
-    private final ReceitaRepository receitaRepository = mock(ReceitaRepository.class);
 
     private DashboardService service;
 
     @BeforeEach
     void setUp() {
         service = new DashboardService(
-            agendamentoRepository, agendamentoFotografoRepository, indicacaoRepository, despesaRepository,
-            compraExtraRepository, clienteRepository, receitaRepository);
-        when(agendamentoRepository.findByDataBetween(any(), any(), anyList())).thenReturn(List.of());
-        when(indicacaoRepository.findByAgendamentoIdIn(anyList())).thenReturn(List.of());
-        when(despesaRepository.findByDataBetweenOrderByDataDesc(any(), any())).thenReturn(List.of());
-        when(receitaRepository.findAll()).thenReturn(List.of());
-        when(compraExtraRepository.findByStatus(any())).thenReturn(List.of());
+            agendamentoQueryService, comissaoQueryService, despesaQueryService,
+            receitaQueryService, ecommerceQueryService, clienteQueryService, financeCalculator);
+
+        when(agendamentoQueryService.obterPorPeriodo(any(), any())).thenReturn(List.of());
+        when(agendamentoQueryService.repasseRepository()).thenReturn(agendamentoFotografoRepository);
+        when(agendamentoFotografoRepository.sumRepassesAtivosPorAgendamento(any())).thenReturn(List.of());
+        when(comissaoQueryService.obterComissaoPorAgendamentos(anyList())).thenReturn(Map.of());
+        when(despesaQueryService.obterPorPeriodo(any(), any()))
+            .thenReturn(new DespesaQueryService.DespesasPorPeriodo(Map.of(), Map.of()));
+        when(receitaQueryService.obterAvulsasPorPeriodo(any(), any()))
+            .thenReturn(new ReceitaQueryService.ReceitasAvulsasPorMes(Map.of(), Map.of()));
     }
 
     @Test
@@ -62,8 +72,10 @@ class DashboardServiceTest {
         var agendamento = agendamento("575.00", "575.00", "0.00");
         agendamento.setRepassarDeslocamento(true);
         agendamento.setCustoDeslocamento(new BigDecimal("60.00"));
-        when(agendamentoRepository.findByDataBetween(any(), any(), anyList()))
+        when(agendamentoQueryService.obterPorPeriodo(any(), any()))
             .thenReturn(List.of(agendamento));
+        when(comissaoQueryService.obterComissaoPorAgendamentos(anyList()))
+            .thenReturn(Map.of(agendamento.getId(), new ComissaoQueryService.ComissaoResumo(BigDecimal.ZERO, BigDecimal.ZERO)));
 
         var mesAtual = mesAtual(service.calcularFinanceiroMensal(6));
 
@@ -77,14 +89,10 @@ class DashboardServiceTest {
     @Test
     void comissaoCanceladaNaoEntraNaDespesa() {
         var agendamento = agendamento("575.00", "575.00", "0.00");
-        var indicacao = Indicacao.builder()
-            .agendamentoId(agendamento.getId())
-            .valorComissao(new BigDecimal("75.00"))
-            .status("CANCELADA")
-            .build();
-        when(agendamentoRepository.findByDataBetween(any(), any(), anyList()))
+        when(agendamentoQueryService.obterPorPeriodo(any(), any()))
             .thenReturn(List.of(agendamento));
-        when(indicacaoRepository.findByAgendamentoIdIn(anyList())).thenReturn(List.of(indicacao));
+        when(comissaoQueryService.obterComissaoPorAgendamentos(anyList()))
+            .thenReturn(Map.of(agendamento.getId(), new ComissaoQueryService.ComissaoResumo(BigDecimal.ZERO, BigDecimal.ZERO)));
 
         var mesAtual = mesAtual(service.calcularFinanceiroMensal(6));
 
@@ -96,14 +104,11 @@ class DashboardServiceTest {
     @Test
     void comissaoPagaEntraNoRealizado() {
         var agendamento = agendamento("575.00", "575.00", "0.00");
-        var indicacao = Indicacao.builder()
-            .agendamentoId(agendamento.getId())
-            .valorComissao(new BigDecimal("75.00"))
-            .status("PAGA")
-            .build();
-        when(agendamentoRepository.findByDataBetween(any(), any(), anyList()))
+        when(agendamentoQueryService.obterPorPeriodo(any(), any()))
             .thenReturn(List.of(agendamento));
-        when(indicacaoRepository.findByAgendamentoIdIn(anyList())).thenReturn(List.of(indicacao));
+        when(comissaoQueryService.obterComissaoPorAgendamentos(anyList()))
+            .thenReturn(Map.of(agendamento.getId(), new ComissaoQueryService.ComissaoResumo(
+                new BigDecimal("75.00"), new BigDecimal("75.00"))));
 
         var mesAtual = mesAtual(service.calcularFinanceiroMensal(6));
 
@@ -115,29 +120,15 @@ class DashboardServiceTest {
     @Test
     void avulsaPrevistaEntraNoFaturamentoMasNaoNoRecebido() {
         var agendamento = agendamento("575.00", "575.00", "0.00");
-        var avulsa = Receita.builder()
-            .agendamentoId(null)
-            .valorBruto(new BigDecimal("100.00"))
-            .valorFinal(new BigDecimal("90.00"))
-            .valorRecebido(BigDecimal.ZERO)
-            .status(StatusReceita.PENDENTE)
-            .dataPrevisaoRecebimento(LocalDate.now())
-            .tipoServico(TipoServico.ENSAIO)
-            .clienteNome("Cliente")
-            .build();
-        var avulsaCancelada = Receita.builder()
-            .agendamentoId(null)
-            .valorBruto(new BigDecimal("200.00"))
-            .valorFinal(new BigDecimal("180.00"))
-            .valorRecebido(BigDecimal.ZERO)
-            .status(StatusReceita.CANCELADO)
-            .dataPrevisaoRecebimento(LocalDate.now())
-            .tipoServico(TipoServico.ENSAIO)
-            .clienteNome("Cliente")
-            .build();
-        when(agendamentoRepository.findByDataBetween(any(), any(), anyList()))
+        when(agendamentoQueryService.obterPorPeriodo(any(), any()))
             .thenReturn(List.of(agendamento));
-        when(receitaRepository.findAll()).thenReturn(List.of(avulsa, avulsaCancelada));
+        when(comissaoQueryService.obterComissaoPorAgendamentos(anyList()))
+            .thenReturn(Map.of(agendamento.getId(), new ComissaoQueryService.ComissaoResumo(BigDecimal.ZERO, BigDecimal.ZERO)));
+
+        var ym = YearMonth.now();
+        when(receitaQueryService.obterAvulsasPorPeriodo(any(), any()))
+            .thenReturn(new ReceitaQueryService.ReceitasAvulsasPorMes(
+                Map.of(ym, new BigDecimal("100.00")), Map.of()));
 
         var resumo = service.calcularFinanceiroMensal(6);
         var mesAtual = mesAtual(resumo);
@@ -153,19 +144,15 @@ class DashboardServiceTest {
     @Test
     void avulsaRecebidaEntraNoRecebido() {
         var agendamento = agendamento("575.00", "575.00", "0.00");
-        var avulsa = Receita.builder()
-            .agendamentoId(null)
-            .valorBruto(new BigDecimal("100.00"))
-            .valorFinal(new BigDecimal("90.00"))
-            .valorRecebido(new BigDecimal("90.00"))
-            .status(StatusReceita.PAGO_PARCIAL)
-            .dataRecebimentoReal(LocalDateTime.now())
-            .tipoServico(TipoServico.ENSAIO)
-            .clienteNome("Cliente")
-            .build();
-        when(agendamentoRepository.findByDataBetween(any(), any(), anyList()))
+        when(agendamentoQueryService.obterPorPeriodo(any(), any()))
             .thenReturn(List.of(agendamento));
-        when(receitaRepository.findAll()).thenReturn(List.of(avulsa));
+        when(comissaoQueryService.obterComissaoPorAgendamentos(anyList()))
+            .thenReturn(Map.of(agendamento.getId(), new ComissaoQueryService.ComissaoResumo(BigDecimal.ZERO, BigDecimal.ZERO)));
+
+        var ym = YearMonth.now();
+        when(receitaQueryService.obterAvulsasPorPeriodo(any(), any()))
+            .thenReturn(new ReceitaQueryService.ReceitasAvulsasPorMes(
+                Map.of(), Map.of(ym, new BigDecimal("90.00"))));
 
         var mesAtual = mesAtual(service.calcularFinanceiroMensal(6));
 
@@ -176,15 +163,15 @@ class DashboardServiceTest {
     @Test
     void despesaPendenteReduzPrevistoMasNaoRealizado() {
         var agendamento = agendamento("575.00", "575.00", "0.00");
-        var despesa = Despesa.builder()
-            .descricao("Despesa")
-            .valor(new BigDecimal("20.00"))
-            .status(StatusDespesa.PENDENTE)
-            .data(LocalDate.now())
-            .build();
-        when(agendamentoRepository.findByDataBetween(any(), any(), anyList()))
+        when(agendamentoQueryService.obterPorPeriodo(any(), any()))
             .thenReturn(List.of(agendamento));
-        when(despesaRepository.findByDataBetweenOrderByDataDesc(any(), any())).thenReturn(List.of(despesa));
+        when(comissaoQueryService.obterComissaoPorAgendamentos(anyList()))
+            .thenReturn(Map.of(agendamento.getId(), new ComissaoQueryService.ComissaoResumo(BigDecimal.ZERO, BigDecimal.ZERO)));
+
+        var ym = YearMonth.now();
+        when(despesaQueryService.obterPorPeriodo(any(), any()))
+            .thenReturn(new DespesaQueryService.DespesasPorPeriodo(
+                Map.of(ym, new BigDecimal("20.00")), Map.of()));
 
         var mesAtual = mesAtual(service.calcularFinanceiroMensal(6));
 

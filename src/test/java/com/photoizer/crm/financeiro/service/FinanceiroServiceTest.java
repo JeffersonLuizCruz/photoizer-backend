@@ -13,11 +13,11 @@ import com.photoizer.crm.financeiro.repository.FotoExtraRepository;
 import com.photoizer.crm.financeiro.repository.PagamentoRepository;
 import com.photoizer.crm.financeiro.repository.ReceitaRepository;
 import com.photoizer.crm.financeiro.repository.VideoExtraRepository;
-import com.photoizer.crm.indicador.service.IndicadorService;
 import com.photoizer.crm.pacote.repository.PacoteRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -40,8 +40,8 @@ class FinanceiroServiceTest {
     private final AgendamentoRepository agendamentoRepository = mock(AgendamentoRepository.class);
     private final PacoteRepository pacoteRepository = mock(PacoteRepository.class);
     private final IndicacaoRepository indicacaoRepository = mock(IndicacaoRepository.class);
-    private final IndicadorService indicadorService = mock(IndicadorService.class);
     private final ConfiguracaoService configuracaoService = mock(ConfiguracaoService.class);
+    private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
     private final DespesaRepository despesaRepository = mock(DespesaRepository.class);
     private final ReceitaRepository receitaRepository = mock(ReceitaRepository.class);
     private final AgendamentoFotografoRepository agendamentoFotografoRepository = mock(AgendamentoFotografoRepository.class);
@@ -54,7 +54,7 @@ class FinanceiroServiceTest {
         service = new FinanceiroService(
             pagamentoRepository, fotoExtraRepository, videoExtraRepository,
             agendamentoRepository, pacoteRepository, indicacaoRepository,
-            indicadorService, configuracaoService, despesaRepository, receitaRepository,
+            configuracaoService, eventPublisher, despesaRepository, receitaRepository,
             agendamentoFotografoRepository, agendamentoMapper);
     }
 

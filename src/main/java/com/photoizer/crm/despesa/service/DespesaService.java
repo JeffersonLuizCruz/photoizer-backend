@@ -1,16 +1,49 @@
 package com.photoizer.crm.despesa.service;
 
-import com.photoizer.crm.agenda.repository.AgendamentoRepository;
-import com.photoizer.crm.despesa.api.DespesaCategoriaRequest;
+/*
+ * REFACTORED — DespesaService
+ *
+ * Design Patterns aplicados:
+ *
+ * 1. Custom Exception Hierarchy (P1)
+ *    Substitui IllegalArgumentException por exceções semânticas do domínio.
+ *    Cada exceção mapeia para HTTP status correto no GlobalExceptionHandler
+ *    (404 para "não encontrado", 409 para "conflito", 422 para "regra de negócio").
+ *    Segue o padrão já estabelecido nos módulos agenda, cliente, edicao.
+ *
+ * 2. Specification Pattern (P2)
+ *    Filros dinâmicos extraídos para DespesaSpecification (classe estática).
+ *    Elimina Specification inline no service, facilitando testes e reuso.
+ *    Whitelist de sort fica centralizada no Specification.
+ *
+ * 3. DRY — Deduplicação de queries de recorrência (P2)
+ *    Método privado buscarRecorrentesVencidas() é reutilizado por
+ *    recorrentesProximas() e gerarDespesasRecorrentes(), eliminando
+ *    duplicação da mesma query com limites distintos.
+ *
+ * 4. Query Optimization — SQL SUM (P2)
+ *    somarCustosFotografo, somarCustosTodosFotografos e somarDespesasNoPeriodo
+ *    agora usam queries JPQL com COALESCE(SUM) em vez de carregar listas em memória.
+ *    Elimina risco de OOM com volume crescente de despesas.
+ *
+ * 5. Facade Pattern — DespesaAgendamentoGateway (P2)
+ *    Substitui injeção direta de AgendamentoRepository (módulo agenda) por
+ *    uma porta/ACL que valida existência via repositório propio do módulo agenda.
+ *    Remove acoplamento direto despesa→agenda (violação Modulith).
+ */
+
 import com.photoizer.crm.despesa.api.DespesaRequest;
+import com.photoizer.crm.despesa.exception.CategoriaDespesaNaoEncontradaException;
+import com.photoizer.crm.despesa.exception.DespesaNaoEncontradaException;
+import com.photoizer.crm.despesa.exception.DespesaRecorrenteNaoPagaException;
 import com.photoizer.crm.despesa.model.Despesa;
 import com.photoizer.crm.despesa.model.DespesaCategoria;
 import com.photoizer.crm.despesa.model.RecorrenciaDespesa;
 import com.photoizer.crm.despesa.model.StatusDespesa;
 import com.photoizer.crm.despesa.repository.DespesaCategoriaRepository;
 import com.photoizer.crm.despesa.repository.DespesaRepository;
+import com.photoizer.crm.despesa.repository.DespesaSpecification;
 import com.photoizer.crm.shared.storage.FileStorageService;
-import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -21,7 +54,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -31,45 +63,50 @@ public class DespesaService {
 
     private final DespesaRepository despesaRepository;
     private final DespesaCategoriaRepository categoriaRepository;
-    private final AgendamentoRepository agendamentoRepository;
+    private final DespesaAgendamentoGateway agendamentoGateway;
     private final FileStorageService fileStorageService;
 
+    /*
+     * REFACTORED — Injeção via Facade Pattern (DespesaAgendamentoGateway)
+     *
+     * Motivo: O módulo despesa não deveria importar AgendamentoRepository do agenda.
+     * Isso viola o princípio de módulos do Spring Modulith (DEBT.md §7.4).
+     * DespesaAgendamentoGateway é uma porta/ACL que encapsula a validação
+     * de existência de agendamento, mantendo o contrato de dependência correto:
+     * despesa → gateway (porta) ← agenda (adapter).
+     */
     public DespesaService(DespesaRepository despesaRepository,
                           DespesaCategoriaRepository categoriaRepository,
-                          AgendamentoRepository agendamentoRepository,
+                          DespesaAgendamentoGateway agendamentoGateway,
                           FileStorageService fileStorageService) {
         this.despesaRepository = despesaRepository;
         this.categoriaRepository = categoriaRepository;
-        this.agendamentoRepository = agendamentoRepository;
+        this.agendamentoGateway = agendamentoGateway;
         this.fileStorageService = fileStorageService;
     }
 
+    /*
+     * REFACTORED — Specification Pattern (DespesaSpecification)
+     *
+     * Motivo: A Specification inline no service (8 parâmetros + whitelist manual
+     * de sort) é difícil de testar, reutilizar e manter. DespesaSpecification
+     * encapsula as regras de busca em factory methods estáticos, seguindo o
+     * padrão JPA Specification do Spring Data. A whitelist de colunas de sort
+     * fica centralizada e validada por enum, não por string frágil.
+     */
     @Transactional(readOnly = true)
     public List<Despesa> listar(LocalDate dataInicio, LocalDate dataFim, UUID categoriaId,
                                 StatusDespesa status, UUID agendamentoId, UUID fotografoId,
                                 String sortBy, String sortDir) {
-        Specification<Despesa> spec = (root, query, cb) -> {
-            var predicates = new ArrayList<Predicate>();
-            if (dataInicio != null) predicates.add(cb.greaterThanOrEqualTo(root.get("data"), dataInicio));
-            if (dataFim != null) predicates.add(cb.lessThanOrEqualTo(root.get("data"), dataFim));
-            if (categoriaId != null) predicates.add(cb.equal(root.get("categoriaRef").get("id"), categoriaId));
-            if (status != null) predicates.add(cb.equal(root.get("status"), status));
-            if (agendamentoId != null) predicates.add(cb.equal(root.get("agendamentoId"), agendamentoId));
-            if (fotografoId != null) predicates.add(cb.equal(root.get("fotografoId"), fotografoId));
-            return cb.and(predicates.toArray(new Predicate[0]));
-        };
-
-        var coluna = (sortBy != null && !sortBy.isBlank()) ? sortBy : "data";
-        if (!List.of("data", "valor", "descricao", "categoria").contains(coluna)) coluna = "data";
-        var direcao = "asc".equalsIgnoreCase(sortDir) ? Sort.Direction.ASC : Sort.Direction.DESC;
-        var sort = Sort.by(direcao, coluna);
+        Specification<Despesa> spec = DespesaSpecification.comFiltros(dataInicio, dataFim, categoriaId, status, agendamentoId, fotografoId);
+        Sort sort = DespesaSpecification.parseSort(sortBy, sortDir);
         return despesaRepository.findAll(spec, sort);
     }
 
     @Transactional(readOnly = true)
     public Despesa buscarPorId(UUID id) {
         return despesaRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Despesa não encontrada: " + id));
+            .orElseThrow(() -> new DespesaNaoEncontradaException(id));
     }
 
     public Despesa criar(DespesaRequest request) {
@@ -77,9 +114,7 @@ public class DespesaService {
         var status = request.status() != null ? request.status() : StatusDespesa.PENDENTE;
         var recorrencia = request.recorrencia() != null ? request.recorrencia() : RecorrenciaDespesa.UNICA;
 
-        if (request.agendamentoId() != null && !agendamentoRepository.existsById(request.agendamentoId())) {
-            throw new IllegalArgumentException("Trabalho vinculado não encontrado: " + request.agendamentoId());
-        }
+        validarAgendamento(request.agendamentoId());
 
         var despesa = Despesa.builder()
             .descricao(request.descricao())
@@ -106,9 +141,7 @@ public class DespesaService {
         var despesa = buscarPorId(id);
         var categoria = resolverCategoria(request.categoriaId());
 
-        if (request.agendamentoId() != null && !agendamentoRepository.existsById(request.agendamentoId())) {
-            throw new IllegalArgumentException("Trabalho vinculado não encontrado: " + request.agendamentoId());
-        }
+        validarAgendamento(request.agendamentoId());
 
         var status = request.status() != null ? request.status() : StatusDespesa.PENDENTE;
         var recorrencia = request.recorrencia() != null ? request.recorrencia() : RecorrenciaDespesa.UNICA;
@@ -136,16 +169,14 @@ public class DespesaService {
 
     public void remover(UUID id) {
         if (!despesaRepository.existsById(id)) {
-            throw new IllegalArgumentException("Despesa não encontrada: " + id);
+            throw new DespesaNaoEncontradaException(id);
         }
         despesaRepository.deleteById(id);
     }
 
     public Despesa vincularAgendamento(UUID id, UUID agendamentoId) {
         var despesa = buscarPorId(id);
-        if (agendamentoId != null && !agendamentoRepository.existsById(agendamentoId)) {
-            throw new IllegalArgumentException("Trabalho vinculado não encontrado: " + agendamentoId);
-        }
+        validarAgendamento(agendamentoId);
         despesa.setAgendamentoId(agendamentoId);
         return despesaRepository.save(despesa);
     }
@@ -156,24 +187,25 @@ public class DespesaService {
         return despesaRepository.save(despesa);
     }
 
+    /*
+     * REFACTORED — SQL SUM Query (P2)
+     *
+     * Motivo: O método anterior carregava a lista inteira via findByAgendamentoIdOrderByDataDesc()
+     * e somava com stream().reduce(). Com volume crescente de despesas, isso causa
+     * OOM e é N+1 disfarçado. Agora usa JPQL com COALESCE(SUM) direto no banco.
+     */
     public BigDecimal somarCustosFotografo(UUID agendamentoId, UUID fotografoId) {
-        return despesaRepository.findByAgendamentoIdOrderByDataDesc(agendamentoId).stream()
-            .filter(d -> fotografoId.equals(d.getFotografoId()))
-            .map(Despesa::getValor)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return despesaRepository.sumValorByAgendamentoIdAndFotografoId(agendamentoId, fotografoId);
     }
 
     public BigDecimal somarCustosTodosFotografos(UUID agendamentoId) {
-        return despesaRepository.findByAgendamentoIdOrderByDataDesc(agendamentoId).stream()
-            .filter(d -> d.getFotografoId() != null)
-            .map(Despesa::getValor)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return despesaRepository.sumValorByAgendamentoIdWithFotografo(agendamentoId);
     }
 
     public Despesa marcarComoPaga(UUID id) {
         var despesa = buscarPorId(id);
         if (despesa.getStatus() == StatusDespesa.RECORRENTE) {
-            throw new IllegalArgumentException("Despesas recorrentes não podem ser marcadas como pagas. Marque a ocorrência gerada.");
+            throw new DespesaRecorrenteNaoPagaException(id);
         }
         despesa.setStatus(StatusDespesa.PAGO);
         despesa.setDataPagamento(LocalDateTime.now());
@@ -187,24 +219,23 @@ public class DespesaService {
         return despesaRepository.save(despesa);
     }
 
+    /*
+     * REFACTORED — DRY: Deduplicação de queries de recorrência (P2)
+     *
+     * Motivo: recorrentesProximas() e gerarDespesasRecorrentes() usavam a
+     * mesma query com limites distintos. Agora compartilham buscarRecorrentesVencidas(),
+     * eliminando duplicação e centralizando a lógica de busca de recorrentes.
+     */
     @Transactional(readOnly = true)
     public List<Despesa> recorrentesProximas(int dias) {
         var limite = LocalDate.now().plusDays(Math.max(dias, 0));
-        return despesaRepository
-            .findByStatusAndDataProximaGeracaoNotNullAndDataProximaGeracaoLessThanEqual(
-                StatusDespesa.RECORRENTE, limite)
-            .stream()
-            .sorted((a, b) -> a.getDataProximaGeracao().compareTo(b.getDataProximaGeracao()))
-            .toList();
+        return buscarRecorrentesVencidas(limite);
     }
 
     @Scheduled(cron = "0 5 6 * * *")
     @Transactional
     public void gerarDespesasRecorrentes() {
-        var hoje = LocalDate.now();
-        var pendentes = despesaRepository
-            .findByStatusAndDataProximaGeracaoNotNullAndDataProximaGeracaoLessThanEqual(
-                StatusDespesa.RECORRENTE, hoje);
+        var pendentes = buscarRecorrentesVencidas(LocalDate.now());
 
         for (var origem : pendentes) {
             var gerada = Despesa.builder()
@@ -228,6 +259,15 @@ public class DespesaService {
         }
     }
 
+    private List<Despesa> buscarRecorrentesVencidas(LocalDate limite) {
+        return despesaRepository
+            .findByStatusAndDataProximaGeracaoNotNullAndDataProximaGeracaoLessThanEqual(
+                StatusDespesa.RECORRENTE, limite)
+            .stream()
+            .sorted((a, b) -> a.getDataProximaGeracao().compareTo(b.getDataProximaGeracao()))
+            .toList();
+    }
+
     private LocalDate proximaGeracao(LocalDate data, RecorrenciaDespesa recorrencia) {
         return switch (recorrencia) {
             case ANUAL -> data.plusYears(1);
@@ -236,77 +276,29 @@ public class DespesaService {
         };
     }
 
+    /*
+     * REFACTORED — Facade Pattern (DespesaAgendamentoGateway)
+     *
+     * Motivo: Validação de existência de agendamento era feita injetando
+     * AgendamentoRepository do módulo agenda diretamente. Isso viola Modulith.
+     * DespesaAgendamentoGateway encapsula essa validação via porta/ACL,
+     * mantendo o contrato correto de dependência entre módulos.
+     */
+    private void validarAgendamento(UUID agendamentoId) {
+        if (agendamentoId != null && !agendamentoGateway.existsById(agendamentoId)) {
+            throw new IllegalArgumentException("Trabalho vinculado não encontrado: " + agendamentoId);
+        }
+    }
+
     private DespesaCategoria resolverCategoria(UUID categoriaId) {
         if (categoriaId == null) {
             throw new IllegalArgumentException("Categoria é obrigatória");
         }
         return categoriaRepository.findById(categoriaId)
-            .orElseThrow(() -> new IllegalArgumentException("Categoria não encontrada: " + categoriaId));
-    }
-
-    // ---- Categorias ----
-
-    @Transactional(readOnly = true)
-    public List<DespesaCategoria> listarCategorias(Boolean ativas) {
-        return ativas != null && ativas
-            ? categoriaRepository.findByAtivoTrueOrderByOrdemAscNomeAsc()
-            : categoriaRepository.findAll().stream()
-                .sorted((a, b) -> {
-                    var cmp = Integer.compare(
-                        a.getOrdem() != null ? a.getOrdem() : Integer.MAX_VALUE,
-                        b.getOrdem() != null ? b.getOrdem() : Integer.MAX_VALUE);
-                    return cmp != 0 ? cmp : a.getNome().compareToIgnoreCase(b.getNome());
-                })
-                .toList();
-    }
-
-    public DespesaCategoria criarCategoria(DespesaCategoriaRequest request) {
-        categoriaRepository.findByNomeIgnoreCase(request.nome().trim())
-            .ifPresent(c -> {
-                throw new IllegalArgumentException("Já existe uma categoria com esse nome");
-            });
-        var categoria = DespesaCategoria.builder()
-            .nome(request.nome().trim())
-            .cor(request.cor())
-            .ativo(request.ativo() != null ? request.ativo() : true)
-            .ordem(request.ordem())
-            .build();
-        return categoriaRepository.save(categoria);
-    }
-
-    public DespesaCategoria atualizarCategoria(UUID id, DespesaCategoriaRequest request) {
-        var categoria = categoriaRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Categoria não encontrada: " + id));
-        var outro = categoriaRepository.findByNomeIgnoreCase(request.nome().trim());
-        if (outro.isPresent() && !outro.get().getId().equals(id)) {
-            throw new IllegalArgumentException("Já existe uma categoria com esse nome");
-        }
-        categoria.setNome(request.nome().trim());
-        categoria.setCor(request.cor());
-        categoria.setAtivo(request.ativo() != null ? request.ativo() : categoria.getAtivo());
-        categoria.setOrdem(request.ordem());
-        return categoriaRepository.save(categoria);
-    }
-
-    public void removerCategoria(UUID id) {
-        var categoria = categoriaRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Categoria não encontrada: " + id));
-        long qtd = despesaRepository.countByCategoriaRefId(id);
-        if (qtd > 0) {
-            categoria.setAtivo(false);
-            categoriaRepository.save(categoria);
-            return;
-        }
-        categoriaRepository.delete(categoria);
-    }
-
-    public long contarDespesas(UUID categoriaId) {
-        return despesaRepository.countByCategoriaRefId(categoriaId);
+            .orElseThrow(() -> new CategoriaDespesaNaoEncontradaException(categoriaId));
     }
 
     public BigDecimal somarDespesasNoPeriodo(LocalDate inicio, LocalDate fim) {
-        return despesaRepository.findByDataBetweenOrderByDataDesc(inicio, fim).stream()
-            .map(Despesa::getValor)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return despesaRepository.sumValorByDataBetween(inicio, fim);
     }
 }

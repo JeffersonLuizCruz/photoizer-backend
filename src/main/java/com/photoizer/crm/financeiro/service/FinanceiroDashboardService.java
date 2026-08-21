@@ -505,9 +505,9 @@ public class FinanceiroDashboardService {
         var previstos = new HashMap<UUID, BigDecimal>();
         var pagos = new HashMap<UUID, BigDecimal>();
         for (var linha : agendamentoFotografoRepository.sumRepassesAtivosPorAgendamento(RepasseStatus.CANCELADO)) {
-            var agendamentoId = (UUID) linha[0];
-            var status = (RepasseStatus) linha[1];
-            var valor = (BigDecimal) linha[2];
+            var agendamentoId = linha.getAgendamentoId();
+            var status = linha.getStatus();
+            var valor = linha.getValor();
             previstos.merge(agendamentoId, valor, BigDecimal::add);
             if (status == RepasseStatus.PAGO) {
                 pagos.merge(agendamentoId, valor, BigDecimal::add);

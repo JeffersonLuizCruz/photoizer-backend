@@ -1,5 +1,10 @@
 package com.photoizer.crm.shared.exception;
 
+import com.photoizer.crm.despesa.exception.CategoriaDespesaNaoEncontradaException;
+import com.photoizer.crm.despesa.exception.CategoriaDuplicadaException;
+import com.photoizer.crm.despesa.exception.CategoriaEmUsoException;
+import com.photoizer.crm.despesa.exception.DespesaNaoEncontradaException;
+import com.photoizer.crm.despesa.exception.DespesaRecorrenteNaoPagaException;
 import org.springframework.security.access.AccessDeniedException;
 import com.photoizer.crm.agenda.exception.AgendamentoNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.AgendamentoNoPassadoException;
@@ -164,6 +169,36 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleMaxUploadSize(MaxUploadSizeExceededException e) {
         log.warn("Upload excedeu tamanho maximo: {}", e.getMessage());
         return build(HttpStatus.PAYLOAD_TOO_LARGE, "Arquivo excede o tamanho máximo permitido de 10MB");
+    }
+
+    @ExceptionHandler(DespesaNaoEncontradaException.class)
+    public ResponseEntity<ErrorResponse> handleDespesaNaoEncontrada(DespesaNaoEncontradaException e) {
+        log.warn("Despesa nao encontrada: {}", e.getMessage());
+        return build(HttpStatus.NOT_FOUND, e);
+    }
+
+    @ExceptionHandler(CategoriaDespesaNaoEncontradaException.class)
+    public ResponseEntity<ErrorResponse> handleCategoriaDespesaNaoEncontrada(CategoriaDespesaNaoEncontradaException e) {
+        log.warn("Categoria de despesa nao encontrada: {}", e.getMessage());
+        return build(HttpStatus.NOT_FOUND, e);
+    }
+
+    @ExceptionHandler(CategoriaEmUsoException.class)
+    public ResponseEntity<ErrorResponse> handleCategoriaEmUso(CategoriaEmUsoException e) {
+        log.warn("Categoria em uso: {}", e.getMessage());
+        return build(HttpStatus.CONFLICT, e);
+    }
+
+    @ExceptionHandler(CategoriaDuplicadaException.class)
+    public ResponseEntity<ErrorResponse> handleCategoriaDuplicada(CategoriaDuplicadaException e) {
+        log.warn("Categoria duplicada: {}", e.getMessage());
+        return build(HttpStatus.CONFLICT, e);
+    }
+
+    @ExceptionHandler(DespesaRecorrenteNaoPagaException.class)
+    public ResponseEntity<ErrorResponse> handleDespesaRecorrenteNaoPaga(DespesaRecorrenteNaoPagaException e) {
+        log.warn("Tentativa de pagar despesa recorrente: {}", e.getMessage());
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

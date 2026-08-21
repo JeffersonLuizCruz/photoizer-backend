@@ -457,8 +457,8 @@ public class FinanceiroService {
     private Map<UUID, BigDecimal> repassesPrevistosPorEnsaio() {
         var mapa = new HashMap<UUID, BigDecimal>();
         for (var linha : agendamentoFotografoRepository.sumRepassesAtivosPorAgendamento(RepasseStatus.CANCELADO)) {
-            var agendamentoId = (UUID) linha[0];
-            var valor = (BigDecimal) linha[2];
+            var agendamentoId = linha.getAgendamentoId();
+            var valor = linha.getValor();
             mapa.merge(agendamentoId, valor, BigDecimal::add);
         }
         return mapa;

@@ -14,6 +14,7 @@ import com.photoizer.crm.contrato.model.Contrato;
 import com.photoizer.crm.contrato.model.StatusContrato;
 import com.photoizer.crm.contrato.repository.AssinaturaRepository;
 import com.photoizer.crm.contrato.repository.ContratoRepository;
+import com.photoizer.crm.shared.pdf.PdfWriter;
 import com.photoizer.crm.shared.storage.FileStorageService;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -39,7 +40,7 @@ public class ContratoPublicoService {
     private final ContratoRepository contratoRepository;
     private final AssinaturaRepository assinaturaRepository;
     private final FileStorageService fileStorageService;
-    private final ContratoPdfWriter pdfWriter;
+    private final PdfWriter pdfWriter;
     private final ConfiguracaoService configuracaoService;
     private final ContratoTemplateService templateService;
     private final ApplicationEventPublisher eventPublisher;
@@ -48,7 +49,7 @@ public class ContratoPublicoService {
     public ContratoPublicoService(ContratoRepository contratoRepository,
                                   AssinaturaRepository assinaturaRepository,
                                   FileStorageService fileStorageService,
-                                  ContratoPdfWriter pdfWriter,
+                                  PdfWriter pdfWriter,
                                   ConfiguracaoService configuracaoService,
                                   ContratoTemplateService templateService,
                                   ApplicationEventPublisher eventPublisher,

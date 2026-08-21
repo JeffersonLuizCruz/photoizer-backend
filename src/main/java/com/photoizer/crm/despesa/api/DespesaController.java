@@ -1,6 +1,7 @@
 package com.photoizer.crm.despesa.api;
 
 import com.photoizer.crm.despesa.model.StatusDespesa;
+import com.photoizer.crm.despesa.service.DespesaCategoriaService;
 import com.photoizer.crm.despesa.service.DespesaService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -32,9 +33,15 @@ import java.util.UUID;
 public class DespesaController {
 
     private final DespesaService despesaService;
+    private final DespesaCategoriaService categoriaService;
+    private final DespesaMapper despesaMapper;
 
-    public DespesaController(DespesaService despesaService) {
+    public DespesaController(DespesaService despesaService,
+                             DespesaCategoriaService categoriaService,
+                             DespesaMapper despesaMapper) {
         this.despesaService = despesaService;
+        this.categoriaService = categoriaService;
+        this.despesaMapper = despesaMapper;
     }
 
     @GetMapping
@@ -50,28 +57,28 @@ public class DespesaController {
             @RequestParam(required = false) String sortDir) {
         var despesas = despesaService
             .listar(dataInicio, dataFim, categoriaId, status, agendamentoId, fotografoId, sortBy, sortDir)
-            .stream().map(DespesaResponse::of).toList();
+            .stream().map(despesaMapper::toResponse).toList();
         return ResponseEntity.ok(despesas);
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Buscar despesa por ID")
     public ResponseEntity<DespesaResponse> buscarPorId(@PathVariable UUID id) {
-        return ResponseEntity.ok(DespesaResponse.of(despesaService.buscarPorId(id)));
+        return ResponseEntity.ok(despesaMapper.toResponse(despesaService.buscarPorId(id)));
     }
 
     @PostMapping
     @Operation(summary = "Criar nova despesa")
     public ResponseEntity<DespesaResponse> criar(@Valid @RequestBody DespesaRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(DespesaResponse.of(despesaService.criar(request)));
+            .body(despesaMapper.toResponse(despesaService.criar(request)));
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Atualizar despesa")
     public ResponseEntity<DespesaResponse> atualizar(@PathVariable UUID id,
                                                      @Valid @RequestBody DespesaRequest request) {
-        return ResponseEntity.ok(DespesaResponse.of(despesaService.atualizar(id, request)));
+        return ResponseEntity.ok(despesaMapper.toResponse(despesaService.atualizar(id, request)));
     }
 
     @DeleteMapping("/{id}")
@@ -84,21 +91,21 @@ public class DespesaController {
     @PatchMapping("/{id}/pagar")
     @Operation(summary = "Marcar despesa como paga")
     public ResponseEntity<DespesaResponse> marcarComoPaga(@PathVariable UUID id) {
-        return ResponseEntity.ok(DespesaResponse.of(despesaService.marcarComoPaga(id)));
+        return ResponseEntity.ok(despesaMapper.toResponse(despesaService.marcarComoPaga(id)));
     }
 
     @PatchMapping("/{id}/agendamento")
     @Operation(summary = "Vincular ou desvincular despesa de um trabalho (agendamento)")
     public ResponseEntity<DespesaResponse> vincularAgendamento(@PathVariable UUID id,
                                                                @RequestBody DespesaAgendamentoRequest request) {
-        return ResponseEntity.ok(DespesaResponse.of(despesaService.vincularAgendamento(id, request.agendamentoId())));
+        return ResponseEntity.ok(despesaMapper.toResponse(despesaService.vincularAgendamento(id, request.agendamentoId())));
     }
 
     @PatchMapping("/{id}/fotografo")
     @Operation(summary = "Vincular ou desvincular despesa de um fotógrafo")
     public ResponseEntity<DespesaResponse> vincularFotografo(@PathVariable UUID id,
                                                              @RequestBody DespesaFotografoRequest request) {
-        return ResponseEntity.ok(DespesaResponse.of(despesaService.vincularFotografo(id, request.fotografoId())));
+        return ResponseEntity.ok(despesaMapper.toResponse(despesaService.vincularFotografo(id, request.fotografoId())));
     }
 
     @PostMapping("/{id}/comprovante")
@@ -106,7 +113,7 @@ public class DespesaController {
     public ResponseEntity<DespesaResponse> anexarComprovante(
             @PathVariable UUID id,
             @RequestPart("arquivo") MultipartFile arquivo) {
-        return ResponseEntity.ok(DespesaResponse.of(despesaService.anexarComprovante(id, arquivo)));
+        return ResponseEntity.ok(despesaMapper.toResponse(despesaService.anexarComprovante(id, arquivo)));
     }
 
     @GetMapping("/recorrentes-proximas")
@@ -114,18 +121,18 @@ public class DespesaController {
     public ResponseEntity<List<DespesaResponse>> recorrentesProximas(
             @RequestParam(defaultValue = "7") int dias) {
         var despesas = despesaService.recorrentesProximas(dias).stream()
-            .map(DespesaResponse::of).toList();
+            .map(despesaMapper::toResponse).toList();
         return ResponseEntity.ok(despesas);
     }
 
-    // ---- Categorias ----
+    // ---- Categorias (delegadas para DespesaCategoriaService) ----
 
     @GetMapping("/categorias")
     @Operation(summary = "Listar categorias de despesa")
     public ResponseEntity<List<DespesaCategoriaResponse>> listarCategorias(
             @RequestParam(required = false, defaultValue = "true") Boolean ativas) {
-        var categorias = despesaService.listarCategorias(ativas).stream()
-            .map(c -> DespesaCategoriaResponse.of(c, despesaService.contarDespesas(c.getId())))
+        var categorias = categoriaService.listar(ativas).stream()
+            .map(c -> despesaMapper.toCategoriaResponse(c, categoriaService.contarDespesas(c.getId())))
             .toList();
         return ResponseEntity.ok(categorias);
     }
@@ -133,23 +140,23 @@ public class DespesaController {
     @PostMapping("/categorias")
     @Operation(summary = "Criar categoria de despesa")
     public ResponseEntity<DespesaCategoriaResponse> criarCategoria(@Valid @RequestBody DespesaCategoriaRequest request) {
-        var categoria = despesaService.criarCategoria(request);
+        var categoria = categoriaService.criar(request);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(DespesaCategoriaResponse.of(categoria, 0));
+            .body(despesaMapper.toCategoriaResponse(categoria, 0));
     }
 
     @PutMapping("/categorias/{id}")
     @Operation(summary = "Atualizar categoria de despesa")
     public ResponseEntity<DespesaCategoriaResponse> atualizarCategoria(@PathVariable UUID id,
                                                                        @Valid @RequestBody DespesaCategoriaRequest request) {
-        var categoria = despesaService.atualizarCategoria(id, request);
-        return ResponseEntity.ok(DespesaCategoriaResponse.of(categoria, 0));
+        var categoria = categoriaService.atualizar(id, request);
+        return ResponseEntity.ok(despesaMapper.toCategoriaResponse(categoria, 0));
     }
 
     @DeleteMapping("/categorias/{id}")
     @Operation(summary = "Remover ou inativar categoria de despesa")
     public ResponseEntity<Void> removerCategoria(@PathVariable UUID id) {
-        despesaService.removerCategoria(id);
+        categoriaService.remover(id);
         return ResponseEntity.noContent().build();
     }
 }

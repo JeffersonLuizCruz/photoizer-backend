@@ -17,8 +17,7 @@ contrato/
 ├── service/
 │   ├── GestaoContratoService.java  # 326 linhas: criar/publicar/confirmarPagamento/aprovar/devolver/cancelar/listar/vincularAgendamento
 │   ├── ContratoPublicoService.java # 359 linhas: buscarPublico/status/assinar (snapshot+hash+PDF+assinatura); JSON manual
-│   ├── ContratoTemplateService.java # carrega template da config e renderiza placeholders {{...}} (texto e HTML)
-│   └── ContratoPdfWriter.java      # 174 linhas: gerador de PDF "na mão" (bytes PDF nativo, sem lib)
+│   └── ContratoTemplateService.java # carrega template da config e renderiza placeholders {{...}} (texto e HTML)
 ├── api/
 │   ├── ContratoController.java        # CRUD + publicar + confirmar-pagamento + aprovar + devolver + cancelar + download PDF/comprovante
 │   ├── ContratoPublicoController.java # endpoints públicos por token (carregar/status/assinar multipart)
@@ -97,9 +96,10 @@ Nenhum teste específico. Apenas `CrmApplicationTests` (smoke de contexto).
 
 ## 7. Dívidas Técnicas e Melhorias Recomendadas
 
-### 7.1 PDF gerado "na mão" — **[CRÍTICO] P1**
-- `ContratoPdfWriter` escreve os bytes do PDF manualmente (`montarPdf`, `montarConteudo`), com encoding WinAnsi e quebra de linha própria — frágil, sem suporte a layout/fonte/acentuação confiável.
-- **Solução**: usar biblioteca (OpenPDF/PDFBox/Flying Saucer). Também existe **duplicação com o módulo `documento`** (`PdfGeneratorService`) — unificar em um serviço de PDF no `shared`/`documento`.
+### 7.1 PDF gerado "na mão" — **[CRÍTICO] P1 (parcialmente resolvido)**
+- `PdfWriter` (movido para `shared/pdf/PdfWriter.java`) escreve os bytes do PDF manualmente com encoding WinAnsi e quebra de linha própria — frágil, sem suporte a layout/fonte/acentuação confiável.
+- **Resolvido**: `ContratoPdfWriter` foi movido para `shared/pdf/PdfWriter` (Facade Pattern), eliminando duplicação com o módulo `documento`.
+- **Pendente**: migrar para biblioteca (OpenPDF/PDFBox/Flying Saucer).
 
 ### 7.2 Entidade `ContratoFotografo` acoplada a `User` (auth) — **[CRÍTICO] P1**
 - `@ManyToOne User` + `Papel` (`ContratoFotografo.java:37-56`) criam dependência de entidade entre módulos.
@@ -137,7 +137,8 @@ Nenhum teste específico. Apenas `CrmApplicationTests` (smoke de contexto).
 - **Solução**: `@Embeddable AuditInfo` + Auditing.
 
 ## 8. Exemplos de arquivos afetados
-- `ContratoPdfWriter.java:28-32,77-139` — geração manual de PDF (deve trocar por lib).
+- `shared/pdf/PdfWriter.java` (movido de `contrato/service/ContratoPdfWriter.java`) — geração manual de PDF (deve trocar por lib).
+- `contrato/service/ContratoPublicoService.java` — import atualizado para `PdfWriter`.
 - `ContratoFotografo.java:36-56` — `@ManyToOne User` (acoplamento auth).
 - `GestaoContratoService.java:64-126,172-309` — lógica de estados com `if`s; `:202-217` filtro em memória; `:229-279` evento de 26 campos.
 - `ContratoPublicoService.java:142-207,243-306` — assinatura, snapshot/hash manual, JSON manual, `IllegalArgumentException`.
