@@ -1,23 +1,30 @@
 # Módulo: Comissão
 
 ## 1. Responsabilidade
-Gerencia comissões de indicação. É um módulo **puramente reativo** — não expõe endpoints de criação (as comissões nascem do `AgendamentoCriadoEvent` do módulo `agenda`). Fornece consultas públicas (por telefone) e agregado de indicadores, e é **gravado diretamente** pelo módulo `financeiro` (comissões de extras).
+Gerencia comissões de indicação. É um módulo **puramente reativo** — não expõe endpoints de criação (as comissões nascem do `AgendamentoCriadoEvent` do módulo `agenda` ou do `ComissaoSolicitadaEvent` do módulo `financeiro`). Fornece consultas públicas (por telefone) e agregado de indicadores.
 
 ## 2. Estrutura
 ```
 comissao/
 ├── model/
-│   └── Indicacao.java          # Entidade (extends BaseEntity): agendamentoId/indicadorId (UUID soltos), nome/tel do indicador, origem String, percentual, valorReferencia, valorComissao, status String, dataPagamento
+│   ├── Indicacao.java              # Entidade (extends BaseEntity): agendamentoId/indicadorId (UUID soltos), nome/tel do indicador, origem enum, percentual, valorReferencia, valorComissao, status enum, dataPagamento
+│   ├── StatusIndicacao.java        # Enum: PENDENTE, PAGA, CANCELADA (com métodos de validação de transição)
+│   └── OrigemIndicacao.java        # Enum: PACOTE, INDICADOR, FOTO_EXTRA, VIDEO_EXTRA
 ├── repository/
-│   └── IndicacaoRepository.java # JpaRepository + findBy* (agendamentoId, indicadorId, telefone), findByAgendamentoIdIn, findAllDistinctTelefones
+│   ├── IndicacaoRepository.java    # JpaRepository + findBy* + query agregada findIndicadoresComResumo (GROUP BY)
+│   └── projection/
+│       └── IndicadorComissaoProjection.java  # Interface de projeção leve para resultados agregados
 ├── service/
-│   ├── IndicacaoService.java    # criar (calcula comissão), marcarTodasComoPaga, marcarTodasComoCancelada, consultarPorTelefone
-│   └── IndicacaoListener.java   # @EventListener: reage a 3 eventos de agenda
-├── api/
-│   ├── IndicacaoController.java # GET /consulta?...telefone=, GET /indicadores — retorna Map<String,Object>
-│   └── IndicacaoResponse.java   # Record c/ dados da indicação + dados financeiros do agendamento
-└── exception/
-    └── IndicacaoNaoEncontradaException.java # RuntimeException — mapeada no GlobalExceptionHandler, mas NUNCA lançada (código morto)
+│   ├── IndicacaoService.java       # criar (usa ComissaoCalculator), marcarTodasComoPaga/Cancelada, consultarPorTelefone, consultarComAgendamento, listarResumoIndicadores (facade)
+│   ├── ComissaoCalculator.java     # Componente de cálculo centralizado (elimina duplicação com financeiro)
+│   └── IndicacaoListener.java      # @EventListener: reage a 4 eventos (AgendamentoCriado, PagamentoFinal, AgendamentoCancelado, ComissaoSolicitada)
+├── event/
+│   └── ComissaoSolicitadaEvent.java  # Evento de domínio para escrita cross-module (financeiro → comissao)
+└── api/
+    ├── IndicacaoController.java    # GET /consulta?telefone=, GET /indicadores — controller slim (1 dependência)
+    ├── IndicacaoResponse.java      # Record c/ dados da indicação + dados do agendamento (usa enums)
+    ├── ConsultaComissoesResponse.java  # Record tipado para resposta de consulta (substitui Map<String,Object>)
+    └── IndicadorResumoResponse.java    # Record tipado para listagem de indicadores (substitui Map<String,Object>)
 ```
 
 ## 3. Dependências Externas
@@ -26,111 +33,108 @@ comissao/
 | Módulo | Onde | Uso |
 |--------|------|-----|
 | **agenda** | `IndicacaoListener` | eventos `AgendamentoCriadoEvent`, `PagamentoFinalRegistradoEvent`, `AgendamentoCanceladoEvent` (uso correto de eventos) |
-| **agenda** | `IndicacaoController` | injeta `AgendamentoRepository` + `Agendamento` para enriquecer a consulta |
+| **agenda** | `IndicacaoService` | `AgendamentoRepository` para enriquecer consulta (leitura — violação menor) |
 | **indicador** | `IndicacaoListener` | `IndicadorService.buscarPorId/buscarOuCriar` |
-| **indicador** | `IndicacaoController` | injeta `IndicadorService` + `IndicadorRepository` — **controller chamando service de outro módulo** |
+| **indicador** | `IndicacaoService` | `IndicadorRepository.findByTelefone` e `findAll` para listagem |
 | **config** | `IndicacaoListener` | `ConfiguracaoService.getValorDecimal("percentualComissao", 10)` |
 | **shared** | model | `BaseEntity` (herança) |
 
-### Módulos que dependem deste (importam `comissao.*`) — **[VIOLAÇÕES]**
+### Módulos que dependem deste (importam `comissao.*`) — **[VIOLAÇÕES REDUZIDAS]**
 | Módulo | Uso |
 |--------|-----|
-| **financeiro** | `FinanceiroService`/`FinanceiroDashboardService` importam `Indicacao`/`IndicacaoRepository`; **FinanceiroService CRIA `Indicacao` diretamente** (`criarComissaoSeNecessario`) |
+| **financeiro** | `FinanceiroService` importa `Indicacao` (apenas leitura para resumos financeiros); **usa `ComissaoSolicitadaEvent` para criação** (violação de escrita resolvida) |
 | **dashboard** | `DashboardService` lê `IndicacaoRepository.findByAgendamentoIdIn` |
-| **agenda** | `AgendamentoController` lê `IndicacaoRepository.findAllByAgendamentoId` (endpoint de indicações) |
+| **agenda** | `AgendamentoController` lê `IndicacaoRepository.findAllByAgendamentoId` |
 | **indicador** | `IndicadorController` lê `IndicacaoRepository.findByIndicadorId` |
-| **shared** | `GlobalExceptionHandler` mapeia `IndicacaoNaoEncontradaException` |
-
-O módulo **depende de indicações e é dependido por 5 módulos** — não é terminal como o doc antigo afirmava.
+| **shared** | `GlobalExceptionHandler` (tratamento removido — código morto eliminado) |
 
 ### Eventos consumidos
-| Evento (agenda) | Ação |
-|------------------|------|
+| Evento | Ação |
+|--------|------|
 | `AgendamentoCriadoEvent` | Se `indicadorNome` e `indicadorTelefone` preenchidos → cria `Indicacao` (origem `INDICADOR` se `indicadorId` presente, senão `PACOTE`) |
-| `PagamentoFinalRegistradoEvent` | Marca todas `Indicacao` PENDENTE do agendamento como PAGA (`dataPagamento=now`) |
-| `AgendamentoCanceladoEvent` | Marca todas `Indicacao` PENDENTE como CANCELADA |
+| `PagamentoFinalRegistradoEvent` | Marca todas `Indicacao` PENDENTE do agendamento como PAGA (`pagar()` → `dataPagamento=now`) |
+| `AgendamentoCanceladoEvent` | Marca todas `Indicacao` PENDENTE como CANCELADA (`cancelar()`) |
+| `ComissaoSolicitadaEvent` | Financeiro solicita criação de comissão para fotos/vídeos extras — processado pelo listener que busca/cria indicador e delega para `IndicacaoService.criar()` |
 
 ### Eventos publicados
 Nenhum.
 
 ## 4. Fluxos Principais
 
-### Fluxo 1: Criação de Comissão (via evento)
+### Fluxo 1: Criação de Comissão (via evento de agenda)
 1. `agenda` publica `AgendamentoCriadoEvent` ao criar agendamento com indicação.
-2. `IndicacaoListener.handleAgendamentoCriado` (`IndicacaoListener.java:35-61`):
+2. `IndicacaoListener.handleAgendamentoCriado` (`IndicacaoListener.java:40-72`):
    - Ignora se `indicadorNome`/`indicadorTelefone` em branco.
    - `indicador = indicadorId != null ? indicadorService.buscarPorId : indicadorService.buscarOuCriar(...)`.
    - `percentual = indicador.getPercentualComissao() ?? config("percentualComissao", 10)`.
    - **Ignora `event.percentualComissao()` do evento** (campo existe no evento, ver seção 5.5).
-   - `IndicacaoService.criar(...)` com `status "PENDENTE"`; `valorComissao = valorReferencia × percentual / 100` (HALF_UP, 2 casas) (`IndicacaoService.java:26`).
+   - `IndicacaoService.criar(...)` com `status StatusIndicacao.PENDENTE`; `valorComissao` calculado por `ComissaoCalculator`.
 
-### Fluxo 2: Pagamento/Cancelamento de Comissões
-- `PagamentoFinalRegistradoEvent` → `handlePagamentoRegistrado` (`IndicacaoListener.java:65-68`) → `marcarTodasComoPaga` (`IndicacaoService.java:43-52`).
-- `AgendamentoCanceladoEvent` → `handleAgendamentoCancelado` (`:72-75`) → `marcarTodasComoCancelada` (`:54-62`).
+### Fluxo 2: Criação de Comissão (via evento de domínio — financeiro)
+1. `financeiro` publica `ComissaoSolicitadaEvent` ao adicionar foto/vídeo extra com indicação.
+2. `IndicacaoListener.handleComissaoSolicitada` (`IndicacaoListener.java:74-106`):
+   - Valida se há dados do indicador.
+   - Busca ou cria indicador via `IndicadorService`.
+   - Calcula percentual (indicador ou config global).
+   - Delega para `IndicacaoService.criar()`.
 
-### Fluxo 3: Consulta por Telefone
-`GET /api/v1/comissoes/consulta?telefone=` (`IndicacaoController.java:49-92`):
-1. Busca indicações por telefone; carrega agendamentos via `agendamentoRepository.findAllById` e monta `IndicacaoResponse.of` com `cliente/pacote/valorTotalFinal/valorExtras/dataHoraEnsaio`.
-2. Soma `totalPendente`/`totalPago`; retorna `Map<String,Object>`.
+### Fluxo 3: Pagamento/Cancelamento de Comissões
+- `PagamentoFinalRegistradoEvent` → `handlePagamentoRegistrado` → `marcarTodasComoPaga` (usa `Indicacao.pagar()`).
+- `AgendamentoCanceladoEvent` → `handleAgendamentoCancelado` → `marcarTodasComoCancelada` (usa `Indicacao.cancelar()`).
 
-### Fluxo 4: Agregado de Indicadores
-`GET /api/v1/comissoes/indicadores` (`IndicacaoController.java:94-157`):
-1. Para cada telefone distinto (`findAllDistinctTelefones`), **refaz** `findByIndicadorTelefoneOrderByCreatedAtDesc` e soma PENDENTE/PAGA/CANCELADA.
-2. Adiciona indicadores cadastrados sem comissão (`indicadorRepository.findAll()`).
-3. Retorna `List<Map<String,Object>>` construído com `HashMap`.
+### Fluxo 4: Consulta por Telefone
+`GET /api/v1/comissoes/consulta?telefone=` (`IndicacaoController.java:38-41`):
+1. Delega para `IndicacaoService.consultarComAgendamento()`.
+2. Service busca indicações, enriquece com dados do agendamento, calcula totais.
+3. Retorna `ConsultaComissoesResponse` (record tipado).
+
+### Fluxo 5: Agregado de Indicadores
+`GET /api/v1/comissoes/indicadores` (`IndicacaoController.java:44-47`):
+1. Delega para `IndicacaoService.listarResumoIndicadores()`.
+2. Service usa query agregada `findIndicadoresComResumo()` (GROUP BY — sem N+1).
+3. Complementa com indicadores cadastrados sem comissão.
+4. Retorna `List<IndicadorResumoResponse>` (record tipado).
 
 ## 5. Regras Específicas
-1. **Módulo reativo**: sem endpoint de criação manual; toda comissão nasce de evento de agenda.
-2. **`status` String (não enum)**: `"PENDENTE"`, `"PAGA"`, `"CANCELADA"` comparados com `String.equals` — qualquer string inválida é aceita e nunca transiciona.
-3. **`origem` String**: `"PACOTE"` ou `"INDICADOR"` (hardcoded no listener); `FinanceiroService` usa `"PACOTE"` também — não há enum.
-4. **`agendamentoId`/`indicadorId` são UUIDs soltos** (sem `@ManyToOne`/FK — por design para desacoplar), o que força `IndicacaoController` a buscar `Agendamento` na mão para enriquecer.
-5. **Divergência de percentual**: `AgendamentoCriadoEvent` carrega `percentualComissao` mas o listener o ignora — o valor efetivo vem do `Indicador` ou da config `percentualComissao`. Decisão de negócio a confirmar (evento pode estar desatualizado).
+1. **Módulo reativo**: sem endpoint de criação manual; toda comissão nasce de eventos.
+2. **`StatusIndicacao` enum**: `PENDENTE`, `PAGA`, `CANCELADA` — transições validadas por métodos de domínio `pagar()` e `cancelar()`.
+3. **`OrigemIndicacao` enum**: `PACOTE`, `INDICADOR`, `FOTO_EXTRA`, `VIDEO_EXTRA` — valores controlados, sem strings soltas.
+4. **`agendamentoId`/`indicadorId` são UUIDs soltos** (sem `@ManyToOne`/FK — por design para desacoplar).
+5. **Divergência de percentual**: `AgendamentoCriadoEvent` carrega `percentualComissao` mas o listener o ignora — o valor efetivo vem do `Indicador` ou da config `percentualComissao`.
 6. **Consulta pública expõe dados financeiros** (`valorTotalFinal`, `valorExtras` do agendamento) na resposta de telefone.
-7. **`IndicacaoResponse.of`** exige agendamento existente — se o agendamento faltar, o item é silenciosamente descartado (`IndicacaoController.java:63`).
+7. **`ComissaoCalculator`** centraliza o cálculo `valorReferencia × percentual / 100` (elimina duplicação com financeiro).
 
 ## 6. Testes
 Nenhum teste específico. Apenas `CrmApplicationTests` (smoke de contexto).
 
-## 7. Dívidas Técnicas e Melhorias Recomendadas
+## 7. Dívidas Técnicas Resolvidas Nesta Refatoração
 
-### 7.1 Controller dependente de 4 módulos + agregação manual — **[CRÍTICO] P1
-- `IndicacaoController` injeta `IndicacaoRepository`, `AgendamentoRepository`, `IndicadorService`, `IndicadorRepository` e constrói `Map<String,Object>` com loops de soma.
-- **Solução**: mover agregações para `IndicacaoService`/repositório (`SUM`/`GROUP BY`); o módulo `agenda` deve expor DTO próprio; `IndicadorResponse` deve ser um record dedicado, não `Map`.
+| Dívida | Status | Solução |
+|--------|--------|---------|
+| Controller dependente de 4 módulos + `Map<String,Object>` | **RESOLVIDO** | Controller slim com 1 dependência; facade `IndicacaoService` absorve orquestração |
+| N+1 queries em `listarIndicadores` | **RESOLVIDO** | Query agregada `findIndicadoresComResumo` com `GROUP BY` |
+| Escrita cross-module do financeiro | **RESOLVIDO** | `ComissaoSolicitadaEvent` — financeiro publica, comissao consome |
+| `status`/`origem` como String | **RESOLVIDO** | Enums `StatusIndicacao` e `OrigemIndicacao` com `@Enumerated(STRING)` |
+| Código morto `IndicacaoNaoEncontradaException` | **RESOLVIDO** | Classe removida + handler removido do `GlobalExceptionHandler` |
+| Duplicação do cálculo de comissão | **RESOLVIDO** | `ComissaoCalculator` centraliza a regra |
+| `Map<String,Object>` em vez de DTOs tipados | **RESOLVIDO** | Records `ConsultaComissoesResponse` e `IndicadorResumoResponse` |
+| Literais String duplicados | **RESOLVIDO** | Enums eliminam comparações `String.equals` |
+| Métodos de transição de estado ausentes | **RESOLVIDO** | `Indicacao.pagar()` e `cancelar()` com validação |
 
-### 7.2 Queries N+1 — **P1**
-- `listarIndicadores` faz `findByIndicadorTelefone...` para **cada** telefone distinto (`IndicacaoController.java:103`) + `indicadorRepository.findByTelefone` por telefone (:123) + `findAll()` (:140).
-- **Solução**: query agregada única com agrupamento por telefone (`SELECT telefone, status, SUM(valorComissao) ... GROUP BY`) + projeção do percentual do indicador.
+## 8. Dívidas Restantes
 
-### 7.3 Escrita cross-module do financeiro — **P1**
-- `FinanceiroService.criarComissaoSeNecessario` cria `Indicacao` diretamente com `status "PENDENTE"` e reusa a **mesma regra de cálculo** do comissao.
-- **Solução**: o módulo `comissao` deve ser o único dono da escrita — expor o cálculo em um componente público (`ComissaoCalculator`) ou publicar `ComissaoSolicitadaEvent`; o financeiro envia o evento, o comissao cria.
+| Dívida | Prioridade | Nota |
+|--------|------------|------|
+| Leitura cross-module (financeiro/dashboard/agenda leem `IndicacaoRepository`) | P2 | Menor que escrita; pode ser resolvido com facade pública no futuro |
+| `BaseEntity` inheritance pattern | P | Padrão transversal do projeto |
+| Sem testes unitários/integração | P1 | Necessário cobertura mínima para regras de negócio |
 
-### 7.4 Código morto — `IndicacaoNaoEncontradaException` reduziu **P2**
-- Mapeada em `GlobalExceptionHandler.java:76-77` mas nenhum código lança — serviço usa `.orElseThrow()` inline.
-- **Solução**: lançar na `findById` do serviço ou remover a classe e o handler.
+## 9. Design Patterns Aplicados
 
-### 7.5 `status` em String → enum — **P2** (padrão-aplicável)
-- Substituir por `enum StatusIndicacao { PENDENTE, PAGA, CANCELADA }` com transições explícitas via métodos de domínio (`pagar()`, `cancelar()`) — elimina comparações de String espalhadas e aceita apenas valores válidos.
-
-### 7.6 Duplicação da regra de cálculo de comissão — **P2**
-- `valorReferencia × percentual / 100` duplicado em `IndicacaoService.criar` e `FinanceiroService` (comissão de extras).
-- **Solução**: componente único no `shared` ou no `comissao` (dono do conceito), usado por ambos.
-
-### 7.7 DTOs manuais e resposta inconsistente — **P3**
-- `IndicacaoController` retorna `Map<String,Object>`; `IndicacaoResponse` (`static of`) é o único DTO.
-- **Solução**: records tipados (`ConsultaIndicacaoResponse`, `ResumoIndicadorResponse`) com MapStruct.
-
-### 7.8 Herança `BaseEntity` — **P** (padrão-aplicável)
-- `Indicacao` estende `@MappedSuperclass`.
-- **Solução**: `@Embeddable AuditInfo` + Auditing.
-
-### 7.9 Expressões duplicadas de string — **P3**
-- Literais `"PENDENTE"`, `"PAGA"`, `"CANCELADA"`, `"PACOTE"`, `"INDICADOR"` repetidos em service, listener e controller.
-
-## 8. Exemplos de arquivos afetados
-- `IndicacaoController.java:49-92, 94-157` — controller gordo, 4 injeções, `Map<String,Object>`, N+1.
-- `IndicacaoListener.java:35-61` — ignora `event.percentualComissao()`; dependências diretas de indicador/config.
-- `IndicacaoService.java:24-67` — cálculo único de comissão (duplicado no financeiro).
-- `Indicacao.java:63-65` — `status` em String sem validação.
-- `GlobalExceptionHandler.java:76-77` — handler de exceção nunca lançada.
-- `FinanceiroService.java:549-586` — criação direta de `Indicacao` (violação cross-module, ver financeiro/MODULE.md 7.3).
+| Pattern | Onde | Motivo |
+|---------|------|--------|
+| **State Pattern** (simplificado) | `StatusIndicacao.podePagar()/podeCancelar()` + `Indicacao.pagar()/cancelar()` | Encapsula regras de transição de estado; previne transições inválidas em compile-time |
+| **Strategy** | `ComissaoCalculator` | Extração da regra de cálculo duplicada; facilita mudanças futuras e testes isolados |
+| **Facade** | `IndicacaoService` como facade interna | Encapsula orquestração (repository + enriquecimento + cálculos); controller não conhece módulos externos |
+| **Domain Event** | `ComissaoSolicitadaEvent` | Elimina escrita cross-module; mantém desacoplamento Modulith |
+| **Projection** (Interface) | `IndicadorComissaoProjection` | Projeção leve para queries agregadas sem carregar entidade completa |

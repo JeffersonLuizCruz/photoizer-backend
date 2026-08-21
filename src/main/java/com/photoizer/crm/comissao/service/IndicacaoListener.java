@@ -3,6 +3,8 @@ package com.photoizer.crm.comissao.service;
 import com.photoizer.crm.agenda.event.AgendamentoCanceladoEvent;
 import com.photoizer.crm.agenda.event.AgendamentoCriadoEvent;
 import com.photoizer.crm.agenda.event.PagamentoFinalRegistradoEvent;
+import com.photoizer.crm.comissao.event.ComissaoSolicitadaEvent;
+import com.photoizer.crm.comissao.model.OrigemIndicacao;
 import com.photoizer.crm.config.service.ConfiguracaoService;
 import com.photoizer.crm.indicador.service.IndicadorService;
 import org.slf4j.Logger;
@@ -44,7 +46,9 @@ public class IndicacaoListener {
             ? indicador.getPercentualComissao()
             : configuracaoService.getValorDecimal("percentualComissao", BigDecimal.TEN);
 
-        var origem = event.indicadorId() != null ? "INDICADOR" : "PACOTE";
+        var origem = event.indicadorId() != null
+            ? OrigemIndicacao.INDICADOR
+            : OrigemIndicacao.PACOTE;
 
         log.info("Criando indicação ({}) para agendamento {}: indicador={}, percentual={}%",
             origem, event.agendamentoId(), event.indicadorNome(), percentual);
@@ -57,6 +61,52 @@ public class IndicacaoListener {
             origem,
             percentual,
             event.valorBasePacote()
+        );
+    }
+
+    /**
+     * Consome evento de domínio publicado pelo módulo financeiro quando
+     * fotos ou vídeos extras são vendidos com indicação.
+     * Substitui a escrita cross-module direta que existia no FinanceiroService.
+     */
+    @EventListener
+    @Transactional
+    public void handleComissaoSolicitada(ComissaoSolicitadaEvent event) {
+        if (event.indicadorId() == null
+            && (event.indicadorNome() == null || event.indicadorNome().isBlank())
+            && (event.indicadorTelefone() == null || event.indicadorTelefone().isBlank())) {
+            return;
+        }
+
+        var indicadorId = event.indicadorId();
+        var nome = event.indicadorNome();
+        var telefone = event.indicadorTelefone();
+
+        if (indicadorId == null && nome != null && !nome.isBlank() && telefone != null && !telefone.isBlank()) {
+            var indicador = indicadorService.buscarOuCriar(nome, telefone);
+            indicadorId = indicador.getId();
+            nome = indicador.getNome();
+            telefone = indicador.getTelefone();
+        }
+
+        if (indicadorId == null) return;
+
+        var indicador = indicadorService.buscarPorId(indicadorId);
+        var percentual = indicador.getPercentualComissao() != null
+            ? indicador.getPercentualComissao()
+            : configuracaoService.getValorDecimal("percentualComissao", BigDecimal.TEN);
+
+        log.info("Criando indicação ({}) para agendamento {}: indicador={}, percentual={}%",
+            event.origem(), event.agendamentoId(), nome, percentual);
+
+        indicacaoService.criar(
+            event.agendamentoId(),
+            indicadorId,
+            nome,
+            telefone,
+            event.origem(),
+            percentual,
+            event.valorReferencia()
         );
     }
 

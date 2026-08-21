@@ -54,8 +54,8 @@ public class DashboardService {
         StatusAgendamento.FINALIZADO
     );
 
-    private static final String STATUS_COMISSAO_CANCELADA = "CANCELADA";
-    private static final String STATUS_COMISSAO_PAGA = "PAGA";
+    private static final com.photoizer.crm.comissao.model.StatusIndicacao STATUS_COMISSAO_CANCELADA = com.photoizer.crm.comissao.model.StatusIndicacao.CANCELADA;
+    private static final com.photoizer.crm.comissao.model.StatusIndicacao STATUS_COMISSAO_PAGA = com.photoizer.crm.comissao.model.StatusIndicacao.PAGA;
 
     private final AgendamentoRepository agendamentoRepository;
     private final AgendamentoFotografoRepository agendamentoFotografoRepository;
@@ -103,9 +103,9 @@ public class DashboardService {
         Map<UUID, BigDecimal> comissaoPorAgendamento = new HashMap<>();
         Map<UUID, BigDecimal> comissaoPagaPorAgendamento = new HashMap<>();
         for (var ind : indicacoes) {
-            if (STATUS_COMISSAO_CANCELADA.equals(ind.getStatus())) continue;
+            if (ind.getStatus() == STATUS_COMISSAO_CANCELADA) continue;
             comissaoPorAgendamento.put(ind.getAgendamentoId(), ind.getValorComissao());
-            if (STATUS_COMISSAO_PAGA.equals(ind.getStatus())) {
+            if (ind.getStatus() == STATUS_COMISSAO_PAGA) {
                 comissaoPagaPorAgendamento.put(ind.getAgendamentoId(), ind.getValorComissao());
             }
         }

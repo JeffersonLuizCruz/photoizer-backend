@@ -10,7 +10,6 @@ import com.photoizer.crm.pacote.exception.PacoteInativoException;
 import com.photoizer.crm.pacote.exception.PacoteNaoEncontradoException;
 
 import com.photoizer.crm.cliente.exception.ClienteNaoEncontradoException;
-import com.photoizer.crm.comissao.exception.IndicacaoNaoEncontradaException;
 import com.photoizer.crm.edicao.exception.EdicaoNaoEncontradaException;
 import com.photoizer.crm.edicao.exception.FotoEdicaoNaoEncontradaException;
 import com.photoizer.crm.edicao.exception.FotoSemRawException;
@@ -71,12 +70,6 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleAgendamentoNoPassado(AgendamentoNoPassadoException e) {
         log.warn("Agendamento no passado: {}", e.getMessage());
         return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
-    }
-
-    @ExceptionHandler(IndicacaoNaoEncontradaException.class)
-    public ResponseEntity<ErrorResponse> handleIndicacaoNaoEncontrada(IndicacaoNaoEncontradaException e) {
-        log.warn("Indicacao nao encontrada: {}", e.getMessage());
-        return build(HttpStatus.NOT_FOUND, e);
     }
 
     @ExceptionHandler(EdicaoNaoEncontradaException.class)

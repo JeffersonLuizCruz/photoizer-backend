@@ -1,6 +1,8 @@
 package com.photoizer.crm.comissao.api;
 
 import com.photoizer.crm.comissao.model.Indicacao;
+import com.photoizer.crm.comissao.model.OrigemIndicacao;
+import com.photoizer.crm.comissao.model.StatusIndicacao;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -11,11 +13,11 @@ public record IndicacaoResponse(
     UUID indicadorId,
     String indicadorNome,
     String indicadorTelefone,
-    String origem,
+    OrigemIndicacao origem,
     BigDecimal percentual,
     BigDecimal valorReferencia,
     BigDecimal valorComissao,
-    String status,
+    StatusIndicacao status,
     LocalDateTime dataPagamento,
     String clienteNome,
     String pacoteNome,

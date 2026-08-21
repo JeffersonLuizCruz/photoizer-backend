@@ -45,8 +45,8 @@ public class FinanceiroDashboardService {
 
     private static final LocalDate MAX_FIM = LocalDate.of(2100, 12, 31);
 
-    private static final String STATUS_COMISSAO_CANCELADA = "CANCELADA";
-    private static final String STATUS_COMISSAO_PAGA = "PAGA";
+    private static final com.photoizer.crm.comissao.model.StatusIndicacao STATUS_COMISSAO_CANCELADA = com.photoizer.crm.comissao.model.StatusIndicacao.CANCELADA;
+    private static final com.photoizer.crm.comissao.model.StatusIndicacao STATUS_COMISSAO_PAGA = com.photoizer.crm.comissao.model.StatusIndicacao.PAGA;
 
     private final ReceitaRepository receitaRepository;
     private final DespesaRepository despesaRepository;
@@ -173,11 +173,11 @@ public class FinanceiroDashboardService {
         var idsEnsaios = ensaiosPeriodo.stream().map(Agendamento::getId).collect(Collectors.toSet());
         var comissao = somar(indicacoes.stream()
             .filter(i -> idsEnsaios.contains(i.getAgendamentoId()))
-            .filter(i -> !STATUS_COMISSAO_CANCELADA.equals(i.getStatus()))
+            .filter(i -> i.getStatus() != STATUS_COMISSAO_CANCELADA)
             .toList(), Indicacao::getValorComissao);
         var comissaoPaga = somar(indicacoes.stream()
             .filter(i -> idsEnsaios.contains(i.getAgendamentoId()))
-            .filter(i -> STATUS_COMISSAO_PAGA.equals(i.getStatus()))
+            .filter(i -> i.getStatus() == STATUS_COMISSAO_PAGA)
             .toList(), Indicacao::getValorComissao);
 
         var avulsasBruto = BigDecimal.ZERO;
@@ -249,7 +249,7 @@ public class FinanceiroDashboardService {
             despesasPorMes.merge(ym, repassePrevisto(a.getId(), repasses), BigDecimal::add);
         }
         for (var i : indicacoes) {
-            if (STATUS_COMISSAO_CANCELADA.equals(i.getStatus())) continue;
+            if (i.getStatus() == STATUS_COMISSAO_CANCELADA) continue;
             var data = dataEnsaioPorId.get(i.getAgendamentoId());
             if (data == null || (temPeriodo && !emPeriodo(data, inicio, fim))) continue;
             despesasPorMes.merge(YearMonth.from(data), i.getValorComissao(), BigDecimal::add);
@@ -312,7 +312,7 @@ public class FinanceiroDashboardService {
             despesasPorMes.merge(ym, repassePago(a.getId(), repasses), BigDecimal::add);
         }
         for (var i : indicacoes) {
-            if (!STATUS_COMISSAO_PAGA.equals(i.getStatus())) continue;
+            if (i.getStatus() != STATUS_COMISSAO_PAGA) continue;
             var data = dataEnsaioPorId.get(i.getAgendamentoId());
             if (data == null || (temPeriodo && !emPeriodo(data, inicio, fim))) continue;
             despesasPorMes.merge(YearMonth.from(data), i.getValorComissao(), BigDecimal::add);
@@ -490,7 +490,7 @@ public class FinanceiroDashboardService {
     private Map<UUID, BigDecimal> comissaoPorTrabalho(List<Indicacao> indicacoes) {
         Map<UUID, BigDecimal> mapa = new HashMap<>();
         for (var i : indicacoes) {
-            if (STATUS_COMISSAO_CANCELADA.equals(i.getStatus())) continue;
+            if (i.getStatus() == STATUS_COMISSAO_CANCELADA) continue;
             mapa.merge(i.getAgendamentoId(), i.getValorComissao(), BigDecimal::add);
         }
         return mapa;

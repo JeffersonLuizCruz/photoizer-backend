@@ -3,6 +3,8 @@ package com.photoizer.crm.comissao.model;
 import com.photoizer.crm.shared.model.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -41,9 +43,10 @@ public class Indicacao extends BaseEntity {
     @Column(nullable = false, length = 20)
     private String indicadorTelefone;
 
-    @NotBlank
+    @NotNull
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private String origem;
+    private OrigemIndicacao origem;
 
     @NotNull
     @Positive
@@ -60,10 +63,36 @@ public class Indicacao extends BaseEntity {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal valorComissao;
 
-    @NotBlank
+    @NotNull
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private String status;
+    private StatusIndicacao status;
 
     @Column
     private LocalDateTime dataPagamento;
+
+    /**
+     * Transição de estado: marcar como paga.
+     * Só é permitida se o status atual for PENDENTE.
+     */
+    public void pagar() {
+        if (!status.podePagar()) {
+            throw new IllegalStateException(
+                "Não é possível pagar comissão com status: " + status);
+        }
+        this.status = StatusIndicacao.PAGA;
+        this.dataPagamento = LocalDateTime.now();
+    }
+
+    /**
+     * Transição de estado: marcar como cancelada.
+     * Só é permitida se o status atual for PENDENTE.
+     */
+    public void cancelar() {
+        if (!status.podeCancelar()) {
+            throw new IllegalStateException(
+                "Não é possível cancelar comissão com status: " + status);
+        }
+        this.status = StatusIndicacao.CANCELADA;
+    }
 }

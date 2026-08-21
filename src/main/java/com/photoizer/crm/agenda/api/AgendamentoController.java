@@ -217,7 +217,7 @@ public class AgendamentoController {
         }
         var primeira = indicacoes.getFirst();
         return ResponseEntity.ok(agendamentoMapper.toResponse(
-            agendamento, links, primeira.getValorComissao(), primeira.getIndicadorNome(), primeira.getStatus()));
+            agendamento, links, primeira.getValorComissao(), primeira.getIndicadorNome(), primeira.getStatus().name()));
     }
 
     @PatchMapping("/{id}/status")

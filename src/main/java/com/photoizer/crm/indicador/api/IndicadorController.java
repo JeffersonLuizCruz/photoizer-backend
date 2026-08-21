@@ -75,11 +75,11 @@ public class IndicadorController {
     private IndicadorResponse toResponse(Indicador i) {
         var indicacoes = indicacaoRepository.findByIndicadorId(i.getId());
         var totalPendente = indicacoes.stream()
-            .filter(ind -> "PENDENTE".equals(ind.getStatus()))
+            .filter(ind -> ind.getStatus() == com.photoizer.crm.comissao.model.StatusIndicacao.PENDENTE)
             .map(Indicacao::getValorComissao)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
         var totalPago = indicacoes.stream()
-            .filter(ind -> "PAGA".equals(ind.getStatus()))
+            .filter(ind -> ind.getStatus() == com.photoizer.crm.comissao.model.StatusIndicacao.PAGA)
             .map(Indicacao::getValorComissao)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
         return IndicadorResponse.of(i, totalPendente, totalPago, indicacoes.size());

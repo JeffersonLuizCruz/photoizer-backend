@@ -6,14 +6,15 @@ import com.photoizer.crm.agenda.model.RepasseStatus;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
+import com.photoizer.crm.comissao.event.ComissaoSolicitadaEvent;
 import com.photoizer.crm.comissao.model.Indicacao;
+import com.photoizer.crm.comissao.model.OrigemIndicacao;
 import com.photoizer.crm.comissao.repository.IndicacaoRepository;
 import com.photoizer.crm.config.service.ConfiguracaoService;
 import com.photoizer.crm.despesa.api.DespesaResponse;
 import com.photoizer.crm.despesa.model.Despesa;
 import com.photoizer.crm.despesa.model.StatusDespesa;
 import com.photoizer.crm.despesa.repository.DespesaRepository;
-import com.photoizer.crm.indicador.service.IndicadorService;
 import com.photoizer.crm.pacote.model.Pacote;
 import com.photoizer.crm.pacote.repository.PacoteRepository;
 import com.photoizer.crm.agenda.api.AgendamentoMapper;
@@ -32,6 +33,7 @@ import com.photoizer.crm.financeiro.repository.FotoExtraRepository;
 import com.photoizer.crm.financeiro.repository.PagamentoRepository;
 import com.photoizer.crm.financeiro.repository.ReceitaRepository;
 import com.photoizer.crm.financeiro.repository.VideoExtraRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,8 +62,8 @@ public class FinanceiroService {
     private final AgendamentoRepository agendamentoRepository;
     private final PacoteRepository pacoteRepository;
     private final IndicacaoRepository indicacaoRepository;
-    private final IndicadorService indicadorService;
     private final ConfiguracaoService configuracaoService;
+    private final ApplicationEventPublisher eventPublisher;
     private final DespesaRepository despesaRepository;
     private final ReceitaRepository receitaRepository;
     private final AgendamentoFotografoRepository agendamentoFotografoRepository;
@@ -73,8 +75,8 @@ public class FinanceiroService {
                              AgendamentoRepository agendamentoRepository,
                              PacoteRepository pacoteRepository,
                              IndicacaoRepository indicacaoRepository,
-                             IndicadorService indicadorService,
                              ConfiguracaoService configuracaoService,
+                             ApplicationEventPublisher eventPublisher,
                              DespesaRepository despesaRepository,
                              ReceitaRepository receitaRepository,
                              AgendamentoFotografoRepository agendamentoFotografoRepository,
@@ -85,8 +87,8 @@ public class FinanceiroService {
         this.agendamentoRepository = agendamentoRepository;
         this.pacoteRepository = pacoteRepository;
         this.indicacaoRepository = indicacaoRepository;
-        this.indicadorService = indicadorService;
         this.configuracaoService = configuracaoService;
+        this.eventPublisher = eventPublisher;
         this.despesaRepository = despesaRepository;
         this.receitaRepository = receitaRepository;
         this.agendamentoFotografoRepository = agendamentoFotografoRepository;
@@ -523,8 +525,9 @@ public class FinanceiroService {
         agendamento.setValorTotalFinal(agendamento.getValorTotal().add(agendamento.getValorExtras()));
         agendamentoRepository.save(agendamento);
 
-        criarComissaoSeNecessario(agendamentoId, indicadorNome, indicadorTelefone, indicadorId,
-            "FOTO_EXTRA", valorTotal);
+        eventPublisher.publishEvent(new ComissaoSolicitadaEvent(
+            agendamentoId, indicadorId, indicadorNome, indicadorTelefone,
+            OrigemIndicacao.FOTO_EXTRA, valorTotal));
 
         return fotoExtraRepository.save(fotoExtra);
     }
@@ -545,49 +548,11 @@ public class FinanceiroService {
         agendamento.setValorTotalFinal(agendamento.getValorTotal().add(agendamento.getValorExtras()));
         agendamentoRepository.save(agendamento);
 
-        criarComissaoSeNecessario(agendamentoId, indicadorNome, indicadorTelefone, indicadorId,
-            "VIDEO_EXTRA", valorTotal);
+        eventPublisher.publishEvent(new ComissaoSolicitadaEvent(
+            agendamentoId, indicadorId, indicadorNome, indicadorTelefone,
+            OrigemIndicacao.VIDEO_EXTRA, valorTotal));
 
         return videoExtraRepository.save(videoExtra);
-    }
-
-    private void criarComissaoSeNecessario(UUID agendamentoId, String indicadorNome, String indicadorTelefone,
-                                           UUID indicadorId, String origem, BigDecimal valorReferencia) {
-        var nome = indicadorNome;
-        var telefone = indicadorTelefone;
-        UUID id = indicadorId;
-
-        if ((nome == null || nome.isBlank()) && (telefone == null || telefone.isBlank()) && id == null) return;
-
-        if (id == null && nome != null && !nome.isBlank() && telefone != null && !telefone.isBlank()) {
-            var indicador = indicadorService.buscarOuCriar(nome, telefone);
-            id = indicador.getId();
-            nome = indicador.getNome();
-            telefone = indicador.getTelefone();
-        }
-
-        if (id == null) return;
-
-        var indicador = indicadorService.buscarPorId(id);
-        var percentual = indicador.getPercentualComissao() != null
-            ? indicador.getPercentualComissao()
-            : configuracaoService.getValorDecimal("percentualComissao", BigDecimal.TEN);
-
-        var comissao = valorReferencia.multiply(percentual).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-
-        var indicacao = Indicacao.builder()
-            .agendamentoId(agendamentoId)
-            .indicadorId(id)
-            .indicadorNome(nome)
-            .indicadorTelefone(telefone)
-            .origem(origem)
-            .percentual(percentual)
-            .valorReferencia(valorReferencia)
-            .valorComissao(comissao)
-            .status("PENDENTE")
-            .build();
-
-        indicacaoRepository.save(indicacao);
     }
 
     @Transactional(readOnly = true)
