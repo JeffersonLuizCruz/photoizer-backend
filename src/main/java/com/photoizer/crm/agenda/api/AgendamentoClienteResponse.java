@@ -1,10 +1,16 @@
-package com.photoizer.crm.cliente.api;
+package com.photoizer.crm.agenda.api;
 
 import com.photoizer.crm.agenda.model.Agendamento;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * DTO de resposta para agendamentos do cliente.
+ * Movido do módulo cliente para agenda (violação Modulith P1).
+ * 
+ * Padrão DTO Pattern - isola dados do domínio do contrato da API.
+ */
 public record AgendamentoClienteResponse(
     UUID id,
     String pacoteNome,
@@ -20,6 +26,10 @@ public record AgendamentoClienteResponse(
     int fotosSelecionadasPacote,
     int fotosPagas
 ) {
+    /**
+     * Converte entidade Agendamento para DTO de resposta.
+     * Inclui descrição legível do status.
+     */
     public static AgendamentoClienteResponse of(Agendamento a, int totalFotosPublicadas, int fotosSelecionadasPacote, int fotosPagas) {
         String statusDescricao = switch (a.getStatus().name()) {
             case "AGENDADO" -> "Agendado";

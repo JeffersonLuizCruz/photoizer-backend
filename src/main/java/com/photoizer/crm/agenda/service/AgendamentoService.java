@@ -32,7 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.photoizer.crm.agenda.api.AtualizarAgendamentoRequest;
 import com.photoizer.crm.agenda.api.AgendamentoMapper;
 import com.photoizer.crm.agenda.api.AgendamentoResponse;
-import com.photoizer.crm.cliente.api.AgendamentoClienteResponse;
+import com.photoizer.crm.agenda.api.AgendamentoClienteResponse;
 import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
 

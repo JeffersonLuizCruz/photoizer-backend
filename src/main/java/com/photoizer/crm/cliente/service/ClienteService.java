@@ -1,71 +1,89 @@
 package com.photoizer.crm.cliente.service;
 
+import com.photoizer.crm.cliente.api.dto.ClienteAdminResponse;
+import com.photoizer.crm.cliente.api.dto.ClienteMapper;
+import com.photoizer.crm.cliente.api.dto.CriarClienteRequest;
+import com.photoizer.crm.cliente.api.dto.AtualizarClienteRequest;
 import com.photoizer.crm.cliente.exception.ClienteNaoEncontradoException;
 import com.photoizer.crm.cliente.model.Cliente;
 import com.photoizer.crm.cliente.repository.ClienteRepository;
+import com.photoizer.crm.cliente.repository.ClienteSpecification;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.UUID;
-import java.util.stream.Stream;
 
+/**
+ * Service para gerenciamento de clientes (admin).
+ * Usa DTOs para contrato da API, nunca entidades JPA.
+ */
 @Service
 @Transactional
 public class ClienteService {
 
     private final ClienteRepository clienteRepository;
+    private final ClienteMapper clienteMapper;
 
-    public ClienteService(ClienteRepository clienteRepository) {
+    public ClienteService(ClienteRepository clienteRepository, ClienteMapper clienteMapper) {
         this.clienteRepository = clienteRepository;
+        this.clienteMapper = clienteMapper;
     }
 
-    public Cliente criar(Cliente cliente) {
-        return clienteRepository.save(cliente);
+    /**
+     * Cria novo cliente a partir do DTO de requisição.
+     * Padrão DTO Pattern - recebe DTO, retorna DTO.
+     */
+    public ClienteAdminResponse criar(CriarClienteRequest request) {
+        var cliente = clienteMapper.toEntity(request);
+        var salvo = clienteRepository.save(cliente);
+        return clienteMapper.toAdminResponse(salvo);
     }
 
+    /**
+     * Lista clientes paginados com busca.
+     * Usa Specification pattern para busca unificada.
+     * Padrão Specification - elimina queries duplicadas e distinct() em memória.
+     */
     @Transactional(readOnly = true)
-    public List<Cliente> listarTodos() {
-        return clienteRepository.findAll();
-    }
-
-    @Transactional(readOnly = true)
-    public List<Cliente> buscarPorSearch(String search) {
-        if (search == null || search.isBlank()) {
-            return clienteRepository.findAll();
+    public Page<ClienteAdminResponse> listarPaginado(String search, Pageable pageable) {
+        var spec = ClienteSpecification.buscarPorNomeOuTelefone(search);
+        Page<Cliente> page;
+        if (spec == null) {
+            page = clienteRepository.findAll(pageable);
+        } else {
+            page = clienteRepository.findAll(spec, pageable);
         }
-        var exato = clienteRepository.findByTelefone(search);
-        if (exato.isPresent()) {
-            return List.of(exato.get());
-        }
-        var porTelefone = clienteRepository.findByTelefoneContaining(search);
-        var porNome = clienteRepository.findByNomeContainingIgnoreCase(search);
-        return Stream.concat(porTelefone.stream(), porNome.stream())
-            .distinct()
-            .toList();
+        return page.map(clienteMapper::toAdminResponse);
     }
 
+    /**
+     * Busca cliente por ID.
+     * Retorna DTO de resposta admin.
+     */
     @Transactional(readOnly = true)
-    public Cliente buscarPorId(UUID id) {
-        return clienteRepository.findById(id)
+    public ClienteAdminResponse buscarPorId(UUID id) {
+        var cliente = clienteRepository.findById(id)
             .orElseThrow(() -> new ClienteNaoEncontradoException(id));
+        return clienteMapper.toAdminResponse(cliente);
     }
 
-    public Cliente atualizar(UUID id, Cliente dados) {
-        var cliente = buscarPorId(id);
-        cliente.setNome(dados.getNome());
-        cliente.setTelefone(dados.getTelefone());
-        cliente.setEmail(dados.getEmail());
-        cliente.setCpf(dados.getCpf());
-        cliente.setCidade(dados.getCidade());
-        cliente.setEstado(dados.getEstado());
-        cliente.setOrigem(dados.getOrigem());
-        cliente.setObservacoes(dados.getObservacoes());
-        return clienteRepository.save(cliente);
+    /**
+     * Atualiza cliente existente.
+     * Recebe DTO de requisição, retorna DTO de resposta.
+     */
+    public ClienteAdminResponse atualizar(UUID id, AtualizarClienteRequest request) {
+        var cliente = clienteRepository.findById(id)
+            .orElseThrow(() -> new ClienteNaoEncontradoException(id));
+        clienteMapper.updateEntity(cliente, request);
+        var atualizado = clienteRepository.save(cliente);
+        return clienteMapper.toAdminResponse(atualizado);
     }
 
+    /**
+     * Exclui cliente por ID.
+     */
     public void deletar(UUID id) {
         if (!clienteRepository.existsById(id)) {
             throw new ClienteNaoEncontradoException(id);
@@ -73,11 +91,31 @@ public class ClienteService {
         clienteRepository.deleteById(id);
     }
 
+    /**
+     * Busca cliente por telefone (usado internamente pelo módulo agenda).
+     * Retorna entidade para uso interno entre módulos.
+     */
     @Transactional(readOnly = true)
-    public Page<Cliente> listarPaginado(String search, Pageable pageable) {
-        if (search == null || search.isBlank()) {
-            return clienteRepository.findAll(pageable);
-        }
-        return clienteRepository.findByNomeContainingIgnoreCaseOrTelefoneContaining(search, search, pageable);
+    public Cliente buscarPorTelefone(String telefone) {
+        return clienteRepository.findByTelefone(telefone)
+            .orElse(null);
+    }
+
+    /**
+     * Busca cliente por email (usado internamente).
+     * Retorna entidade para uso interno entre módulos.
+     */
+    @Transactional(readOnly = true)
+    public Cliente buscarPorEmail(String email) {
+        return clienteRepository.findByEmailIgnoreCase(email)
+            .orElse(null);
+    }
+
+    /**
+     * Salva cliente (usado internamente pelo módulo agenda).
+     * Mantém compatibilidade com fluxos existentes.
+     */
+    public Cliente salvar(Cliente cliente) {
+        return clienteRepository.save(cliente);
     }
 }

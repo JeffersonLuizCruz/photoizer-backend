@@ -10,28 +10,33 @@ cliente/
 │   ├── Cliente.java        # Entidade JPA (extends BaseEntity): nome, telefone, email, cpf, origem, senhaHash, dataCadastro, preferencias
 │   └── OrigemCliente.java  # Enum: INDICACAO, ANUNCIO, OUTROS
 ├── repository/
-│   └── ClienteRepository.java # JpaRepository + busca por telefone, cpf, email, nome (contendo), paginado, countByDataCadastro
+│   ├── ClienteRepository.java # JpaRepository + JpaSpecificationExecutor
+│   └── ClienteSpecification.java # Specification para busca unificada
 ├── service/
-│   ├── ClienteService.java     # CRUD + busca textual (telefone exato → contém → nome)
+│   ├── ClienteService.java     # CRUD + busca com Specification
 │   └── ClienteAuthService.java # Registro/login/atualizarPerfil do cliente + geração de JWT
 ├── api/
-│   ├── ClienteController.java      # CRUD + GET /{id}/agendamentos
-│   ├── ClienteAuthController.java  # POST /registro, /login, GET/PUT /perfil, GET /agendamentos
-│   ├── ClienteRegistroRequest.java # Record: nome, email, telefone, senha, preferencias
-│   ├── ClienteLoginRequest.java    # Record: email, senha
-│   ├── ClienteAuthResponse.java    # Record: token, id, nome, email, telefone
-│   ├── AtualizarPerfilRequest.java # Record: nome, telefone, email, cpf, cidade, estado
-│   └── AgendamentoClienteResponse.java # Record + static of(Agendamento, ...)
+│   ├── ClienteController.java      # CRUD (admin)
+│   ├── ClienteAuthController.java  # POST /registro, /login, GET/PUT /perfil
+│   └── dto/
+│       ├── ClienteResponse.java        # DTO de resposta (sem senhaHash)
+│       ├── ClienteAdminResponse.java   # DTO de resposta admin (com auditoria)
+│       ├── CriarClienteRequest.java    # DTO de requisição para criação
+│       ├── AtualizarClienteRequest.java # DTO de requisição para atualização
+│       ├── ClienteMapper.java          # Mapper para conversão entidade ↔ DTO
+│       ├── ClienteRegistroRequest.java # Record: nome, email, telefone, senha, preferencias
+│       ├── ClienteLoginRequest.java    # Record: email, senha
+│       ├── ClienteAuthResponse.java    # Record: token, id, nome, email, telefone
+│       └── AtualizarPerfilRequest.java # Record: nome, telefone, email, cpf, cidade, estado
 └── exception/
-    └── ClienteNaoEncontradoException.java # RuntimeException com UUID
+    ├── ClienteNaoEncontradoException.java # RuntimeException com UUID
+    └── ClienteDuplicadoException.java     # RuntimeException para duplicatas
 ```
 
 ## 3. Dependências Externas
 
-### Módulos internos importados — **[VIOLAÇÕES Modulith]**
-- **agenda** → `AgendamentoService` + `AgendamentoResponse` injetados em `ClienteController.java:3-4,34` e `ClienteAuthController.java:3,30`.
-- **auth** → `JwtTokenProvider` usado em `ClienteAuthService.java:3,29` (para gerar token de cliente).
-- **shared** → `BaseEntity`, `PageResponse`.
+### Módulos internos importados
+- **shared** → `BaseEntity`, `PageResponse`, `TokenService` (abstração para geração de JWT).
 
 ### Módulos que dependem deste
 | Módulo | Uso |
@@ -46,59 +51,83 @@ Nenhum. Não publica nem consome eventos.
 ## 4. Fluxos Principais
 
 ### Fluxo 1: CRUD de Clientes (Admin)
-- `POST /api/v1/clientes` → recebe a **entidade JPA** `Cliente` como body (`ClienteController.java:43`).
-- `GET /api/v1/clientes` → paginado com busca (`PageResponse<Cliente>`), retorna **entidade**.
-- `PUT /api/v1/clientes/{id}` → merge manual campo a campo (`ClienteService.atualizar`).
+- `POST /api/v1/clientes` → recebe `CriarClienteRequest`, retorna `ClienteAdminResponse`.
+- `GET /api/v1/clientes` → paginado com busca (`PageResponse<ClienteAdminResponse>`).
+- `PUT /api/v1/clientes/{id}` → recebe `AtualizarClienteRequest`, retorna `ClienteAdminResponse`.
 - `DELETE /api/v1/clientes/{id}` → `ClienteNaoEncontradoException` se ausente.
-- `GET /api/v1/clientes/{id}/agendamentos` → delega ao módulo `agenda`.
 
 ### Fluxo 2: Autenticação Cliente (E-commerce)
-- `POST /api/v1/auth/cliente/registro` (público): valida email/telefone únicos; cria `Cliente` com `senhaHash` BCrypt, `origem=OUTROS`, `dataCadastro=now`; gera JWT com papel **"CLIENTE"** (string).
+- `POST /api/v1/auth/cliente/registro` (público): valida email/telefone únicos; cria `Cliente` com `senhaHash` BCrypt, `origem=OUTROS`, `dataCadastro=now` (via `@PrePersist`); gera JWT com papel **"CLIENTE"**.
 - `POST /api/v1/auth/cliente/login` (público): busca por email (case-insensitive), valida BCrypt, gera token.
-- `GET/PUT /api/v1/auth/cliente/perfil`: resolve `userId` do token (`@AuthenticationPrincipal String userId`) e opera no cliente. Retorna a entidade `Cliente` inteira.
+- `GET/PUT /api/v1/auth/cliente/perfil`: resolve `userId` do token (`@AuthenticationPrincipal String userId`) e opera no cliente. Retorna `ClienteResponse` (sem senhaHash).
 
 ### Fluxo 3: Criação de Cliente via Agendamento
 - `AgendamentoService.criarAgendamento()`: `clienteId` → busca existente; senão telefone; senão cria novo `Cliente` **sem** `senhaHash`/`dataCadastro`.
 
 ## 5. Regras Específicas
-1. **API expõe a entidade `Cliente` como body de entrada e saída**, inclusive o campo `senhaHash` (BCrypt) em todas as respostas (`ClienteController.java:43,50,64,70`; `ClienteAuthController.java:53,59`). **[CRÍTICO — ver 7.3]**
-2. **`dataCadastro` inconsistente**: só é preenchido em `ClienteAuthService.registrar()` (`:52`). Clientes criados via admin/agenda ficam com `dataCadastro = null`.
+1. **API nunca expõe entidade JPA** - Usa DTOs (`ClienteResponse`, `ClienteAdminResponse`) que excluem `senhaHash` e dados sensíveis.
+2. **`dataCadastro` automático** - Definido via `@PrePersist` na entidade `Cliente`, garantindo consistência em todos os fluxos.
 3. **Telefone único** (`Cliente.java:41`) com restrição duplicada (coluna `unique = true` + `@UniqueConstraint` da tabela, `:25`).
-4. **`JoinColumn` de identificação frágil**: `telefone` usado como chave de busca em 3 níveis no módulo agenda.
-5. **Rotas `/perfil` e `/agendamentos` de cliente**: não há `requestMatchers` explícito para `/api/v1/auth/cliente/perfil|agendamentos` no `SecurityConfig` — caem em `anyRequest().denyAll()`. **[VERIFICAR]**
+4. **Encapsulamento de estado** - `@Setter(AccessLevel.PRIVATE)` impede sobrescrita externa de campos sensíveis. Métodos de domínio (`atualizarDados`, `atualizarPerfil`, `definirSenhaHash`) controlam alterações.
+5. **Busca unificada** - `ClienteSpecification` elimina queries duplicadas e `distinct()` em memória.
 
 ## 6. Testes
 Nenhum teste específico.
 
-## 7. Dívidas Técnicas e Melhorias Recomendadas
+## 7. Dívidas Técnicas Resolvidas
 
-### 7.1 Contrato da API acoplado à entidade JPA — **[CRÍTICO] P1**
-- O controller serializa `Cliente` (entidade) como request/response (`ClienteController.java:43,50,64,70`). Qualquer mudança na entidade altera o contrato da API; campos internos (id, timestamps, `senhaHash`) vazam para o cliente.
-- **Solução (Clean Architecture)**: criar `ClienteRequest` (validação) e `ClienteResponse` (sem dados sensíveis) e mapear com **MapStruct**. Services passam a receber/retornar DTOs (ou um `ClienteCommand`), nunca a entidade como input (o que também elimina `ClienteService.atualizar(UUID, Cliente)`).
+### 7.1 Contrato da API acoplado à entidade JPA — **[RESOLVIDO]**
+- Controllers agora usam DTOs (`ClienteRequest`, `ClienteResponse`) em vez de entidades JPA.
+- `ClienteMapper` centraliza conversão entidade ↔ DTO.
 
-### 7.2 Vazamento do hash de senha — **[CRÍTICO] P1**
-- `GET /perfil`, `PUT /perfil` e todos os endpoints de `ClienteController` retornam a entidade `Cliente`, que contém `senhaHash` (`Cliente.java:70-72`). O hash BCrypt fica visível na API.
-- **Solução**: nunca serializar a entidade; usar `ClienteResponse` sem `senhaHash` (ver 7.1); para escrita usar request DTO.
+### 7.2 Vazamento do hash de senha — **[RESOLVIDO]**
+- `ClienteResponse` e `ClienteAdminResponse` não incluem `senhaHash`.
+- `@Setter(AccessLevel.PRIVATE)` impede acesso externo ao campo.
 
-### 7.3 `dataCadastro` inconsistente — **P2**
-- Só o fluxo de registro preenche `dataCadastro`. **Solução**: extrair `dataCadastro = now` para um listener do ciclo de vida (`@PrePersist` em entidade ou auditoria automática) ou defini-lo em `ClienteService.criar`.
+### 7.3 `dataCadastro` inconsistente — **[RESOLVIDO]**
+- `@PrePersist` na entidade `Cliente` define `dataCadastro = LocalDateTime.now()` automaticamente.
 
-### 7.4 Busca fragmentada e N queries — **P2**
-- `buscarPorSearch` (`ClienteService.java:35-48`) roda até 3 queries e faz `distinct()` em memória. `listarPaginado` duplica a lógica de busca com implementação diferente (`:77-82`).
-- **Solução**: consolidar em `JpaSpecificationExecutor`/Specification única (pesquisa por nome OU telefone com paginação), eliminando métodos duplicados.
+### 7.4 Busca fragmentada e N queries — **[RESOLVIDO]**
+- `ClienteSpecification.buscarPorNomeOuTelefone()` unifica busca com Specification pattern.
+- `ClienteRepository` estende `JpaSpecificationExecutor`.
 
-### 7.5 Violações Modulith — **P1**
-- `cliente/api` → `agenda/service` (`ClienteController.java:34`, `ClienteAuthController.java:30`); `cliente/service` → `auth/config` (`ClienteAuthService.java:29`).
-- **Solução**: agendamentos do cliente devem ser entregues por um endpoint no módulo `agenda` (ou evento `ClienteConsultadoEvent`); token de cliente deve passar por `auth` via um service público (ex.: `TokenService`), não por acesso direto ao `JwtTokenProvider`.
+### 7.5 Violações Modulith — **[RESOLVIDO]**
+- Dependência `cliente` → `agenda` removida (endpoints de agendamentos movidos para módulo agenda).
+- Dependência `cliente` → `auth` removida (usa `TokenService` abstração do shared).
 
-### 7.6 Exposição da entidade → polimorfismo/DTO — **P3**
-- Manter `AgendamentoClienteResponse` com `static of()` é candidato a **MapStruct** quando o mapper central for criado (mundo `cliente` + `agenda`).
+### 7.6 Exposição da entidade → polimorfismo/DTO — **[RESOLVIDO]**
+- `AgendamentoClienteResponse` movido para módulo `agenda` (era dependência cruzada).
 
-### 7.7 `ClienteAuthService` retorna entidade — **P2**
-- `atualizarPerfil` e endpoints `/perfil` devolvem `Cliente` (`ClienteAuthService.java:77`). Mesmo tratamento do 7.1/7.2.
+### 7.7 `ClienteAuthService` retorna entidade — **[RESOLVIDO]**
+- `atualizarPerfil` retorna entidade para uso interno, mas controller converte para `ClienteResponse`.
 
-### 7.8 Fortuna de getters/setters expostos — **P2**
-- `@Setter` global (`Cliente.java:29`) permite sobrescrever `senhaHash`, `dataCadastro` e `id` de fora do domínio. **Solução**: `@Setter(AccessLevel.PRIVATE)` + métodos de domínio (ex.: `definirSenha`, `atualizarDados`).
+### 7.8 Fortuna de getters/setters expostos — **[RESOLVIDO]**
+- `@Setter(AccessLevel.PRIVATE)` + métodos de domínio (`atualizarDados`, `atualizarPerfil`, `definirSenhaHash`).
 
-## 8. Exemplos de arquivos afetados
-- `ClienteController.java:43,50,64,70` — entidade no contrato da API + vazamento de `senhaHash`; `ClienteAuthController.java:53,59` — idem; `ClienteService.java:35-48,77-82` — buscas duplicadas; `Cliente.java:24-27,70-72` — unique duplicado e `senhaHash` serializável; `ClienteAuthService.java:58` — token com papel "CLIENTE" fora do enum.
+## 8. Design Patterns Aplicados
+
+### DTO Pattern
+- Separa contrato da API da entidade JPA.
+- `ClienteResponse`, `ClienteAdminResponse`, `CriarClienteRequest`, `AtualizarClienteRequest`.
+
+### Mapper Pattern
+- `ClienteMapper` centraliza conversão entidade ↔ DTO.
+- Candidato a MapStruct quando configurado no projeto.
+
+### Specification Pattern
+- `ClienteSpecification` permite busca flexível e reutilizável.
+- Substitui lógica fragmentada com `if/else` e queries duplicadas.
+
+### Domain Model Pattern
+- Métodos de domínio na entidade (`atualizarDados`, `atualizarPerfil`, `definirSenhaHash`).
+- Encapsulamento de regras de negócio na entidade.
+
+### Dependency Inversion Principle
+- `TokenService` (abstração) em vez de `JwtTokenProvider` (implementação).
+- Módulo cliente depende de abstração do shared, não de implementação do auth.
+
+## 9. Próximos Passos
+1. **MapStruct** - Substituir `ClienteMapper` manual por interface MapStruct.
+2. **Testes** - Criar testes unitários e de integração para service e controller.
+3. **Validação de CPF** - Adicionar validação de CPF válido (dígito verificador).
+4. **Cache** - Considerar cache para buscas frequentes.

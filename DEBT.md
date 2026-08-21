@@ -9,18 +9,18 @@
 
 ## 1. Top 10 — Dívidas **[CRÍTICO]** (resolver primeiro)
 
-| # | Dívida | Módulo(s) |
-|---|--------|-----------|
-| 1 | **`/api/v1/documentos/**` inacessível**: sem regra no `SecurityConfig`, cai em `anyRequest().denyAll()` → módulo inteiro bloqueado | documento |
-| 2 | **IDOR em notificações**: `userId` vem da request sem verificação de dono (qualquer usuário lê/apaga notificações de outro) | notificacao |
-| 3 | **Exposição de `User` com `password`** na API | fotografo |
-| 4 | **PDF de contrato gerado "na mão"** (bytes nativos) + `PdfGeneratorService` do documento é **stub** (`byte[0]`) | contrato, documento |
-| 5 | **Escrita cross-module**: serviços mutam entidades de outros módulos (`Agendamento`, `FotoEnsaio`, `Indicacao`) diretamente | ecommerce, edicao, foto, financeiro, comissao, documento |
-| 6 | **God classes** (`EcommerceService` 574, `FinanceiroService` 600, `FinanceiroDashboardService` 608, `AgendamentoService` 768, `EdicaoService` 534) | ecommerce, financeiro, agenda, edicao |
-| 7 | **`findAll()` + agregação em memória** em dashboards/relatórios (tabelas crescentes) | dashboard, financeiro, comissao, indicador |
-| 8 | **Vazamento de hash de senha do `Cliente`** nas respostas | cliente |
-| 9 | **`Entidade` JPA como contrato da API** (retorna entidade em vez de DTO) | cliente, foto, financeiro, fotografo |
-| 10 | **Máquinas de estado sem validação central** (`if` espalhados, status como `String`) | agenda, contrato, comissao |
+| # | Dívida | Módulo(s) | Status |
+|---|--------|-----------|--------|
+| 1 | **`/api/v1/documentos/**` inacessível**: sem regra no `SecurityConfig`, cai em `anyRequest().denyAll()` → módulo inteiro bloqueado | documento | Pendente |
+| 2 | **IDOR em notificações**: `userId` vem da request sem verificação de dono (qualquer usuário lê/apaga notificações de outro) | notificacao | Pendente |
+| 3 | ~~**Exposição de `User` com `password`** na API~~ | fotografo | **RESOLVIDO** |
+| 4 | **PDF de contrato gerado "na mão"** (bytes nativos) + `PdfGeneratorService` do documento é **stub** (`byte[0]`) | contrato, documento | Pendente |
+| 5 | **Escrita cross-module**: serviços mutam entidades de outros módulos (`Agendamento`, `FotoEnsaio`, `Indicacao`) diretamente | ecommerce, edicao, foto, financeiro, comissao, documento | Pendente |
+| 6 | **God classes** (`EcommerceService` 574, `FinanceiroService` 600, `FinanceiroDashboardService` 608, `AgendamentoService` 768, `EdicaoService` 534) | ecommerce, financeiro, agenda, edicao | Pendente |
+| 7 | **`findAll()` + agregação em memória** em dashboards/relatórios (tabelas crescentes) | dashboard, financeiro, comissao, indicador | Pendente |
+| 8 | ~~**Vazamento de hash de senha do `Cliente`** nas respostas~~ | cliente | **RESOLVIDO** |
+| 9 | ~~**`Entidade` JPA como contrato da API** (retorna entidade em vez de DTO)~~ | ~~fotografo~~ | **RESOLVIDO** (fotografo) |
+| 10 | **Máquinas de estado sem validação central** (`if` espalhados, status como `String`) | agenda, contrato, comissao | Pendente |
 
 ---
 
@@ -34,11 +34,17 @@
 - `handler(Exception.class)` genérico captura tudo; auditoria (`createdBy`) e testes ausentes (`CrmApplicationTests` é smoke).
 
 ### auth
-- `SecurityConfig` é god config: mapeia rotas de **todos** os módulos (acoplamento forte e frágil a mudanças de path).
-- `User` sem Lombok/auditoria/consistência (não estende `BaseEntity`); tratamento de erros inconsistente.
+- ~~`SecurityConfig` é god config~~ **RESOLVIDO**: migrado para `@RolesAllowed` nos controllers + `anyRequest().authenticated()`.
+- ~~`User` sem Lombok/auditoria/consistência~~ **RESOLVIDO**: Lombok + `@Embeddable AuditInfo`.
+- ~~Tratamento de erros inconsistente~~ **RESOLVIDO**: `ResponseStatusException(404/409)` + mensagem uniforme no login.
+- ~~`LoginResponse.userId` como String~~ **RESOLVIDO**: trocado para `UUID`.
+- ~~`User` expõe hash de senha~~ **RESOLVIDO**: `@JsonIgnore` + `FotografoController` retorna DTO.
+- ~~**P2**: Token JWT 24h sem refresh/logout/revogação~~ **RESOLVIDO**: refresh token (7 dias) + blocklist + logout endpoint.
+- ~~**P2**: Secret hardcoded em properties~~ **RESOLVIDO**: variável de ambiente `JWT_SECRET`.
+- ~~**P2**: `FotografoService` duplica CRUD de User~~ **RESOLVIDO**: delega para `UserService`.
 
 ### cliente
-- **Contrato da API acoplado à entidade JPA** + **vazamento do hash de senha** nas respostas. Violações Modulith (services de ecommerce/agenda importados).
+- ~~**Contrato da API acoplado à entidade JPA** + **vazamento do hash de senha** nas respostas. Violações Modulith (services de ecommerce/agenda importados).~~ **RESOLVIDO**: DTOs (`ClienteResponse`, `ClienteAdminResponse`), `ClienteMapper`, `@Setter(PRIVATE)`, `TokenService` abstração, `AgendamentoClienteResponse` movido para agenda.
 
 ### comissao
 - Controller dependente de **4 módulos** + `Map<String,Object>`; N+1 na listagem de indicadores; **financeiro cria `Indicacao` diretamente** (escrita cross-module — comissao deveria ser dono).
@@ -71,7 +77,9 @@
 - Dependência **inversa** foto→agenda (exceção cruzada); expõe entidade JPA; `RuntimeException`; **publicação por escrita direta do edicao** (3ª cópia de watermark/thumbnail).
 
 ### fotografo
-- **`User` (com `password`) exposto via `/api/v1/fotografos`**; busca O(N)+N+1 nos relatórios; CRUD de usuários duplicado com auth; `RepasseController` atravessa o modulo agenda; partilha duplicada.
+- ~~**`User` (com `password`) exposto via `/api/v1/fotografos`**~~ **RESOLVIDO**: agora retorna `UserResponse` (sem password).
+- ~~CRUD de usuários duplicado com auth~~ **RESOLVIDO**: delega para `UserService`.
+- Busca O(N)+N+1 nos relatórios; `RepasseController` atravessa o modulo agenda; partilha duplicada.
 
 ### indicador
 - N+1 na listagem + acoplamento com comissao; exceções genéricas.

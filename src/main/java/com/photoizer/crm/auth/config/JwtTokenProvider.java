@@ -1,5 +1,6 @@
 package com.photoizer.crm.auth.config;
 
+import com.photoizer.crm.shared.auth.TokenService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -12,8 +13,13 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.UUID;
 
+/**
+ * Provedor de tokens JWT.
+ * Implementa TokenService para permitir uso por outros módulos sem acoplamento direto.
+ * Padrão Dependency Inversion - implementa abstração do módulo shared.
+ */
 @Component
-public class JwtTokenProvider {
+public class JwtTokenProvider implements TokenService {
 
     private final SecretKey secretKey;
     private final long expiration;
@@ -28,6 +34,7 @@ public class JwtTokenProvider {
         this.refreshExpiration = refreshExpiration;
     }
 
+    @Override
     public String generateToken(UUID userId, String email, String papel) {
         var now = new Date();
         var jti = UUID.randomUUID().toString();

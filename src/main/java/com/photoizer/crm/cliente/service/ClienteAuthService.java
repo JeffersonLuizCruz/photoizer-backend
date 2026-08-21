@@ -1,24 +1,29 @@
 package com.photoizer.crm.cliente.service;
 
-import com.photoizer.crm.auth.config.JwtTokenProvider;
 import com.photoizer.crm.cliente.api.AtualizarPerfilRequest;
 import com.photoizer.crm.cliente.api.ClienteAuthResponse;
 import com.photoizer.crm.cliente.api.ClienteLoginRequest;
 import com.photoizer.crm.cliente.api.ClienteRegistroRequest;
+import com.photoizer.crm.cliente.api.dto.ClienteMapper;
+import com.photoizer.crm.cliente.exception.ClienteDuplicadoException;
+import com.photoizer.crm.cliente.exception.ClienteNaoEncontradoException;
 import com.photoizer.crm.cliente.model.Cliente;
 import com.photoizer.crm.cliente.model.OrigemCliente;
 import com.photoizer.crm.cliente.repository.ClienteRepository;
+import com.photoizer.crm.shared.auth.TokenService;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
  * Autenticação de clientes do e-commerce (RF013).
  * Senhas criptografadas com BCrypt (RNF003).
+ * 
+ * NOTA: Usa TokenService (abstração) em vez de JwtTokenProvider (implementação).
+ * Padrão Dependency Inversion - módulo cliente depende de abstração do shared.
  */
 @Service
 @Transactional
@@ -26,22 +31,29 @@ public class ClienteAuthService {
 
     private final ClienteRepository clienteRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtTokenProvider jwtTokenProvider;
+    private final TokenService tokenService;
+    private final ClienteMapper clienteMapper;
 
     public ClienteAuthService(ClienteRepository clienteRepository,
                               PasswordEncoder passwordEncoder,
-                              JwtTokenProvider jwtTokenProvider) {
+                              TokenService tokenService,
+                              ClienteMapper clienteMapper) {
         this.clienteRepository = clienteRepository;
         this.passwordEncoder = passwordEncoder;
-        this.jwtTokenProvider = jwtTokenProvider;
+        this.tokenService = tokenService;
+        this.clienteMapper = clienteMapper;
     }
 
+    /**
+     * Registra novo cliente.
+     * Padrão DTO Pattern - recebe DTO de request, retorna DTO de response.
+     */
     public ClienteAuthResponse registrar(ClienteRegistroRequest request) {
         if (clienteRepository.findByEmailIgnoreCase(request.email()).isPresent()) {
-            throw new IllegalArgumentException("Email já cadastrado");
+            throw new ClienteDuplicadoException("email", request.email());
         }
         if (clienteRepository.findByTelefone(request.telefone()).isPresent()) {
-            throw new IllegalArgumentException("Telefone já cadastrado");
+            throw new ClienteDuplicadoException("telefone", request.telefone());
         }
 
         var cliente = Cliente.builder()
@@ -49,17 +61,19 @@ public class ClienteAuthService {
             .email(request.email())
             .telefone(request.telefone())
             .senhaHash(passwordEncoder.encode(request.senha()))
-            .dataCadastro(LocalDateTime.now())
             .preferencias(request.preferencias())
             .origem(OrigemCliente.OUTROS)
             .build();
         cliente = clienteRepository.save(cliente);
 
-        var token = jwtTokenProvider.generateToken(cliente.getId(), cliente.getEmail(), "CLIENTE");
+        var token = tokenService.generateToken(cliente.getId(), cliente.getEmail(), "CLIENTE");
         return new ClienteAuthResponse(token, cliente.getId(), cliente.getNome(),
             cliente.getEmail(), cliente.getTelefone());
     }
 
+    /**
+     * Login de cliente.
+     */
     public ClienteAuthResponse login(ClienteLoginRequest request) {
         var cliente = clienteRepository.findByEmailIgnoreCase(request.email())
             .orElseThrow(() -> new BadCredentialsException("Email ou senha inválidos"));
@@ -69,22 +83,20 @@ public class ClienteAuthService {
             throw new BadCredentialsException("Email ou senha inválidos");
         }
 
-        var token = jwtTokenProvider.generateToken(cliente.getId(), cliente.getEmail(), "CLIENTE");
+        var token = tokenService.generateToken(cliente.getId(), cliente.getEmail(), "CLIENTE");
         return new ClienteAuthResponse(token, cliente.getId(), cliente.getNome(),
             cliente.getEmail(), cliente.getTelefone());
     }
 
+    /**
+     * Atualiza perfil do cliente.
+     * Retorna entidade para uso interno (será convertida pelo controller).
+     */
     public Cliente atualizarPerfil(UUID clienteId, AtualizarPerfilRequest request) {
         var cliente = clienteRepository.findById(clienteId)
-            .orElseThrow(() -> new IllegalArgumentException("Cliente não encontrado"));
+            .orElseThrow(() -> new ClienteNaoEncontradoException(clienteId));
 
-        cliente.setNome(request.nome());
-        cliente.setTelefone(request.telefone());
-        cliente.setEmail(request.email());
-        if (request.cpf() != null) cliente.setCpf(request.cpf());
-        if (request.cidade() != null) cliente.setCidade(request.cidade());
-        if (request.estado() != null) cliente.setEstado(request.estado());
-
+        clienteMapper.updatePerfil(cliente, request);
         return clienteRepository.save(cliente);
     }
 }
