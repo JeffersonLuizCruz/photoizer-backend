@@ -3,8 +3,10 @@ package com.photoizer.crm.shared.config;
 import com.photoizer.crm.auth.model.Papel;
 import com.photoizer.crm.auth.model.User;
 import com.photoizer.crm.auth.repository.UserRepository;
+import com.photoizer.crm.config.model.ConfigKey;
 import com.photoizer.crm.config.model.Configuracao;
 import com.photoizer.crm.config.repository.ConfiguracaoRepository;
+import com.photoizer.crm.contrato.service.ContratoTemplateService;
 import com.photoizer.crm.despesa.model.Despesa;
 import com.photoizer.crm.despesa.model.DespesaCategoria;
 import com.photoizer.crm.despesa.model.StatusDespesa;
@@ -69,22 +71,14 @@ public class DataSeeder implements CommandLineRunner {
         }
 
         if (configuracaoRepository.count() == 0) {
-            var c1 = new Configuracao();
-            c1.setChave("valorUnitarioFotoExtra");
-            c1.setValor("15.00");
-            var c2 = new Configuracao();
-            c2.setChave("valorUnitarioVideoExtra");
-            c2.setValor("50.00");
-            var c3 = new Configuracao();
-            c3.setChave("percentualComissao");
-            c3.setValor("10.00");
-            var c4 = new Configuracao();
-            c4.setChave("percentualEntrada");
-            c4.setValor("30.00");
-            var c5 = new Configuracao();
-            c5.setChave("taxaDeslocamentoPadrao");
-            c5.setValor("0.00");
-            configuracaoRepository.saveAll(List.of(c1, c2, c3, c4, c5));
+            var configs = List.of(
+                createConfig(ConfigKey.VALOR_FOTO_EXTRA),
+                createConfig(ConfigKey.VALOR_VIDEO_EXTRA),
+                createConfig(ConfigKey.PERCENTUAL_COMISSAO),
+                createConfig(ConfigKey.PERCENTUAL_ENTRADA),
+                createConfig(ConfigKey.TAXA_DESLOCAMENTO)
+            );
+            configuracaoRepository.saveAll(configs);
         }
 
         limparIndicadoresDuplicados();
@@ -95,29 +89,30 @@ public class DataSeeder implements CommandLineRunner {
 
     private void seedConfigsContrato() {
         List.of(
-            new String[]{"nomeContratada", "Ana Carolina de Oliveira Cruz - Carol Oliva Fotografia"},
-            new String[]{"cnpjContratada", "62.017.385/0001-57"},
-            new String[]{"enderecoContratada", "Ipojuca - PE"},
-            new String[]{"pixChave", "62.017.385/0001-57"},
-            new String[]{"pixTipoChave", "CNPJ"},
-            new String[]{"contratoDiasValidade", "7"}
-        ).forEach(chaveValor -> {
-            if (!configuracaoRepository.existsById(chaveValor[0])) {
+            new ConfigKey[]{ConfigKey.NOME_CONTRATADA, null},
+            new ConfigKey[]{ConfigKey.CNPJ_CONTRATADA, null},
+            new ConfigKey[]{ConfigKey.ENDERECO_CONTRATADA, null},
+            new ConfigKey[]{ConfigKey.PIX_CHAVE, null},
+            new ConfigKey[]{ConfigKey.PIX_TIPO_CHAVE, null},
+            new ConfigKey[]{ConfigKey.CONTRATO_DIAS_VALIDADE, null}
+        ).forEach(pair -> {
+            var key = pair[0];
+            if (!configuracaoRepository.existsById(key.getKey())) {
                 var config = new Configuracao();
-                config.setChave(chaveValor[0]);
-                config.setValor(chaveValor[1]);
+                config.setChave(key.getKey());
+                config.setValor(key.getDefaultValue());
                 configuracaoRepository.save(config);
             }
         });
 
-        if (!configuracaoRepository.existsById("contratoTemplateTexto")) {
+        if (!configuracaoRepository.existsById(ConfigKey.CONTRATO_TEMPLATE.getKey())) {
             var template = new Configuracao();
-            template.setChave("contratoTemplateTexto");
-            template.setValor(TEMPLATO_PADRAO);
+            template.setChave(ConfigKey.CONTRATO_TEMPLATE.getKey());
+            template.setValor(ContratoTemplateService.TEMPLATE_PADRAO);
             configuracaoRepository.save(template);
         }
 
-        configuracaoRepository.findById("contratoTemplateTexto").ifPresent(t -> {
+        configuracaoRepository.findById(ConfigKey.CONTRATO_TEMPLATE.getKey()).ifPresent(t -> {
             if (!t.getValor().contains("{{fotografosEnsaio}}")) {
                 t.setValor(t.getValor().replace(
                     "Endereço completo: {{enderecoEnsaio}}",
@@ -128,64 +123,12 @@ public class DataSeeder implements CommandLineRunner {
         });
     }
 
-    public static final String TEMPLATO_PADRAO = """
-= PRESTAÇÃO DE SERVIÇOS FOTOGRÁFICOS =
-
-# 1. Dados do Cliente
-Nome completo: {{clienteNome}}
-CPF: {{clienteCPF}}
-E-mail: {{clienteEmail}}
-Telefone: {{clienteTelefone}}
-Cidade / Estado: {{clienteCidade}} / {{clienteEstado}}
-
-Contratada: {{contratadaNome}}, inscrita no CNPJ nº {{contratadaCnpj}}, com sede em {{contratadaCidade}}.
-
-# 2. Informações do Ensaio
-Data do ensaio: {{dataEnsaio}}
-Horário do ensaio: {{horarioEnsaio}}
-Local do ensaio: {{localEnsaio}}
-Endereço completo: {{enderecoEnsaio}}
-Profissionais do ensaio: {{fotografosEnsaio}}
-
-# 3. Pacote Contratado
-Pacote: {{pacoteNome}}
-Inclui: serviço conforme pacote contratado.
-
-# 4. Valores
-Valor total do serviço: {{valorTotal}}
-Valor pago como reserva ({{percentualEntrada}}%): {{valorEntrada}}
-Valor restante a pagar no final do ensaio: {{valorRestante}}
-O pagamento da reserva garante o bloqueio da data e horário na agenda da Contratada.
-O valor restante deverá ser pago ao final da realização do ensaio fotográfico.
-
-Dados para pagamento (PIX)
-Chave PIX ({{pixTipoChave}}): {{pixChave}}
-
-# 5. Entrega das Fotografias
-As fotos do ensaio serão enviadas ao Cliente em até 2 dias após a realização do ensaio para que ele faça a seleção das imagens desejadas.
-Após a seleção, a entrega final das fotografias ocorrerá em até 2 dias.
-As fotos serão entregues em formato digital, em alta resolução.
-Caso o Cliente opte por fotos extras além do pacote contratado, será cobrado o valor de {{precoFotoExtra}} por foto adicional.
-
-# 6. Cancelamento
-Caso o Cliente cancele o ensaio por qualquer motivo, o valor pago como reserva não será reembolsado, pois garante a reserva da data na agenda da Contratada.
-Caso ocorra algum imprevisto que impeça a presença da Contratada, poderá haver a substituição por outro fotógrafo profissional de padrão equivalente.
-Caso não seja possível a substituição, o valor pago será devolvido integralmente ao Cliente.
-Se houver algum imprevisto relacionado à antecipação de voo, chuva ou doença, o ensaio será cancelado e haverá o reembolso completo do valor da reserva.
-
-# 7. USO DE IMAGEM (OPCIONAL)
-{{autorizaUsoImagem}}
-
-# 8. Disposições Gerais
-Este contrato passa a vigorar a partir da assinatura das partes.
-Qualquer alteração neste contrato deverá ser realizada por escrito.
-
-# 9. Assinatura Digital
-Ao assinar este documento, o Cliente declara que leu e concorda com todos os termos acima descritos.
-Resposta do cliente sobre uso de imagem: {{autorizaUsoImagem}}
-Assinatura do contratante: {{clienteNome}}
-Assinatura da Contratada: {{contratadaNome}}
-""";
+    private Configuracao createConfig(ConfigKey key) {
+        var config = new Configuracao();
+        config.setChave(key.getKey());
+        config.setValor(key.getDefaultValue());
+        return config;
+    }
 
     private void limparIndicadoresDuplicados() {
         var duplicados = entityManager.createQuery(

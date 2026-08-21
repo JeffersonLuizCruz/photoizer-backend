@@ -10,6 +10,7 @@ import com.photoizer.crm.comissao.event.ComissaoSolicitadaEvent;
 import com.photoizer.crm.comissao.model.Indicacao;
 import com.photoizer.crm.comissao.model.OrigemIndicacao;
 import com.photoizer.crm.comissao.repository.IndicacaoRepository;
+import com.photoizer.crm.config.model.ConfigKey;
 import com.photoizer.crm.config.service.ConfiguracaoService;
 import com.photoizer.crm.despesa.api.DespesaResponse;
 import com.photoizer.crm.despesa.model.Despesa;
@@ -100,7 +101,7 @@ public class FinanceiroService {
         var pacote = pacoteRepository.findById(pacoteId).orElseThrow();
         var taxa = taxaDeslocamento != null ? taxaDeslocamento : BigDecimal.ZERO;
 
-        var percentualEntrada = configuracaoService.getValorDecimal("percentualEntrada", new BigDecimal("30.00"));
+        var percentualEntrada = configuracaoService.getValorDecimal(ConfigKey.PERCENTUAL_ENTRADA);
         var fatorEntrada = percentualEntrada.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
         var valorTotal = pacote.getValorBase().add(taxa);
         var valorEntradaExigido = valorTotal.multiply(fatorEntrada)

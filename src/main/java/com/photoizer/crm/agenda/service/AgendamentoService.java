@@ -22,6 +22,7 @@ import com.photoizer.crm.cliente.exception.ClienteNaoEncontradoException;
 import com.photoizer.crm.cliente.model.Cliente;
 import com.photoizer.crm.cliente.model.OrigemCliente;
 import com.photoizer.crm.cliente.repository.ClienteRepository;
+import com.photoizer.crm.config.model.ConfigKey;
 import com.photoizer.crm.config.service.ConfiguracaoService;
 import com.photoizer.crm.contrato.event.ContratoAprovadoEvent;
 import com.photoizer.crm.shared.storage.FileStorageService;
@@ -101,13 +102,13 @@ public class AgendamentoService {
 
         var dataHoraEnsaio = resolverDataHora(command);
 
-        var taxaDeslocamentoPadrao = configuracaoService.getValorDecimal("taxaDeslocamentoPadrao", BigDecimal.ZERO);
+        var taxaDeslocamentoPadrao = configuracaoService.getValorDecimal(ConfigKey.TAXA_DESLOCAMENTO);
         var custoDeslocamento = command.custoDeslocamento() != null ? command.custoDeslocamento() : taxaDeslocamentoPadrao;
         var repassarDeslocamento = command.repassarDeslocamento() != null ? command.repassarDeslocamento() : true;
         var taxaDeslocamento = repassarDeslocamento ? custoDeslocamento : BigDecimal.ZERO;
         var autorizaUsoImagem = command.autorizaUsoImagem() != null ? command.autorizaUsoImagem() : false;
 
-        var percentualEntrada = configuracaoService.getValorDecimal("percentualEntrada", new BigDecimal("30.00"));
+        var percentualEntrada = configuracaoService.getValorDecimal(ConfigKey.PERCENTUAL_ENTRADA);
         var valores = agendamentoValoresCalculator.calcularValoresNovo(
             pacote.getValorBase(), taxaDeslocamento, percentualEntrada);
 

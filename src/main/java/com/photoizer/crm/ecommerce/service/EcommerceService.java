@@ -2,6 +2,7 @@ package com.photoizer.crm.ecommerce.service;
 
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
+import com.photoizer.crm.config.model.ConfigKey;
 import com.photoizer.crm.config.service.ConfiguracaoService;
 import com.photoizer.crm.ecommerce.api.AdminCompraDetalheResponse;
 import com.photoizer.crm.ecommerce.api.AdminComprasRelatorioResponse;
@@ -118,7 +119,7 @@ public class EcommerceService {
 
     @Transactional(readOnly = true)
     public BigDecimal getValorUnitarioFotoExtra() {
-        return configuracaoService.getValorDecimal("valorUnitarioFotoExtra", new BigDecimal("15.00"));
+        return configuracaoService.getValorDecimal(ConfigKey.VALOR_FOTO_EXTRA);
     }
 
     @Transactional(readOnly = true)

@@ -7,28 +7,37 @@ Gerencia configurações globais do sistema no modelo chave-valor. Consumido por
 ```
 config/
 ├── model/
-│   └── Configuracao.java         # Entidade JPA (@Id String chave + String valor TEXT, sem auditoria)
+│   ├── Configuracao.java          # Entidade JPA (@Id String chave + String valor TEXT, sem auditoria)
+│   └── ConfigKey.java             # Enum type-safe com chaves conhecidas + tipo + default
 ├── repository/
 │   └── ConfiguracaoRepository.java # JpaRepository<Configuracao, String>
 ├── service/
-│   └── ConfiguracaoService.java    # getConfig, atualizarMultiplos, getValorDecimal/Inteiro/Texto, atualizarValorTexto
-└── api/
-    └── ConfiguracaoController.java # GET/PUT /api/v1/config + endpoints de template de contrato
+│   └── ConfiguracaoService.java    # CRUD type-safe via ConfigKey + cache
+├── api/
+│   ├── ConfiguracaoController.java # GET/PUT /api/v1/config (DTOs)
+│   ├── ConfiguracaoRequest.java    # Record DTO de entrada
+│   └── ConfiguracaoResponse.java   # Record DTO de saída
+└── exception/
+    └── ConfiguracaoInvalidaException.java  # Exceção específica para valores inválidos
 ```
 
 ## 3. Dependências Externas
 
-### Módulos internos importados — **[VIOLAÇÃO Modulith]**
-- `ConfiguracaoController.java:21-27` injeta `ContratoTemplateService` do módulo **contrato** e acessa `shared.config.DataSeeder.TEMPLATO_PADRAO` (`:62-63`). Um módulo "fundacional" de config dependendo de `contrato` une dois domínios distintos na mesma controller.
+### Módulos internos importados
+Nenhum. O módulo config é **fundacional** — não depende de módulos de domínio.
+
+> **Refatoração (Fase 2):** A dependência `config→contrato` (ContratoTemplateService) foi removida.
+> Endpoints de template de contrato foram movidos para `contrato/api/ContratoTemplateController.java`.
 
 ### Módulos que dependem deste
 | Módulo | Uso |
 |--------|-----|
-| agenda | `getValorDecimal("percentualEntrada"/"taxaDeslocamentoPadrao")` |
-| comissao | `getValorDecimal("comissaoPercentual"/"percentualComissao")` |
-| financeiro | `getValorDecimal` para valores de foto/vídeo extra |
-| contrato | `getValorTexto` para dados da contratada e template |
+| agenda | `getValorDecimal(ConfigKey.TAXA_DESLOCAMENTO/PERCENTUAL_ENTRADA)` |
+| comissao | (via financeiro) |
+| financeiro | `getValorDecimal(ConfigKey.PERCENTUAL_ENTRADA/PERCENTUAL_COMISSAO)` |
+| contrato | `getValor(ConfigKey.*)`, `getValorDecimal`, `getValorInteiro`, `atualizar` |
 | despesa | categorias/valores |
+| ecommerce | `getValorDecimal(ConfigKey.VALOR_FOTO_EXTRA)` |
 
 ### Eventos
 Nenhum. Não publica nem consome eventos.
@@ -36,59 +45,59 @@ Nenhum. Não publica nem consome eventos.
 ## 4. Fluxos Principais
 
 ### Fluxo 1: Leitura
-- `GET /api/v1/config` → `Map<String, Object>` com todas as chaves (`getConfig`).
-- `getValorDecimal/Inteiro/Texto(chave, default)` → busca por chave e converte; retorna default se ausente.
+- `GET /api/v1/config` → `ConfiguracaoResponse` com todas as chaves (`getConfig`).
+- `getValor(ConfigKey)` → busca por chave, retorna valor bruto ou default do enum.
+- `getValorDecimal(ConfigKey)` / `getValorInteiro(ConfigKey)` → busca + conversão tipada.
 
 ### Fluxo 2: Atualização
-- `PUT /api/v1/config` → `Map<String, String>`; upsert chave a chave (`atualizarMultiplos`).
-- Endpoints `/contrato/template/**` delegam a `ContratoTemplateService` + `atualizarValorTexto`.
+- `PUT /api/v1/config` → `ConfiguracaoRequest` com `Map<ConfigKey, String>`; upsert chave a chave com validação de tipo.
+- `atualizar(ConfigKey, String)` → upsert individual com validação.
 
-### Chaves conhecidas (populadas pelo `DataSeeder` e seeds de contrato)
-| Chave | Tipo | Descrição |
-|-------|------|-----------|
-| `valorUnitarioFotoExtra` / `valorUnitarioVideoExtra` | decimal | Preços de extras |
-| `percentualComissao` | decimal | Comissão padrão de indicação |
-| `percentualEntrada` | decimal | % de entrada cobrado no agendamento |
-| `taxaDeslocamentoPadrao` | decimal | Taxa de deslocamento |
-| `nomeContratada`, `cnpjContratada`, `enderecoContratada`, `pixChave`, `pixTipoChave`, `contratoDiasValidade` | texto | Dados do contrato |
-| `contratoTemplateTexto` | texto | Template com placeholders `{{...}}` |
-
-**Nota**: o `DataSeeder` (shared) registra as chaves com nomes distintos dos citados no `AGENTS.md` (`comissao_percentual_padrao`, etc.) — há **duplicidade de nomenclatura de chaves** entre consumidores.
+### Chaves conhecidas (centralizadas no `ConfigKey` enum)
+| Constante | Chave no banco | Tipo | Default |
+|-----------|---------------|------|---------|
+| `VALOR_FOTO_EXTRA` | `valorUnitarioFotoExtra` | DECIMAL | `15.00` |
+| `VALOR_VIDEO_EXTRA` | `valorUnitarioVideoExtra` | DECIMAL | `50.00` |
+| `PERCENTUAL_COMISSAO` | `percentualComissao` | DECIMAL | `10.00` |
+| `PERCENTUAL_ENTRADA` | `percentualEntrada` | DECIMAL | `30.00` |
+| `TAXA_DESLOCAMENTO` | `taxaDeslocamentoPadrao` | DECIMAL | `0.00` |
+| `NOME_CONTRATADA` | `nomeContratada` | TEXT | `Carol Oliva Fotografia` |
+| `CNPJ_CONTRATADA` | `cnpjContratada` | TEXT | `""` |
+| `ENDERECO_CONTRATADA` | `enderecoContratada` | TEXT | `""` |
+| `PIX_CHAVE` | `pixChave` | TEXT | `""` |
+| `PIX_TIPO_CHAVE` | `pixTipoChave` | TEXT | `CNPJ` |
+| `CONTRATO_DIAS_VALIDADE` | `contratoDiasValidade` | INTEGER | `7` |
+| `CONTRATO_TEMPLATE` | `contratoTemplateTexto` | TEXT | `null` |
 
 ## 5. Regras Específicas
-1. **Tudo é String**: conversões via `new BigDecimal(...)`/`Integer.parseInt(...)` sem tratamento de erro.
-2. **Sem auditoria nem BaseEntity**: `Configuration` é chave-valor mínimo.
-3. **Upsert implícito**: qualquer chave enviada no `PUT` é criada, sem validação de schema.
-4. **`getValorDecimal`/`getValorInteiro` podem quebrar**: se o valor armazenado não for numérico, `NumberFormatException` → handler 422 genérico.
-5. **Sem cache**: toda leitura consulta o banco.
+
+1. **`ConfigKey` centraliza tudo**: chaves, tipos e defaults. Consumidores usam `ConfigKey.XXX` em vez de strings.
+2. **Validação de tipo**: `ConfigKey.convert()` valida se o valor é compatível com o tipo (DECIMAL/INTEGER/TEXT) e lança `ConfiguracaoInvalidaException` se inválido.
+3. **Cache**: `@Cacheable("config")` nas leituras, `@CacheEvict("config")` nas escritas. Usa `ConcurrentMapCacheManager` (sem dependência externa).
+4. **Upsert implícito**: qualquer chave enviada no `PUT` é criada, com validação de tipo via ConfigKey.
+5. **Sem auditoria nem BaseEntity**: `Configuracao` é chave-valor mínimo.
 
 ## 6. Testes
 Nenhum teste específico.
 
-## 7. Dívidas Técnicas e Melhorias Recomendadas
+## 7. Débitas Resolvidas (Fase 2)
 
-### 7.1 Vaização de chaves e tipos — **P1**
-- `PUT /api/v1/config` aceita qualquer `Map<String,String>` (`ConfiguracaoController.java:37-39`), criando chaves órfãs ou com valor inválido. `getValorDecimal` lança `NumberFormatException` silenciosamente (`ConfiguracaoService.java:48-52`).
-- **Solução**: definir **enum `ConfigKey`** com as chaves conhecidas + tipo esperado (DECIMAL, INT, TEXT, TEMPLATE). O service remove a necessidade de string mágica e valida conversão com resposta clara. Isso elimina o acoplamento por string hardcoded nos módulos consumidores.
-
-### 7.2 Sem cache — **P2**
-- Configurações lidas em alta frequência (percentual de entrada, taxas). Cada `getValor*` faz `findById` (`ConfiguracaoService.java:48-67`).
-- **Solução**: cache `@Cacheable("config")` + invalidação no `atualizarMultiplos`/`atualizarValorTexto` (Spring Cache com Simple/Caffeine).
-
-### 7.3 Cruzamento config→contrato na controller — **P1**
-- Template de contrato dentro do módulo `config` (`ConfiguracaoController.java:42-64`) viola o isolamento do Modulith.
-- **Solução**: mover endpoints `/contrato/template/**` para o módulo `contrato` (dono legítimo do template); `config` fica apenas com o `ConfigKey` + acesso genérico.
-
-### 7.4 Controller sem DTO e sem validação — **P2**
-- Usa `Map` como request/response (`ConfiguracaoController.java:31-37`), sem `@Valid`, sem doc Swagger dos campos.
-- **Solução**: `ConfiguracaoRequest`/`ConfiguracaoResponse` com campos tipados.
-
-### 7.5 Duplicidade de nomes de chaves — **P1**
-- `DataSeeder` registra `valorUnitarioFotoExtra`/`percentualEntrada` enquanto o `AGENTS.md` e módulos documentam `comissao_percentual_padrao`/`percentual_entrada_padrao`. Consumidores podem ler chaves que não existem (default silencioso).
-- **Solução**: centralizar nomes no `ConfigKey` (ver 7.1) e corrigir o `DataSeeder` para usar a mesma nomenclatura.
-
-### 7.6 `getValorTexto` com tamanho ilimitado — **P3**
-- `atualizarValorTexto` loga valor truncado mas aceita qualquer tamanho (`ConfiguracaoService.java:69-79`). Para `contratoTemplateTexto`, considerar limite ou versionamento.
+| Débita | Solução |
+|--------|---------|
+| **7.1 Validação de chaves e tipos** | `ConfigKey` enum com tipos + `ConfiguracaoInvalidaException` |
+| **7.2 Sem cache** | `@Cacheable`/`@CacheEvict` no `ConfiguracaoService` |
+| **7.3 Cruzamento config→contrato na controller** | Endpoints movidos para `ContratoTemplateController` (módulo contrato) |
+| **7.4 Controller sem DTO e sem validação** | `ConfiguracaoRequest`/`ConfiguracaoResponse` com `@Valid` |
+| **7.5 Duplicidade de nomes de chaves** | `ConfigKey` centraliza todos os nomes; `DataSeeder` usa o enum |
+| **7.6 `getValorTexto` com tamanho ilimitado** | Mantido; `atualizarValorTexto` mantido deprecated para compatibilidade |
 
 ## 8. Exemplos de arquivos afetados
-- `ConfiguracaoController.java:21-27` — dependência cross-module de `ContratoTemplateService`; `ConfiguracaoService.java:48-52` — conversão sem validação; `ConfiguracaoService.java:34-45` — upsert sem schema; `DataSeeder` (shared) — nomes de chaves divergentes.
+- `ConfiguracaoService.java` — refatorado: métodos type-safe, cache, deprecated para legados
+- `ConfiguracaoController.java` — refatorado: DTOs, sem cross-module
+- `ConfigKey.java` — novo: enum centralizador
+- `ConfiguracaoInvalidaException.java` — novo: exceção específica
+- `ConfiguracaoRequest.java` / `ConfiguracaoResponse.java` — novos: DTOs
+- `ContratoTemplateController.java` (módulo contrato) — novo: endpoints de template
+- `ContratoTemplateService.java` (módulo contrato) — editado: `TEMPLATO_PADRAO` movido aqui
+- `DataSeeder.java` — editado: usa `ConfigKey`
+- Consumidores (6 arquivos) — editados: usam `ConfigKey` em vez de strings

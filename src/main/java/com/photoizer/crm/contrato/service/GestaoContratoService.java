@@ -3,6 +3,7 @@ package com.photoizer.crm.contrato.service;
 import com.photoizer.crm.agenda.exception.AgendamentoNoPassadoException;
 import com.photoizer.crm.agenda.exception.EditorNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.FotografoNaoEncontradoException;
+import com.photoizer.crm.config.model.ConfigKey;
 import com.photoizer.crm.config.service.ConfiguracaoService;
 import com.photoizer.crm.contrato.api.CriarContratoRequest;
 import com.photoizer.crm.contrato.api.DevolverContratoRequest;
@@ -80,13 +81,13 @@ public class GestaoContratoService {
 
         var custoDeslocamento = request.custoDeslocamento() != null
             ? request.custoDeslocamento()
-            : configuracaoService.getValorDecimal("taxaDeslocamentoPadrao", BigDecimal.ZERO);
+            : configuracaoService.getValorDecimal(ConfigKey.TAXA_DESLOCAMENTO);
         var repassarDeslocamento = request.repassarDeslocamento() != null
             ? request.repassarDeslocamento()
             : true;
         var taxaDeslocamento = repassarDeslocamento ? custoDeslocamento : BigDecimal.ZERO;
 
-        var percentualEntrada = configuracaoService.getValorDecimal("percentualEntrada", new BigDecimal("30.00"));
+        var percentualEntrada = configuracaoService.getValorDecimal(ConfigKey.PERCENTUAL_ENTRADA);
         var fatorEntrada = percentualEntrada.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
         var valorTotal = pacote.getValorBase().add(taxaDeslocamento);
         var valorEntradaExigido = valorTotal.multiply(fatorEntrada).setScale(2, RoundingMode.HALF_UP);
@@ -181,7 +182,7 @@ public class GestaoContratoService {
         }
 
         var token = UUID.randomUUID().toString();
-        var diasValidade = configuracaoService.getValorInteiro("contratoDiasValidade", DIAS_VALIDADE_PADRAO);
+        var diasValidade = configuracaoService.getValorInteiro(ConfigKey.CONTRATO_DIAS_VALIDADE);
 
         contrato.setToken(token);
         contrato.setTokenHash(sha256(token));

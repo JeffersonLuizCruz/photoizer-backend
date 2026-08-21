@@ -120,6 +120,12 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.GONE, e);
     }
 
+    @ExceptionHandler(com.photoizer.crm.config.exception.ConfiguracaoInvalidaException.class)
+    public ResponseEntity<ErrorResponse> handleConfiguracaoInvalida(com.photoizer.crm.config.exception.ConfiguracaoInvalidaException e) {
+        log.warn("Configuracao invalida: {}", e.getMessage());
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
+    }
+
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ErrorResponse> handleBadCredentials(BadCredentialsException e) {
         log.warn("Credenciais invalidas: {}", e.getMessage());

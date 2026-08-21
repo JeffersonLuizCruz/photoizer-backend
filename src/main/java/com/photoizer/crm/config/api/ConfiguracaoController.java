@@ -13,55 +13,37 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
+/**
+ * Controller de configuracoes globais do sistema.
+ *
+ * <p>Nota sobre Modulith: endpoints de template de contrato foram movidos para
+ * {@code ContratoTemplateController} (modulo contrato) pois template e responsabilidade
+ * do dominio contrato, nao do modulo fundacional config.
+ * O modulo config NAO deve depender de modulos de dominio.
+ */
 @RestController
 @RequestMapping("/api/v1/config")
-@Tag(name = "Config", description = "Configurações globais do sistema")
+@Tag(name = "Config", description = "Configuracoes globais do sistema")
 @RolesAllowed("ADMIN")
 public class ConfiguracaoController {
 
     private final ConfiguracaoService configuracaoService;
-    private final com.photoizer.crm.contrato.service.ContratoTemplateService templateService;
 
-    public ConfiguracaoController(ConfiguracaoService configuracaoService,
-                                  com.photoizer.crm.contrato.service.ContratoTemplateService templateService) {
+    public ConfiguracaoController(ConfiguracaoService configuracaoService) {
         this.configuracaoService = configuracaoService;
-        this.templateService = templateService;
     }
 
     @GetMapping
-    @Operation(summary = "Obter configurações globais")
-    public ResponseEntity<Map<String, Object>> getConfig() {
-        return ResponseEntity.ok(configuracaoService.getConfig());
+    @Operation(summary = "Obter configuracoes globais")
+    public ResponseEntity<ConfiguracaoResponse> getConfig() {
+        var configs = configuracaoService.getConfig();
+        return ResponseEntity.ok(ConfiguracaoResponse.of(configs));
     }
 
     @PutMapping
-    @Operation(summary = "Atualizar configurações globais")
+    @Operation(summary = "Atualizar configuracoes globais")
     public ResponseEntity<Void> atualizar(@RequestBody Map<String, String> valores) {
         configuracaoService.atualizarMultiplos(valores);
         return ResponseEntity.ok().build();
-    }
-
-    @GetMapping("/contrato/template")
-    @Operation(summary = "Obter template do contrato")
-    public ResponseEntity<java.util.Map<String, String>> getTemplate() {
-        var template = templateService.carregarTemplate();
-        return ResponseEntity.ok(java.util.Map.of("template", template != null ? template : ""));
-    }
-
-    @PutMapping("/contrato/template")
-    @Operation(summary = "Atualizar template do contrato")
-    public ResponseEntity<Void> atualizarTemplate(@RequestBody java.util.Map<String, String> body) {
-        var novoTemplate = body.get("template");
-        if (novoTemplate != null) {
-            configuracaoService.atualizarValorTexto(templateService.getTemplateKey(), novoTemplate);
-        }
-        return ResponseEntity.ok().build();
-    }
-
-    @PutMapping("/contrato/template/padrao")
-    @Operation(summary = "Restaurar template padrão do contrato")
-    public ResponseEntity<java.util.Map<String, String>> restaurarPadrao() {
-        configuracaoService.atualizarValorTexto(templateService.getTemplateKey(), com.photoizer.crm.shared.config.DataSeeder.TEMPLATO_PADRAO);
-        return ResponseEntity.ok(java.util.Map.of("template", com.photoizer.crm.shared.config.DataSeeder.TEMPLATO_PADRAO));
     }
 }

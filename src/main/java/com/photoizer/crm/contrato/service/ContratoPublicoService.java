@@ -1,5 +1,6 @@
 package com.photoizer.crm.contrato.service;
 
+import com.photoizer.crm.config.model.ConfigKey;
 import com.photoizer.crm.config.service.ConfiguracaoService;
 import com.photoizer.crm.contrato.api.ContratoPublicoResponse;
 import com.photoizer.crm.contrato.api.ContratoStatusPublicoResponse;
@@ -76,11 +77,11 @@ public class ContratoPublicoService {
 
         return ContratoPublicoResponse.of(
             contrato,
-            configuracaoService.getValorTexto("nomeContratada", "Carol Oliva Fotografia"),
-            configuracaoService.getValorTexto("cnpjContratada", ""),
-            configuracaoService.getValorTexto("enderecoContratada", ""),
-            configuracaoService.getValorTexto("pixChave", ""),
-            configuracaoService.getValorTexto("pixTipoChave", "CNPJ"),
+            configuracaoService.getValor(ConfigKey.NOME_CONTRATADA),
+            configuracaoService.getValor(ConfigKey.CNPJ_CONTRATADA),
+            configuracaoService.getValor(ConfigKey.ENDERECO_CONTRATADA),
+            configuracaoService.getValor(ConfigKey.PIX_CHAVE),
+            configuracaoService.getValor(ConfigKey.PIX_TIPO_CHAVE),
             html,
             profissionais
         );
@@ -98,11 +99,11 @@ public class ContratoPublicoService {
             String cpf, String cidade, String estado, boolean autoriza,
             String nomeAssina, String ip) {
         var dataHora = c.getDataHoraEnsaio();
-        var pixChave = configuracaoService.getValorTexto("pixChave", "");
-        var pixTipo = configuracaoService.getValorTexto("pixTipoChave", "CNPJ");
-        var contratadaNome = configuracaoService.getValorTexto("nomeContratada", "");
-        var contratadaCnpj = configuracaoService.getValorTexto("cnpjContratada", "");
-        var contratadaCidade = configuracaoService.getValorTexto("enderecoContratada", "");
+        var pixChave = configuracaoService.getValor(ConfigKey.PIX_CHAVE);
+        var pixTipo = configuracaoService.getValor(ConfigKey.PIX_TIPO_CHAVE);
+        var contratadaNome = configuracaoService.getValor(ConfigKey.NOME_CONTRATADA);
+        var contratadaCnpj = configuracaoService.getValor(ConfigKey.CNPJ_CONTRATADA);
+        var contratadaCidade = configuracaoService.getValor(ConfigKey.ENDERECO_CONTRATADA);
 
         var autorizaTexto = !autoriza ? "( ) AUTORIZO\n( ) NÃO AUTORIZO"
             : autoriza ? "(X) AUTORIZO\n( ) NÃO AUTORIZO"
@@ -257,9 +258,9 @@ public class ContratoPublicoService {
         mapa.put("valorTotal", c.getValorTotal().toPlainString());
         mapa.put("valorEntradaExigido", c.getValorEntradaExigido().toPlainString());
         mapa.put("valorRestante", c.getValorRestante().toPlainString());
-        mapa.put("contratadaNome", configuracaoService.getValorTexto("nomeContratada", ""));
-        mapa.put("contratadaCnpj", configuracaoService.getValorTexto("cnpjContratada", ""));
-        mapa.put("contratadaCidade", configuracaoService.getValorTexto("enderecoContratada", ""));
+        mapa.put("contratadaNome", configuracaoService.getValor(ConfigKey.NOME_CONTRATADA));
+        mapa.put("contratadaCnpj", configuracaoService.getValor(ConfigKey.CNPJ_CONTRATADA));
+        mapa.put("contratadaCidade", configuracaoService.getValor(ConfigKey.ENDERECO_CONTRATADA));
         mapa.put("clienteNome", nome);
         mapa.put("clienteTelefone", telefone);
         mapa.put("clienteEmail", email);

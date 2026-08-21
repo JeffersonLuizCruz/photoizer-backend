@@ -1,6 +1,7 @@
 package com.photoizer.crm.financeiro.service;
 
 import com.photoizer.crm.cliente.repository.ClienteRepository;
+import com.photoizer.crm.config.model.ConfigKey;
 import com.photoizer.crm.config.service.ConfiguracaoService;
 import com.photoizer.crm.financeiro.api.ReceitaRequest;
 import com.photoizer.crm.financeiro.model.Receita;
@@ -165,7 +166,7 @@ public class ReceitaService {
 
     private void preencherComissao(Receita receita) {
         var bruto = receita.getValorBruto();
-        var percentual = configuracaoService.getValorDecimal("percentualComissao", BigDecimal.TEN);
+        var percentual = configuracaoService.getValorDecimal(ConfigKey.PERCENTUAL_COMISSAO);
 
         var comissao = bruto.multiply(percentual).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
         receita.setValorComissao(comissao);
