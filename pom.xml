@@ -115,6 +115,19 @@
 			<version>0.4.20</version>
 		</dependency>
 
+		<!--
+			PATTERN: Facade Pattern (futuro)
+			OpenPDF será utilizado pelo PdfWriter para gerar PDFs de forma robusta,
+			substituindo a geração manual de bytes PDF 1.4 que é frágil e limitada.
+			A biblioteca fornece suporte completo a UTF-8, layout flexível e
+			é a opção mais leve entre as alternativas (PDFBox, Flying Saucer).
+		-->
+		<dependency>
+			<groupId>com.github.librepdf</groupId>
+			<artifactId>openpdf</artifactId>
+			<version>1.3.30</version>
+		</dependency>
+
 		<dependency>
 			<groupId>com.h2database</groupId>
 			<artifactId>h2</artifactId>

@@ -17,7 +17,7 @@
 | 4 | **PDF de contrato gerado "na mão"** (bytes nativos) + `PdfGeneratorService` do documento é **stub** (`byte[0]`) | contrato, documento | Pendente |
 | 5 | **Escrita cross-module**: serviços mutam entidades de outros módulos (`Agendamento`, `FotoEnsaio`, `Indicacao`) diretamente | ecommerce, edicao, foto, financeiro, comissao, documento | Pendente |
 | 6 | **God classes** (`EcommerceService` 574, `FinanceiroService` 600, `FinanceiroDashboardService` 608, `AgendamentoService` 768, `EdicaoService` 534) | ecommerce, financeiro, agenda, edicao | Pendente |
-| 7 | **`findAll()` + agregação em memória** em dashboards/relatórios (tabelas crescentes) | dashboard, financeiro, comissao, indicador | Pendente |
+| 7 | ~~**`findAll()` + agregação em memória** em dashboards/relatórios (tabelas crescentes)~~ | ~~dashboard~~, financeiro, comissao, indicador | **RESOLVIDO** (dashboard) |
 | 8 | ~~**Vazamento de hash de senha do `Cliente`** nas respostas~~ | cliente | **RESOLVIDO** |
 | 9 | ~~**`Entidade` JPA como contrato da API** (retorna entidade em vez de DTO)~~ | ~~fotografo~~ | **RESOLVIDO** (fotografo) |
 | 10 | **Máquinas de estado sem validação central** (`if` espalhados, status como `String`) | agenda, contrato, comissao | Pendente |
@@ -56,10 +56,21 @@
 - PDF manual (nakie lib); `ContratoFotografo` com `@ManyToOne User` (auth); estados validados por `if`; `listar` filtra em memória; **`EXPIRADO` nunca aplicado**; eventos `ContratoAssinado/Devolvido` sem consumidor.
 
 ### dashboard
-- `findAll()` em 3 pontos; **7 repositórios de 6 módulos** sem facades; regras financeiras (deslocamento/comissão/repasse) duplicadas com o financeiro.
+- ~~`findAll()` em 3 pontos~~ **RESOLVIDO**: usa facades com queries agregadas SQL.
+- ~~**7 repositórios de 6 módulos** sem facades~~ **RESOLVIDO**: 6 QueryService facades + FinanceCalculator.
+- ~~regras financeiras (deslocamento/comissão/repasse) duplicadas com o financeiro~~ **RESOLVIDO**: `FinanceCalculator` compartilhado.
+- **RESOLVIDO**: projeção `Object[]` → `RepasseAggregation` interface tipada.
+- **RESOLVIDO**: `@Cacheable` em todos os 4 endpoints.
 
 ### despesa
-- Todas as exceções são `IllegalArgumentException`; job `@Scheduled` de recorrências junto do service.
+- ~~Todas as exceções são `IllegalArgumentException`~~ **RESOLVIDO**: hierarquia `DespesaNaoEncontradaException` (404), `CategoriaDespesaNaoEncontradaException` (404), `CategoriaDuplicadaException` (409), `CategoriaEmUsoException` (409), `DespesaRecorrenteNaoPagaException` (422); `GlobalExceptionHandler` atualizado.
+- ~~Soma de valores em memória (3 métodos)~~ **RESOLVIDO**: queries JPQL `COALESCE(SUM)` no `DespesaRepository`.
+- ~~Duplicação queries recorrência~~ **RESOLVIDO**: `buscarRecorrentesVencidas()` compartilhado.
+- ~~Acoplamento direto a `AgendamentoRepository`~~ **RESOLVIDO**: `DespesaAgendamentoGateway` (porta/ACL) + `AgendamentoGatewayAdapter`.
+- **DTOs**: `DespesaMapper` (MapStruct) criado; controller usa mapper; `static of()` mantido para backward compat.
+- **SRP**: `DespesaCategoriaService` extraído de `DespesaService` (312→~230 linhas).
+- **Ordenação**: `DespesaSpecification.parseSort()` tipado centralizado.
+- Job `@Scheduled` de recorrências junto do service (P3 — sem lock/idempotência).
 
 ### documento
 - **Endpoints bloqueados** (`denyAll`); **PDF é stub**; escrita cross-module (`contratoGerado` no `Agendamento`); duplica `documento` vs `contrato`.

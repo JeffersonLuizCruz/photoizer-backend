@@ -2,14 +2,12 @@ package com.photoizer.crm.contrato.api;
 
 import com.photoizer.crm.contrato.model.StatusContrato;
 import com.photoizer.crm.contrato.service.GestaoContratoService;
+import com.photoizer.crm.shared.storage.FileServeHelper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,9 +17,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -30,9 +25,11 @@ import java.util.UUID;
 public class ContratoController {
 
     private final GestaoContratoService contratoService;
+    private final FileServeHelper fileServeHelper;
 
-    public ContratoController(GestaoContratoService contratoService) {
+    public ContratoController(GestaoContratoService contratoService, FileServeHelper fileServeHelper) {
         this.contratoService = contratoService;
+        this.fileServeHelper = fileServeHelper;
     }
 
     @GetMapping
@@ -107,7 +104,8 @@ public class ContratoController {
         if (contrato.getUrlPdf() == null) {
             return ResponseEntity.notFound().build();
         }
-        return serveArquivo(contrato.getUrlPdf(), "contrato_" + id + ".pdf", MediaType.APPLICATION_PDF);
+        return fileServeHelper.servirArquivo(
+            contrato.getUrlPdf(), "contrato_" + id + ".pdf", "inline");
     }
 
     @GetMapping("/{id}/comprovante")
@@ -117,38 +115,7 @@ public class ContratoController {
         if (contrato.getUrlComprovanteEntrada() == null) {
             return ResponseEntity.notFound().build();
         }
-        var tipo = contentType(contrato.getUrlComprovanteEntrada());
-        return serveArquivo(contrato.getUrlComprovanteEntrada(), "comprovante",
-            tipo != null ? tipo : MediaType.APPLICATION_OCTET_STREAM);
-    }
-
-    /**
-     * Pattern: Defense in Depth — valida que o caminho esta dentro do diretorio
-     * de uploads antes de servir o arquivo, prevenindo path traversal se o banco
-     * for adulterado com um caminho como "../../etc/passwd".
-     */
-    private ResponseEntity<Resource> serveArquivo(String caminho, String filename, MediaType tipo) {
-        var uploadDir = Path.of("uploads").toAbsolutePath().normalize();
-        var file = Path.of(caminho).toAbsolutePath().normalize();
-        if (!file.startsWith(uploadDir)) {
-            return ResponseEntity.badRequest().build();
-        }
-        var resource = new FileSystemResource(file);
-        if (!resource.exists()) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.ok()
-            .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
-            .contentType(tipo)
-            .body(resource);
-    }
-
-    private MediaType contentType(String caminho) {
-        try {
-            var tipo = Files.probeContentType(Path.of(caminho));
-            return tipo != null ? MediaType.parseMediaType(tipo) : null;
-        } catch (Exception e) {
-            return null;
-        }
+        return fileServeHelper.servirArquivo(
+            contrato.getUrlComprovanteEntrada(), "comprovante", "inline");
     }
 }

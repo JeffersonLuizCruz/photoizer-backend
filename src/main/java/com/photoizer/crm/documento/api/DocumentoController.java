@@ -4,9 +4,9 @@ import com.photoizer.crm.agenda.exception.AgendamentoNaoEncontradoException;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.documento.model.TipoComprovante;
 import com.photoizer.crm.documento.service.DocumentoService;
+import com.photoizer.crm.shared.storage.FileServeHelper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -16,8 +16,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.UUID;
 
 @RestController
@@ -27,11 +25,14 @@ public class DocumentoController {
 
     private final DocumentoService documentoService;
     private final AgendamentoRepository agendamentoRepository;
+    private final FileServeHelper fileServeHelper;
 
     public DocumentoController(DocumentoService documentoService,
-                               AgendamentoRepository agendamentoRepository) {
+                               AgendamentoRepository agendamentoRepository,
+                               FileServeHelper fileServeHelper) {
         this.documentoService = documentoService;
         this.agendamentoRepository = agendamentoRepository;
+        this.fileServeHelper = fileServeHelper;
     }
 
     @GetMapping("/contratos/{agendamentoId}")
@@ -73,35 +74,9 @@ public class DocumentoController {
             return ResponseEntity.notFound().build();
         }
 
-        var file = new FileSystemResource(Path.of(caminho));
-        if (!file.exists()) {
-            return ResponseEntity.notFound().build();
-        }
+        var filename = "comprovante_" + tipo + "_" + agendamentoId
+            + fileServeHelper.extrairExtensao(caminho);
 
-        var contentType = resolverContentType(caminho);
-        var filename = "comprovante_" + tipo + "_" + agendamentoId + extensaoDoArquivo(caminho);
-
-        return ResponseEntity.ok()
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
-            .contentType(contentType)
-            .body(file);
-    }
-
-    private MediaType resolverContentType(String caminho) {
-        try {
-            var probe = Files.probeContentType(Path.of(caminho));
-            if (probe != null) {
-                return MediaType.parseMediaType(probe);
-            }
-        } catch (Exception ignored) {
-        }
-        return MediaType.APPLICATION_OCTET_STREAM;
-    }
-
-    private String extensaoDoArquivo(String caminho) {
-        if (caminho == null) return ".bin";
-        var nome = Path.of(caminho).getFileName().toString();
-        var idx = nome.lastIndexOf('.');
-        return idx >= 0 ? nome.substring(idx) : ".bin";
+        return fileServeHelper.servirArquivo(caminho, filename, "attachment");
     }
 }
