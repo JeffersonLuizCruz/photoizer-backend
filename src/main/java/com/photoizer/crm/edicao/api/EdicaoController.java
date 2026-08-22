@@ -5,6 +5,7 @@ import com.photoizer.crm.edicao.service.EdicaoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.security.RolesAllowed;
+import jakarta.validation.Valid;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -22,8 +23,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -107,7 +108,7 @@ public class EdicaoController {
     @PatchMapping("/{agendamentoId}/publicar")
     @Operation(summary = "Publicar fotos editadas no ecommerce")
     @RolesAllowed("ADMIN")
-    public ResponseEntity<List<FotoEdicaoResponse>> publicarNoEcommerce(@PathVariable UUID agendamentoId) {
+    public ResponseEntity<EdicaoResponse> publicarNoEcommerce(@PathVariable UUID agendamentoId) {
         return ResponseEntity.ok(edicaoService.publicarNoEcommerce(agendamentoId));
     }
 
@@ -176,9 +177,8 @@ public class EdicaoController {
     @RolesAllowed({"ADMIN", "EDITOR"})
     public ResponseEntity<EdicaoResponse> atualizarObservacoes(
             @PathVariable UUID agendamentoId,
-            @RequestBody Map<String, String> body) {
-        var observacoes = body.getOrDefault("observacoes", "");
-        var response = edicaoService.atualizarObservacoes(agendamentoId, observacoes);
+            @RequestBody @Valid ObservacoesRequest body) {
+        var response = edicaoService.atualizarObservacoes(agendamentoId, body.observacoes());
         return ResponseEntity.ok(response);
     }
 
@@ -186,7 +186,7 @@ public class EdicaoController {
     @Operation(summary = "Revisar foto (aprovar/rejeitar + comentário)")
     public ResponseEntity<FotoEdicaoResponse> revisarFoto(
             @PathVariable UUID fotoId,
-            @RequestBody RevisaoRequest request) {
+            @RequestBody @Valid RevisaoRequest request) {
         return ResponseEntity.ok(edicaoService.revisarFoto(fotoId, request));
     }
 
@@ -194,7 +194,7 @@ public class EdicaoController {
     @Operation(summary = "Reordenar fotos da edicao")
     @RolesAllowed({"ADMIN", "EDITOR"})
     public ResponseEntity<List<FotoEdicaoResponse>> reordenarFotos(
-            @RequestBody List<Map<String, Object>> fotos) {
+            @RequestBody @Valid List<ReordenarFotoRequest> fotos) {
         var response = edicaoService.reordenarFotos(fotos);
         return ResponseEntity.ok(response);
     }
@@ -202,35 +202,27 @@ public class EdicaoController {
     @GetMapping("/{agendamentoId}/download-raw")
     @Operation(summary = "Download de todas as RAW em ZIP")
     @RolesAllowed({"ADMIN", "EDITOR"})
-    public ResponseEntity<Resource> downloadRawZip(@PathVariable UUID agendamentoId) {
-        try {
-            var zipPath = edicaoService.gerarZipRaw(agendamentoId);
-            var resource = new FileSystemResource(zipPath.toFile());
-            return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                    "attachment; filename=\"raw_" + agendamentoId + ".zip\"")
-                .body(resource);
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().build();
-        }
+    public ResponseEntity<Resource> downloadRawZip(@PathVariable UUID agendamentoId) throws IOException {
+        var zipPath = edicaoService.gerarZipRaw(agendamentoId);
+        var resource = new FileSystemResource(zipPath.toFile());
+        return ResponseEntity.ok()
+            .contentType(MediaType.APPLICATION_OCTET_STREAM)
+            .header(HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=\"raw_" + agendamentoId + ".zip\"")
+            .body(resource);
     }
 
     @GetMapping("/{agendamentoId}/download-editadas")
     @Operation(summary = "Download de todas as editadas em ZIP")
     @RolesAllowed({"ADMIN", "EDITOR"})
-    public ResponseEntity<Resource> downloadEditadasZip(@PathVariable UUID agendamentoId) {
-        try {
-            var zipPath = edicaoService.gerarZipEditadas(agendamentoId);
-            var resource = new FileSystemResource(zipPath.toFile());
-            return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                    "attachment; filename=\"editadas_" + agendamentoId + ".zip\"")
-                .body(resource);
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().build();
-        }
+    public ResponseEntity<Resource> downloadEditadasZip(@PathVariable UUID agendamentoId) throws IOException {
+        var zipPath = edicaoService.gerarZipEditadas(agendamentoId);
+        var resource = new FileSystemResource(zipPath.toFile());
+        return ResponseEntity.ok()
+            .contentType(MediaType.APPLICATION_OCTET_STREAM)
+            .header(HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=\"editadas_" + agendamentoId + ".zip\"")
+            .body(resource);
     }
 
     private MediaType mediaTypeFromFilename(String filename) {

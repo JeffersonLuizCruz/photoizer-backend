@@ -19,6 +19,7 @@ import com.photoizer.crm.edicao.exception.EdicaoNaoEncontradaException;
 import com.photoizer.crm.edicao.exception.FotoEdicaoNaoEncontradaException;
 import com.photoizer.crm.edicao.exception.FotoSemRawException;
 import com.photoizer.crm.edicao.exception.StatusEdicaoInvalidoException;
+import com.photoizer.crm.edicao.exception.EdicaoBusinessException;
 import com.photoizer.crm.ecommerce.exception.CarrinhoVazioException;
 import com.photoizer.crm.ecommerce.exception.CompraJaPagaException;
 import com.photoizer.crm.ecommerce.exception.CompraNaoEncontradaException;
@@ -108,6 +109,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(StatusEdicaoInvalidoException.class)
     public ResponseEntity<ErrorResponse> handleStatusEdicaoInvalido(StatusEdicaoInvalidoException e) {
         log.warn("Status de edicao invalido: {}", e.getMessage());
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
+    }
+
+    @ExceptionHandler(EdicaoBusinessException.class)
+    public ResponseEntity<ErrorResponse> handleEdicaoBusiness(EdicaoBusinessException e) {
+        log.warn("Exceção de negócio do módulo edição: {}", e.getMessage());
         return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
     }
 

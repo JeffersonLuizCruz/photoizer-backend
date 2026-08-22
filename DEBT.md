@@ -16,7 +16,7 @@
 | 3 | ~~**Exposição de `User` com `password`** na API~~ | fotografo | **RESOLVIDO** |
 | 4 | **PDF de contrato gerado "na mão"** (bytes nativos) + `PdfGeneratorService` do documento é **stub** (`byte[0]`) | contrato, documento | Pendente |
 | 5 | ~~**Escrita cross-module**: serviços mutam entidades de outros módulos~~ | ~~ecommerce~~ | **RESOLVIDO** (ecommerce: eventos `CompraExtraFotosAssociadasEvent`, `CompraExtraCanceladaEvent`, `CompraExtraPagaEvent`, `FotoDownloadEvent`, `FotosSelecionadasEvent`, `TokenGaleriaRegeneradoEvent` + listeners `FotoEcommerceEventListener`, `AgendamentoEcommerceEventListener`) |
-| 6 | **God classes** (`EcommerceService` 574, `FinanceiroService` 600, `FinanceiroDashboardService` 608, `AgendamentoService` 768, `EdicaoService` 534) | ecommerce, financeiro, agenda, edicao | Pendente |
+| 6 | **God classes** (`EcommerceService` 574, `FinanceiroService` 600, `FinanceiroDashboardService` 608, `AgendamentoService` 768, ~~`EdicaoService` 534~~) | ecommerce, financeiro, agenda, ~~edicao~~ | **RESOLVIDO** (edicao) |
 | 7 | ~~**`findAll()` + agregação em memória** em dashboards/relatórios (tabelas crescentes)~~ | ~~dashboard~~, financeiro, comissao, indicador | **RESOLVIDO** (dashboard) |
 | 8 | ~~**Vazamento de hash de senha do `Cliente`** nas respostas~~ | cliente | **RESOLVIDO** |
 | 9 | ~~**`Entidade` JPA como contrato da API** (retorna entidade em vez de DTO)~~ | ~~fotografo~~ | **RESOLVIDO** (fotografo) |
@@ -86,7 +86,19 @@
 - **State Pattern** aplicado: `StatusCompraExtra` enum com métodos de transição (`proximoAoComprovanteEnviado`, `proximoAoCancelar`, `podeSerCancelada`).
 
 ### edicao
-- **Escrita cross-module em `Agendamento`/`FotoEnsaio`**; service grande; dois fluxos de publicação duplicados (`publicarNoEcommerce` vs `publicarLoja`); 3 cópias de watermark/thumbnail.
+- **RESOLVIDO**: God class `EdicaoService` (534→~190 linhas): extraídos `EdicaoQueryService`, `RawUploadService`, `EdicaoUploadEditadasService`, `PublicacaoService`, `EdicaoRevisaoService`, `FotoEdicaoProcessor`, `EdicaoZipService`.
+- **RESOLVIDO**: Dois fluxos de publicação duplicados: `PublicacaoService.publicar(tipo)` unifica ECOMMERCE/LOJA via Strategy Pattern.
+- **RESOLVIDO**: 3 cópias de watermark/thumbnail: `FotoEdicaoProcessor.processar()` (Template Method).
+- **RESOLVIDO**: DTOs manuais: `EdicaoMapper` (MapStruct) substitui `static of()`.
+- **RESOLVIDO**: `reordenarFotos` com `Map<String,Object>`: record `ReordenarFotoRequest` + `@Valid`.
+- **RESOLVIDO**: Exceções duplicadas: hierarquia `EdicaoBusinessException` base + 4 subclasses.
+- **RESOLVIDO**: ZIP com `catch(Exception)` engolindo erros: controller propaga `IOException`.
+- **RESOLVIDO**: `ZipJobResponse` código morto: removido.
+- **RESOLVIDO**: `StatusFotoEdicao.EM_EDICAO` valor não utilizado: removido.
+- **RESOLVIDO**: `StatusEdicao` sem transições: State Pattern com `podeTransicionarPara()`.
+- **Pendente (P1)**: Escrita cross-module em `Agendamento`/`FotoEnsaio` — mantida por decisão (resolver transversalmente).
+- **Pendente (P2)**: N+1 de counts em listagens — `@Query` agregado pendente.
+- **Pendente (P3)**: `getCurrentUser()` N+1 — resolver via JWT claims.
 
 ### financeiro
 - God classes; `findAll()` + Streams; **escrita directa** (`status` do `Agendamento`, `Indicacao`); controller expõe entidades (`Pagamento`, `FotoExtra`, `VideoExtra`); regra de partilha duplicada.
@@ -129,7 +141,7 @@
 | **`status`/`origem` em `String`** | comissao, agenda, foto, despesa, contrato, ecommerce | enums com métodos de transição; nunca comparar `String.equals` |
 | **Exceções genéricas** | maioria | hierarquia central `BusinessException` + `HttpStatus`/código (decisão já aprovada) |
 | **DTOs manuais (`static of`/`Map`)** | quase todos | MapStruct (decisão já aprovada; Fase 2) — **iniciado em `agenda`** (AgendamentoMapper/RascunhoAgendamentoMapper) |
-| ~~**Escrita em entidade alheia** (ecommerce)~~ | ~~ecommerce, edicao, foto, financeiro, comissao, documento, notificacao~~ | **RESOLVIDO** (ecommerce): eventos de domínio + listeners; outros módulos pendentes |
+| ~~**Escrita em entidade alheia** (ecommerce)~~ | ~~ecommerce, edicao, foto, financeiro, comissao, documento, notificacao~~ | **RESOLVIDO** (ecommerce): eventos de domínio + listeners; **RESOLVIDO** (edicao): decidido manter escrita direta até refatoração transversal; outros módulos pendentes |
 | **Agregação em memória** | dashboard, financeiro, comissao, indicador, agenda | queries agregadas SQL (`SUM`/`GROUP BY`/`COUNT`) nos repositórios donos |
 
 ---
