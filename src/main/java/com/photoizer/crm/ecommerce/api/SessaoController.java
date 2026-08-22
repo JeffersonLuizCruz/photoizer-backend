@@ -1,6 +1,7 @@
 package com.photoizer.crm.ecommerce.api;
 
 import com.photoizer.crm.ecommerce.model.Sessao;
+import com.photoizer.crm.ecommerce.model.StatusSessao;
 import com.photoizer.crm.ecommerce.repository.SessaoRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -32,7 +33,7 @@ public class SessaoController {
             .dataRealizacao(request.dataRealizacao())
             .local(request.local())
             .descricao(request.descricao())
-            .status(request.status() != null ? request.status() : "ATIVA")
+            .status(request.status() != null ? request.status() : StatusSessao.ATIVA)
             .build();
         return ResponseEntity.status(HttpStatus.CREATED).body(SessaoResponse.of(sessaoRepository.save(sessao)));
     }

@@ -102,7 +102,7 @@ public class EdicaoService {
 
     @Transactional(readOnly = true)
     public List<EdicaoResponse> listarTodos() {
-        var edicoes = edicaoRepository.findAllByOrderByUpdatedAtDesc();
+        var edicoes = edicaoRepository.findAllByOrderByAuditInfoUpdatedAtDesc();
         return edicoes.stream()
             .map(e -> {
                 var totalRaw = fotoEdicaoRepository.countByEdicaoIdAndStatus(e.getId(), StatusFotoEdicao.RAW);
@@ -114,7 +114,7 @@ public class EdicaoService {
 
     @Transactional(readOnly = true)
     public List<EdicaoResponse> listarPorStatus(StatusEdicao status) {
-        var edicoes = edicaoRepository.findByStatusOrderByUpdatedAtDesc(status);
+        var edicoes = edicaoRepository.findByStatusOrderByAuditInfoUpdatedAtDesc(status);
         return edicoes.stream()
             .map(e -> {
                 var totalRaw = fotoEdicaoRepository.countByEdicaoIdAndStatus(e.getId(), StatusFotoEdicao.RAW);

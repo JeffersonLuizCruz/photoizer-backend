@@ -74,7 +74,7 @@ public class IndicacaoService {
 
     @Transactional(readOnly = true)
     public List<Indicacao> consultarPorTelefone(String telefone) {
-        return indicacaoRepository.findByIndicadorTelefoneOrderByCreatedAtDesc(telefone);
+        return indicacaoRepository.findByIndicadorTelefoneOrderByAuditInfoCreatedAtDesc(telefone);
     }
 
     /**
@@ -83,7 +83,7 @@ public class IndicacaoService {
      */
     @Transactional(readOnly = true)
     public ConsultaComissoesResponse consultarComAgendamento(String telefone) {
-        var indicacoes = indicacaoRepository.findByIndicadorTelefoneOrderByCreatedAtDesc(telefone);
+        var indicacoes = indicacaoRepository.findByIndicadorTelefoneOrderByAuditInfoCreatedAtDesc(telefone);
 
         var agendamentoIds = indicacoes.stream()
             .map(Indicacao::getAgendamentoId)

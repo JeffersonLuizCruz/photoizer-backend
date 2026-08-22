@@ -1,19 +1,24 @@
 package com.photoizer.crm.foto.model;
 
-import com.photoizer.crm.shared.model.BaseEntity;
+import com.photoizer.crm.shared.model.AuditInfo;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import lombok.experimental.SuperBuilder;
 
 import jakarta.persistence.ElementCollection;
 import java.time.LocalDate;
@@ -26,9 +31,19 @@ import java.util.UUID;
 @Table(name = "fotos_ensaio")
 @Getter
 @Setter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
-@SuperBuilder
-public class FotoEnsaio extends BaseEntity {
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class FotoEnsaio {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(nullable = false, updatable = false)
+    private UUID id;
+
+    @Embedded
+    @Builder.Default
+    private AuditInfo auditInfo = new AuditInfo();
 
     @NotNull
     @Column(nullable = false)
@@ -75,6 +90,7 @@ public class FotoEnsaio extends BaseEntity {
     private String descricao;
 
     @ElementCollection
+    @Builder.Default
     private List<String> tags = new ArrayList<>();
 
     @Size(max = 50)

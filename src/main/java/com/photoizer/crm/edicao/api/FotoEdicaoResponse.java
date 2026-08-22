@@ -33,7 +33,7 @@ public record FotoEdicaoResponse(
             f.getEditedPath() != null ? fotoBase + "/edited-preview" : null,
             f.getStatus().name(),
             f.getOrdem(),
-            f.getCreatedAt(),
+            f.getAuditInfo().getCreatedAt(),
             f.getAprovado(),
             f.getComentario()
         );

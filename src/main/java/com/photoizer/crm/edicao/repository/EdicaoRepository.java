@@ -12,9 +12,9 @@ public interface EdicaoRepository extends JpaRepository<Edicao, UUID> {
 
     Optional<Edicao> findByAgendamentoId(UUID agendamentoId);
 
-    List<Edicao> findByStatusOrderByUpdatedAtDesc(StatusEdicao status);
+    List<Edicao> findByStatusOrderByAuditInfoUpdatedAtDesc(StatusEdicao status);
 
-    List<Edicao> findAllByOrderByUpdatedAtDesc();
+    List<Edicao> findAllByOrderByAuditInfoUpdatedAtDesc();
 
     boolean existsByAgendamentoId(UUID agendamentoId);
 }

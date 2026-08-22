@@ -1,20 +1,25 @@
 package com.photoizer.crm.indicador.model;
 
-import com.photoizer.crm.shared.model.BaseEntity;
+import com.photoizer.crm.shared.model.AuditInfo;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
-import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import lombok.experimental.SuperBuilder;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 @Entity
 @Table(name = "indicadores", uniqueConstraints = {
@@ -22,9 +27,19 @@ import java.math.BigDecimal;
 })
 @Getter
 @Setter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
-@SuperBuilder
-public class Indicador extends BaseEntity {
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Indicador {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(nullable = false, updatable = false)
+    private UUID id;
+
+    @Embedded
+    @Builder.Default
+    private AuditInfo auditInfo = new AuditInfo();
 
     @NotBlank
     @Column(nullable = false, length = 255)

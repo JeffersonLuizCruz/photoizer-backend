@@ -1,20 +1,24 @@
 package com.photoizer.crm.comissao.model;
 
-import com.photoizer.crm.shared.model.BaseEntity;
+import com.photoizer.crm.shared.model.AuditInfo;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
-import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import lombok.experimental.SuperBuilder;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -24,9 +28,19 @@ import java.util.UUID;
 @Table(name = "indicacoes")
 @Getter
 @Setter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
-@SuperBuilder
-public class Indicacao extends BaseEntity {
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Indicacao {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(nullable = false, updatable = false)
+    private UUID id;
+
+    @Embedded
+    @Builder.Default
+    private AuditInfo auditInfo = new AuditInfo();
 
     @NotNull
     @Column(nullable = false)
@@ -71,10 +85,6 @@ public class Indicacao extends BaseEntity {
     @Column
     private LocalDateTime dataPagamento;
 
-    /**
-     * Transição de estado: marcar como paga.
-     * Só é permitida se o status atual for PENDENTE.
-     */
     public void pagar() {
         if (!status.podePagar()) {
             throw new IllegalStateException(
@@ -84,10 +94,6 @@ public class Indicacao extends BaseEntity {
         this.dataPagamento = LocalDateTime.now();
     }
 
-    /**
-     * Transição de estado: marcar como cancelada.
-     * Só é permitida se o status atual for PENDENTE.
-     */
     public void cancelar() {
         if (!status.podeCancelar()) {
             throw new IllegalStateException(

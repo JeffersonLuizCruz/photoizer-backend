@@ -1,5 +1,6 @@
 package com.photoizer.crm.ecommerce.api;
 
+import com.photoizer.crm.ecommerce.model.StatusSessao;
 import jakarta.validation.constraints.NotBlank;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -9,6 +10,6 @@ public record SessaoRequest(
     LocalDate dataRealizacao,
     String local,
     String descricao,
-    String status,
+    StatusSessao status,
     UUID clienteId
 ) {}

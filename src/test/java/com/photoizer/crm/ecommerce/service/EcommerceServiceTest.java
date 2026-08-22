@@ -210,7 +210,7 @@ class EcommerceServiceTest {
             .sessionId(sessionId)
             .build();
 
-        when(itemCarrinhoRepository.findBySessionIdAndAgendamentoIdOrderByCreatedAtAsc(sessionId, agendamentoId))
+        when(itemCarrinhoRepository.findBySessionIdAndAgendamentoIdOrderByAuditInfoCreatedAtAsc(sessionId, agendamentoId))
             .thenReturn(List.of(item));
         when(fotoEnsaioRepository.findAllById(anyList())).thenReturn(List.of(fotoPacote));
 

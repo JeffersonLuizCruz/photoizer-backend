@@ -19,6 +19,16 @@ import com.photoizer.crm.edicao.exception.EdicaoNaoEncontradaException;
 import com.photoizer.crm.edicao.exception.FotoEdicaoNaoEncontradaException;
 import com.photoizer.crm.edicao.exception.FotoSemRawException;
 import com.photoizer.crm.edicao.exception.StatusEdicaoInvalidoException;
+import com.photoizer.crm.ecommerce.exception.CarrinhoVazioException;
+import com.photoizer.crm.ecommerce.exception.CompraJaPagaException;
+import com.photoizer.crm.ecommerce.exception.CompraNaoEncontradaException;
+import com.photoizer.crm.ecommerce.exception.FotoIndisponivelException;
+import com.photoizer.crm.ecommerce.exception.FotoJaBaixadaException;
+import com.photoizer.crm.ecommerce.exception.FotoJaSelecionadaException;
+import com.photoizer.crm.ecommerce.exception.FotoNaoEncontradaException;
+import com.photoizer.crm.ecommerce.exception.GaleriaNaoEncontradaException;
+import com.photoizer.crm.ecommerce.exception.LimitePacoteExcedidoException;
+import com.photoizer.crm.ecommerce.exception.SessaoInvalidaException;
 import com.photoizer.crm.ecommerce.exception.TokenExpiradoException;
 import com.photoizer.crm.contrato.exception.ContratoEstadoInvalidoException;
 import com.photoizer.crm.contrato.exception.ContratoNaoEncontradoException;
@@ -105,6 +115,66 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleTokenExpirado(TokenExpiradoException e) {
         log.warn("Token da galeria expirado: {}", e.getMessage());
         return build(HttpStatus.GONE, e);
+    }
+
+    @ExceptionHandler(GaleriaNaoEncontradaException.class)
+    public ResponseEntity<ErrorResponse> handleGaleriaNaoEncontrada(GaleriaNaoEncontradaException e) {
+        log.warn("Galeria nao encontrada: {}", e.getMessage());
+        return build(HttpStatus.NOT_FOUND, e);
+    }
+
+    @ExceptionHandler(CompraNaoEncontradaException.class)
+    public ResponseEntity<ErrorResponse> handleCompraNaoEncontrada(CompraNaoEncontradaException e) {
+        log.warn("Compra nao encontrada: {}", e.getMessage());
+        return build(HttpStatus.NOT_FOUND, e);
+    }
+
+    @ExceptionHandler(FotoNaoEncontradaException.class)
+    public ResponseEntity<ErrorResponse> handleFotoNaoEncontrada(FotoNaoEncontradaException e) {
+        log.warn("Foto nao encontrada: {}", e.getMessage());
+        return build(HttpStatus.NOT_FOUND, e);
+    }
+
+    @ExceptionHandler(CarrinhoVazioException.class)
+    public ResponseEntity<ErrorResponse> handleCarrinhoVazio(CarrinhoVazioException e) {
+        log.warn("Carrinho vazio: {}", e.getMessage());
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
+    }
+
+    @ExceptionHandler(FotoJaSelecionadaException.class)
+    public ResponseEntity<ErrorResponse> handleFotoJaSelecionada(FotoJaSelecionadaException e) {
+        log.warn("Foto ja selecionada: {}", e.getMessage());
+        return build(HttpStatus.CONFLICT, e);
+    }
+
+    @ExceptionHandler(FotoJaBaixadaException.class)
+    public ResponseEntity<ErrorResponse> handleFotoJaBaixada(FotoJaBaixadaException e) {
+        log.warn("Foto ja baixada: {}", e.getMessage());
+        return build(HttpStatus.CONFLICT, e);
+    }
+
+    @ExceptionHandler(LimitePacoteExcedidoException.class)
+    public ResponseEntity<ErrorResponse> handleLimitePacoteExcedido(LimitePacoteExcedidoException e) {
+        log.warn("Limite do pacote excedido: {}", e.getMessage());
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
+    }
+
+    @ExceptionHandler(CompraJaPagaException.class)
+    public ResponseEntity<ErrorResponse> handleCompraJaPaga(CompraJaPagaException e) {
+        log.warn("Compra ja paga: {}", e.getMessage());
+        return build(HttpStatus.CONFLICT, e);
+    }
+
+    @ExceptionHandler(SessaoInvalidaException.class)
+    public ResponseEntity<ErrorResponse> handleSessaoInvalida(SessaoInvalidaException e) {
+        log.warn("Sessao invalida: {}", e.getMessage());
+        return build(HttpStatus.UNAUTHORIZED, e);
+    }
+
+    @ExceptionHandler(FotoIndisponivelException.class)
+    public ResponseEntity<ErrorResponse> handleFotoIndisponivel(FotoIndisponivelException e) {
+        log.warn("Foto indisponivel: {}", e.getMessage());
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
     }
 
     @ExceptionHandler(ContratoNaoEncontradoException.class)

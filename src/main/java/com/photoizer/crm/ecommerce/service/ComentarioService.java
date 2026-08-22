@@ -1,71 +1,57 @@
 package com.photoizer.crm.ecommerce.service;
 
-import com.photoizer.crm.agenda.model.Agendamento;
-import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.ecommerce.api.ComentarioRequest;
 import com.photoizer.crm.ecommerce.api.ComentarioResponse;
 import com.photoizer.crm.ecommerce.api.ComentariosPorFotoResponse;
-import com.photoizer.crm.ecommerce.exception.TokenExpiradoException;
+import com.photoizer.crm.ecommerce.exception.FotoIndisponivelException;
 import com.photoizer.crm.ecommerce.model.FotoComentario;
 import com.photoizer.crm.ecommerce.model.OrigemComentario;
 import com.photoizer.crm.ecommerce.repository.FotoComentarioRepository;
 import com.photoizer.crm.foto.api.FotoEnsaioResponse;
-import com.photoizer.crm.foto.model.FotoEnsaio;
 import com.photoizer.crm.foto.model.StatusFoto;
-import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.UUID;
 
 /**
- * Comentários por foto: clientes comentam via token da galeria e o fotógrafo/
+ * Comentarios por foto: clientes comentam via token da galeria e o fotografo/
  * admin visualiza e responde no painel administrativo.
+ *
+ * MODULITH: Usa GaleriaQueryService para queries read-only em FotoEnsaio.
+ * O módulo ecommerce NÃO deve escrever diretamente em FotoEnsaio.
  */
 @Service
 public class ComentarioService {
 
-    private final AgendamentoRepository agendamentoRepository;
-    private final FotoEnsaioRepository fotoEnsaioRepository;
+    private final GaleriaQueryService galeriaQueryService;
     private final FotoComentarioRepository comentarioRepository;
 
-    public ComentarioService(AgendamentoRepository agendamentoRepository,
-                             FotoEnsaioRepository fotoEnsaioRepository,
+    public ComentarioService(GaleriaQueryService galeriaQueryService,
                              FotoComentarioRepository comentarioRepository) {
-        this.agendamentoRepository = agendamentoRepository;
-        this.fotoEnsaioRepository = fotoEnsaioRepository;
+        this.galeriaQueryService = galeriaQueryService;
         this.comentarioRepository = comentarioRepository;
     }
 
-    @Transactional(readOnly = true)
-    public Agendamento buscarAgendamentoPorToken(UUID token) {
-        var agendamento = agendamentoRepository.findByTokenGaleria(token)
-            .orElseThrow(() -> new RuntimeException("Galeria não encontrada"));
-        if (agendamento.getTokenExpiracao() != null && agendamento.getTokenExpiracao().isBefore(LocalDateTime.now())) {
-            throw new TokenExpiradoException("O link da galeria expirou. Solicite um novo link ao fotógrafo.");
-        }
-        return agendamento;
-    }
-
-    private FotoEnsaio validarFotoPertencenteAoAgendamento(UUID agendamentoId, UUID fotoId) {
-        var foto = fotoEnsaioRepository.findById(fotoId)
-            .orElseThrow(() -> new RuntimeException("Foto não encontrada"));
+    private void validarFotoPertencenteAoAgendamento(UUID agendamentoId, UUID fotoId) {
+        var foto = galeriaQueryService.buscarFotoPorId(fotoId);
         if (!foto.getAgendamentoId().equals(agendamentoId)) {
-            throw new IllegalArgumentException("A foto não pertence a esta galeria");
+            throw new FotoIndisponivelException("A foto não pertence a esta galeria");
         }
-        return foto;
     }
 
     @Transactional
     public ComentarioResponse comentarCliente(UUID token, UUID fotoId, ComentarioRequest request) {
-        var agendamento = buscarAgendamentoPorToken(token);
-        var foto = validarFotoPertencenteAoAgendamento(agendamento.getId(), fotoId);
+        var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
+        var foto = galeriaQueryService.buscarFotoPorId(fotoId);
+        if (!foto.getAgendamentoId().equals(agendamento.getId())) {
+            throw new FotoIndisponivelException("A foto não pertence a esta galeria");
+        }
         if (!foto.isVisivel() || (foto.getStatus() != StatusFoto.PUBLICADA && foto.getStatus() != StatusFoto.PAGA)) {
-            throw new IllegalArgumentException("Esta foto não está disponível para comentários");
+            throw new FotoIndisponivelException("Esta foto não está disponível para comentários");
         }
         var comentario = FotoComentario.builder()
             .fotoId(foto.getId())
@@ -80,23 +66,23 @@ public class ComentarioService {
 
     @Transactional(readOnly = true)
     public List<ComentarioResponse> listarCliente(UUID token, UUID fotoId) {
-        var agendamento = buscarAgendamentoPorToken(token);
+        var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
         validarFotoPertencenteAoAgendamento(agendamento.getId(), fotoId);
-        return comentarioRepository.findByFotoIdOrderByCreatedAtAsc(fotoId).stream()
+        return comentarioRepository.findByFotoIdOrderByAuditInfoCreatedAtAsc(fotoId).stream()
             .map(ComentarioResponse::of)
             .toList();
     }
 
     @Transactional(readOnly = true)
     public List<ComentariosPorFotoResponse> listarAdmin(UUID agendamentoId) {
-        var comentarios = comentarioRepository.findByAgendamentoIdOrderByCreatedAtAsc(agendamentoId);
+        var comentarios = comentarioRepository.findByAgendamentoIdOrderByAuditInfoCreatedAtAsc(agendamentoId);
 
         var porFoto = new LinkedHashMap<UUID, List<FotoComentario>>();
         for (var comentario : comentarios) {
             porFoto.computeIfAbsent(comentario.getFotoId(), k -> new ArrayList<>()).add(comentario);
         }
 
-        return fotoEnsaioRepository.findByAgendamentoIdOrderByOrdemAsc(agendamentoId).stream()
+        return galeriaQueryService.listarFotosPorAgendamento(agendamentoId).stream()
             .map(foto -> new ComentariosPorFotoResponse(
                 FotoEnsaioResponse.of(foto),
                 porFoto.getOrDefault(foto.getId(), List.of()).stream()
@@ -127,7 +113,7 @@ public class ComentarioService {
 
     @Transactional
     public void marcarLidos(UUID agendamentoId, UUID fotoId) {
-        var comentarios = comentarioRepository.findByFotoIdOrderByCreatedAtAsc(fotoId).stream()
+        var comentarios = comentarioRepository.findByFotoIdOrderByAuditInfoCreatedAtAsc(fotoId).stream()
             .filter(c -> c.getAgendamentoId().equals(agendamentoId))
             .filter(c -> c.getOrigem() == OrigemComentario.CLIENTE && !c.isLida())
             .toList();

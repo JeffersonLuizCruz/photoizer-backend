@@ -1,16 +1,20 @@
 package com.photoizer.crm.agenda.model;
 
-import com.photoizer.crm.shared.model.BaseEntity;
+import com.photoizer.crm.shared.model.AuditInfo;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
-import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import lombok.experimental.SuperBuilder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -22,9 +26,19 @@ import java.util.UUID;
 })
 @Getter
 @Setter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
-@SuperBuilder
-public class RascunhoAgendamento extends BaseEntity {
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class RascunhoAgendamento {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(nullable = false, updatable = false)
+    private UUID id;
+
+    @Embedded
+    @Builder.Default
+    private AuditInfo auditInfo = new AuditInfo();
 
     @NotNull
     @Column(nullable = false)

@@ -21,12 +21,12 @@ public interface CompraExtraRepository extends JpaRepository<CompraExtra, UUID> 
 
     Page<CompraExtra> findByStatus(StatusCompraExtra status, Pageable pageable);
 
-    @Query("SELECT c FROM CompraExtra c WHERE c.createdAt BETWEEN :dataInicio AND :dataFim")
+    @Query("SELECT c FROM CompraExtra c WHERE c.auditInfo.createdAt BETWEEN :dataInicio AND :dataFim")
     Page<CompraExtra> findByPeriodo(@Param("dataInicio") LocalDateTime dataInicio,
                                     @Param("dataFim") LocalDateTime dataFim,
                                     Pageable pageable);
 
-    @Query("SELECT c FROM CompraExtra c WHERE c.status = :status AND c.createdAt BETWEEN :dataInicio AND :dataFim")
+    @Query("SELECT c FROM CompraExtra c WHERE c.status = :status AND c.auditInfo.createdAt BETWEEN :dataInicio AND :dataFim")
     Page<CompraExtra> findByStatusAndPeriodo(@Param("status") StatusCompraExtra status,
                                               @Param("dataInicio") LocalDateTime dataInicio,
                                               @Param("dataFim") LocalDateTime dataFim,

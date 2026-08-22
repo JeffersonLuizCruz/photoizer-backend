@@ -1,9 +1,13 @@
 package com.photoizer.crm.ecommerce.api;
 
-import com.photoizer.crm.ecommerce.model.ItemCarrinho;
 import com.photoizer.crm.ecommerce.model.MetodoPagamento;
+import com.photoizer.crm.ecommerce.service.CarrinhoService;
 import com.photoizer.crm.ecommerce.service.ComentarioService;
+import com.photoizer.crm.ecommerce.service.DownloadService;
 import com.photoizer.crm.ecommerce.service.EcommerceService;
+import com.photoizer.crm.ecommerce.service.GaleriaQueryService;
+import com.photoizer.crm.ecommerce.service.FavoritoService;
+import com.photoizer.crm.ecommerce.service.PagamentoExtraService;
 import com.photoizer.crm.ecommerce.service.SessionService;
 import com.photoizer.crm.foto.api.FotoEnsaioResponse;
 import com.photoizer.crm.foto.model.FotoEnsaio;
@@ -43,12 +47,30 @@ public class EcommerceController {
     private static final String HEADER_SESSION = "X-Session-Id";
 
     private final EcommerceService ecommerceService;
+    private final GaleriaQueryService galeriaQueryService;
+    private final CarrinhoService carrinhoService;
+    private final FavoritoService favoritoService;
+    private final DownloadService downloadService;
+    private final PagamentoExtraService pagamentoExtraService;
     private final FotoService fotoService;
     private final SessionService sessionService;
     private final ComentarioService comentarioService;
 
-    public EcommerceController(EcommerceService ecommerceService, FotoService fotoService, SessionService sessionService, ComentarioService comentarioService) {
+    public EcommerceController(EcommerceService ecommerceService,
+                               GaleriaQueryService galeriaQueryService,
+                               CarrinhoService carrinhoService,
+                               FavoritoService favoritoService,
+                               DownloadService downloadService,
+                               PagamentoExtraService pagamentoExtraService,
+                               FotoService fotoService,
+                               SessionService sessionService,
+                               ComentarioService comentarioService) {
         this.ecommerceService = ecommerceService;
+        this.galeriaQueryService = galeriaQueryService;
+        this.carrinhoService = carrinhoService;
+        this.favoritoService = favoritoService;
+        this.downloadService = downloadService;
+        this.pagamentoExtraService = pagamentoExtraService;
         this.fotoService = fotoService;
         this.sessionService = sessionService;
         this.comentarioService = comentarioService;
@@ -70,7 +92,7 @@ public class EcommerceController {
     @GetMapping("/galeria/{token}")
     @Operation(summary = "Listar fotos publicadas da galeria (via token)")
     public ResponseEntity<GaleriaResponse> galeria(@PathVariable UUID token) {
-        var agendamento = ecommerceService.buscarAgendamento(token);
+        var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
         var fotos = ecommerceService.listarFotosPublicadas(token);
         var response = new GaleriaResponse(
             fotos.stream().map(FotoEnsaioResponse::ofPublic).toList(),
@@ -97,7 +119,7 @@ public class EcommerceController {
             @PathVariable UUID token,
             @RequestHeader(value = HEADER_SESSION, required = false) String sessionId,
             @RequestBody AdicionarAoCarrinhoRequest request) {
-        ecommerceService.adicionarAoCarrinho(token, resolverSessionId(sessionId), request.fotoId());
+        carrinhoService.adicionarAoCarrinho(token, resolverSessionId(sessionId), request.fotoId());
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
@@ -107,7 +129,7 @@ public class EcommerceController {
             @PathVariable UUID token,
             @RequestHeader(value = HEADER_SESSION, required = false) String sessionId,
             @PathVariable UUID fotoId) {
-        ecommerceService.removerDoCarrinho(token, resolverSessionId(sessionId), fotoId);
+        carrinhoService.removerDoCarrinho(token, resolverSessionId(sessionId), fotoId);
         return ResponseEntity.ok().build();
     }
 
@@ -116,10 +138,10 @@ public class EcommerceController {
     public ResponseEntity<CarrinhoResponse> listarCarrinho(
             @PathVariable UUID token,
             @RequestHeader(value = HEADER_SESSION, required = false) String sessionId) {
-        var itens = ecommerceService.listarCarrinho(token, resolverSessionId(sessionId));
+        var itens = carrinhoService.listarCarrinho(token, resolverSessionId(sessionId));
         var valorUnitario = ecommerceService.getValorUnitarioFotoExtraPorToken(token);
         var itensResponse = itens.stream()
-            .map(ItemCarrinho::getFotoId)
+            .map(com.photoizer.crm.ecommerce.model.ItemCarrinho::getFotoId)
             .map(fotoService::buscarPorId)
             .map(FotoEnsaioResponse::ofPublic)
             .map(fotoResponse -> CarrinhoItemResponse.of(fotoResponse, itens.size(), 0, valorUnitario))
@@ -132,7 +154,7 @@ public class EcommerceController {
     public ResponseEntity<Integer> contarCarrinho(
             @PathVariable UUID token,
             @RequestHeader(value = HEADER_SESSION, required = false) String sessionId) {
-        return ResponseEntity.ok(ecommerceService.contarCarrinho(token, resolverSessionId(sessionId)));
+        return ResponseEntity.ok(carrinhoService.contarCarrinho(token, resolverSessionId(sessionId)));
     }
 
     @GetMapping("/galeria/{token}/calcular")
@@ -140,7 +162,7 @@ public class EcommerceController {
     public ResponseEntity<CalculoCarrinhoResponse> calcular(
             @PathVariable UUID token,
             @RequestHeader(value = HEADER_SESSION, required = false) String sessionId) {
-        return ResponseEntity.ok(ecommerceService.calcularCarrinho(token, resolverSessionId(sessionId)));
+        return ResponseEntity.ok(carrinhoService.calcularCarrinho(token, resolverSessionId(sessionId)));
     }
 
     @PostMapping("/galeria/{token}/checkout")
@@ -152,7 +174,7 @@ public class EcommerceController {
         var metodo = request != null && request.metodoPagamento() != null
             ? MetodoPagamento.valueOf(request.metodoPagamento().toUpperCase())
             : null;
-        var compra = ecommerceService.checkout(token, resolverSessionId(sessionId), metodo);
+        var compra = ecommerceService.checkout(token, resolverSessionId(sessionId), metodo, carrinhoService);
         return ResponseEntity.status(HttpStatus.CREATED).body(CompraExtraResponse.ofPublic(compra));
     }
 
@@ -201,14 +223,14 @@ public class EcommerceController {
     public ResponseEntity<CompraExtraResponse> simularPagamento(
             @PathVariable UUID token,
             @PathVariable UUID compraExtraId) {
-        var compra = ecommerceService.simularPagamento(token, compraExtraId);
+        var compra = pagamentoExtraService.simularPagamento(token, compraExtraId);
         return ResponseEntity.ok(CompraExtraResponse.ofPublic(compra));
     }
 
     @PatchMapping("/admin/compras/{compraExtraId}/confirmar")
     @Operation(summary = "Confirmar pagamento da compra de extras (admin)")
     public ResponseEntity<Void> confirmarPagamento(@PathVariable UUID compraExtraId) {
-        ecommerceService.confirmarPagamento(compraExtraId);
+        pagamentoExtraService.confirmarPagamento(compraExtraId);
         return ResponseEntity.ok().build();
     }
 
@@ -218,7 +240,7 @@ public class EcommerceController {
             @PathVariable UUID token,
             @RequestHeader(value = HEADER_SESSION, required = false) String sessionId,
             @PathVariable UUID fotoId) {
-        ecommerceService.adicionarFavorito(token, resolverSessionId(sessionId), fotoId);
+        favoritoService.adicionarFavorito(token, resolverSessionId(sessionId), fotoId);
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
@@ -228,7 +250,7 @@ public class EcommerceController {
             @PathVariable UUID token,
             @RequestHeader(value = HEADER_SESSION, required = false) String sessionId,
             @PathVariable UUID fotoId) {
-        ecommerceService.removerFavorito(token, resolverSessionId(sessionId), fotoId);
+        favoritoService.removerFavorito(token, resolverSessionId(sessionId), fotoId);
         return ResponseEntity.ok().build();
     }
 
@@ -237,7 +259,7 @@ public class EcommerceController {
     public ResponseEntity<List<UUID>> listarFavoritos(
             @PathVariable UUID token,
             @RequestHeader(value = HEADER_SESSION, required = false) String sessionId) {
-        return ResponseEntity.ok(ecommerceService.listarFavoritos(token, resolverSessionId(sessionId)));
+        return ResponseEntity.ok(favoritoService.listarFavoritos(token, resolverSessionId(sessionId)));
     }
 
     @GetMapping("/galeria/{token}/download/{fotoId}")
@@ -245,7 +267,7 @@ public class EcommerceController {
     public ResponseEntity<Resource> downloadFoto(
             @PathVariable UUID token,
             @PathVariable UUID fotoId) {
-        var originalPath = ecommerceService.downloadFoto(token, fotoId);
+        var originalPath = downloadService.downloadFoto(token, fotoId);
         var file = new FileSystemResource(originalPath);
         return ResponseEntity.ok()
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + originalPath.getFileName().toString() + "\"")
@@ -256,7 +278,7 @@ public class EcommerceController {
     @GetMapping("/galeria/{token}/download-zip")
     @Operation(summary = "Baixar todas as fotos liberadas em ZIP")
     public ResponseEntity<Resource> downloadZip(@PathVariable UUID token) {
-        var zipPath = ecommerceService.downloadZip(token);
+        var zipPath = downloadService.downloadZip(token);
         var file = new FileSystemResource(zipPath);
         return ResponseEntity.ok()
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"fotos.zip\"")

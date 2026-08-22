@@ -1,16 +1,23 @@
 package com.photoizer.crm.ecommerce.model;
 
-import com.photoizer.crm.shared.model.BaseEntity;
+import com.photoizer.crm.shared.model.AuditInfo;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import lombok.experimental.SuperBuilder;
 
 import java.time.LocalDate;
 import java.util.UUID;
@@ -19,9 +26,19 @@ import java.util.UUID;
 @Table(name = "sessoes")
 @Getter
 @Setter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
-@SuperBuilder
-public class Sessao extends BaseEntity {
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Sessao {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(nullable = false, updatable = false)
+    private UUID id;
+
+    @Embedded
+    @Builder.Default
+    private AuditInfo auditInfo = new AuditInfo();
 
     @Column
     private UUID clienteId;
@@ -41,7 +58,8 @@ public class Sessao extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String descricao;
 
-    @Size(max = 20)
-    @Column(length = 20)
-    private String status;
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private StatusSessao status;
 }

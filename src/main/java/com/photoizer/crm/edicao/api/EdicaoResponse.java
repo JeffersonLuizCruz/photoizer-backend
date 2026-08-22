@@ -35,8 +35,8 @@ public record EdicaoResponse(
             e.getObservacoes(),
             totalRaw,
             totalEditadas,
-            e.getCreatedAt(),
-            e.getUpdatedAt()
+            e.getAuditInfo().getCreatedAt(),
+            e.getAuditInfo().getUpdatedAt()
         );
     }
 }

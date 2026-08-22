@@ -15,7 +15,7 @@ public interface IndicacaoRepository extends JpaRepository<Indicacao, UUID> {
 
     List<Indicacao> findByIndicadorId(UUID indicadorId);
 
-    List<Indicacao> findByIndicadorTelefoneOrderByCreatedAtDesc(String indicadorTelefone);
+    List<Indicacao> findByIndicadorTelefoneOrderByAuditInfoCreatedAtDesc(String indicadorTelefone);
 
     @Query("SELECT i FROM Indicacao i WHERE i.agendamentoId IN :ids")
     List<Indicacao> findByAgendamentoIdIn(@Param("ids") List<UUID> ids);

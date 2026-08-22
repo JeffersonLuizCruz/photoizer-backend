@@ -8,7 +8,7 @@ import java.util.UUID;
 
 public interface ItemCarrinhoRepository extends JpaRepository<ItemCarrinho, UUID> {
 
-    List<ItemCarrinho> findBySessionIdAndAgendamentoIdOrderByCreatedAtAsc(UUID sessionId, UUID agendamentoId);
+    List<ItemCarrinho> findBySessionIdAndAgendamentoIdOrderByAuditInfoCreatedAtAsc(UUID sessionId, UUID agendamentoId);
 
     void deleteBySessionIdAndAgendamentoIdAndFotoId(UUID sessionId, UUID agendamentoId, UUID fotoId);
 

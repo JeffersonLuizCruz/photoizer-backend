@@ -1,8 +1,8 @@
 package com.photoizer.crm.ecommerce.api;
 
-import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.ecommerce.model.StatusCompraExtra;
 import com.photoizer.crm.ecommerce.service.EcommerceService;
+import com.photoizer.crm.ecommerce.service.GaleriaQueryService;
 import com.photoizer.crm.foto.api.FotoEnsaioResponse;
 import com.photoizer.crm.foto.model.StatusFoto;
 import io.swagger.v3.oas.annotations.Operation;
@@ -25,21 +25,18 @@ import java.util.UUID;
 public class AdminEcommerceController {
 
     private final EcommerceService ecommerceService;
-    private final AgendamentoRepository agendamentoRepository;
+    private final GaleriaQueryService galeriaQueryService;
 
     public AdminEcommerceController(EcommerceService ecommerceService,
-                                    AgendamentoRepository agendamentoRepository) {
+                                    GaleriaQueryService galeriaQueryService) {
         this.ecommerceService = ecommerceService;
-        this.agendamentoRepository = agendamentoRepository;
+        this.galeriaQueryService = galeriaQueryService;
     }
 
     @GetMapping
     @Operation(summary = "Resumo completo do ecommerce do agendamento")
     public ResponseEntity<AdminEcommerceResumoResponse> resumo(@PathVariable UUID agendamentoId) {
-        var agendamento = agendamentoRepository.findById(agendamentoId)
-            .orElseThrow(() -> new RuntimeException("Agendamento não encontrado"));
-
-        var fotos = ecommerceService.listarFotosPorAgendamento(agendamentoId);
+        var fotos = galeriaQueryService.listarFotosPorAgendamento(agendamentoId);
         var compras = ecommerceService.listarComprasPorAgendamento(agendamentoId);
 
         var totalFotos = fotos.size();
@@ -57,12 +54,11 @@ public class AdminEcommerceController {
 
         var fotosResponse = fotos.stream().map(FotoEnsaioResponse::of).toList();
         var comprasResponse = compras.stream().map(CompraExtraResponse::ofAdmin).toList();
-        var linkGaleria = "/g/" + agendamento.getTokenGaleria();
 
         return ResponseEntity.ok(new AdminEcommerceResumoResponse(
             totalFotos, publicadas, selecionadas, pagas, aguardando,
-            fotosResponse, comprasResponse, valorTotalExtras, linkGaleria,
-            agendamento.getTokenGaleria()
+            fotosResponse, comprasResponse, valorTotalExtras, null,
+            null
         ));
     }
 

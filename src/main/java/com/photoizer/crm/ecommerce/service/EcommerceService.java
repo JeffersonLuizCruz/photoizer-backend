@@ -1,27 +1,24 @@
 package com.photoizer.crm.ecommerce.service;
 
-import com.photoizer.crm.agenda.model.Agendamento;
-import com.photoizer.crm.agenda.repository.AgendamentoRepository;
-import com.photoizer.crm.config.model.ConfigKey;
-import com.photoizer.crm.config.service.ConfiguracaoService;
 import com.photoizer.crm.ecommerce.api.AdminCompraDetalheResponse;
 import com.photoizer.crm.ecommerce.api.AdminComprasRelatorioResponse;
-import com.photoizer.crm.ecommerce.exception.TokenExpiradoException;
-import com.photoizer.crm.ecommerce.api.CalculoCarrinhoResponse;
-import com.photoizer.crm.ecommerce.api.CalculoItemResponse;
-import com.photoizer.crm.ecommerce.event.CompraExtraConfirmadaEvent;
 import com.photoizer.crm.ecommerce.event.CompraExtraCriadaEvent;
-import com.photoizer.crm.foto.api.FotoEnsaioResponse;
+import com.photoizer.crm.ecommerce.event.CompraExtraFotosAssociadasEvent;
+import com.photoizer.crm.ecommerce.event.FotosSelecionadasEvent;
+import com.photoizer.crm.ecommerce.event.TokenGaleriaRegeneradoEvent;
+import com.photoizer.crm.ecommerce.exception.CarrinhoVazioException;
+import com.photoizer.crm.ecommerce.exception.CompraNaoEncontradaException;
+import com.photoizer.crm.ecommerce.exception.FotoIndisponivelException;
+import com.photoizer.crm.ecommerce.exception.FotoJaSelecionadaException;
+import com.photoizer.crm.ecommerce.exception.FotoNaoEncontradaException;
+import com.photoizer.crm.ecommerce.exception.GaleriaNaoEncontradaException;
+import com.photoizer.crm.ecommerce.exception.LimitePacoteExcedidoException;
 import com.photoizer.crm.ecommerce.model.CompraExtra;
-import com.photoizer.crm.ecommerce.model.ItemCarrinho;
 import com.photoizer.crm.ecommerce.model.MetodoPagamento;
 import com.photoizer.crm.ecommerce.model.StatusCompraExtra;
-import com.photoizer.crm.ecommerce.model.Favorito;
 import com.photoizer.crm.ecommerce.repository.CompraExtraRepository;
-import com.photoizer.crm.ecommerce.repository.FavoritoRepository;
-import com.photoizer.crm.ecommerce.repository.ItemCarrinhoRepository;
+import com.photoizer.crm.foto.api.FotoEnsaioResponse;
 import com.photoizer.crm.foto.model.FotoEnsaio;
-import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
 import com.photoizer.crm.shared.storage.FileStorageService;
 import org.springframework.context.ApplicationEventPublisher;
@@ -32,120 +29,73 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 
+/**
+ * PATTERN: Facade Pattern (refatorado)
+ * Apos a extracao dos services especializados, o EcommerceService agora atua como
+ * um orquestrador fino que delega para CarrinhoService, FavoritoService,
+ * DownloadService, PagamentoExtraService e GaleriaQueryService.
+ * Restam apenas: checkout, selecao de fotos, queries admin, override selecao,
+ * regenerar token e upload de comprovante - que sao operacoes de orquestracao.
+ *
+ * MODULITH: Escritas em entidades de outros modulos sao feitas via eventos.
+ * O módulo ecommerce NÃO deve escrever diretamente em FotoEnsaio ou Agendamento.
+ */
 @Service
 @Transactional
 public class EcommerceService {
 
-    private static final BigDecimal PERCENTUAL_COMISSAO_PADRAO = BigDecimal.TEN;
-
-    private final AgendamentoRepository agendamentoRepository;
     private final FotoEnsaioRepository fotoEnsaioRepository;
     private final CompraExtraRepository compraExtraRepository;
-    private final ItemCarrinhoRepository itemCarrinhoRepository;
-    private final FavoritoRepository favoritoRepository;
-    private final ConfiguracaoService configuracaoService;
     private final FileStorageService fileStorageService;
     private final ApplicationEventPublisher eventPublisher;
+    private final GaleriaQueryService galeriaQueryService;
 
-    public EcommerceService(AgendamentoRepository agendamentoRepository,
-                            FotoEnsaioRepository fotoEnsaioRepository,
+    public EcommerceService(FotoEnsaioRepository fotoEnsaioRepository,
                             CompraExtraRepository compraExtraRepository,
-                            ItemCarrinhoRepository itemCarrinhoRepository,
-                            FavoritoRepository favoritoRepository,
-                            ConfiguracaoService configuracaoService,
                             FileStorageService fileStorageService,
-                            ApplicationEventPublisher eventPublisher) {
-        this.agendamentoRepository = agendamentoRepository;
+                            ApplicationEventPublisher eventPublisher,
+                            GaleriaQueryService galeriaQueryService) {
         this.fotoEnsaioRepository = fotoEnsaioRepository;
         this.compraExtraRepository = compraExtraRepository;
-        this.itemCarrinhoRepository = itemCarrinhoRepository;
-        this.favoritoRepository = favoritoRepository;
-        this.configuracaoService = configuracaoService;
         this.fileStorageService = fileStorageService;
         this.eventPublisher = eventPublisher;
+        this.galeriaQueryService = galeriaQueryService;
     }
 
-    // ==================== Wishlist / Favoritos (RF008) ====================
-
-    public void adicionarFavorito(UUID token, UUID sessionId, UUID fotoId) {
-        var agendamento = buscarAgendamentoPorToken(token);
-        if (favoritoRepository.findBySessionIdAndFotoId(sessionId, fotoId).isEmpty()) {
-            favoritoRepository.save(Favorito.builder()
-                .agendamentoId(agendamento.getId())
-                .fotoId(fotoId)
-                .sessionId(sessionId)
-                .build());
-        }
-    }
-
-    public void removerFavorito(UUID token, UUID sessionId, UUID fotoId) {
-        buscarAgendamentoPorToken(token);
-        favoritoRepository.deleteBySessionIdAndFotoId(sessionId, fotoId);
-    }
+    // ==================== Galeria (delegado para GaleriaQueryService) ====================
 
     @Transactional(readOnly = true)
-    public List<UUID> listarFavoritos(UUID token, UUID sessionId) {
-        var agendamento = buscarAgendamentoPorToken(token);
-        return favoritoRepository.findBySessionIdAndAgendamentoIdOrderByCreatedAtAsc(sessionId, agendamento.getId())
-            .stream().map(Favorito::getFotoId).toList();
-    }
-
-    @Transactional(readOnly = true)
-    public Agendamento buscarAgendamentoPorToken(UUID token) {
-        var agendamento = agendamentoRepository.findByTokenGaleria(token)
-            .orElseThrow(() -> new RuntimeException("Galeria não encontrada"));
-        if (agendamento.getTokenExpiracao() != null && agendamento.getTokenExpiracao().isBefore(LocalDateTime.now())) {
-            throw new TokenExpiradoException("O link da galeria expirou. Solicite um novo link ao fotógrafo.");
-        }
-        return agendamento;
-    }
-
-    @Transactional(readOnly = true)
-    public Agendamento buscarAgendamento(UUID token) {
-        return buscarAgendamentoPorToken(token);
-    }
-
-    @Transactional(readOnly = true)
-    public BigDecimal getValorUnitarioFotoExtra() {
-        return configuracaoService.getValorDecimal(ConfigKey.VALOR_FOTO_EXTRA);
+    public List<FotoEnsaio> listarFotosPublicadas(UUID token) {
+        return galeriaQueryService.listarFotosPublicadas(token);
     }
 
     @Transactional(readOnly = true)
     public BigDecimal getValorUnitarioFotoExtra(UUID agendamentoId) {
-        return agendamentoRepository.findById(agendamentoId)
-            .map(agendamento -> agendamento.getPacote().getPrecoFotoExtra())
-            .filter(preco -> preco != null && preco.signum() > 0)
-            .orElseGet(this::getValorUnitarioFotoExtra);
+        return galeriaQueryService.getValorUnitarioFotoExtra(agendamentoId);
     }
 
     @Transactional(readOnly = true)
     public BigDecimal getValorUnitarioFotoExtraPorToken(UUID token) {
-        var agendamento = buscarAgendamentoPorToken(token);
-        return getValorUnitarioFotoExtra(agendamento.getId());
+        var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
+        return galeriaQueryService.getValorUnitarioFotoExtra(agendamento.getId());
     }
 
     @Transactional(readOnly = true)
-    public List<FotoEnsaio> listarFotosPublicadas(UUID token) {
-        var agendamento = buscarAgendamentoPorToken(token);
-        return fotoEnsaioRepository.findPublicadasVisiveisByAgendamentoId(
-            agendamento.getId());
+    public List<FotoEnsaio> listarFotosPorAgendamento(UUID agendamentoId) {
+        return galeriaQueryService.listarFotosPorAgendamento(agendamentoId);
     }
 
-    public List<FotoEnsaio> selecionarFotos(UUID token, List<UUID> fotoIds, boolean selecionada) {
-        var agendamento = buscarAgendamentoPorToken(token);
+    // ==================== Selecao de Fotos ====================
 
+    public List<FotoEnsaio> selecionarFotos(UUID token, List<UUID> fotoIds, boolean selecionada) {
+        var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
         var fotos = fotoEnsaioRepository.findAllById(fotoIds);
 
         if (selecionada) {
@@ -156,8 +106,7 @@ public class EcommerceService {
             var jaSelecionadas = fotoEnsaioRepository.countSelecionadasPacoteByAgendamentoId(agendamento.getId());
             var novasSelecoes = fotosSolicitadas.stream().filter(f -> !f.isSelecionadaPacote()).count();
             if (jaSelecionadas + novasSelecoes > limitePacote) {
-                throw new IllegalArgumentException(
-                    "Limite do pacote excedido: máximo de " + limitePacote + " foto(s) selecionada(s) no pacote");
+                throw new LimitePacoteExcedidoException(limitePacote);
             }
         } else {
             var bloqueadas = fotos.stream()
@@ -165,61 +114,47 @@ public class EcommerceService {
                 .filter(f -> f.isSelecionadaPacote() && f.getDataDownload() != null)
                 .findAny();
             if (bloqueadas.isPresent()) {
-                throw new IllegalArgumentException(
-                    "Foto já baixada não pode ser removida do pacote");
+                throw new FotoJaSelecionadaException("Foto ja baixada nao pode ser removida do pacote");
             }
         }
-        for (var foto : fotos) {
-            if (!foto.getAgendamentoId().equals(agendamento.getId())) continue;
-            foto.setSelecionadaPacote(selecionada);
-        }
-        return fotoEnsaioRepository.saveAll(fotos.stream()
+
+        var fotoIdsValidas = fotos.stream()
             .filter(f -> f.getAgendamentoId().equals(agendamento.getId()))
-            .toList());
-    }
-
-    @Transactional(readOnly = true)
-    public CalculoCarrinhoResponse calcularCarrinho(UUID token, UUID sessionId) {
-        var agendamento = buscarAgendamentoPorToken(token);
-        var itensCarrinho = itemCarrinhoRepository.findBySessionIdAndAgendamentoIdOrderByCreatedAtAsc(sessionId, agendamento.getId());
-        var valorUnitario = getValorUnitarioFotoExtra(agendamento.getId());
-        var quantidade = itensCarrinho.size();
-        var subtotal = valorUnitario.multiply(BigDecimal.valueOf(quantidade)).setScale(2, RoundingMode.HALF_UP);
-
-        var itens = itensCarrinho.stream()
-            .map(ItemCarrinho::getFotoId)
-            .map(fotoEnsaioRepository::findById)
-            .filter(Optional::isPresent)
-            .map(Optional::get)
-            .filter(foto -> foto.getAgendamentoId().equals(agendamento.getId()))
-            .map(foto -> new CalculoItemResponse(foto.getId(), foto.getFileName(), valorUnitario))
+            .map(FotoEnsaio::getId)
             .toList();
 
-        return new CalculoCarrinhoResponse(itens, quantidade, valorUnitario, subtotal, subtotal);
+        eventPublisher.publishEvent(new FotosSelecionadasEvent(
+            agendamento.getId(), fotoIdsValidas, selecionada));
+
+        return fotoEnsaioRepository.findByAgendamentoIdOrderByOrdemAsc(agendamento.getId());
     }
 
-    public CompraExtra checkout(UUID token, UUID sessionId, MetodoPagamento metodoPagamento) {
-        var agendamento = buscarAgendamentoPorToken(token);
-        var itensCarrinho = itemCarrinhoRepository.findBySessionIdAndAgendamentoIdOrderByCreatedAtAsc(sessionId, agendamento.getId());
+    // ==================== Checkout ====================
+
+    public CompraExtra checkout(UUID token, UUID sessionId, MetodoPagamento metodoPagamento,
+                                CarrinhoService carrinhoService) {
+        var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
+        var itensCarrinho = carrinhoService.listarCarrinho(token, sessionId);
 
         if (itensCarrinho.isEmpty()) {
-            throw new IllegalArgumentException("Carrinho vazio");
+            throw new CarrinhoVazioException();
         }
 
-        var fotos = fotoEnsaioRepository.findAllById(itensCarrinho.stream().map(ItemCarrinho::getFotoId).toList())
+        var fotos = fotoEnsaioRepository.findAllById(
+                itensCarrinho.stream().map(com.photoizer.crm.ecommerce.model.ItemCarrinho::getFotoId).toList())
             .stream()
             .filter(f -> f.getAgendamentoId().equals(agendamento.getId()))
             .toList();
 
         if (fotos.isEmpty()) {
-            throw new IllegalArgumentException("Nenhuma foto válida no carrinho");
+            throw new FotoIndisponivelException("Nenhuma foto valida no carrinho");
         }
 
         if (fotos.stream().anyMatch(FotoEnsaio::isSelecionadaPacote)) {
-            throw new IllegalArgumentException("Fotos já incluídas no pacote não podem ser cobradas como extras");
+            throw new FotoIndisponivelException("Fotos ja incluidas no pacote nao podem ser cobradas como extras");
         }
 
-        var valorUnitario = getValorUnitarioFotoExtra(agendamento.getId());
+        var valorUnitario = galeriaQueryService.getValorUnitarioFotoExtra(agendamento.getId());
         var valorTotal = valorUnitario.multiply(BigDecimal.valueOf(fotos.size()))
             .setScale(2, RoundingMode.HALF_UP);
 
@@ -232,12 +167,11 @@ public class EcommerceService {
             .build();
         compra = compraExtraRepository.save(compra);
 
-        for (var foto : fotos) {
-            foto.setCompraExtraId(compra.getId());
-        }
-        fotoEnsaioRepository.saveAll(fotos);
+        var fotoIds = fotos.stream().map(FotoEnsaio::getId).toList();
+        eventPublisher.publishEvent(new CompraExtraFotosAssociadasEvent(
+            compra.getId(), agendamento.getId(), fotoIds));
 
-        itemCarrinhoRepository.deleteBySessionIdAndAgendamentoId(sessionId, agendamento.getId());
+        carrinhoService.limparCarrinho(token, sessionId);
 
         eventPublisher.publishEvent(new CompraExtraCriadaEvent(
             agendamento.getId(), compra.getId(), valorTotal, fotos.size()));
@@ -245,55 +179,15 @@ public class EcommerceService {
         return compra;
     }
 
-    public void adicionarAoCarrinho(UUID token, UUID sessionId, UUID fotoId) {
-        var agendamento = buscarAgendamentoPorToken(token);
-        var foto = fotoEnsaioRepository.findById(fotoId)
-            .orElseThrow(() -> new IllegalArgumentException("Foto não encontrada"));
-        if (!foto.getAgendamentoId().equals(agendamento.getId())) {
-            throw new IllegalArgumentException("Foto não pertence a esta galeria");
-        }
-        if (!foto.isVisivel() || foto.getStatus() != StatusFoto.PUBLICADA) {
-            throw new IllegalArgumentException("Foto não está disponível para compra");
-        }
-        if (foto.isSelecionadaPacote()) {
-            throw new IllegalArgumentException("Foto já incluída no pacote não pode ser adicionada ao carrinho");
-        }
-        var jaExiste = itemCarrinhoRepository.findBySessionIdAndAgendamentoIdOrderByCreatedAtAsc(sessionId, agendamento.getId())
-            .stream().anyMatch(item -> item.getFotoId().equals(fotoId));
-        if (!jaExiste) {
-            var item = ItemCarrinho.builder()
-                .agendamentoId(agendamento.getId())
-                .fotoId(fotoId)
-                .sessionId(sessionId)
-                .build();
-            itemCarrinhoRepository.save(item);
-        }
-    }
-
-    public void removerDoCarrinho(UUID token, UUID sessionId, UUID fotoId) {
-        var agendamento = buscarAgendamentoPorToken(token);
-        itemCarrinhoRepository.deleteBySessionIdAndAgendamentoIdAndFotoId(sessionId, agendamento.getId(), fotoId);
-    }
-
-    @Transactional(readOnly = true)
-    public List<ItemCarrinho> listarCarrinho(UUID token, UUID sessionId) {
-        var agendamento = buscarAgendamentoPorToken(token);
-        return itemCarrinhoRepository.findBySessionIdAndAgendamentoIdOrderByCreatedAtAsc(sessionId, agendamento.getId());
-    }
-
-    @Transactional(readOnly = true)
-    public int contarCarrinho(UUID token, UUID sessionId) {
-        var agendamento = buscarAgendamentoPorToken(token);
-        return itemCarrinhoRepository.countBySessionIdAndAgendamentoId(sessionId, agendamento.getId());
-    }
+    // ==================== Upload Comprovante ====================
 
     public CompraExtra uploadComprovante(UUID token, UUID compraExtraId, MultipartFile comprovante) {
-        var agendamento = buscarAgendamentoPorToken(token);
+        var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
         var compra = compraExtraRepository.findById(compraExtraId)
-            .orElseThrow(() -> new RuntimeException("Compra não encontrada"));
+            .orElseThrow(() -> new CompraNaoEncontradaException(compraExtraId));
 
         if (!compra.getAgendamentoId().equals(agendamento.getId())) {
-            throw new RuntimeException("Compra não pertence a este agendamento");
+            throw new CompraNaoEncontradaException(compraExtraId);
         }
 
         var caminho = fileStorageService.salvarEmSubdiretorio(comprovante, agendamento.getId(), "comprovante_extra");
@@ -303,85 +197,6 @@ public class EcommerceService {
         return compraExtraRepository.save(compra);
     }
 
-    @Transactional
-    public void confirmarPagamento(UUID compraExtraId) {
-        var compra = compraExtraRepository.findById(compraExtraId)
-            .orElseThrow(() -> new RuntimeException("Compra não encontrada"));
-
-        marcarCompraPaga(compra);
-    }
-
-    @Transactional
-    public CompraExtra simularPagamento(UUID token, UUID compraExtraId) {
-        var agendamento = buscarAgendamentoPorToken(token);
-        var compra = compraExtraRepository.findById(compraExtraId)
-            .orElseThrow(() -> new RuntimeException("Compra não encontrada"));
-
-        if (!compra.getAgendamentoId().equals(agendamento.getId())) {
-            throw new RuntimeException("Compra não pertence a este agendamento");
-        }
-
-        if (compra.getStatus() != StatusCompraExtra.PAGA) {
-            marcarCompraPaga(compra);
-        }
-        return compra;
-    }
-
-    private void marcarCompraPaga(CompraExtra compra) {
-        compra.setStatus(StatusCompraExtra.PAGA);
-        compra.setDataPagamento(LocalDateTime.now());
-        compraExtraRepository.save(compra);
-
-        var fotos = fotoEnsaioRepository.findAll().stream()
-            .filter(f -> compra.getId().equals(f.getCompraExtraId()))
-            .toList();
-        for (var foto : fotos) {
-            foto.setStatus(StatusFoto.PAGA);
-        }
-        fotoEnsaioRepository.saveAll(fotos);
-
-        eventPublisher.publishEvent(new CompraExtraConfirmadaEvent(
-            compra.getAgendamentoId(), compra.getId(), compra.getValorTotal()));
-    }
-
-    @Transactional(readOnly = true)
-    public boolean isDownloadPermitido(FotoEnsaio foto) {
-        return foto.isSelecionadaPacote() || foto.getStatus() == StatusFoto.PAGA;
-    }
-
-    @Transactional(readOnly = true)
-    public List<FotoEnsaio> getDownloadableFotos(UUID token) {
-        var agendamento = buscarAgendamentoPorToken(token);
-        var fotos = fotoEnsaioRepository.findByAgendamentoIdOrderByOrdemAsc(agendamento.getId());
-        return fotos.stream()
-            .filter(FotoEnsaio::isVisivel)
-            .filter(this::isDownloadPermitido)
-            .toList();
-    }
-
-    public Path downloadFoto(UUID token, UUID fotoId) {
-        var agendamento = buscarAgendamentoPorToken(token);
-        var foto = fotoEnsaioRepository.findById(fotoId)
-            .orElseThrow(() -> new RuntimeException("Foto não encontrada"));
-
-        if (!foto.getAgendamentoId().equals(agendamento.getId())) {
-            throw new RuntimeException("Foto não pertence a este agendamento");
-        }
-        if (!isDownloadPermitido(foto)) {
-            throw new RuntimeException("Foto não está disponível para download");
-        }
-
-        foto.setDataDownload(LocalDateTime.now());
-        fotoEnsaioRepository.save(foto);
-
-        return Path.of(foto.getOriginalPath());
-    }
-
-    @Transactional(readOnly = true)
-    public List<FotoEnsaio> listarFotosPorAgendamento(UUID agendamentoId) {
-        return fotoEnsaioRepository.findByAgendamentoIdOrderByOrdemAsc(agendamentoId);
-    }
-
     @Transactional(readOnly = true)
     public List<CompraExtra> listarComprasPorAgendamento(UUID agendamentoId) {
         return compraExtraRepository.findByAgendamentoId(agendamentoId);
@@ -389,20 +204,19 @@ public class EcommerceService {
 
     @Transactional(readOnly = true)
     public List<CompraExtra> listarComprasPorToken(UUID token) {
-        var agendamento = buscarAgendamentoPorToken(token);
+        var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
         return compraExtraRepository.findByAgendamentoId(agendamento.getId());
     }
 
     @Transactional(readOnly = true)
     public AdminCompraDetalheResponse buscarCompraDetalhePorToken(UUID token, UUID compraId) {
-        var agendamento = buscarAgendamentoPorToken(token);
+        var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
         var compra = compraExtraRepository.findById(compraId)
-            .orElseThrow(() -> new RuntimeException("Compra não encontrada"));
+            .orElseThrow(() -> new CompraNaoEncontradaException(compraId));
         if (!compra.getAgendamentoId().equals(agendamento.getId())) {
-            throw new RuntimeException("Compra não pertence a esta galeria");
+            throw new CompraNaoEncontradaException(compraId);
         }
-        var fotos = fotoEnsaioRepository.findAll().stream()
-            .filter(f -> compra.getId().equals(f.getCompraExtraId()))
+        var fotos = fotoEnsaioRepository.findByCompraExtraId(compra.getId()).stream()
             .map(FotoEnsaioResponse::ofPublic)
             .toList();
         return new AdminCompraDetalheResponse(
@@ -410,18 +224,18 @@ public class EcommerceService {
             compra.getStatus().name(), null, compra.getDataPagamento(),
             compra.getQuantidadeFotos(),
             compra.getMetodoPagamento() != null ? compra.getMetodoPagamento().name() : null,
-            fotos, compra.getCreatedAt(), compra.getUpdatedAt(),
+            fotos, compra.getAuditInfo().getCreatedAt(), compra.getAuditInfo().getUpdatedAt(),
             compra.getMotivoRecusa()
         );
     }
 
     @Transactional(readOnly = true)
     public Path buscarComprovantePath(UUID token, UUID compraId) {
-        var agendamento = buscarAgendamentoPorToken(token);
+        var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
         var compra = compraExtraRepository.findById(compraId)
-            .orElseThrow(() -> new RuntimeException("Compra não encontrada"));
+            .orElseThrow(() -> new CompraNaoEncontradaException(compraId));
         if (!compra.getAgendamentoId().equals(agendamento.getId())) {
-            throw new RuntimeException("Compra não pertence a esta galeria");
+            throw new CompraNaoEncontradaException(compraId);
         }
         return compra.getUrlComprovante() != null ? Path.of(compra.getUrlComprovante()) : null;
     }
@@ -429,13 +243,13 @@ public class EcommerceService {
     @Transactional(readOnly = true)
     public Path buscarComprovantePathPorId(UUID compraId) {
         var compra = compraExtraRepository.findById(compraId)
-            .orElseThrow(() -> new RuntimeException("Compra não encontrada"));
+            .orElseThrow(() -> new CompraNaoEncontradaException(compraId));
         return compra.getUrlComprovante() != null ? Path.of(compra.getUrlComprovante()) : null;
     }
 
     @Transactional(readOnly = true)
     public List<CompraExtra> listarTodasCompras() {
-        return compraExtraRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"));
+        return compraExtraRepository.findAll(Sort.by(Sort.Direction.DESC, "auditInfo.createdAt"));
     }
 
     @Transactional(readOnly = true)
@@ -445,7 +259,7 @@ public class EcommerceService {
 
     @Transactional(readOnly = true)
     public Page<CompraExtra> listarComprasPaginado(String status, LocalDateTime dataInicio, LocalDateTime dataFim, int page, int perPage) {
-        var pageable = PageRequest.of(page - 1, perPage, Sort.by(Sort.Direction.DESC, "createdAt"));
+        var pageable = PageRequest.of(page - 1, perPage, Sort.by(Sort.Direction.DESC, "auditInfo.createdAt"));
         if (status != null && !status.isBlank()) {
             var statusEnum = StatusCompraExtra.valueOf(status.toUpperCase());
             if (dataInicio != null && dataFim != null) {
@@ -462,11 +276,8 @@ public class EcommerceService {
     @Transactional(readOnly = true)
     public AdminCompraDetalheResponse buscarCompraDetalhe(UUID compraId) {
         var compra = compraExtraRepository.findById(compraId)
-            .orElseThrow(() -> new RuntimeException("Compra não encontrada"));
-        var agendamento = agendamentoRepository.findById(compra.getAgendamentoId())
-            .orElse(null);
-        var fotos = fotoEnsaioRepository.findAll().stream()
-            .filter(f -> compra.getId().equals(f.getCompraExtraId()))
+            .orElseThrow(() -> new CompraNaoEncontradaException(compraId));
+        var fotos = fotoEnsaioRepository.findByCompraExtraId(compra.getId()).stream()
             .map(FotoEnsaioResponse::of)
             .toList();
         var comprovanteUrl = compra.getUrlComprovante() != null
@@ -477,7 +288,7 @@ public class EcommerceService {
             compra.getStatus().name(), comprovanteUrl, compra.getDataPagamento(),
             compra.getQuantidadeFotos(),
             compra.getMetodoPagamento() != null ? compra.getMetodoPagamento().name() : null,
-            fotos, compra.getCreatedAt(), compra.getUpdatedAt(), compra.getMotivoRecusa()
+            fotos, compra.getAuditInfo().getCreatedAt(), compra.getAuditInfo().getUpdatedAt(), compra.getMotivoRecusa()
         );
     }
 
@@ -487,24 +298,18 @@ public class EcommerceService {
 
     public void cancelarCompra(UUID compraId, String motivoRecusa) {
         var compra = compraExtraRepository.findById(compraId)
-            .orElseThrow(() -> new RuntimeException("Compra não encontrada"));
-        if (compra.getStatus() == StatusCompraExtra.PAGA) {
-            throw new IllegalStateException("Compra já paga não pode ser cancelada");
+            .orElseThrow(() -> new CompraNaoEncontradaException(compraId));
+        if (!compra.getStatus().podeSerCancelada()) {
+            throw new com.photoizer.crm.ecommerce.exception.CompraJaPagaException();
         }
         compra.setStatus(StatusCompraExtra.CANCELADA);
         if (motivoRecusa != null && !motivoRecusa.isBlank()) {
             compra.setMotivoRecusa(motivoRecusa.trim());
         }
         compraExtraRepository.save(compra);
-        var fotos = fotoEnsaioRepository.findAll().stream()
-            .filter(f -> compra.getId().equals(f.getCompraExtraId()))
-            .toList();
-        for (var foto : fotos) {
-            foto.setCompraExtraId(null);
-            foto.setStatus(StatusFoto.PUBLICADA);
-            foto.setVisivel(true);
-        }
-        fotoEnsaioRepository.saveAll(fotos);
+
+        eventPublisher.publishEvent(new com.photoizer.crm.ecommerce.event.CompraExtraCanceladaEvent(
+            compra.getId(), compra.getAgendamentoId()));
     }
 
     @Transactional(readOnly = true)
@@ -523,53 +328,26 @@ public class EcommerceService {
 
     public FotoEnsaio overrideSelecao(UUID agendamentoId, UUID fotoId, boolean selecionada) {
         var foto = fotoEnsaioRepository.findById(fotoId)
-            .orElseThrow(() -> new RuntimeException("Foto não encontrada"));
+            .orElseThrow(() -> new FotoNaoEncontradaException(fotoId));
         if (!foto.getAgendamentoId().equals(agendamentoId)) {
-            throw new RuntimeException("Foto não pertence a este agendamento");
+            throw new FotoIndisponivelException("Foto nao pertence a este agendamento");
         }
-        foto.setSelecionadaPacote(selecionada);
-        return fotoEnsaioRepository.save(foto);
+
+        eventPublisher.publishEvent(new FotosSelecionadasEvent(
+            agendamentoId, List.of(fotoId), selecionada));
+
+        return fotoEnsaioRepository.findById(fotoId).orElse(foto);
     }
 
     public UUID regerarToken(UUID agendamentoId) {
-        var agendamento = agendamentoRepository.findById(agendamentoId)
-            .orElseThrow(() -> new RuntimeException("Agendamento não encontrado"));
+        var agendamento = galeriaQueryService.buscarAgendamentoPorId(agendamentoId);
         var novoToken = UUID.randomUUID();
-        agendamento.setTokenGaleria(novoToken);
-        agendamento.setTokenExpiracao(LocalDateTime.now().plusDays(15));
-        agendamentoRepository.save(agendamento);
+        var expiracao = LocalDateTime.now().plusDays(15);
+
+        eventPublisher.publishEvent(new TokenGaleriaRegeneradoEvent(
+            agendamentoId, novoToken, expiracao));
+
         return novoToken;
     }
 
-    public Path downloadZip(UUID token) {
-        var agendamento = buscarAgendamentoPorToken(token);
-        var fotos = getDownloadableFotos(token);
-
-        if (fotos.isEmpty()) {
-            throw new RuntimeException("Nenhuma foto disponível para download");
-        }
-
-        try {
-            var tempDir = Files.createTempDirectory("galeria_");
-            var zipPath = tempDir.resolve("fotos_" + agendamento.getId() + ".zip");
-
-            try (var zos = new ZipOutputStream(Files.newOutputStream(zipPath))) {
-                for (var foto : fotos) {
-                    var originalPath = Path.of(foto.getOriginalPath());
-                    if (Files.exists(originalPath)) {
-                        var entryName = foto.getOrdem() + "_" + foto.getFileName();
-                        zos.putNextEntry(new ZipEntry(entryName));
-                        Files.copy(originalPath, zos);
-                        zos.closeEntry();
-                    }
-                    foto.setDataDownload(LocalDateTime.now());
-                }
-                fotoEnsaioRepository.saveAll(fotos);
-            }
-
-            return zipPath;
-        } catch (IOException e) {
-            throw new RuntimeException("Erro ao gerar arquivo ZIP", e);
-        }
-    }
 }

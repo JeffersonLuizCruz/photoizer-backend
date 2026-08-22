@@ -1,6 +1,7 @@
 package com.photoizer.crm.ecommerce.api;
 
 import com.photoizer.crm.ecommerce.service.EcommerceService;
+import com.photoizer.crm.ecommerce.service.PagamentoExtraService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.core.io.FileSystemResource;
@@ -27,9 +28,12 @@ import java.util.UUID;
 public class AdminComprasController {
 
     private final EcommerceService ecommerceService;
+    private final PagamentoExtraService pagamentoExtraService;
 
-    public AdminComprasController(EcommerceService ecommerceService) {
+    public AdminComprasController(EcommerceService ecommerceService,
+                                  PagamentoExtraService pagamentoExtraService) {
         this.ecommerceService = ecommerceService;
+        this.pagamentoExtraService = pagamentoExtraService;
     }
 
     @GetMapping
@@ -68,7 +72,7 @@ public class AdminComprasController {
     @PatchMapping("/{id}/confirmar")
     @Operation(summary = "Confirmar pagamento da compra")
     public ResponseEntity<Void> confirmar(@PathVariable UUID id) {
-        ecommerceService.confirmarPagamento(id);
+        pagamentoExtraService.confirmarPagamento(id);
         return ResponseEntity.ok().build();
     }
 
@@ -77,7 +81,7 @@ public class AdminComprasController {
     public ResponseEntity<Void> cancelar(@PathVariable UUID id,
                                          @Valid @RequestBody(required = false) CancelarCompraRequest request) {
         var motivo = request != null ? request.motivo() : null;
-        ecommerceService.cancelarCompra(id, motivo);
+        pagamentoExtraService.cancelarCompra(id, motivo);
         return ResponseEntity.ok().build();
     }
 

@@ -143,7 +143,7 @@ public class DataSeeder implements CommandLineRunner {
                 var telefone = (String) ((Object[]) par)[1];
                 var indicadores = indicadorRepository.findAllByNomeAndTelefone(nome, telefone);
                 indicadores.sort(Comparator.comparing(
-                    i -> i.getCreatedAt() != null ? i.getCreatedAt() : LocalDateTime.MIN));
+                    i -> i.getAuditInfo().getCreatedAt() != null ? i.getAuditInfo().getCreatedAt() : LocalDateTime.MIN));
                 var manter = indicadores.removeLast();
                 for (var remover : indicadores) {
                     indicadorRepository.delete(remover);

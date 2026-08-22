@@ -1,10 +1,14 @@
 package com.photoizer.crm.cliente.model;
 
-import com.photoizer.crm.shared.model.BaseEntity;
+import com.photoizer.crm.shared.model.AuditInfo;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
@@ -14,12 +18,14 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import lombok.experimental.SuperBuilder;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "clientes", uniqueConstraints = {
@@ -28,9 +34,19 @@ import java.time.LocalDateTime;
 })
 @Getter
 @Setter(AccessLevel.PRIVATE)
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
-@SuperBuilder
-public class Cliente extends BaseEntity {
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Cliente {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(nullable = false, updatable = false)
+    private UUID id;
+
+    @Embedded
+    @Builder.Default
+    private AuditInfo auditInfo = new AuditInfo();
 
     @NotBlank
     @Size(max = 255)
@@ -78,10 +94,6 @@ public class Cliente extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String preferencias;
 
-    /**
-     * Define dataCadastro automaticamente na primeira persistência.
-     * Corrige inconsistência P2 - apenas registro preenchia dataCadastro.
-     */
     @PrePersist
     protected void onCreate() {
         if (dataCadastro == null) {
@@ -89,11 +101,6 @@ public class Cliente extends BaseEntity {
         }
     }
 
-    /**
-     * Atualiza dados do perfil do cliente.
-     * Método de domínio que controla quais campos podem ser alterados.
-     * Padrão Domain Model - encapsula regras de negócio na entidade.
-     */
     public void atualizarPerfil(String nome, String telefone, String email, String cpf, 
                                String cidade, String estado) {
         if (nome != null) this.nome = nome;
@@ -104,10 +111,6 @@ public class Cliente extends BaseEntity {
         if (estado != null) this.estado = estado;
     }
 
-    /**
-     * Atualiza dados administrativos do cliente.
-     * Método de domínio para uso apenas pelo admin.
-     */
     public void atualizarDados(String nome, String telefone, String email, String cpf,
                               String cidade, String estado, OrigemCliente origem, 
                               String observacoes, String preferencias) {
@@ -122,10 +125,6 @@ public class Cliente extends BaseEntity {
         this.preferencias = preferencias;
     }
 
-    /**
-     * Define hash da senha (uso interno apenas).
-     * Método de domínio para controle de acesso à senha.
-     */
     public void definirSenhaHash(String senhaHash) {
         this.senhaHash = senhaHash;
     }

@@ -1,150 +1,129 @@
 # Módulo: E-commerce
 
 ## 1. Responsabilidade
-Gerencia a galeria pública do cliente (via token), seleção de fotos para o pacote, carrinho + checkout de fotos extras (`CompraExtra`), comprovantes, download (individual/ZIP), favoritos (wishlist), comentários por foto e avaliações (depoimentos). É o maior módulo do sistema (`~3.4k LOC`, 7 entidades, 6 services, 8 controllers).
-
-> **Nota**: O MODULE.md anterior descrevia `Pedido`/`Cupom`/`PedidoService`/`AdminPedidoController` — **essas classes não existem mais no código atual** (foram removidas; somente `CompraExtra` mantém o fluxo de venda). Este documento reflete a implementação atual.
+Gerencia a galeria pública do cliente (via token), seleção de fotos para o pacote, carrinho + checkout de fotos extras (`CompraExtra`), comprovantes, download (individual/ZIP), favoritos (wishlist), comentários por foto e avaliações (depoimentos).
 
 ## 2. Estrutura
 ```
 ecommerce/
 ├── model/
-│   ├── CompraExtra.java       # Entidade (extends BaseEntity): agendamentoId, valorTotal, quantidadeFotos, metodoPagamento, status, urlComprovante, dataPagamento, observacao, motivoRecusa
-│   ├── StatusCompraExtra.java # Enum: AGUARDANDO_COMPROVANTE, AGUARDANDO_CONFIRMACAO, PAGA, CANCELADA
-│   ├── MetodoPagamento.java   # Enum: PIX, CREDITO, DEBITO, BOLETO, DINHEIRO
+│   ├── CompraExtra.java       # Entidade: agendamentoId, valorTotal, quantidadeFotos, metodoPagamento, status, urlComprovante, dataPagamento, observacao, motivoRecusa
+│   ├── StatusCompraExtra.java # Enum (State Pattern): AGUARDANDO_COMPROVANTE, AGUARDANDO_CONFIRMACAO, PAGA, CANCELADA — com métodos de transição
+│   ├── MetodoPagamento.java   # Enum: PIX, TRANSFERENCIA, DINHEIRO
+│   ├── StatusSessao.java      # Enum: ATIVA, FINALIZADA, CANCELADA
 │   ├── ItemCarrinho.java      # Entidade: agendamentoId, fotoId, sessionId
 │   ├── Favorito.java          # Entidade: agendamentoId, fotoId, sessionId (wishlist)
 │   ├── FotoComentario.java    # Entidade: fotoId, agendamentoId, autorNome, mensagem, origem, lida
 │   ├── OrigemComentario.java  # Enum: CLIENTE, STAFF
 │   ├── Avaliacao.java         # Entidade: clienteId, agendamentoId, pacoteId, pontuacao(1-5), comentario, depoimento, aprovado
-│   └── Sessao.java            # Entidade legada: clienteId, nomeSessao, dataRealizacao, local, descricao, status String — **não integrada ao fluxo principal**
+│   └── Sessao.java            # Entidade legada: status agora usa enum StatusSessao
 ├── repository/
-│   ├── CompraExtraRepository.java     # JpaRepository + queries por status/período, totalPorStatus (SUM)
-│   ├── ItemCarrinhoRepository.java    # JpaRepository + delete por session+agenda
-│   ├── FavoritoRepository.java        # JpaRepository + findBySessionIdAndFotoId
-│   ├── FotoComentarioRepository.java  # JpaRepository + findByFotoId/AgendamentoId
-│   ├── AvaliacaoRepository.java       # JpaRepository + findByAprovadoTrue/ByClienteId
-│   └── SessaoRepository.java          # JpaRepository (sem queries customizadas)
+│   ├── CompraExtraRepository.java
+│   ├── ItemCarrinhoRepository.java
+│   ├── FavoritoRepository.java
+│   ├── FotoComentarioRepository.java
+│   ├── AvaliacaoRepository.java
+│   └── SessaoRepository.java
 ├── service/
-│   ├── EcommerceService.java    # 574 linhas: galeria, seleção, carrinho, checkout, comprovante, favoritos, download/ZIP, admin
-│   ├── SessionService.java      # 75 linhas: emite/valida sessão de carrinho assinada HMAC-SHA256 (UUID v4 + assinatura)
-│   └── ComentarioService.java   # 144 linhas: comentários de clientes + resposta staff + marcar lidos
-├── api/ (8 controllers + ~30 DTOs/records)
-│   ├── EcommerceController.java         # Galeria pública, carrinho, checkout, comprovante, favoritos, download, comentários cliente
-│   ├── AdminComprasController.java      # Admin: listar paginado/filtrável, detalhe, confirmar/cancelar, relatório
-│   ├── AdminEcommerceController.java    # Admin por agendamento: resumo, override seleção, regen token
-│   ├── AdminAnalyticsController.java    # Admin: métricas (receita, conversão, populares)
-│   ├── AdminComentariosController.java  # Admin: listar por agendamento, responder, marcar lidos
-│   ├── AvaliacaoController.java         # CRUD de avaliações/depoimentos
-│   └── SessaoController.java            # CRUD de Sessao (legado)
+│   ├── EcommerceService.java         # Orquestrador fino (~300 linhas): checkout, seleção de fotos, queries admin, override, regen token, upload comprovante. Publica eventos para escritas cross-module.
+│   ├── GaleriaQueryService.java      # Fachada read-only: buscarAgendamentoPorToken, valorUnitarioFotoExtra, listarFotosPublicadas, isDownloadPermitido
+│   ├── CarrinhoService.java          # Facade: adicionar/remover/listar/contar/calcular carrinho
+│   ├── FavoritoService.java          # Facade: adicionar/remover/listar favoritos (wishlist)
+│   ├── DownloadService.java          # Facade: download foto individual + ZIP com limpeza de temp
+│   ├── PagamentoExtraService.java    # State Pattern: confirmarPagamento, simularPagamento, cancelarCompra — transições via enum StatusCompraExtra
+│   ├── SessionService.java           # Sessão assinada HMAC-SHA256 (UUID v4 + assinatura)
+│   └── ComentarioService.java        # Comentários de clientes + resposta staff + marcar lidos
+├── api/ (7 controllers + ~25 DTOs/records)
+│   ├── EcommerceController.java
+│   ├── AdminComprasController.java
+│   ├── AdminEcommerceController.java
+│   ├── AdminAnalyticsController.java
+│   ├── AdminComentariosController.java
+│   ├── AvaliacaoController.java
+│   └── SessaoController.java         # Legado
 ├── event/
-│   ├── CompraExtraCriadaEvent.java      # Publicado no checkout
-│   └── CompraExtraConfirmadaEvent.java  # Publicado ao marcar compra como PAGA
+│   ├── CompraExtraCriadaEvent.java
+│   ├── CompraExtraConfirmadaEvent.java
+│   ├── CompraExtraFotosAssociadasEvent.java  # NOVO: associa fotos à compra no checkout
+│   ├── CompraExtraCanceladaEvent.java         # NOVO: desassocia fotos no cancelamento
+│   ├── CompraExtraPagaEvent.java              # NOVO: marca fotos como PAGA
+│   ├── FotosSelecionadasEvent.java            # NOVO: seleção/desseleção de fotos
+│   ├── FotoDownloadEvent.java                 # NOVO: registro de download
+│   └── TokenGaleriaRegeneradoEvent.java       # NOVO: regeneração de token
 ├── listener/
-│   └── (vazio — eventos consumidos em financeiro: FinanceiroEventListener)
+│   └── (vazio — listeners em módulos foto/agenda: FotoEcommerceEventListener, AgendamentoEcommerceEventListener)
 └── exception/
-    └── TokenExpiradoException.java      # Token da galeria expirado
+    ├── TokenExpiradoException.java
+    ├── GaleriaNaoEncontradaException.java   # 404
+    ├── CompraNaoEncontradaException.java    # 404
+    ├── FotoNaoEncontradaException.java      # 404
+    ├── CarrinhoVazioException.java          # 422
+    ├── FotoJaSelecionadaException.java      # 409
+    ├── FotoJaBaixadaException.java          # 409
+    ├── LimitePacoteExcedidoException.java   # 422
+    ├── CompraJaPagaException.java           # 409
+    ├── SessaoInvalidaException.java         # 401
+    └── FotoIndisponivelException.java       # 422
 ```
 
-## 3. Dependências Externas
+## 3. Design Patterns Aplicados
 
-### Módulos internos importados — **[VIOLAÇÕES Modulith]**
+| Pattern | Onde | Motivo |
+|---------|------|--------|
+| **Facade** | `CarrinhoService`, `FavoritoService`, `DownloadService`, `GaleriaQueryService` | Isolar responsabilidades do God class EcommerceService em beans coesos |
+| **State** | `StatusCompraExtra` enum | Transições de estado válidas centralizadas no enum, eliminando if/else espalhados |
+| **Facade** | `PagamentoExtraService` | Orquestra transições de estado de CompraExtra usando State Pattern |
+
+## 4. Dependências Externas
+
+### Módulos internos importados
 | Módulo | Uso | Tipo |
 |--------|-----|------|
-| **agenda** | `Agendamento`, `AgendamentoRepository` — token galeria, valorExtras, status; `EcommerceService` **muta `Agendamento`** (regenerar token, setar valorExtras) | entrada **e escrita** |
-| **foto** | `FotoEnsaio`, `FotoEnsaioRepository`, `StatusFoto`, `FotoEnsaioResponse`, `FotoService` — fotos da galeria; `EcommerceService`/`AdminAnalyticsController` **muta `FotoEnsaio`** (status PAGA, compraExtraId, selecionadaPacote, dataDownload) | entrada **e escrita** |
+| **agenda** | `Agendamento` (via `GaleriaQueryService`) — token galeria | leitura |
+| **foto** | `FotoEnsaio` (via `GaleriaQueryService` e `FotoEnsaioRepository` para queries read-only) — fotos da galeria | leitura |
 | **config** | `ConfiguracaoService` (`valorUnitarioFotoExtra` default R$ 15,00) | leitura |
-| **financeiro** | consome eventos `CompraExtraCriadaEvent`/`CompraExtraConfirmadaEvent` (via `FinanceiroEventListener`) | eventos |
-| **shared** | `BaseEntity`, `FileStorageService` (comprovante) | infraestrutura |
+| **financeiro** | consome eventos `CompraExtraCriadaEvent`/`CompraExtraConfirmadaEvent` | eventos |
+| **shared** | `AuditInfo`, `FileStorageService` | infraestrutura |
 
-> BOA PRÁTICA: **financeiro** consome os eventos do ecommerce — este é o padrão Modulith correto. As violações estão no próprio `EcommerceService` (escreve em `FotoEnsaio` e `Agendamento`).
+> **MODULITH**: O módulo ecommerce NÃO escreve diretamente em entidades de outros módulos.
+> Escritas são feitas via eventos (`CompraExtraFotosAssociadasEvent`, `CompraExtraCanceladaEvent`, `CompraExtraPagaEvent`, `FotoDownloadEvent`, `FotosSelecionadasEvent`, `TokenGaleriaRegeneradoEvent`).
+> Listeners nos módulos foto (`FotoEcommerceEventListener`) e agenda (`AgendamentoEcommerceEventListener`) processam os eventos.
 
 ### Eventos publicados
 | Evento | Consumidores |
 |--------|-------------|
 | `CompraExtraCriadaEvent` | `financeiro.FinanceiroEventListener` |
 | `CompraExtraConfirmadaEvent` | `financeiro.FinanceiroEventListener` |
+| `CompraExtraFotosAssociadasEvent` | `foto.FotoEcommerceEventListener` |
+| `CompraExtraCanceladaEvent` | `foto.FotoEcommerceEventListener` |
+| `CompraExtraPagaEvent` | `foto.FotoEcommerceEventListener` |
+| `FotosSelecionadasEvent` | `foto.FotoEcommerceEventListener` |
+| `FotoDownloadEvent` | `foto.FotoEcommerceEventListener` |
+| `TokenGaleriaRegeneradoEvent` | `agenda.AgendamentoEcommerceEventListener` |
 
-### Eventos consumidos
-Nenhum.
+## 5. Melhorias Aplicadas (Refactor)
 
-## 4. Fluxos Principais
+| # | Melhoria | Impacto |
+|---|----------|---------|
+| 1 | **Split God Class**: `EcommerceService` (574→~300 linhas) extraindo `CarrinhoService`, `FavoritoService`, `DownloadService`, `PagamentoExtraService`, `GaleriaQueryService` | Manutenibilidade |
+| 2 | **Query `findByCompraExtraId`**: substitui 4x `findAll().stream().filter()` por query dedicada no banco | Performance (P1) |
+| 3 | **10 exceções de domínio**: substituem `RuntimeException`/`IllegalArgumentException` genéricas | UX, tratamento de erros |
+| 4 | **State Pattern em `StatusCompraExtra`**: transições de estado centralizadas no enum | Manutenibilidade |
+| 5 | **`Sessao.status` como enum** (`StatusSessao`): elimina `String` crua | Type safety |
+| 6 | **Remoção de `PERCENTUAL_COMISSAO_PADRAO`** (código morto) | Limpeza |
+| 7 | **`CarrinhoItemResponse.subtotal`** corrigido (multiplicava por 1) | Bug fix |
+| 8 | **`ComentarioService`** delega para `GaleriaQueryService` (elimina duplicação) | DRY |
+| 9 | **`AdminEcommerceController`** não injeta mais `AgendamentoRepository` diretamente | Modulith |
+| 10 | **`DownloadService.downloadZip`** limpa arquivos temporários (corrige resource leak) | Resource management |
+| 11 | **Desacoplamento cross-module**: 6 eventos criados + 2 listeners; `EcommerceService` não escreve mais em `FotoEnsaio`/`Agendamento` | Modulith |
+| 12 | **`BaseEntity` → `AuditInfo`**: composição em vez de herança; entidade removida | Clean Architecture |
 
-### Fluxo 1: Galeria Pública (Cliente)
-1. `POST /ecommerce/sessao` → `SessionService.emitir()`: gera `UUIDv4.assinatura` HMAC-SHA256.
-2. `GET /ecommerce/galeria/{token}` → fotos publicadas/visíveis (`FotoEnsaioResponse.ofPublic`).
-3. `PATCH /galeria/{token}/selecionar` → `selecionarFotos()`: valida limite do pacote; bloqueia remoção de foto já baixada.
-4. Carrinho: adicionar/remover/listar/contar (`X-Session-Id` validada pelo `SessionService`).
+## 6. Pendências Restantes
 
-### Fluxo 2: Checkout e Pagamento de Extras
-1. `POST /galeria/{token}/checkout` → `checkout()` (`EcommerceService.java:200-245`): valida carrinho, cria `CompraExtra` `AGUARDANDO_COMPROVANTE`, associa `compraExtraId` nas fotos, limpa carrinho, publica `CompraExtraCriadaEvent`.
-2. `POST /galeria/{token}/comprovante` → `uploadComprovante()`: salva comprovante, status → `AGUARDANDO_CONFIRMACAO`.
-3. `PATCH /admin/compras/{id}/confirmar` → `confirmarPagamento()` → `marcarCompraPaga()` (`:329-344`): status → `PAGA`, marca fotos `PAGA`, publica `CompraExtraConfirmadaEvent`.
-4. `simularPagamento()` (`:314-327`): endpoint dev — libera sem comprovante.
-5. `cancelarCompra()` (`:483-507`): status → `CANCELADA`, desvinca fotos.
-
-### Fluxo 3: Download
-- `GET /galeria/{token}/download/{fotoId}` → `downloadFoto()` (`:361-377`): libera se `selecionadaPacote || PAGA`; seta `dataDownload`.
-- `GET /galeria/{token}/download-zip` → `downloadZip()` (`:543-573`): ZIP em temp dir; atualiza `dataDownload` de todas.
-
-### Fluxo 4: Comentários e Avaliações
-- Cliente comenta em foto (`ComentarioService.comentarCliente`, origem `CLIENTE`); staff responde (`responderStaff`, origem `STAFF`, lida=true); admin lista por agendamento com contagem de não-lidos.
-- `AvaliacaoController` — CRUD simples de depoimentos (sem validação de pertencimento a agendamento).
-
-## 5. Regras Específicas
-1. **Sessão assinada HMAC-SHA256** (`SessionService`): mesmo padrão do JWT (`app.jwt.secret`); sessão forjada é rejeitada pelo header `X-Session-Id`.
-2. **Token galeria com expiração** (15 dias) gerenciado pela agenda; `TokenExpiradoException` se expirado.
-3. **Preço extra** vem do pacote (`precoFotoExtra > 0`) ou da config `valorUnitarioFotoExtra` (default R$ 15,00).
-4. **Pertecença protegida por checks manuais**: cada método chama `buscarAgendamentoPorToken` e valida `agendamentoId` do item/foto — bastante repetido, com exceções genéricas.
-5. **`Sessao`/`SessaoController` legado**: entidade não integrada ao fluxo da galeria (que usa `SessionService`).
-
-## 6. Testes
-Nenhum teste específico para este módulo. Apenas `CrmApplicationTests` (smoke de contexto).
-
-## 7. Dívidas Técnicas e Melhorias Recomendadas
-
-### 7.1 `EcommerceService` é god class (574 linhas, +20 métodos) — **P1**
-- Mistura galeria, carrinho, checkout, pagamento, favoritos, download, ZIP, métricas e admin em um único bean.
-- **Solução**: splits — `CarrinhoService`, `PagamentoExtraService`, `DownloadService`, `GaleriaQuery`, `AdminEcommerceQuery`; manter `EcommerceService` como orquestrador fino.
-
-### 7.2 Escrita cross-module em `FotoEnsaio` e `Agendamento` — **[CRÍTICO] P1**
-- `marcarCompraPaga` (`:329-344`) e `cancelarCompra` (`:483-507`) **mutam `FotoEnsaio.status`/`compraExtraId`** (módulo foto); `regerarToken`/`setValorExtras` **mutam `Agendamento`** (módulo agenda).
-- **Solução**: evento `CompraExtraConfirmadaEvent` já publicado — o módulo **foto** deve ter listener que marca `FotoEnsaio.PAGA`; regeneração de token via evento no módulo agenda. Os repros de foto/agenda não deveriam ser injetados no `EcommerceService`.
-
-### 7.3 `findAll()` para achar fotos por `compraExtraId` — **[CRÍTICO] P1**
-- `marcarCompraPaga` (`:334-336`), `cancelarCompra` (`:498-500`), `buscarCompraDetalhe*` (`:403-404, 467-468`) fazem `fotoEnsaioRepository.findAll().stream().filter(...)` — **carregam o banco inteiro de fotos em memória**.
-- **Solução**: query dedicada `findByCompraExtraId(UUID)` no `FotoEnsaioRepository` (módulo foto).
-
-### 7.4 Exceções genéricas `RuntimeException`/`IllegalArgumentException` — **P1**
-- Dezenas de `orElseThrow(() -> new RuntimeException(...))` e `IllegalArgumentException` para regras de negócio (`:107, 158, 250, 292, 308, 364, 489...`).
-- **Solução**: hierarquia central `BusinessException` + subtipos (`NotFoundException`, `IllegalStateException`, `ConflictException`).
-
-### 7.5 Violações no controller (regra no controller) — **P2**
-- `EcommerceController` injeta `FotoService` e `SessionService` e monta o `CarrinhoResponse` chamando `fotoService.buscarPorId` por item (`EcommerceController.java:119-127`) — lógica de negócio (query N+1) no controller.
-- `AdminAnalyticsController` injeta `CompraExtraRepository`/`FotoEnsaioRepository` direto no controller (`AdminAnalyticsController.java:22-28`) com `fotoEnsaioRepository.findAll()`.
-
-### 7.6 Regras de pagamento duplicadas — **P2**
-- Fluxo `confirmarPagamento`/`simularPagamento`/`marcarCompraPaga` repetem validações e mutações; `AdminComprasController.confirmar` e `AdminEcommerceController` têm lógica similar.
-- **Solução**: `PagamentoExtraService` único com estados transicionáveis (usar padrão State via enum no `CompraExtra`).
-
-### 7.7 `Sessao` e `SessaoController` legado — **P3**
-- Entidade `Sessao` + controller (`/api/v1/sessoes`) não participam do fluxo de galeria (que usa `SessionService`). Código morto/latente.
-- **Solução**: remover ou integrar; registrar intenção no backlog.
-
-### 7.8 DTOs manuais e `.name()` de enums — **P2**
-- `CompraExtraResponse.ofPublic/ofAdmin`, `AdminCompraDetalheResponse`, `CarrinhoResponse` etc. montados à mão; `getStatus().name()`/`getMetodoPagamento().name()`.
-- **Solução**: MapStruct com `@Mapping(toStatusName)`, `@Context` para URLs relativas; enums serializados como enum.
-
-### 7.9 Herança `BaseEntity` → composição — **P1** (padrão-aplicável)
-- Todas as 7 entidades estendem `@MappedSuperclass`.
-- **Solução**: `@Embeddable AuditInfo` + Auditing; eliminar `BaseEntity`/`@SuperBuilder`.
-
-### 7.10 Validações de pertencimento repetidas — **P3**
-- `buscarAgendamentoPorToken` + checks `agendamentoId` duplicados em quase todos os métodos.
-- **Solução**: `GaleriaAppService` com `@Transactional` por caso de uso já faz parte do contexto; delegar o check a um método privado único/ACL.
-
-## 8. Exemplos de arquivos afetados
-- `EcommerceService.java:200-245` — checkout (muta fotos/querries); `:329-344` — marca fotos `PAGA` via `findAll()`; `:483-507` — cancelar com `findAll()`; `:533-541` — regen token (muta agenda); `:543-573` — zip.
-- `EcommerceController.java:119-127` — N+1 no controller via `FotoService`; `:63-68` — validar sessão; `AdminAnalyticsController.java:34-58` — `findAll()` fotos no controller.
-- `ComentarioService.java:45-52` — duplica `buscarAgendamentoPorToken` do EcommerceService.
-- `model/Sessao.java` + `api/SessaoController.java` — legado não integrado.
+| # | Pendência | Prioridade |
+|---|-----------|------------|
+| 1 | **`AdminAnalyticsController`** ainda injeta repositórios diretamente no controller | P2 |
+| 2 | **DTOs manuais** (`static of()`, `.name()`): migrar para MapStruct | P2 |
+| 3 | **`Sessao`/`SessaoController` legado**: remover ou integrar | P3 |
+| 4 | **Testes unitários/integração**: nenhum teste específico existe | P2 |
+| 5 | **Optimistic locking** (`@Version`): ausente em todas as entidades | P2 |

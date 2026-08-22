@@ -1,12 +1,16 @@
 package com.photoizer.crm.contrato.model;
 
-import com.photoizer.crm.shared.model.BaseEntity;
+import com.photoizer.crm.shared.model.AuditInfo;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
@@ -15,11 +19,11 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
-import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import lombok.experimental.SuperBuilder;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -34,9 +38,19 @@ import java.util.UUID;
 })
 @Getter
 @Setter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
-@SuperBuilder
-public class Contrato extends BaseEntity {
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Contrato {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(nullable = false, updatable = false)
+    private UUID id;
+
+    @Embedded
+    @Builder.Default
+    private AuditInfo auditInfo = new AuditInfo();
 
     @Size(max = 64)
     @Column(unique = true, length = 64)
@@ -214,7 +228,8 @@ public class Contrato extends BaseEntity {
     private String observacoes;
 
     @OneToMany(mappedBy = "contrato", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<ContratoFotografo> fotografos;
+    @Builder.Default
+    private List<ContratoFotografo> fotografos = new ArrayList<>();
 
     public void addFotografo(ContratoFotografo link) {
         if (this.fotografos == null) this.fotografos = new ArrayList<>();
@@ -222,15 +237,6 @@ public class Contrato extends BaseEntity {
         link.setContrato(this);
     }
 
-    // ════════════════════════════════════════════════════════════════
-    //  METHODS DE DOMINIO — Transicoes de estado
-    //  Pattern: Rich Domain Model — entidade com comportamento.
-    //  Cada transicao valida E executa, eliminando if espalhado no service.
-    // ════════════════════════════════════════════════════════════════
-
-    /**
-     * Publica o contrato: gera token, seta status PUBLICADO e expiracao.
-     */
     public void publicar(String tokenHash, int diasValidade) {
         this.status.validarTransicaoPara(StatusContrato.PUBLICADO);
         this.tokenHash = tokenHash;
@@ -239,27 +245,18 @@ public class Contrato extends BaseEntity {
         this.tokenExpiracao = LocalDateTime.now().plusDays(diasValidade);
     }
 
-    /**
-     * Confirma pagamento da reserva.
-     */
     public void confirmarPagamento() {
         this.status.validarTransicaoPara(StatusContrato.PAGAMENTO_CONFIRMADO);
         this.status = StatusContrato.PAGAMENTO_CONFIRMADO;
         this.dataPagamentoConfirmado = LocalDateTime.now();
     }
 
-    /**
-     * Aprova o contrato (apos pagamento confirmado).
-     */
     public void aprovar() {
         this.status.validarTransicaoPara(StatusContrato.APROVADO);
         this.status = StatusContrato.APROVADO;
         this.dataAprovacao = LocalDateTime.now();
     }
 
-    /**
-     * Devolve o contrato ao cliente com motivo.
-     */
     public void devolver(String tipoMotivo, String motivo) {
         this.status.validarTransicaoPara(StatusContrato.DEVOLVIDO);
         this.status = StatusContrato.DEVOLVIDO;
@@ -268,17 +265,11 @@ public class Contrato extends BaseEntity {
         this.motivoDevolucao = motivo;
     }
 
-    /**
-     * Cancela o contrato.
-     */
     public void cancelar() {
         this.status.validarTransicaoPara(StatusContrato.CANCELADO);
         this.status = StatusContrato.CANCELADO;
     }
 
-    /**
-     * Assina o contrato (cliente preenche dados e anexa comprovante).
-     */
     public void assinar(String nome, String telefone, String email, String cpf,
                         String cidade, String estado, boolean autoriza,
                         String urlComprovante, String snapshotJson, String snapshotHash,
@@ -297,7 +288,6 @@ public class Contrato extends BaseEntity {
         this.urlPdf = urlPdf;
         this.dataAssinatura = LocalDateTime.now();
         this.status = StatusContrato.ASSINADO_PELO_CLIENTE;
-        // Limpa dados de devolucao anterior (re-assinatura)
         this.tipoMotivoDevolucao = null;
         this.motivoDevolucao = null;
         this.dataDevolucao = null;

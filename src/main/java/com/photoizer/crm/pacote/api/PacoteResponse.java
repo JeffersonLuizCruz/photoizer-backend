@@ -40,8 +40,8 @@ public record PacoteResponse(
             p.getBloqueiaDiaInteiro(),
             p.getAtivo(),
             p.getDiasParaEntrega(),
-            p.getCreatedAt(),
-            p.getUpdatedAt()
+            p.getAuditInfo().getCreatedAt(),
+            p.getAuditInfo().getUpdatedAt()
         );
     }
 }

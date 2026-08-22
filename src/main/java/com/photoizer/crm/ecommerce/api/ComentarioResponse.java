@@ -22,7 +22,7 @@ public record ComentarioResponse(
             c.getMensagem(),
             c.getOrigem().name(),
             c.isLida(),
-            c.getCreatedAt()
+            c.getAuditInfo().getCreatedAt()
         );
     }
 }

@@ -15,7 +15,7 @@
 | 2 | **IDOR em notificações**: `userId` vem da request sem verificação de dono (qualquer usuário lê/apaga notificações de outro) | notificacao | Pendente |
 | 3 | ~~**Exposição de `User` com `password`** na API~~ | fotografo | **RESOLVIDO** |
 | 4 | **PDF de contrato gerado "na mão"** (bytes nativos) + `PdfGeneratorService` do documento é **stub** (`byte[0]`) | contrato, documento | Pendente |
-| 5 | **Escrita cross-module**: serviços mutam entidades de outros módulos (`Agendamento`, `FotoEnsaio`, `Indicacao`) diretamente | ecommerce, edicao, foto, financeiro, comissao, documento | Pendente |
+| 5 | ~~**Escrita cross-module**: serviços mutam entidades de outros módulos~~ | ~~ecommerce~~ | **RESOLVIDO** (ecommerce: eventos `CompraExtraFotosAssociadasEvent`, `CompraExtraCanceladaEvent`, `CompraExtraPagaEvent`, `FotoDownloadEvent`, `FotosSelecionadasEvent`, `TokenGaleriaRegeneradoEvent` + listeners `FotoEcommerceEventListener`, `AgendamentoEcommerceEventListener`) |
 | 6 | **God classes** (`EcommerceService` 574, `FinanceiroService` 600, `FinanceiroDashboardService` 608, `AgendamentoService` 768, `EdicaoService` 534) | ecommerce, financeiro, agenda, edicao | Pendente |
 | 7 | ~~**`findAll()` + agregação em memória** em dashboards/relatórios (tabelas crescentes)~~ | ~~dashboard~~, financeiro, comissao, indicador | **RESOLVIDO** (dashboard) |
 | 8 | ~~**Vazamento de hash de senha do `Cliente`** nas respostas~~ | cliente | **RESOLVIDO** |
@@ -27,7 +27,7 @@
 ## 2. Dívidas por módulo (P1)
 
 ### shared — infraestrutura transversal
-- Herança → composição: todas as entidades usam `@MappedSuperclass BaseEntity` (ver padrão nos módulos). **[CRÍTICO — padrão vertical]**
+- ~~Herança → composição~~ **RESOLVIDO**: `@Embeddable AuditInfo` + composição em todas as 25 entidades; `BaseEntity.java` removido.
 - **Dependência invertida `shared → módulos`**: `GlobalExceptionHandler` importa exceções de todos os módulos (deveria ser os módulos → shared).
 - Hierarquia de exceções ausente: falta `BusinessException` base + código + `HttpStatus` (padrões atuais: `RuntimeException`/`IllegalArgumentException` espalhadas).
 - `ErrorResponse` sem suporte a múltiplos erros (`bindingResult`) e sem código de domínio.
@@ -76,7 +76,14 @@
 - **Endpoints bloqueados** (`denyAll`); **PDF é stub**; escrita cross-module (`contratoGerado` no `Agendamento`); duplica `documento` vs `contrato`.
 
 ### ecommerce
-- God class (`EcommerceService`, +20 métodos); **escrita directa em `FotoEnsaio`/`Agendamento`**; `findAll().stream().filter` para achar fotos por `compraExtraId` (4 pontos).
+- ~~God class (`EcommerceService`, +20 métodos)~~ **RESOLVIDO**: extraídos `CarrinhoService`, `FavoritoService`, `DownloadService`, `PagamentoExtraService`, `GaleriaQueryService`; `EcommerceService` agora é orquestrador fino (~300 linhas).
+- ~~**Escrita directa em `FotoEnsaio`/`Agendamento`**~~ **RESOLVIDO**: eventos `CompraExtraFotosAssociadasEvent`, `CompraExtraCanceladaEvent`, `CompraExtraPagaEvent`, `FotoDownloadEvent`, `FotosSelecionadasEvent`, `TokenGaleriaRegeneradoEvent` + listeners `FotoEcommerceEventListener` (foto) e `AgendamentoEcommerceEventListener` (agenda). Removidas injeções de `AgendamentoRepository` e `FotoEnsaioRepository` dos services ecommerce.
+- ~~`findAll().stream().filter` para achar fotos por `compraExtraId` (4 pontos)~~ **RESOLVIDO**: query dedicada `findByCompraExtraId(UUID)` no `FotoEnsaioRepository`.
+- ~~Exceções genéricas `RuntimeException`/`IllegalArgumentException`~~ **RESOLVIDO**: 10 exceções de domínio criadas (`GaleriaNaoEncontradaException`, `CompraNaoEncontradaException`, `FotoNaoEncontradaException`, `CarrinhoVazioException`, `FotoJaSelecionadaException`, `FotoJaBaixadaException`, `LimitePacoteExcedidoException`, `CompraJaPagaException`, `SessaoInvalidaException`, `FotoIndisponivelException`).
+- **P2 pendente**: `AdminAnalyticsController` ainda injeta repositórios diretamente no controller.
+- **P2 pendente**: DTOs manuais (`static of()`, `.name()`) — migrar para MapStruct.
+- **P3**: `Sessao`/`SessaoController` legado — `Sessao.status` migrado para enum `StatusSessao`, mas entidade ainda não integrada ao fluxo principal.
+- **State Pattern** aplicado: `StatusCompraExtra` enum com métodos de transição (`proximoAoComprovanteEnviado`, `proximoAoCancelar`, `podeSerCancelada`).
 
 ### edicao
 - **Escrita cross-module em `Agendamento`/`FotoEnsaio`**; service grande; dois fluxos de publicação duplicados (`publicarNoEcommerce` vs `publicarLoja`); 3 cópias de watermark/thumbnail.
@@ -118,11 +125,11 @@
 
 | Padrão | Módulos afetados | Ação geral |
 |--------|------------------|------------|
-| **Herança `BaseEntity`** | todos com entidades | `@Embeddable AuditInfo` + JPA Auditing (eliminar `@MappedSuperclass`/`@SuperBuilder`) |
+| ~~**Herança `BaseEntity`**~~ | ~~todos com entidades~~ | **RESOLVIDO**: `@Embeddable AuditInfo` + composição; `BaseEntity.java` removido |
 | **`status`/`origem` em `String`** | comissao, agenda, foto, despesa, contrato, ecommerce | enums com métodos de transição; nunca comparar `String.equals` |
 | **Exceções genéricas** | maioria | hierarquia central `BusinessException` + `HttpStatus`/código (decisão já aprovada) |
 | **DTOs manuais (`static of`/`Map`)** | quase todos | MapStruct (decisão já aprovada; Fase 2) — **iniciado em `agenda`** (AgendamentoMapper/RascunhoAgendamentoMapper) |
-| **Escrita em entidade alheia** | ecommerce, edicao, foto, financeiro, comissao, documento, notificacao | eventos de domínio (`publica`/`@EventListener`/`@TransactionalEventListener`) — padrão já usado corretamente em alguns pontos |
+| ~~**Escrita em entidade alheia** (ecommerce)~~ | ~~ecommerce, edicao, foto, financeiro, comissao, documento, notificacao~~ | **RESOLVIDO** (ecommerce): eventos de domínio + listeners; outros módulos pendentes |
 | **Agregação em memória** | dashboard, financeiro, comissao, indicador, agenda | queries agregadas SQL (`SUM`/`GROUP BY`/`COUNT`) nos repositórios donos |
 
 ---
@@ -133,11 +140,11 @@ Ordem proposta (valor × risco):
 
 1. **Segurança imediata** — IDOR notificações, exposição de `password`/hash, `denyAll` documentos, exposição de entidades.
 2. **Hierarquia de exceções** no `shared` + conversão das exceções genéricas (P1 dos módulos).
-3. **Padding cross-module** — substituir escritas diretas por eventos (agenda dono do estado; comissao dono de `Indicacao`) e remover dependências invertidas (`shared→módulos`, `foto→agenda`).
+3. ~~**Padding cross-module** — substituir escritas diretas por eventos~~ **PARCIAL**: resolvido para ecommerce; pendente para edicao, foto, financeiro, comissao, documento, notificacao.
 4. **Enums e máquinas de estado** — `StatusAgendamento`, `StatusIndicacao`, `StatusContrato` com transições.
 5. **Queries agregadas** + facades públicas por módulo (dashboard/financeiro deixam de puxar repositório alheio).
 6. **MapStruct total** nos DTOs.
-7. **AuditInfo `@Embeddable` + Auditing** (substitui `BaseEntity`).
+7. ~~**AuditInfo `@Embeddable` + Auditing**~~ **RESOLVIDO**: `AuditInfo` criado, todas as 25 entidades migradas, `BaseEntity.java` removido.
 8. **PDF unificado** (escolher lib; eliminar stub do documento e duplicação com contrato).
 
 > **Fase 2 em andamento**: extração de services + encapsulamento de domínio + MapStruct foram aplicados ao módulo `agenda` (ver `agenda/MODULE.md §7`). As demais etapas desta lista ainda não foram executadas; as decisões arquiteturais (layering, exceções, MapStruct) já foram aprovadas em conversa anterior e estão refletidas nos `MODULE.md`.

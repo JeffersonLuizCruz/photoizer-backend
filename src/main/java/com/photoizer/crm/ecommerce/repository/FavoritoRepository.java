@@ -9,7 +9,7 @@ import java.util.UUID;
 
 public interface FavoritoRepository extends JpaRepository<Favorito, UUID> {
 
-    List<Favorito> findBySessionIdAndAgendamentoIdOrderByCreatedAtAsc(UUID sessionId, UUID agendamentoId);
+    List<Favorito> findBySessionIdAndAgendamentoIdOrderByAuditInfoCreatedAtAsc(UUID sessionId, UUID agendamentoId);
 
     Optional<Favorito> findBySessionIdAndFotoId(UUID sessionId, UUID fotoId);
 

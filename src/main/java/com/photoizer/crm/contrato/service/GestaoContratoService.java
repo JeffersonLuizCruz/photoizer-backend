@@ -203,7 +203,7 @@ public class GestaoContratoService {
             ));
         }
 
-        var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "auditInfo.createdAt"));
         return contratoRepository.findAll(spec, pageable);
     }
 

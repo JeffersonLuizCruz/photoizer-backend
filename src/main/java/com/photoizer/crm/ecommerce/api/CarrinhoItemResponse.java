@@ -17,7 +17,7 @@ public record CarrinhoItemResponse(
             quantidadeTotal,
             pacoteQuantidadeFotos,
             valorUnitario,
-            valorUnitario.multiply(BigDecimal.valueOf(1))
+            valorUnitario
         );
     }
 }

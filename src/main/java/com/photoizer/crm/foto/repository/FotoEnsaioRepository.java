@@ -34,4 +34,6 @@ public interface FotoEnsaioRepository extends JpaRepository<FotoEnsaio, UUID> {
 
     @Query("SELECT f FROM FotoEnsaio f WHERE f.agendamentoId = :agendamentoId AND f.status = 'PUBLICADA' AND f.visivel = true ORDER BY f.ordem ASC")
     List<FotoEnsaio> findPublicadasVisiveisByAgendamentoId(@Param("agendamentoId") UUID agendamentoId);
+
+    List<FotoEnsaio> findByCompraExtraId(UUID compraExtraId);
 }

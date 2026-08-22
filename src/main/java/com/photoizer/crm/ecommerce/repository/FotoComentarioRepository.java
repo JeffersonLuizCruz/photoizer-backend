@@ -9,9 +9,9 @@ import java.util.UUID;
 
 public interface FotoComentarioRepository extends JpaRepository<FotoComentario, UUID> {
 
-    List<FotoComentario> findByFotoIdOrderByCreatedAtAsc(UUID fotoId);
+    List<FotoComentario> findByFotoIdOrderByAuditInfoCreatedAtAsc(UUID fotoId);
 
-    List<FotoComentario> findByAgendamentoIdOrderByCreatedAtAsc(UUID agendamentoId);
+    List<FotoComentario> findByAgendamentoIdOrderByAuditInfoCreatedAtAsc(UUID agendamentoId);
 
     long countByFotoIdAndOrigemAndLidaFalse(UUID fotoId, OrigemComentario origem);
 

@@ -34,7 +34,7 @@ public record ReceitaResponse(
             r.getTipoServico(), r.getDescricao(), r.getValorBruto(), r.getValorComissao(),
             r.getValorFinal(), r.getStatus(), r.getValorRecebido(),
             r.getDataPrevisaoRecebimento(), r.getDataRecebimentoReal(),
-            r.getFormaPagamento(), r.getObservacoes(), r.getCreatedAt()
+            r.getFormaPagamento(), r.getObservacoes(), r.getAuditInfo().getCreatedAt()
         );
     }
 }

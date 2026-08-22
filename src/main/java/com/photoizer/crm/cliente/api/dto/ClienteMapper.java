@@ -54,8 +54,8 @@ public class ClienteMapper {
             cliente.getObservacoes(),
             cliente.getDataCadastro(),
             cliente.getPreferencias(),
-            cliente.getCreatedAt(),
-            cliente.getUpdatedAt()
+            cliente.getAuditInfo().getCreatedAt(),
+            cliente.getAuditInfo().getUpdatedAt()
         );
     }
 

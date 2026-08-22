@@ -20,7 +20,7 @@ public record AvaliacaoResponse(
         return new AvaliacaoResponse(
             a.getId(), a.getClienteId(), a.getAgendamentoId(), a.getPacoteId(),
             a.getPontuacao(), a.getComentario(), a.isDepoimento(), a.isAprovado(),
-            a.getCreatedAt()
+            a.getAuditInfo().getCreatedAt()
         );
     }
 }

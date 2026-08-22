@@ -74,8 +74,8 @@ public class EcommerceQueryService {
 
         Map<YearMonth, List<CompraExtra>> porMes = new HashMap<>();
         for (var c : todasCompras) {
-            if (c.getCreatedAt() == null) continue;
-            var ym = YearMonth.from(c.getCreatedAt());
+            if (c.getAuditInfo().getCreatedAt() == null) continue;
+            var ym = YearMonth.from(c.getAuditInfo().getCreatedAt());
             porMes.computeIfAbsent(ym, k -> new ArrayList<>()).add(c);
         }
 
