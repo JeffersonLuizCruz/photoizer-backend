@@ -1,6 +1,7 @@
 package com.photoizer.crm.fotografo.api;
 
 import com.photoizer.crm.auth.api.UserResponse;
+import com.photoizer.crm.despesa.api.DespesaMapper;
 import com.photoizer.crm.fotografo.service.FotografoCsvExporter;
 import com.photoizer.crm.fotografo.service.FotografoService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,10 +32,12 @@ public class FotografoController {
 
     private final FotografoService fotografoService;
     private final FotografoCsvExporter csvExporter;
+    private final DespesaMapper despesaMapper;
 
-    public FotografoController(FotografoService fotografoService, FotografoCsvExporter csvExporter) {
+    public FotografoController(FotografoService fotografoService, FotografoCsvExporter csvExporter, DespesaMapper despesaMapper) {
         this.fotografoService = fotografoService;
         this.csvExporter = csvExporter;
+        this.despesaMapper = despesaMapper;
     }
 
     @GetMapping
@@ -106,7 +109,7 @@ public class FotografoController {
     @Operation(summary = "Listar custos/despesas do fotógrafo")
     public ResponseEntity<List<com.photoizer.crm.despesa.api.DespesaResponse>> listarCustos(@PathVariable UUID id) {
         var custos = fotografoService.listarCustos(id).stream()
-            .map(com.photoizer.crm.despesa.api.DespesaResponse::of)
+            .map(despesaMapper::toResponse)
             .toList();
         return ResponseEntity.ok(custos);
     }

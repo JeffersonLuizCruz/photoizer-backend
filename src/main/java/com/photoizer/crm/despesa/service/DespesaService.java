@@ -33,9 +33,10 @@ package com.photoizer.crm.despesa.service;
  */
 
 import com.photoizer.crm.despesa.api.DespesaRequest;
+import com.photoizer.crm.despesa.exception.AgendamentoVinculadoInvalidoException;
 import com.photoizer.crm.despesa.exception.CategoriaDespesaNaoEncontradaException;
+import com.photoizer.crm.despesa.exception.CategoriaObrigatoriaException;
 import com.photoizer.crm.despesa.exception.DespesaNaoEncontradaException;
-import com.photoizer.crm.despesa.exception.DespesaRecorrenteNaoPagaException;
 import com.photoizer.crm.despesa.model.Despesa;
 import com.photoizer.crm.despesa.model.DespesaCategoria;
 import com.photoizer.crm.despesa.model.RecorrenciaDespesa;
@@ -58,7 +59,6 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
-@Transactional
 public class DespesaService {
 
     private final DespesaRepository despesaRepository;
@@ -202,12 +202,19 @@ public class DespesaService {
         return despesaRepository.sumValorByAgendamentoIdWithFotografo(agendamentoId);
     }
 
+    /*
+     * REFACTORED — State Pattern (StatusDespesa)
+     *
+     * Motivo: A validação de transição de status era feita com if inline
+     * no service. Agora o enum StatusDespesa encapsula as regras de
+     * transição (quem pode ser pago, quem pode transicionar para PAGO),
+     * seguindo o padrão já adotado em StatusCompraExtra e StatusEdicao.
+     * Transições inválidas lançam StatusDespesaInvalidoException (409 CONFLICT).
+     */
     public Despesa marcarComoPaga(UUID id) {
         var despesa = buscarPorId(id);
-        if (despesa.getStatus() == StatusDespesa.RECORRENTE) {
-            throw new DespesaRecorrenteNaoPagaException(id);
-        }
-        despesa.setStatus(StatusDespesa.PAGO);
+        var novoStatus = despesa.getStatus().transicionarParaPagamento();
+        despesa.setStatus(novoStatus);
         despesa.setDataPagamento(LocalDateTime.now());
         return despesaRepository.save(despesa);
     }
@@ -286,13 +293,13 @@ public class DespesaService {
      */
     private void validarAgendamento(UUID agendamentoId) {
         if (agendamentoId != null && !agendamentoGateway.existsById(agendamentoId)) {
-            throw new IllegalArgumentException("Trabalho vinculado não encontrado: " + agendamentoId);
+            throw new AgendamentoVinculadoInvalidoException(agendamentoId);
         }
     }
 
     private DespesaCategoria resolverCategoria(UUID categoriaId) {
         if (categoriaId == null) {
-            throw new IllegalArgumentException("Categoria é obrigatória");
+            throw new CategoriaObrigatoriaException();
         }
         return categoriaRepository.findById(categoriaId)
             .orElseThrow(() -> new CategoriaDespesaNaoEncontradaException(categoriaId));

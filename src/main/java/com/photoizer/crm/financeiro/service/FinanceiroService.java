@@ -12,6 +12,7 @@ import com.photoizer.crm.comissao.model.OrigemIndicacao;
 import com.photoizer.crm.comissao.repository.IndicacaoRepository;
 import com.photoizer.crm.config.model.ConfigKey;
 import com.photoizer.crm.config.service.ConfiguracaoService;
+import com.photoizer.crm.despesa.api.DespesaMapper;
 import com.photoizer.crm.despesa.api.DespesaResponse;
 import com.photoizer.crm.despesa.model.Despesa;
 import com.photoizer.crm.despesa.model.StatusDespesa;
@@ -69,6 +70,7 @@ public class FinanceiroService {
     private final ReceitaRepository receitaRepository;
     private final AgendamentoFotografoRepository agendamentoFotografoRepository;
     private final AgendamentoMapper agendamentoMapper;
+    private final DespesaMapper despesaMapper;
 
     public FinanceiroService(PagamentoRepository pagamentoRepository,
                              FotoExtraRepository fotoExtraRepository,
@@ -81,7 +83,8 @@ public class FinanceiroService {
                              DespesaRepository despesaRepository,
                              ReceitaRepository receitaRepository,
                              AgendamentoFotografoRepository agendamentoFotografoRepository,
-                             AgendamentoMapper agendamentoMapper) {
+                             AgendamentoMapper agendamentoMapper,
+                             DespesaMapper despesaMapper) {
         this.pagamentoRepository = pagamentoRepository;
         this.fotoExtraRepository = fotoExtraRepository;
         this.videoExtraRepository = videoExtraRepository;
@@ -94,6 +97,7 @@ public class FinanceiroService {
         this.receitaRepository = receitaRepository;
         this.agendamentoFotografoRepository = agendamentoFotografoRepository;
         this.agendamentoMapper = agendamentoMapper;
+        this.despesaMapper = despesaMapper;
     }
 
     @Transactional(readOnly = true)
@@ -278,7 +282,7 @@ public class FinanceiroService {
         var custosFotografoDespesas = fotosInfo.stream()
             .flatMap(fi -> despesas.stream()
                 .filter(d -> fi.fotografoId().equals(d.getFotografoId()))
-                .map(DespesaResponse::of))
+                .map(despesaMapper::toResponse))
             .toList();
 
         return new FinanceiroTrabalhoResponse(
@@ -300,7 +304,7 @@ public class FinanceiroService {
             agendamento.getValorPartilhaGlobal(),
             agendamento.getValorLucroCrm(),
             totalCustosFotografo,
-            despesas.stream().map(DespesaResponse::of).toList(),
+            despesas.stream().map(despesaMapper::toResponse).toList(),
             custosFotografoDespesas,
             pagamentos.stream().map(com.photoizer.crm.financeiro.api.PagamentoResponse::of).toList()
         );

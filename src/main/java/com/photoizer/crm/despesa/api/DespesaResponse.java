@@ -1,6 +1,5 @@
 package com.photoizer.crm.despesa.api;
 
-import com.photoizer.crm.despesa.model.Despesa;
 import com.photoizer.crm.despesa.model.RecorrenciaDespesa;
 import com.photoizer.crm.despesa.model.StatusDespesa;
 import com.photoizer.crm.shared.model.FormaPagamento;
@@ -28,27 +27,4 @@ public record DespesaResponse(
     LocalDateTime dataPagamento,
     String urlComprovante,
     String observacao
-) {
-    public static DespesaResponse of(Despesa d) {
-        var cat = d.getCategoriaRef();
-        return new DespesaResponse(
-            d.getId(),
-            d.getDescricao(),
-            d.getValor(),
-            cat != null ? cat.getId() : null,
-            cat != null ? cat.getNome() : d.getCategoria(),
-            cat != null ? cat.getCor() : null,
-            d.getData(),
-            d.getFormaPagamento(),
-            d.getStatus(),
-            d.getRecorrencia(),
-            d.getDataProximaGeracao(),
-            d.getGeradaDeId(),
-            d.getAgendamentoId(),
-            d.getFotografoId(),
-            d.getDataPagamento(),
-            d.getUrlComprovante(),
-            d.getObservacao()
-        );
-    }
-}
+) {}

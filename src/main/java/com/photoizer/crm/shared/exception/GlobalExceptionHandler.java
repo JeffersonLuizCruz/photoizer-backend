@@ -3,8 +3,11 @@ package com.photoizer.crm.shared.exception;
 import com.photoizer.crm.despesa.exception.CategoriaDespesaNaoEncontradaException;
 import com.photoizer.crm.despesa.exception.CategoriaDuplicadaException;
 import com.photoizer.crm.despesa.exception.CategoriaEmUsoException;
+import com.photoizer.crm.despesa.exception.CategoriaObrigatoriaException;
 import com.photoizer.crm.despesa.exception.DespesaNaoEncontradaException;
 import com.photoizer.crm.despesa.exception.DespesaRecorrenteNaoPagaException;
+import com.photoizer.crm.despesa.exception.StatusDespesaInvalidoException;
+import com.photoizer.crm.despesa.exception.AgendamentoVinculadoInvalidoException;
 import org.springframework.security.access.AccessDeniedException;
 import com.photoizer.crm.agenda.exception.AgendamentoNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.AgendamentoNoPassadoException;
@@ -275,6 +278,24 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DespesaRecorrenteNaoPagaException.class)
     public ResponseEntity<ErrorResponse> handleDespesaRecorrenteNaoPaga(DespesaRecorrenteNaoPagaException e) {
         log.warn("Tentativa de pagar despesa recorrente: {}", e.getMessage());
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
+    }
+
+    @ExceptionHandler(StatusDespesaInvalidoException.class)
+    public ResponseEntity<ErrorResponse> handleStatusDespesaInvalido(StatusDespesaInvalidoException e) {
+        log.warn("Transição de status de despesa inválida: {}", e.getMessage());
+        return build(HttpStatus.CONFLICT, e);
+    }
+
+    @ExceptionHandler(AgendamentoVinculadoInvalidoException.class)
+    public ResponseEntity<ErrorResponse> handleAgendamentoVinculadoInvalido(AgendamentoVinculadoInvalidoException e) {
+        log.warn("Agendamento vinculado inválido: {}", e.getMessage());
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
+    }
+
+    @ExceptionHandler(CategoriaObrigatoriaException.class)
+    public ResponseEntity<ErrorResponse> handleCategoriaObrigatoria(CategoriaObrigatoriaException e) {
+        log.warn("Categoria obrigatória não informada: {}", e.getMessage());
         return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
     }
 

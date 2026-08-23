@@ -37,4 +37,31 @@ public interface DespesaRepository extends JpaRepository<Despesa, UUID>, JpaSpec
 
     @Query("SELECT COALESCE(SUM(d.valor), 0) FROM Despesa d WHERE d.data BETWEEN :inicio AND :fim")
     BigDecimal sumValorByDataBetween(@Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
+
+    /**
+     * Projeção para agregação de despesas por mês.
+     * Usada pelo DespesaQueryService para evitar agregação em memória.
+     */
+    record DespesaPorMesProjection(
+        int ano,
+        int mes,
+        BigDecimal total,
+        BigDecimal pagas
+    ) {}
+
+    @Query("""
+        SELECT new com.photoizer.crm.despesa.repository.DespesaRepository$DespesaPorMesProjection(
+            YEAR(d.data),
+            MONTH(d.data),
+            COALESCE(SUM(d.valor), 0),
+            COALESCE(SUM(CASE WHEN d.status = com.photoizer.crm.despesa.model.StatusDespesa.PAGO THEN d.valor ELSE 0 END), 0)
+        )
+        FROM Despesa d
+        WHERE d.data BETWEEN :inicio AND :fim
+        GROUP BY YEAR(d.data), MONTH(d.data)
+        ORDER BY YEAR(d.data) DESC, MONTH(d.data) DESC
+        """)
+    List<DespesaPorMesProjection> sumByMesBetween(
+        @Param("inicio") LocalDate inicio,
+        @Param("fim") LocalDate fim);
 }
