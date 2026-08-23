@@ -77,7 +77,10 @@ public class AgendamentoStatusLifecycle {
         int duracao = (duracaoMinutos != null) ? duracaoMinutos : agendamento.getDuracaoMinutos();
 
         var pacote = agendamento.getPacote();
-        disponibilidadeService.validarConflitoAgenda(pacote, novaDataHora, duracao, agendamento.getLocalEnsaio());
+        var fotografoId = agendamento.getFotografo() != null ? agendamento.getFotografo().getId() : null;
+        disponibilidadeService.validarConflitoAgenda(
+            pacote, novaDataHora, duracao, agendamento.getLocalEnsaio(),
+            ConflitoAgendaParams.paraAtualizacao(fotografoId, agendamento.getId()));
 
         agendamento.reagendar(novaDataHora, duracao);
 

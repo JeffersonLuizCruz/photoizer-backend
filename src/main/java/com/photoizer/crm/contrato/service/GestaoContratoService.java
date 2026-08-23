@@ -174,7 +174,7 @@ public class GestaoContratoService {
         var diasValidade = configuracaoService.getValorInteiro(ConfigKey.CONTRATO_DIAS_VALIDADE);
 
         // Delegate para o dominio: valida transicao E executa
-        contrato.publicar(sha256(token), diasValidade);
+        contrato.publicar(token, sha256(token), diasValidade);
         contratoRepository.save(contrato);
 
         return new PublicarContratoResponse(contrato.getId(), "/contrato/" + token);
@@ -239,6 +239,7 @@ public class GestaoContratoService {
             contrato.getClienteEstado(),
             contrato.getPacoteId(),
             contrato.getEditorId(),
+            contrato.getFotografoId(),
             contrato.getDataHoraEnsaio(),
             contrato.getDuracaoMinutos(),
             contrato.getLocalEnsaio(),

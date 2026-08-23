@@ -18,6 +18,7 @@ public record ContratoAprovadoEvent(
     String estado,
     UUID pacoteId,
     UUID editorId,
+    UUID fotografoId,
     LocalDateTime dataHoraEnsaio,
     Integer duracaoMinutos,
     String localEnsaio,

@@ -22,6 +22,8 @@ public record AgendamentoResponse(
     String pacoteNome,
     UUID editorId,
     String editorNome,
+    UUID fotografoId,
+    String fotografoNome,
     LocalDateTime dataHoraEnsaio,
     Integer duracaoMinutos,
     String localEnsaio,

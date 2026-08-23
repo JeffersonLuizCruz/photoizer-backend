@@ -20,6 +20,7 @@ public record CriarAgendamentoCommand(
     String origem,
     UUID pacoteId,
     UUID editorId,
+    UUID fotografoId,
     LocalDateTime dataHoraEnsaio,
     LocalDate data,
     String hora,

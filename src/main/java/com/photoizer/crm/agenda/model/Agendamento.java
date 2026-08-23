@@ -69,6 +69,10 @@ public class Agendamento {
     @JoinColumn(name = "editor_id")
     private User editor;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "fotografo_id")
+    private User fotografo;
+
     @PositiveOrZero
     @Column(name = "valor_partilha_fotografo", precision = 10, scale = 2)
     private BigDecimal valorPartilhaGlobal;

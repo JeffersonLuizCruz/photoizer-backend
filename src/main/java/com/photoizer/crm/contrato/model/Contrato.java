@@ -237,8 +237,9 @@ public class Contrato {
         link.setContrato(this);
     }
 
-    public void publicar(String tokenHash, int diasValidade) {
+    public void publicar(String token, String tokenHash, int diasValidade) {
         this.status.validarTransicaoPara(StatusContrato.PUBLICADO);
+        this.token = token;
         this.tokenHash = tokenHash;
         this.status = StatusContrato.PUBLICADO;
         this.publicadoEm = LocalDateTime.now();

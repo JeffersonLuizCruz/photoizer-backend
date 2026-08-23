@@ -146,9 +146,12 @@ public class AgendamentoController {
             fotografosList = List.of(new CriarAgendamentoCommand.FotografoRepasse(parsedFotografoId, parsedValorRepassar));
         }
 
+        var parsedFotografoId = fotografoId != null && !fotografoId.isBlank()
+            ? UUID.fromString(fotografoId) : null;
+
         var command = new CriarAgendamentoCommand(
             parsedClienteId, nome, telefone, email, cpf, cidade, estado, origem,
-            parsedPacoteId, parsedEditorId, parsedDataHora, null, null, parsedDuracao,
+            parsedPacoteId, parsedEditorId, parsedFotografoId, parsedDataHora, null, null, parsedDuracao,
             localEnsaio, enderecoCompleto, parsedTaxa, parsedCusto, parsedRepassar,
             comprovanteEntrada, parsedAutoriza, clausulasPersonalizadas, observacoes,
             parsedIndicadorId, indicadorNome, indicadorTelefone,
@@ -197,8 +200,9 @@ public class AgendamentoController {
             @RequestParam String hora,
             @RequestParam(defaultValue = "60") Integer duracaoMinutos,
             @RequestParam(required = false) UUID excluirAgendamentoId,
-            @RequestParam(defaultValue = "false") Boolean bloqueiaDiaInteiro) {
-        return ResponseEntity.ok(disponibilidadeService.verificarDisponibilidade(data, hora, duracaoMinutos, excluirAgendamentoId, bloqueiaDiaInteiro));
+            @RequestParam(defaultValue = "false") Boolean bloqueiaDiaInteiro,
+            @RequestParam(required = false) UUID fotografoId) {
+        return ResponseEntity.ok(disponibilidadeService.verificarDisponibilidade(data, hora, duracaoMinutos, excluirAgendamentoId, bloqueiaDiaInteiro, fotografoId));
     }
 
     @GetMapping("/{id}")

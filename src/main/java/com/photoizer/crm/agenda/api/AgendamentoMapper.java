@@ -22,6 +22,8 @@ public interface AgendamentoMapper {
     @Mapping(target = "pacoteNome", source = "agendamento.pacote.nome")
     @Mapping(target = "editorId", source = "agendamento.editor.id")
     @Mapping(target = "editorNome", source = "agendamento.editor.nome")
+    @Mapping(target = "fotografoId", source = "agendamento.fotografo.id")
+    @Mapping(target = "fotografoNome", source = "agendamento.fotografo.nome")
     @Mapping(target = "valorPacote", expression = "java(agendamento.getValorTotal().subtract(agendamento.getTaxaDeslocamento()))")
     @Mapping(target = "saldoDevedor", expression = "java(agendamento.getValorTotalFinal().subtract(agendamento.getValorEntradaPago()))")
     @Mapping(target = "status", expression = "java(agendamento.getStatus().name())")

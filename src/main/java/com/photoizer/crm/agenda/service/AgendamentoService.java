@@ -117,6 +117,7 @@ public class AgendamentoService {
         return criarAgendamentoBase(new DadosNovoAgendamento(
             pacote,
             command.editorId(),
+            command.fotografoId(),
             cliente,
             dataHoraEnsaio,
             command.duracaoMinutos(),
@@ -227,12 +228,18 @@ public class AgendamentoService {
                 .orElseThrow(() -> new EditorNaoEncontradoException(request.editorId()))
             : null;
 
+        var fotografo = request.fotografoId() != null
+            ? userRepository.findById(request.fotografoId()).orElse(null)
+            : null;
+
         if (request.dataHoraEnsaio().isBefore(LocalDateTime.now())) {
             throw new AgendamentoNoPassadoException();
         }
 
         var duracao = agendamento.getDuracaoMinutos();
-        disponibilidadeService.validarConflitoAgenda(pacote, request.dataHoraEnsaio(), duracao, request.localEnsaio(), agendamento.getId());
+        disponibilidadeService.validarConflitoAgenda(
+            pacote, request.dataHoraEnsaio(), duracao, request.localEnsaio(),
+            ConflitoAgendaParams.paraAtualizacao(fotografo != null ? fotografo.getId() : null, agendamento.getId()));
 
         var taxaDeslocamentoPadrao = configuracaoService.getValorDecimal("taxaDeslocamentoPadrao", BigDecimal.ZERO);
         var custoDeslocamento = request.custoDeslocamento() != null ? request.custoDeslocamento() : taxaDeslocamentoPadrao;
@@ -246,6 +253,7 @@ public class AgendamentoService {
 
         agendamento.setPacote(pacote);
         agendamento.setEditor(editor);
+        agendamento.setFotografo(fotografo);
         agendamento.setDataHoraEnsaio(request.dataHoraEnsaio());
         agendamento.setLocalEnsaio(request.localEnsaio());
         agendamento.setEnderecoCompleto(request.enderecoCompleto());
@@ -307,6 +315,7 @@ public class AgendamentoService {
         return criarAgendamentoBase(new DadosNovoAgendamento(
             pacote,
             event.editorId(),
+            event.fotografoId(),
             cliente,
             event.dataHoraEnsaio(),
             event.duracaoMinutos(),
@@ -357,17 +366,24 @@ public class AgendamentoService {
                 .orElseThrow(() -> new EditorNaoEncontradoException(dados.editorId()))
             : null;
 
+        var fotografo = (dados.fotografoId() != null)
+            ? userRepository.findById(dados.fotografoId()).orElse(null)
+            : null;
+
         if (dados.dataHoraEnsaio().isBefore(LocalDateTime.now())) {
             throw new AgendamentoNoPassadoException();
         }
 
         var duracao = dados.duracaoMinutos() != null ? dados.duracaoMinutos() : 60;
-        disponibilidadeService.validarConflitoAgenda(pacote, dados.dataHoraEnsaio(), duracao, dados.localEnsaio());
+        disponibilidadeService.validarConflitoAgenda(
+            pacote, dados.dataHoraEnsaio(), duracao, dados.localEnsaio(),
+            ConflitoAgendaParams.paraCriacao(fotografo != null ? fotografo.getId() : null));
 
         var agendamento = Agendamento.builder()
             .cliente(dados.cliente())
             .pacote(pacote)
             .editor(editor)
+            .fotografo(fotografo)
             .dataHoraEnsaio(dados.dataHoraEnsaio())
             .duracaoMinutos(duracao)
             .localEnsaio(dados.localEnsaio())
@@ -422,6 +438,7 @@ public class AgendamentoService {
     private record DadosNovoAgendamento(
         Pacote pacote,
         UUID editorId,
+        UUID fotografoId,
         Cliente cliente,
         LocalDateTime dataHoraEnsaio,
         Integer duracaoMinutos,

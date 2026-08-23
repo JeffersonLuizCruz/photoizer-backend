@@ -1,6 +1,7 @@
 package com.photoizer.crm.auth.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.photoizer.crm.shared.model.AuditInfo;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
