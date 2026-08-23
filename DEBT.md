@@ -79,14 +79,18 @@
 - ~~**Endpoints bloqueados** (`denyAll`); **PDF é stub**; escrita cross-module (`contratoGerado` no `Agendamento`); duplica `documento` vs `contrato`.~~ **RESOLVIDO**: `@RolesAllowed({"ADMIN","FOTOGRAFO"})` no controller; `PdfWriter` no shared; `ContratoGeradoEvent`; Strategy Pattern genérico (`PdfContentStrategy<T>`); `TipoDocumento` enum; `PdfContentHelper` (DRY); `DocumentoService.resolverComprovante()` (Facade); `TipoComprovanteInvalidoException` (400).
 
 ### ecommerce
-- ~~God class (`EcommerceService`, +20 métodos)~~ **RESOLVIDO**: extraídos `CarrinhoService`, `FavoritoService`, `DownloadService`, `PagamentoExtraService`, `GaleriaQueryService`; `EcommerceService` agora é orquestrador fino (~300 linhas).
-- ~~**Escrita directa em `FotoEnsaio`/`Agendamento`**~~ **RESOLVIDO**: eventos `CompraExtraFotosAssociadasEvent`, `CompraExtraCanceladaEvent`, `CompraExtraPagaEvent`, `FotoDownloadEvent`, `FotosSelecionadasEvent`, `TokenGaleriaRegeneradoEvent` + listeners `FotoEcommerceEventListener` (foto) e `AgendamentoEcommerceEventListener` (agenda). Removidas injeções de `AgendamentoRepository` e `FotoEnsaioRepository` dos services ecommerce.
+- ~~God class (`EcommerceService`, +20 métodos)~~ **RESOLVIDO**: extraídos `CarrinhoService`, `FavoritoService`, `DownloadService`, `PagamentoExtraService`, `GaleriaQueryService`, `SelecaoFotosService`, `CompraQueryService`; `EcommerceService` agora é orquestrador fino (~200 linhas).
+- ~~**Escrita direta em `FotoEnsaio`/`Agendamento`**~~ **RESOLVIDO**: eventos `CompraExtraFotosAssociadasEvent`, `CompraExtraCanceladaEvent`, `CompraExtraPagaEvent`, `FotoDownloadEvent`, `FotosSelecionadasEvent`, `TokenGaleriaRegeneradoEvent` + listeners `FotoEcommerceEventListener` (foto) e `AgendamentoEcommerceEventListener` (agenda). Removidas injeções de `AgendamentoRepository` e `FotoEnsaioRepository` dos services ecommerce.
 - ~~`findAll().stream().filter` para achar fotos por `compraExtraId` (4 pontos)~~ **RESOLVIDO**: query dedicada `findByCompraExtraId(UUID)` no `FotoEnsaioRepository`.
 - ~~Exceções genéricas `RuntimeException`/`IllegalArgumentException`~~ **RESOLVIDO**: 10 exceções de domínio criadas (`GaleriaNaoEncontradaException`, `CompraNaoEncontradaException`, `FotoNaoEncontradaException`, `CarrinhoVazioException`, `FotoJaSelecionadaException`, `FotoJaBaixadaException`, `LimitePacoteExcedidoException`, `CompraJaPagaException`, `SessaoInvalidaException`, `FotoIndisponivelException`).
-- **P2 pendente**: `AdminAnalyticsController` ainda injeta repositórios diretamente no controller.
-- **P2 pendente**: DTOs manuais (`static of()`, `.name()`) — migrar para MapStruct.
+- ~~**P2 pendente**: `AdminAnalyticsController` ainda injeta repositórios diretamente no controller~~ **RESOLVIDO**: usa `EcommerceQueryService.obterAnalytics()`.
+- ~~**P2 pendente**: DTOs manuais (`static of()`, `.name()`) — migrar para MapStruct~~ **RESOLVIDO**: `EcommerceMapper` (MapStruct) criado para CompraExtra, FotoComentario, Avaliacao, Sessao.
 - **P3**: `Sessao`/`SessaoController` legado — `Sessao.status` migrado para enum `StatusSessao`, mas entidade ainda não integrada ao fluxo principal.
 - **State Pattern** aplicado: `StatusCompraExtra` enum com métodos de transição (`proximoAoComprovanteEnviado`, `proximoAoCancelar`, `podeSerCancelada`).
+- **RESOLVIDO**: `cancelarCompra` duplicado (EcommerceService + PagamentoExtraService) → consolidado em `PagamentoExtraService`.
+- **RESOLVIDO**: `EcommerceService.checkout()` recebia `CarrinhoService` como parâmetro → injetado via construtor.
+- **RESOLVIDO**: `AvaliacaoController` injetava `AvaliacaoRepository` diretamente → `AvaliacaoService` criado.
+- **RESOLVIDO**: Testes unitários desatualizados (`EcommerceServiceTest`) → refletidos na nova estrutura.
 
 ### edicao
 - **RESOLVIDO**: God class `EdicaoService` (534→~190 linhas): extraídos `EdicaoQueryService`, `RawUploadService`, `EdicaoUploadEditadasService`, `PublicacaoService`, `EdicaoRevisaoService`, `FotoEdicaoProcessor`, `EdicaoZipService`.
@@ -143,7 +147,7 @@
 | ~~**Herança `BaseEntity`**~~ | ~~todos com entidades~~ | **RESOLVIDO**: `@Embeddable AuditInfo` + composição; `BaseEntity.java` removido |
 | **`status`/`origem` em `String`** | comissao, agenda, foto, despesa, contrato, ecommerce | enums com métodos de transição; nunca comparar `String.equals` — **despesa RESOLVIDO** (State Pattern) |
 | **Exceções genéricas** | maioria | hierarquia central `BusinessException` + `HttpStatus`/código (decisão já aprovada) |
-| **DTOs manuais (`static of`/`Map`)** | quase todos | MapStruct (decisão já aprovada; Fase 2) — **iniciado em `agenda`** (AgendamentoMapper/RascunhoAgendamentoMapper); **despesa RESOLVIDO** (static of() removido) |
+| **DTOs manuais (`static of`/`Map`)** | quase todos | MapStruct (decisão já aprovada; Fase 2) — **iniciado em `agenda`** (AgendamentoMapper/RascunhoAgendamentoMapper); **despesa RESOLVIDO** (static of() removido); **ecommerce RESOLVIDO** (EcommerceMapper) |
 | ~~**Escrita em entidade alheia** (ecommerce)~~ | ~~ecommerce, edicao, foto, financeiro, comissao, documento, notificacao~~ | **RESOLVIDO** (ecommerce): eventos de domínio + listeners; **RESOLVIDO** (edicao): decidido manter escrita direta até refatoração transversal; outros módulos pendentes |
 | **Agregação em memória** | dashboard, financeiro, comissao, indicador, agenda | queries agregadas SQL (`SUM`/`GROUP BY`/`COUNT`) nos repositórios donos — **despesa RESOLVIDO** (DespesaQueryService) |
 

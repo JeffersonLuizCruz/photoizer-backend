@@ -1,6 +1,6 @@
 package com.photoizer.crm.ecommerce.api;
 
-import com.photoizer.crm.ecommerce.service.EcommerceService;
+import com.photoizer.crm.ecommerce.service.CompraQueryService;
 import com.photoizer.crm.ecommerce.service.PagamentoExtraService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,13 +27,16 @@ import java.util.UUID;
 @Tag(name = "Admin Compras", description = "Gestão administrativa de todas as compras de fotos extras")
 public class AdminComprasController {
 
-    private final EcommerceService ecommerceService;
+    private final CompraQueryService compraQueryService;
     private final PagamentoExtraService pagamentoExtraService;
+    private final EcommerceMapper ecommerceMapper;
 
-    public AdminComprasController(EcommerceService ecommerceService,
-                                  PagamentoExtraService pagamentoExtraService) {
-        this.ecommerceService = ecommerceService;
+    public AdminComprasController(CompraQueryService compraQueryService,
+                                  PagamentoExtraService pagamentoExtraService,
+                                  EcommerceMapper ecommerceMapper) {
+        this.compraQueryService = compraQueryService;
         this.pagamentoExtraService = pagamentoExtraService;
+        this.ecommerceMapper = ecommerceMapper;
     }
 
     @GetMapping
@@ -44,15 +47,15 @@ public class AdminComprasController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dataFim,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int perPage) {
-        var compras = ecommerceService.listarComprasPaginado(status, dataInicio, dataFim, page, perPage);
-        var response = compras.map(CompraExtraResponse::ofAdmin);
+        var compras = compraQueryService.listarComprasPaginado(status, dataInicio, dataFim, page, perPage);
+        var response = compras.map(ecommerceMapper::toAdminResponse);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}/comprovante")
     @Operation(summary = "Servir comprovante da compra (admin)")
     public ResponseEntity<Resource> comprovante(@PathVariable UUID id) {
-        var comprovantePath = ecommerceService.buscarComprovantePathPorId(id);
+        var comprovantePath = compraQueryService.buscarComprovantePathPorId(id);
         if (comprovantePath == null) {
             return ResponseEntity.notFound().build();
         }
@@ -66,7 +69,7 @@ public class AdminComprasController {
     @GetMapping("/{id}")
     @Operation(summary = "Detalhe da compra com fotos")
     public ResponseEntity<AdminCompraDetalheResponse> detalhe(@PathVariable UUID id) {
-        return ResponseEntity.ok(ecommerceService.buscarCompraDetalhe(id));
+        return ResponseEntity.ok(compraQueryService.buscarCompraDetalhe(id));
     }
 
     @PatchMapping("/{id}/confirmar")
@@ -88,6 +91,6 @@ public class AdminComprasController {
     @GetMapping("/relatorio")
     @Operation(summary = "Relatório financeiro do ecommerce")
     public ResponseEntity<AdminComprasRelatorioResponse> relatorio() {
-        return ResponseEntity.ok(ecommerceService.gerarRelatorio());
+        return ResponseEntity.ok(compraQueryService.gerarRelatorio());
     }
 }

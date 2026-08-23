@@ -3,6 +3,7 @@ package com.photoizer.crm.ecommerce.service;
 import com.photoizer.crm.ecommerce.api.ComentarioRequest;
 import com.photoizer.crm.ecommerce.api.ComentarioResponse;
 import com.photoizer.crm.ecommerce.api.ComentariosPorFotoResponse;
+import com.photoizer.crm.ecommerce.api.EcommerceMapper;
 import com.photoizer.crm.ecommerce.exception.FotoIndisponivelException;
 import com.photoizer.crm.ecommerce.model.FotoComentario;
 import com.photoizer.crm.ecommerce.model.OrigemComentario;
@@ -18,7 +19,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Comentarios por foto: clientes comentam via token da galeria e o fotografo/
+ * Comentários por foto: clientes comentam via token da galeria e o fotógrafo/
  * admin visualiza e responde no painel administrativo.
  *
  * MODULITH: Usa GaleriaQueryService para queries read-only em FotoEnsaio.
@@ -29,11 +30,14 @@ public class ComentarioService {
 
     private final GaleriaQueryService galeriaQueryService;
     private final FotoComentarioRepository comentarioRepository;
+    private final EcommerceMapper ecommerceMapper;
 
     public ComentarioService(GaleriaQueryService galeriaQueryService,
-                             FotoComentarioRepository comentarioRepository) {
+                             FotoComentarioRepository comentarioRepository,
+                             EcommerceMapper ecommerceMapper) {
         this.galeriaQueryService = galeriaQueryService;
         this.comentarioRepository = comentarioRepository;
+        this.ecommerceMapper = ecommerceMapper;
     }
 
     private void validarFotoPertencenteAoAgendamento(UUID agendamentoId, UUID fotoId) {
@@ -61,7 +65,7 @@ public class ComentarioService {
             .origem(OrigemComentario.CLIENTE)
             .lida(false)
             .build();
-        return ComentarioResponse.of(comentarioRepository.save(comentario));
+        return ecommerceMapper.toComentarioResponse(comentarioRepository.save(comentario));
     }
 
     @Transactional(readOnly = true)
@@ -69,7 +73,7 @@ public class ComentarioService {
         var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
         validarFotoPertencenteAoAgendamento(agendamento.getId(), fotoId);
         return comentarioRepository.findByFotoIdOrderByAuditInfoCreatedAtAsc(fotoId).stream()
-            .map(ComentarioResponse::of)
+            .map(ecommerceMapper::toComentarioResponse)
             .toList();
     }
 
@@ -86,7 +90,7 @@ public class ComentarioService {
             .map(foto -> new ComentariosPorFotoResponse(
                 FotoEnsaioResponse.of(foto),
                 porFoto.getOrDefault(foto.getId(), List.of()).stream()
-                    .map(ComentarioResponse::of)
+                    .map(ecommerceMapper::toComentarioResponse)
                     .toList(),
                 porFoto.getOrDefault(foto.getId(), List.of()).stream()
                     .filter(c -> c.getOrigem() == OrigemComentario.CLIENTE && !c.isLida())
@@ -108,7 +112,7 @@ public class ComentarioService {
             .build();
         var salvo = comentarioRepository.save(comentario);
         marcarLidos(agendamentoId, fotoId);
-        return ComentarioResponse.of(salvo);
+        return ecommerceMapper.toComentarioResponse(salvo);
     }
 
     @Transactional

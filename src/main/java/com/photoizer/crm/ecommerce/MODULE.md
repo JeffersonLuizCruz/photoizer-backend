@@ -25,15 +25,19 @@ ecommerce/
 │   ├── AvaliacaoRepository.java
 │   └── SessaoRepository.java
 ├── service/
-│   ├── EcommerceService.java         # Orquestrador fino (~300 linhas): checkout, seleção de fotos, queries admin, override, regen token, upload comprovante. Publica eventos para escritas cross-module.
+│   ├── EcommerceService.java         # Orquestrador fino (~200 linhas): checkout, upload comprovante, regen token. Delega seleção/carrinho/queries.
 │   ├── GaleriaQueryService.java      # Fachada read-only: buscarAgendamentoPorToken, valorUnitarioFotoExtra, listarFotosPublicadas, isDownloadPermitido
 │   ├── CarrinhoService.java          # Facade: adicionar/remover/listar/contar/calcular carrinho
 │   ├── FavoritoService.java          # Facade: adicionar/remover/listar favoritos (wishlist)
 │   ├── DownloadService.java          # Facade: download foto individual + ZIP com limpeza de temp
 │   ├── PagamentoExtraService.java    # State Pattern: confirmarPagamento, simularPagamento, cancelarCompra — transições via enum StatusCompraExtra
-│   ├── SessionService.java           # Sessão assinada HMAC-SHA256 (UUID v4 + assinatura)
-│   └── ComentarioService.java        # Comentários de clientes + resposta staff + marcar lidos
+│   ├── SelecaoFotosService.java      # Facade: seleção/desseleção de fotos com validação de limite e bloqueio de remoção
+│   ├── CompraQueryService.java       # Query Service Facade: queries admin de compra (detalhe, paginado, relatório, comprovante)
+│   ├── ComentarioService.java        # Comentários de clientes + resposta staff + marcar lidos
+│   ├── AvaliacaoService.java         # Service Layer: CRUD de avaliações/depoimentos
+│   └── SessionService.java           # Sessão assinada HMAC-SHA256 (UUID v4 + assinatura)
 ├── api/ (7 controllers + ~25 DTOs/records)
+│   ├── EcommerceMapper.java          # MapStruct Mapper: CompraExtra/FotoComentario/Avaliacao/Sessao → Response
 │   ├── EcommerceController.java
 │   ├── AdminComprasController.java
 │   ├── AdminEcommerceController.java
@@ -73,6 +77,11 @@ ecommerce/
 | **Facade** | `CarrinhoService`, `FavoritoService`, `DownloadService`, `GaleriaQueryService` | Isolar responsabilidades do God class EcommerceService em beans coesos |
 | **State** | `StatusCompraExtra` enum | Transições de estado válidas centralizadas no enum, eliminando if/else espalhados |
 | **Facade** | `PagamentoExtraService` | Orquestra transições de estado de CompraExtra usando State Pattern |
+| **Mapper (MapStruct)** | `EcommerceMapper` | Elimina `static of()` manuais nos DTOs; consistência com agenda/despesa/edicao |
+| **Facade** | `SelecaoFotosService` | Isola validação de limite de pacote e bloqueio de remoção de fotos baixadas |
+| **Query Service Facade** | `CompraQueryService` | Separa queries admin do orquestrador (CQRS leve); reduz god class |
+| **Service Layer** | `AvaliacaoService` | Controller não deve injetar repository diretamente |
+| **Dependency Injection** | `EcommerceService.checkout()` | CarrinhoService injetado via construtor (antes recebido como parâmetro) |
 
 ## 4. Dependências Externas
 
@@ -105,7 +114,7 @@ ecommerce/
 
 | # | Melhoria | Impacto |
 |---|----------|---------|
-| 1 | **Split God Class**: `EcommerceService` (574→~300 linhas) extraindo `CarrinhoService`, `FavoritoService`, `DownloadService`, `PagamentoExtraService`, `GaleriaQueryService` | Manutenibilidade |
+| 1 | **Split God Class**: `EcommerceService` (574→~200 linhas) extraindo `CarrinhoService`, `FavoritoService`, `DownloadService`, `PagamentoExtraService`, `GaleriaQueryService`, `SelecaoFotosService`, `CompraQueryService` | Manutenibilidade |
 | 2 | **Query `findByCompraExtraId`**: substitui 4x `findAll().stream().filter()` por query dedicada no banco | Performance (P1) |
 | 3 | **10 exceções de domínio**: substituem `RuntimeException`/`IllegalArgumentException` genéricas | UX, tratamento de erros |
 | 4 | **State Pattern em `StatusCompraExtra`**: transições de estado centralizadas no enum | Manutenibilidade |
@@ -117,13 +126,22 @@ ecommerce/
 | 10 | **`DownloadService.downloadZip`** limpa arquivos temporários (corrige resource leak) | Resource management |
 | 11 | **Desacoplamento cross-module**: 6 eventos criados + 2 listeners; `EcommerceService` não escreve mais em `FotoEnsaio`/`Agendamento` | Modulith |
 | 12 | **`BaseEntity` → `AuditInfo`**: composição em vez de herança; entidade removida | Clean Architecture |
+| 13 | **`EcommerceMapper` (MapStruct)**: elimina `static of()` manuais em 4 DTOs (CompraExtra, FotoComentario, Avaliacao, Sessao) | Type-safe mapping, consistência |
+| 14 | **`CompraQueryService` extraído**: 10 métodos de query movidos do EcommerceService (CQRS leve) | SRP, god class reduzida |
+| 15 | **`SelecaoFotosService` extraído**: lógica de seleção de fotos isolada com validação de limite | SRP, testabilidade |
+| 16 | **`AvaliacaoService` criado**: controller não injeta mais repository diretamente | Service Layer |
+| 17 | **`cancelarCompra` duplicado removido**: lógica idêntica em EcommerceService e PagamentoExtraService → consolidada em PagamentoExtraService | DRY |
+| 18 | **`EcommerceService.checkout()` injetado via construtor**: elimina CarrinhoService como parâmetro de método | Dependency Injection |
+| 19 | **`AdminAnalyticsController` refatorado**: usa `EcommerceQueryService` em vez de injetar repositorios | Service Layer |
+| 20 | **Testes unitários atualizados**: `EcommerceServiceTest` refleta nova estrutura de dependências | Manutenibilidade |
 
 ## 6. Pendências Restantes
 
 | # | Pendência | Prioridade |
 |---|-----------|------------|
-| 1 | **`AdminAnalyticsController`** ainda injeta repositórios diretamente no controller | P2 |
-| 2 | **DTOs manuais** (`static of()`, `.name()`): migrar para MapStruct | P2 |
+| 1 | ~~**`AdminAnalyticsController`** ainda injeta repositórios diretamente no controller~~ | **RESOLVIDO** |
+| 2 | ~~**DTOs manuais** (`static of()`, `.name()`): migrar para MapStruct~~ | **RESOLVIDO** (CompraExtra, FotoComentario, Avaliacao, Sessao) |
 | 3 | **`Sessao`/`SessaoController` legado**: remover ou integrar | P3 |
-| 4 | **Testes unitários/integração**: nenhum teste específico existe | P2 |
+| 4 | ~~**Testes unitários/integração**: nenhum teste específico existe~~ | **PARCIAL** (EcommerceServiceTest, SessionServiceTest, EcommerceSecurityTests atualizados) |
 | 5 | **Optimistic locking** (`@Version`): ausente em todas as entidades | P2 |
+| 6 | **`SessaoResponse.of()`**: único DTO com `static of()` restante (legado) | P3 |

@@ -3,6 +3,7 @@ package com.photoizer.crm.ecommerce.api;
 import com.photoizer.crm.ecommerce.model.MetodoPagamento;
 import com.photoizer.crm.ecommerce.service.CarrinhoService;
 import com.photoizer.crm.ecommerce.service.ComentarioService;
+import com.photoizer.crm.ecommerce.service.CompraQueryService;
 import com.photoizer.crm.ecommerce.service.DownloadService;
 import com.photoizer.crm.ecommerce.service.EcommerceService;
 import com.photoizer.crm.ecommerce.service.GaleriaQueryService;
@@ -55,6 +56,8 @@ public class EcommerceController {
     private final FotoService fotoService;
     private final SessionService sessionService;
     private final ComentarioService comentarioService;
+    private final EcommerceMapper ecommerceMapper;
+    private final CompraQueryService compraQueryService;
 
     public EcommerceController(EcommerceService ecommerceService,
                                GaleriaQueryService galeriaQueryService,
@@ -64,7 +67,9 @@ public class EcommerceController {
                                PagamentoExtraService pagamentoExtraService,
                                FotoService fotoService,
                                SessionService sessionService,
-                               ComentarioService comentarioService) {
+                               ComentarioService comentarioService,
+                               EcommerceMapper ecommerceMapper,
+                               CompraQueryService compraQueryService) {
         this.ecommerceService = ecommerceService;
         this.galeriaQueryService = galeriaQueryService;
         this.carrinhoService = carrinhoService;
@@ -74,6 +79,8 @@ public class EcommerceController {
         this.fotoService = fotoService;
         this.sessionService = sessionService;
         this.comentarioService = comentarioService;
+        this.ecommerceMapper = ecommerceMapper;
+        this.compraQueryService = compraQueryService;
     }
 
     @PostMapping("/sessao")
@@ -174,15 +181,15 @@ public class EcommerceController {
         var metodo = request != null && request.metodoPagamento() != null
             ? MetodoPagamento.valueOf(request.metodoPagamento().toUpperCase())
             : null;
-        var compra = ecommerceService.checkout(token, resolverSessionId(sessionId), metodo, carrinhoService);
-        return ResponseEntity.status(HttpStatus.CREATED).body(CompraExtraResponse.ofPublic(compra));
+        var compra = ecommerceService.checkout(token, resolverSessionId(sessionId), metodo);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ecommerceMapper.toPublicResponse(compra));
     }
 
     @GetMapping("/galeria/{token}/compras")
     @Operation(summary = "Listar compras do agendamento (via token)")
     public ResponseEntity<List<CompraExtraResponse>> listarCompras(@PathVariable UUID token) {
-        var compras = ecommerceService.listarComprasPorToken(token).stream()
-            .map(CompraExtraResponse::ofPublic)
+        var compras = compraQueryService.listarComprasPorToken(token).stream()
+            .map(ecommerceMapper::toPublicResponse)
             .toList();
         return ResponseEntity.ok(compras);
     }
@@ -191,14 +198,14 @@ public class EcommerceController {
     @Operation(summary = "Detalhe da compra com fotos (via token)")
     public ResponseEntity<AdminCompraDetalheResponse> detalheCompra(
             @PathVariable UUID token, @PathVariable UUID compraId) {
-        return ResponseEntity.ok(ecommerceService.buscarCompraDetalhePorToken(token, compraId));
+        return ResponseEntity.ok(compraQueryService.buscarCompraDetalhePorToken(token, compraId));
     }
 
     @GetMapping("/galeria/{token}/compras/{compraId}/comprovante")
     @Operation(summary = "Servir comprovante da compra (via token)")
     public ResponseEntity<Resource> comprovanteCompra(
             @PathVariable UUID token, @PathVariable UUID compraId) {
-        var comprovantePath = ecommerceService.buscarComprovantePath(token, compraId);
+        var comprovantePath = compraQueryService.buscarComprovantePath(token, compraId);
         if (comprovantePath == null) {
             return ResponseEntity.notFound().build();
         }
@@ -215,7 +222,7 @@ public class EcommerceController {
             @RequestParam UUID compraExtraId,
             @RequestParam MultipartFile comprovante) {
         var compra = ecommerceService.uploadComprovante(token, compraExtraId, comprovante);
-        return ResponseEntity.ok(CompraExtraResponse.ofPublic(compra));
+        return ResponseEntity.ok(ecommerceMapper.toPublicResponse(compra));
     }
 
     @PostMapping("/galeria/{token}/compras/{compraExtraId}/simular-pagamento")
@@ -224,7 +231,7 @@ public class EcommerceController {
             @PathVariable UUID token,
             @PathVariable UUID compraExtraId) {
         var compra = pagamentoExtraService.simularPagamento(token, compraExtraId);
-        return ResponseEntity.ok(CompraExtraResponse.ofPublic(compra));
+        return ResponseEntity.ok(ecommerceMapper.toPublicResponse(compra));
     }
 
     @PatchMapping("/admin/compras/{compraExtraId}/confirmar")

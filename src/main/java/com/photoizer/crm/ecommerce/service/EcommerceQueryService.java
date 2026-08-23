@@ -1,8 +1,11 @@
 package com.photoizer.crm.ecommerce.service;
 
+import com.photoizer.crm.ecommerce.api.EcommerceAnalyticsResponse;
 import com.photoizer.crm.ecommerce.model.CompraExtra;
 import com.photoizer.crm.ecommerce.model.StatusCompraExtra;
 import com.photoizer.crm.ecommerce.repository.CompraExtraRepository;
+import com.photoizer.crm.foto.model.StatusFoto;
+import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,18 +20,62 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Facade de leitura para métricas de e-commerce.
- * Pattern: Query Service Facade — centraliza agregações de vendas no módulo ecommerce,
- * evitando que dashboard acesse CompraExtraRepository diretamente com findAll().
+ * PATTERN: Query Service Facade
+ * Centraliza todas as queries de leitura do módulo ecommerce, evitando que
+ * controllers acessem repositories diretamente. Elimina agregação em memória
+ * substituindo por queries SQL quando possível.
  */
 @Service
 @Transactional(readOnly = true)
 public class EcommerceQueryService {
 
     private final CompraExtraRepository compraExtraRepository;
+    private final FotoEnsaioRepository fotoEnsaioRepository;
 
-    public EcommerceQueryService(CompraExtraRepository compraExtraRepository) {
+    public EcommerceQueryService(CompraExtraRepository compraExtraRepository,
+                                 FotoEnsaioRepository fotoEnsaioRepository) {
         this.compraExtraRepository = compraExtraRepository;
+        this.fotoEnsaioRepository = fotoEnsaioRepository;
+    }
+
+    /**
+     * Dashboard de analytics do ecommerce: métricas de vendas, seleção e fotos populares.
+     * Substitui o acesso direto a repositorios no AdminAnalyticsController.
+     */
+    public EcommerceAnalyticsResponse obterAnalytics() {
+        var fotos = fotoEnsaioRepository.findAll();
+        var receitaExtras = compraExtraRepository.totalPorStatus(StatusCompraExtra.PAGA);
+
+        var totalSelecionadas = (int) fotos.stream().filter(f -> f.isSelecionadaPacote()).count();
+        var totalVendidasExtras = (int) fotos.stream().filter(f -> f.getStatus() == StatusFoto.PAGA).count();
+        var totalPublicadas = (int) fotos.stream()
+            .filter(f -> f.getStatus() != StatusFoto.INEDITA)
+            .count();
+
+        var naoSelecionadas = totalPublicadas - totalSelecionadas;
+        var taxaConversao = naoSelecionadas > 0
+            ? (double) totalVendidasExtras / naoSelecionadas * 100.0
+            : 0.0;
+
+        List<EcommerceAnalyticsResponse.FotoPopularResponse> populares = fotos.stream()
+            .filter(f -> f.isSelecionadaPacote() || f.getStatus() == StatusFoto.PAGA)
+            .limit(20)
+            .map(f -> new EcommerceAnalyticsResponse.FotoPopularResponse(
+                f.getId().toString(),
+                f.getFileName(),
+                "/api/v1/agendamentos/" + f.getAgendamentoId() + "/fotos/" + f.getId() + "/thumb",
+                f.isSelecionadaPacote(),
+                f.getStatus() == StatusFoto.PAGA))
+            .toList();
+
+        return new EcommerceAnalyticsResponse(
+            receitaExtras,
+            receitaExtras,
+            totalSelecionadas,
+            totalVendidasExtras,
+            Math.round(taxaConversao * 100.0) / 100.0,
+            populares
+        );
     }
 
     /**

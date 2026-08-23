@@ -1,6 +1,7 @@
 package com.photoizer.crm.ecommerce.api;
 
 import com.photoizer.crm.ecommerce.model.StatusCompraExtra;
+import com.photoizer.crm.ecommerce.service.CompraQueryService;
 import com.photoizer.crm.ecommerce.service.EcommerceService;
 import com.photoizer.crm.ecommerce.service.GaleriaQueryService;
 import com.photoizer.crm.foto.api.FotoEnsaioResponse;
@@ -26,18 +27,24 @@ public class AdminEcommerceController {
 
     private final EcommerceService ecommerceService;
     private final GaleriaQueryService galeriaQueryService;
+    private final CompraQueryService compraQueryService;
+    private final EcommerceMapper ecommerceMapper;
 
     public AdminEcommerceController(EcommerceService ecommerceService,
-                                    GaleriaQueryService galeriaQueryService) {
+                                    GaleriaQueryService galeriaQueryService,
+                                    CompraQueryService compraQueryService,
+                                    EcommerceMapper ecommerceMapper) {
         this.ecommerceService = ecommerceService;
         this.galeriaQueryService = galeriaQueryService;
+        this.compraQueryService = compraQueryService;
+        this.ecommerceMapper = ecommerceMapper;
     }
 
     @GetMapping
     @Operation(summary = "Resumo completo do ecommerce do agendamento")
     public ResponseEntity<AdminEcommerceResumoResponse> resumo(@PathVariable UUID agendamentoId) {
         var fotos = galeriaQueryService.listarFotosPorAgendamento(agendamentoId);
-        var compras = ecommerceService.listarComprasPorAgendamento(agendamentoId);
+        var compras = compraQueryService.listarComprasPorAgendamento(agendamentoId);
 
         var totalFotos = fotos.size();
         var publicadas = (int) fotos.stream().filter(f -> f.getStatus() == StatusFoto.PUBLICADA).count();
@@ -53,7 +60,7 @@ public class AdminEcommerceController {
             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         var fotosResponse = fotos.stream().map(FotoEnsaioResponse::of).toList();
-        var comprasResponse = compras.stream().map(CompraExtraResponse::ofAdmin).toList();
+        var comprasResponse = compras.stream().map(ecommerceMapper::toAdminResponse).toList();
 
         return ResponseEntity.ok(new AdminEcommerceResumoResponse(
             totalFotos, publicadas, selecionadas, pagas, aguardando,
