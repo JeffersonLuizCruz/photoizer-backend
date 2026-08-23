@@ -1,53 +1,59 @@
 package com.photoizer.crm.documento.service;
 
+import com.photoizer.crm.documento.model.TipoDocumento;
+
 import java.util.List;
 
 /**
- * PATTERN: Strategy Pattern
+ * PATTERN: Strategy Pattern (Generic Type Safety)
  *
- * Define contrato para estratégias de geração de conteúdo PDF.
- * Cada tipo de documento (contrato, recibo, etc.) implementa esta interface
- * para fornecer título e linhas específicas.
+ * Define contrato para geracao de conteudo PDF por tipo de documento.
+ * Cada tipo (contrato, recibo, etc.) implementa esta interface
+ * para fornecer titulo e linhas especificas.
  *
  * Motivo: Permite adicionar novos tipos de PDF sem modificar DocumentoService
- * (princípio Open/Closed). A lógica de formatação fica isolada em classes
- * específicas, facilitando testes e manutenção.
+ * (principio Open/Closed). A logica de formatacao fica isolada em classes
+ * especificas, facilitando testes e manutencao.
  *
- * Uso do Spring: Cada implementação é um @Component, permitindo injeção
- * por tipo ou por lista (para descoberta automática).
+ * Type-Safety: O generic T elimina casting manual em cada implementacao.
+ * Cada estrategia declara o tipo de contexto que recebe (tipicamente a entidade
+ * de dominio), garantindo compile-time checking.
+ *
+ * Uso do Spring: Cada implementacao e um @Component, permitindo injecao
+ * por tipo ou por lista (para descoberta automatica).
  *
  * Como extender:
  * Para adicionar um novo tipo de PDF (ex: "certificado"), basta criar uma
  * nova classe que implementa esta interface e anotar com @Component.
- * O DocumentoService descobrirá automaticamente via injeção de Collection.
+ * O DocumentoService descobrira automaticamente via injecao de Collection.
  *
  * Exemplo:
- * @Component
- * public class CertificadoPdfStrategy implements PdfContentStrategy {
- *     @Override
- *     public String getTipo() { return "certificado"; }
+ * &#64;Component
+ * public class CertificadoPdfStrategy implements PdfContentStrategy&lt;Agendamento&gt; {
+ *     &#64;Override
+ *     public TipoDocumento getTipo() { return TipoDocumento.CERTIFICADO; }
  *     // ...
  * }
  */
-public interface PdfContentStrategy {
+public interface PdfContentStrategy<T> {
 
     /**
-     * Identificador único do tipo de PDF.
-     * Usado para resolução da estratégia no DocumentoService.
+     * Identificador unico do tipo de PDF.
+     * Usado para resolucao da estrategia no DocumentoService.
      */
-    String getTipo();
+    TipoDocumento getTipo();
 
     /**
-     * Título do documento PDF (aparece em negrito no topo).
+     * Titulo do documento PDF (aparece em negrito no topo).
      */
     String getTitulo();
 
     /**
-     * Gera as linhas de conteúdo do PDF.
+     * Gera as linhas de conteudo do PDF.
      *
-     * @param contexto objeto com dados necessários para formatação
-     *                 (tipicamente a entidade de domínio, ex: Agendamento)
+     * @param contexto objeto com dados necessarios para formatacao
+     *                 (tipicamente a entidade de dominio, ex: Agendamento)
      * @return lista de linhas do documento
      */
-    List<String> getLinhas(Object contexto);
+    List<String> getLinhas(T contexto);
 }

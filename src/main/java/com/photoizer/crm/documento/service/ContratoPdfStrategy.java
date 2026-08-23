@@ -1,41 +1,44 @@
 package com.photoizer.crm.documento.service;
 
 import com.photoizer.crm.agenda.model.Agendamento;
+import com.photoizer.crm.documento.model.TipoDocumento;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.List;
 
 /**
- * PATTERN: Strategy Pattern - Implementação para Contratos
+ * PATTERN: Strategy Pattern - Implementacao para Contratos
  *
- * Gera conteúdo específico para contratos de prestação de serviços fotográficos.
+ * Gera conteudo especifico para contratos de prestacao de servicos fotograficos.
  * Extrai dados do Agendamento e formata conforme layout definido.
  *
- * Motivo: Isola a lógica de formatação de contrato do DocumentoService,
- * permitindo mudanças de layout sem afetar outros tipos de PDF.
+ * Motivo: Isola a logica de formatacao de contrato do DocumentoService,
+ * permitindo mudancas de layout sem afetar outros tipos de PDF.
  * O construtor recebe o contexto tipado (Agendamento), garantindo
- * type-safety e eliminando casting genérico.
+ * type-safety e eliminando casting generico.
  */
 @Component
-public class ContratoPdfStrategy implements PdfContentStrategy {
+public class ContratoPdfStrategy implements PdfContentStrategy<Agendamento> {
 
     @Override
-    public String getTipo() {
-        return "contrato";
+    public TipoDocumento getTipo() {
+        return TipoDocumento.CONTRATO;
     }
 
     @Override
     public String getTitulo() {
-        return "CONTRATO DE PRESTAÇÃO DE SERVIÇOS FOTOGRÁFICOS";
+        return "CONTRATO DE PRESTACAO DE SERVICOS FOTOGRAFICOS";
     }
 
     @Override
-    public List<String> getLinhas(Object contexto) {
-        var agendamento = (Agendamento) contexto;
+    public List<String> getLinhas(Agendamento agendamento) {
         var cliente = agendamento.getCliente();
         var pacote = agendamento.getPacote();
+
+        if (cliente == null || pacote == null) {
+            throw new IllegalStateException(
+                "Agendamento " + agendamento.getId() + " com cliente ou pacote nulo");
+        }
 
         return List.of(
             "Cliente: " + cliente.getNome(),
@@ -45,18 +48,12 @@ public class ContratoPdfStrategy implements PdfContentStrategy {
             "Pacote: " + pacote.getNome(),
             "Data do ensaio: " + agendamento.getDataHoraEnsaio(),
             "Local: " + agendamento.getLocalEnsaio(),
-            "Endereço: " + agendamento.getEnderecoCompleto(),
+            "Endereco: " + agendamento.getEnderecoCompleto(),
             "",
-            "Valor total: R$ " + formatarValor(agendamento.getValorTotal()),
-            "Entrada exigida: R$ " + formatarValor(agendamento.getValorEntradaExigido()),
-            "Valor restante: R$ " + formatarValor(agendamento.getValorRestante()),
-            "Taxa de deslocamento: R$ " + formatarValor(agendamento.getTaxaDeslocamento())
+            "Valor total: R$ " + PdfContentHelper.formatarValor(agendamento.getValorTotal()),
+            "Entrada exigida: R$ " + PdfContentHelper.formatarValor(agendamento.getValorEntradaExigido()),
+            "Valor restante: R$ " + PdfContentHelper.formatarValor(agendamento.getValorRestante()),
+            "Taxa de deslocamento: R$ " + PdfContentHelper.formatarValor(agendamento.getTaxaDeslocamento())
         );
-    }
-
-    private String formatarValor(BigDecimal valor) {
-        if (valor == null) return "0,00";
-        return valor.setScale(2, RoundingMode.HALF_UP)
-            .toPlainString().replace(".", ",");
     }
 }

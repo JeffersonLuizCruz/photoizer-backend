@@ -1,5 +1,7 @@
 package com.photoizer.crm.documento.model;
 
+import com.photoizer.crm.documento.exception.TipoComprovanteInvalidoException;
+
 /**
  * PATTERN: Enum Type Safety
  * Substitui magic strings "entrada"/"final" por tipo seguro com compile-time checking.
@@ -43,7 +45,6 @@ public enum TipoComprovante {
                 return tipo;
             }
         }
-        throw new IllegalArgumentException(
-            "Tipo de comprovante inválido: '" + valor + "'. Valores aceitos: entrada, final.");
+        throw new TipoComprovanteInvalidoException(valor);
     }
 }

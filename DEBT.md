@@ -11,10 +11,10 @@
 
 | # | Dívida | Módulo(s) | Status |
 |---|--------|-----------|--------|
-| 1 | **`/api/v1/documentos/**` inacessível**: sem regra no `SecurityConfig`, cai em `anyRequest().denyAll()` → módulo inteiro bloqueado | documento | Pendente |
+| 1 | ~~**`/api/v1/documentos/**` inacessível**: sem regra no `SecurityConfig`, cai em `anyRequest().denyAll()` → módulo inteiro bloqueado~~ | documento | **RESOLVIDO** (`@RolesAllowed`) |
 | 2 | **IDOR em notificações**: `userId` vem da request sem verificação de dono (qualquer usuário lê/apaga notificações de outro) | notificacao | Pendente |
 | 3 | ~~**Exposição de `User` com `password`** na API~~ | fotografo | **RESOLVIDO** |
-| 4 | **PDF de contrato gerado "na mão"** (bytes nativos) + `PdfGeneratorService` do documento é **stub** (`byte[0]`) | contrato, documento | Pendente |
+| 4 | ~~**PDF de contrato gerado "na mão"** (bytes nativos) + `PdfGeneratorService` do documento é **stub** (`byte[0]`)~~ | contrato, documento | **RESOLVIDO** (PdfWriter shared + Strategy Pattern) |
 | 5 | ~~**Escrita cross-module**: serviços mutam entidades de outros módulos~~ | ~~ecommerce~~ | **RESOLVIDO** (ecommerce: eventos `CompraExtraFotosAssociadasEvent`, `CompraExtraCanceladaEvent`, `CompraExtraPagaEvent`, `FotoDownloadEvent`, `FotosSelecionadasEvent`, `TokenGaleriaRegeneradoEvent` + listeners `FotoEcommerceEventListener`, `AgendamentoEcommerceEventListener`) |
 | 6 | **God classes** (`EcommerceService` 574, `FinanceiroService` 600, `FinanceiroDashboardService` 608, `AgendamentoService` 768, ~~`EdicaoService` 534~~) | ecommerce, financeiro, agenda, ~~edicao~~ | **RESOLVIDO** (edicao) |
 | 7 | ~~**`findAll()` + agregação em memória** em dashboards/relatórios (tabelas crescentes)~~ | ~~dashboard~~, financeiro, comissao, indicador | **RESOLVIDO** (dashboard) |
@@ -76,7 +76,7 @@
 - Job `@Scheduled` de recorrências junto do service (P3 — sem lock/idempotência).
 
 ### documento
-- **Endpoints bloqueados** (`denyAll`); **PDF é stub**; escrita cross-module (`contratoGerado` no `Agendamento`); duplica `documento` vs `contrato`.
+- ~~**Endpoints bloqueados** (`denyAll`); **PDF é stub**; escrita cross-module (`contratoGerado` no `Agendamento`); duplica `documento` vs `contrato`.~~ **RESOLVIDO**: `@RolesAllowed({"ADMIN","FOTOGRAFO"})` no controller; `PdfWriter` no shared; `ContratoGeradoEvent`; Strategy Pattern genérico (`PdfContentStrategy<T>`); `TipoDocumento` enum; `PdfContentHelper` (DRY); `DocumentoService.resolverComprovante()` (Facade); `TipoComprovanteInvalidoException` (400).
 
 ### ecommerce
 - ~~God class (`EcommerceService`, +20 métodos)~~ **RESOLVIDO**: extraídos `CarrinhoService`, `FavoritoService`, `DownloadService`, `PagamentoExtraService`, `GaleriaQueryService`; `EcommerceService` agora é orquestrador fino (~300 linhas).

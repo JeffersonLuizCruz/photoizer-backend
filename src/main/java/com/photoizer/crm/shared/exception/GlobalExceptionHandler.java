@@ -37,6 +37,7 @@ import com.photoizer.crm.ecommerce.exception.TokenExpiradoException;
 import com.photoizer.crm.contrato.exception.ContratoEstadoInvalidoException;
 import com.photoizer.crm.contrato.exception.ContratoNaoEncontradoException;
 import com.photoizer.crm.contrato.exception.ContratoTokenExpiradoException;
+import com.photoizer.crm.documento.exception.TipoComprovanteInvalidoException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -297,6 +298,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleCategoriaObrigatoria(CategoriaObrigatoriaException e) {
         log.warn("Categoria obrigatória não informada: {}", e.getMessage());
         return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
+    }
+
+    @ExceptionHandler(TipoComprovanteInvalidoException.class)
+    public ResponseEntity<ErrorResponse> handleTipoComprovanteInvalido(TipoComprovanteInvalidoException e) {
+        log.warn("Tipo de comprovante invalido: {}", e.getMessage());
+        return build(HttpStatus.BAD_REQUEST, e);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

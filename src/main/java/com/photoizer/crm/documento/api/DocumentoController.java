@@ -1,12 +1,10 @@
 package com.photoizer.crm.documento.api;
 
-import com.photoizer.crm.agenda.exception.AgendamentoNaoEncontradoException;
-import com.photoizer.crm.agenda.repository.AgendamentoRepository;
-import com.photoizer.crm.documento.model.TipoComprovante;
 import com.photoizer.crm.documento.service.DocumentoService;
 import com.photoizer.crm.shared.storage.FileServeHelper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.security.RolesAllowed;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -18,20 +16,30 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
+/**
+ * Controller do modulo documento.
+ *
+ * PATTERN: Facade (via DocumentoService)
+ * O controller delega toda logica de dominio para DocumentoService,
+ * incluindo a resolucao de comprovantes. Isso elimina a dependencia
+ * direta de AgendamentoRepository (violacao de modulo).
+ *
+ * PATTERN: Role-Based Access Control
+ * @RolesAllowed garante que apenas ADMIN e FOTOGRAFO acessem os endpoints.
+ * Antes: qualquer autenticado podia baixar contratos/recibos/comprovantes.
+ */
 @RestController
 @RequestMapping("/api/v1/documentos")
-@Tag(name = "Documentos", description = "Geração de contratos e recibos")
+@Tag(name = "Documentos", description = "Geracao de contratos e recibos")
+@RolesAllowed({"ADMIN", "FOTOGRAFO"})
 public class DocumentoController {
 
     private final DocumentoService documentoService;
-    private final AgendamentoRepository agendamentoRepository;
     private final FileServeHelper fileServeHelper;
 
     public DocumentoController(DocumentoService documentoService,
-                               AgendamentoRepository agendamentoRepository,
                                FileServeHelper fileServeHelper) {
         this.documentoService = documentoService;
-        this.agendamentoRepository = agendamentoRepository;
         this.fileServeHelper = fileServeHelper;
     }
 
@@ -63,20 +71,15 @@ public class DocumentoController {
             @PathVariable UUID agendamentoId,
             @PathVariable String tipo) {
 
-        var tipoComprovante = TipoComprovante.fromValor(tipo);
+        var comprovante = documentoService.resolverComprovante(agendamentoId, tipo);
 
-        var agendamento = agendamentoRepository.findById(agendamentoId)
-            .orElseThrow(() -> new AgendamentoNaoEncontradoException(agendamentoId));
-
-        var caminho = tipoComprovante.extrairUrl(agendamento);
-
-        if (!tipoComprovante.urlValida(caminho)) {
+        if (comprovante == null) {
             return ResponseEntity.notFound().build();
         }
 
-        var filename = "comprovante_" + tipo + "_" + agendamentoId
-            + fileServeHelper.extrairExtensao(caminho);
+        var filename = "comprovante_" + comprovante.tipo() + "_" + comprovante.agendamentoId()
+            + fileServeHelper.extrairExtensao(comprovante.caminho());
 
-        return fileServeHelper.servirArquivo(caminho, filename, "attachment");
+        return fileServeHelper.servirArquivo(comprovante.caminho(), filename, "attachment");
     }
 }
