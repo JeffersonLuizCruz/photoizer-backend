@@ -67,9 +67,12 @@
 - ~~Soma de valores em memória (3 métodos)~~ **RESOLVIDO**: queries JPQL `COALESCE(SUM)` no `DespesaRepository`.
 - ~~Duplicação queries recorrência~~ **RESOLVIDO**: `buscarRecorrentesVencidas()` compartilhado.
 - ~~Acoplamento direto a `AgendamentoRepository`~~ **RESOLVIDO**: `DespesaAgendamentoGateway` (porta/ACL) + `AgendamentoGatewayAdapter`.
-- **DTOs**: `DespesaMapper` (MapStruct) criado; controller usa mapper; `static of()` mantido para backward compat.
+- **DTOs**: `DespesaMapper` (MapStruct) criado; controller usa mapper; ~~`static of()` mantido para backward compat~~ **RESOLVIDO**: `static of()` removido de `DespesaResponse` e `DespesaCategoriaResponse`.
 - **SRP**: `DespesaCategoriaService` extraído de `DespesaService` (312→~230 linhas).
 - **Ordenação**: `DespesaSpecification.parseSort()` tipado centralizado.
+- ~~`StatusDespesa` sem transições~~ **RESOLVIDO**: State Pattern com `transicionarParaPagamento()` e `podeSerPaga()`.
+- ~~`IllegalArgumentException` residual em `validarAgendamento()`/`resolverCategoria()`~~ **RESOLVIDO**: `AgendamentoVinculadoInvalidoException` (422) + `CategoriaObrigatoriaException` (422).
+- ~~`DespesaQueryService` agregação em memória~~ **RESOLVIDO**: SQL `GROUP BY` via `sumByMesBetween()`.
 - Job `@Scheduled` de recorrências junto do service (P3 — sem lock/idempotência).
 
 ### documento
@@ -138,11 +141,11 @@
 | Padrão | Módulos afetados | Ação geral |
 |--------|------------------|------------|
 | ~~**Herança `BaseEntity`**~~ | ~~todos com entidades~~ | **RESOLVIDO**: `@Embeddable AuditInfo` + composição; `BaseEntity.java` removido |
-| **`status`/`origem` em `String`** | comissao, agenda, foto, despesa, contrato, ecommerce | enums com métodos de transição; nunca comparar `String.equals` |
+| **`status`/`origem` em `String`** | comissao, agenda, foto, despesa, contrato, ecommerce | enums com métodos de transição; nunca comparar `String.equals` — **despesa RESOLVIDO** (State Pattern) |
 | **Exceções genéricas** | maioria | hierarquia central `BusinessException` + `HttpStatus`/código (decisão já aprovada) |
-| **DTOs manuais (`static of`/`Map`)** | quase todos | MapStruct (decisão já aprovada; Fase 2) — **iniciado em `agenda`** (AgendamentoMapper/RascunhoAgendamentoMapper) |
+| **DTOs manuais (`static of`/`Map`)** | quase todos | MapStruct (decisão já aprovada; Fase 2) — **iniciado em `agenda`** (AgendamentoMapper/RascunhoAgendamentoMapper); **despesa RESOLVIDO** (static of() removido) |
 | ~~**Escrita em entidade alheia** (ecommerce)~~ | ~~ecommerce, edicao, foto, financeiro, comissao, documento, notificacao~~ | **RESOLVIDO** (ecommerce): eventos de domínio + listeners; **RESOLVIDO** (edicao): decidido manter escrita direta até refatoração transversal; outros módulos pendentes |
-| **Agregação em memória** | dashboard, financeiro, comissao, indicador, agenda | queries agregadas SQL (`SUM`/`GROUP BY`/`COUNT`) nos repositórios donos |
+| **Agregação em memória** | dashboard, financeiro, comissao, indicador, agenda | queries agregadas SQL (`SUM`/`GROUP BY`/`COUNT`) nos repositórios donos — **despesa RESOLVIDO** (DespesaQueryService) |
 
 ---
 
