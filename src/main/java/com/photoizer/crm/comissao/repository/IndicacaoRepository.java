@@ -1,6 +1,7 @@
 package com.photoizer.crm.comissao.repository;
 
 import com.photoizer.crm.comissao.model.Indicacao;
+import com.photoizer.crm.comissao.model.StatusIndicacao;
 import com.photoizer.crm.comissao.repository.projection.IndicadorComissaoProjection;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -43,4 +44,14 @@ public interface IndicacaoRepository extends JpaRepository<Indicacao, UUID> {
 
     @Query("SELECT DISTINCT i.indicadorTelefone FROM Indicacao i")
     List<String> findAllDistinctTelefones();
+
+    @Query("SELECT COALESCE(SUM(i.valorComissao), 0) FROM Indicacao i WHERE i.agendamentoId IN :agendamentoIds AND i.status <> :statusIgnorado")
+    java.math.BigDecimal sumValorComissaoByAgendamentoIdInAndStatusNot(
+        @Param("agendamentoIds") List<UUID> agendamentoIds,
+        @Param("statusIgnorado") StatusIndicacao statusIgnorado);
+
+    @Query("SELECT COALESCE(SUM(i.valorComissao), 0) FROM Indicacao i WHERE i.agendamentoId IN :agendamentoIds AND i.status = :status")
+    java.math.BigDecimal sumValorComissaoByAgendamentoIdInAndStatus(
+        @Param("agendamentoIds") List<UUID> agendamentoIds,
+        @Param("status") StatusIndicacao status);
 }

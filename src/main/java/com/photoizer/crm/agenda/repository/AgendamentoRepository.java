@@ -2,8 +2,10 @@ package com.photoizer.crm.agenda.repository;
 
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -75,5 +77,13 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID>,
     java.util.Optional<Agendamento> findByTokenGaleria(UUID tokenGaleria);
 
     long countByDataHoraEnsaioBetween(LocalDateTime start, LocalDateTime end);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM Agendamento a WHERE a.id = :id")
+    Optional<Agendamento> findByIdWithLock(@Param("id") UUID id);
+
+    @Query("SELECT CASE WHEN COUNT(a) > 0 THEN true ELSE false END FROM Agendamento a " +
+           "WHERE a.cliente.id = :clienteId AND a.valorRestante > 0 AND a.status <> com.photoizer.crm.agenda.model.StatusAgendamento.CANCELADO")
+    boolean existsByClienteIdWithSaldoDevedor(@Param("clienteId") UUID clienteId);
 
 }

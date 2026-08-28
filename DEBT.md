@@ -15,9 +15,9 @@
 | 2 | **IDOR em notificações**: `userId` vem da request sem verificação de dono (qualquer usuário lê/apaga notificações de outro) | notificacao | Pendente |
 | 3 | ~~**Exposição de `User` com `password`** na API~~ | fotografo | **RESOLVIDO** |
 | 4 | ~~**PDF de contrato gerado "na mão"** (bytes nativos) + `PdfGeneratorService` do documento é **stub** (`byte[0]`)~~ | contrato, documento | **RESOLVIDO** (PdfWriter shared + Strategy Pattern) |
-| 5 | ~~**Escrita cross-module**: serviços mutam entidades de outros módulos~~ | ~~ecommerce~~ | **RESOLVIDO** (ecommerce: eventos `CompraExtraFotosAssociadasEvent`, `CompraExtraCanceladaEvent`, `CompraExtraPagaEvent`, `FotoDownloadEvent`, `FotosSelecionadasEvent`, `TokenGaleriaRegeneradoEvent` + listeners `FotoEcommerceEventListener`, `AgendamentoEcommerceEventListener`) |
-| 6 | **God classes** (`EcommerceService` 574, `FinanceiroService` 600, `FinanceiroDashboardService` 608, `AgendamentoService` 768, ~~`EdicaoService` 534~~) | ecommerce, financeiro, agenda, ~~edicao~~ | **RESOLVIDO** (edicao) |
-| 7 | ~~**`findAll()` + agregação em memória** em dashboards/relatórios (tabelas crescentes)~~ | ~~dashboard~~, financeiro, comissao, indicador | **RESOLVIDO** (dashboard) |
+| 5 | ~~**Escrita cross-module**: serviços mutam entidades de outros módulos~~ | ~~ecommerce, financeiro~~ | **RESOLVIDO** (ecommerce: eventos + listeners; financeiro: `PagamentoRegistradoEvent` + `ExtrasAdicionadosEvent` + listener no agenda) |
+| 6 | **God classes** (`EcommerceService` 574, ~~`FinanceiroService` 600~~, ~~`FinanceiroDashboardService` 608~~, `AgendamentoService` 768, ~~`EdicaoService` 534~~) | ecommerce, ~~financeiro~~, agenda, ~~edicao~~ | **RESOLVIDO** (edicao, financeiro) |
+| 7 | ~~**`findAll()` + agregação em memória** em dashboards/relatórios (tabelas crescentes)~~ | ~~dashboard, financeiro~~, comissao, indicador | **RESOLVIDO** (dashboard, financeiro) |
 | 8 | ~~**Vazamento de hash de senha do `Cliente`** nas respostas~~ | cliente | **RESOLVIDO** |
 | 9 | ~~**`Entidade` JPA como contrato da API** (retorna entidade em vez de DTO)~~ | ~~fotografo~~ | **RESOLVIDO** (fotografo) |
 | 10 | **Máquinas de estado sem validação central** (`if` espalhados, status como `String`) | agenda, contrato, comissao | Pendente |
@@ -108,7 +108,16 @@
 - **Pendente (P3)**: `getCurrentUser()` N+1 — resolver via JWT claims.
 
 ### financeiro
-- God classes; `findAll()` + Streams; **escrita directa** (`status` do `Agendamento`, `Indicacao`); controller expõe entidades (`Pagamento`, `FotoExtra`, `VideoExtra`); regra de partilha duplicada.
+- **RESOLVIDO**: God classes — extraídos `PagamentoService`, `ExtraVendaService`, `FinanceiroQueryService` de `FinanceiroService` (575→~80 linhas orchestrator). `FinanceiroDashboardService` delega repasses ao `FinanceCalculator`.
+- **RESOLVIDO**: `findAll()` + Streams — `isClienteBloqueado` usa query SQL; `FinanceiroRelatorioService` usa `findInadimplentes()`, `findAvulsasByDataBetween()`; queries SQL em `DespesaRepository` e `IndicacaoRepository`.
+- **RESOLVIDO**: Escrita cross-module — `PagamentoRegistradoEvent` + `ExtrasAdicionadosEvent` + listener `PagamentoFinanceiroEventListener` no agenda. Elimina mutação direta no `Agendamento`.
+- **RESOLVIDO**: Exposição de entidades — `FinanceiroController` retorna `PagamentoResponse`, `ExtraServicoResponse`.
+- **RESOLVIDO**: Regra de partilha duplicada — `FinanceCalculator` (shared) centraliza `deslocamentoEfetivo()` e `carregarRepasses()`.
+- **RESOLVIDO**: Unificação `FotoExtra`+`VideoExtra` → `ExtraServico` com `TipoExtra` enum.
+- **RESOLVIDO**: DTOs cross-module — `RelatorioAgendamentoItem` substitui `AgendamentoResponse` do agenda.
+- **RESOLVIDO**: Duplicidades internas — `labelServico()` → `TipoServico.label()`; `emPeriodo()` → `FinanceiroQueryService.emPeriodo()`.
+- **RESOLVIDO**: Exceções genéricas — criadas `PagamentoNaoEncontradoException`, `AgendamentoNaoEncontradoParaFinanceiroException`, `ValorInvalidoException`.
+- **Pendente (P2)**: `ReconciliarComprasExtraFinanceiro` (CommandLineRunner) roda a cada boot — migrar para job com lock.
 
 ### foto
 - Dependência **inversa** foto→agenda (exceção cruzada); expõe entidade JPA; `RuntimeException`; **publicação por escrita direta do edicao** (3ª cópia de watermark/thumbnail).

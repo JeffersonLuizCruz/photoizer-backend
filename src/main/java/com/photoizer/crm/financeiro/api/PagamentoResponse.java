@@ -12,7 +12,8 @@ public record PagamentoResponse(
     BigDecimal valor,
     LocalDateTime dataPagamento,
     String urlComprovante,
-    String observacao
+    String observacao,
+    UUID compraExtraId
 ) {
     public static PagamentoResponse of(Pagamento p) {
         return new PagamentoResponse(
@@ -21,7 +22,8 @@ public record PagamentoResponse(
             p.getValor(),
             p.getDataPagamento(),
             p.getUrlComprovante(),
-            p.getObservacao()
+            p.getObservacao(),
+            p.getCompraExtraId()
         );
     }
 }

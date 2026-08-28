@@ -43,7 +43,7 @@ public class FinanceiroRelatorioService {
     }
 
     public ResumoMensalResponse resumoMensal(LocalDate inicio, LocalDate fim) {
-        var receitas = receitasNoPeriodo(inicio, fim, false);
+        var receitas = receitasNoPeriodo(inicio, fim, true);
         var despesas = despesasNoPeriodo(inicio, fim);
 
         var receitasBrutas = BigDecimal.ZERO;
@@ -113,7 +113,8 @@ public class FinanceiroRelatorioService {
     public InadimplenciaRelatorioResponse inadimplencia(LocalDate dataInicio, LocalDate dataFim) {
         var hoje = LocalDate.now();
         var itens = new ArrayList<InadimplenciaRelatorioResponse.Item>();
-        var receitas = receitaRepository.findAll();
+        var receitas = receitaRepository.findInadimplentes(
+            List.of(StatusReceita.PENDENTE, StatusReceita.PAGO_PARCIAL), hoje);
 
         for (var r : receitas) {
             if (r.getStatus() != StatusReceita.PENDENTE && r.getStatus() != StatusReceita.PAGO_PARCIAL) continue;
@@ -189,10 +190,8 @@ public class FinanceiroRelatorioService {
 
     public ComparativoRelatorioResponse comparativo(String tipo, LocalDate inicio, LocalDate fim) {
         boolean anual = "ANUAL".equalsIgnoreCase(tipo);
-        var receitas = receitaRepository.findAll().stream()
-            .filter(r -> r.getStatus() != StatusReceita.CANCELADO)
-            .toList();
-        var despesas = despesaRepository.findAll();
+        var receitas = receitaRepository.findAvulsasByDataBetween(inicio, fim);
+        var despesas = despesaRepository.findByDataBetweenOrderByDataDesc(inicio, fim);
 
         Map<String, BigDecimal> receitasPorPeriodo = new LinkedHashMap<>();
         Map<String, BigDecimal> despesasPorPeriodo = new LinkedHashMap<>();
@@ -248,21 +247,19 @@ public class FinanceiroRelatorioService {
     }
 
     private List<Receita> receitasNoPeriodo(LocalDate inicio, LocalDate fim, boolean excluirCanceladas) {
-        return receitaRepository.findAll().stream()
-            .filter(r -> !excluirCanceladas || r.getStatus() != StatusReceita.CANCELADO)
-            .filter(r -> emPeriodo(r.getDataPrevisaoRecebimento(), inicio, fim))
-            .toList();
+        if (excluirCanceladas) {
+            return receitaRepository.findAvulsasByDataBetween(inicio, fim);
+        }
+        return receitaRepository.findByStatusInAndDataPrevisaoRecebimentoBetween(
+            List.of(StatusReceita.values()), inicio, fim);
     }
 
     private List<Despesa> despesasNoPeriodo(LocalDate inicio, LocalDate fim) {
-        return despesaRepository.findAll().stream()
-            .filter(d -> emPeriodo(d.getData(), inicio, fim))
-            .toList();
+        return despesaRepository.findByDataBetweenOrderByDataDesc(inicio, fim);
     }
 
     private boolean emPeriodo(LocalDate data, LocalDate inicio, LocalDate fim) {
-        if (data == null || inicio == null || fim == null) return false;
-        return !data.isBefore(inicio) && !data.isAfter(fim);
+        return FinanceiroQueryService.emPeriodo(data, inicio, fim);
     }
 
     private String chavePeriodo(LocalDate data, boolean anual) {

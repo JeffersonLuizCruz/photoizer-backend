@@ -33,7 +33,7 @@ public class RascunhoAgendamentoController {
     private UUID getCurrentUserId() {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || auth.getName() == null) {
-            throw new IllegalStateException("Usuário não autenticado");
+            throw new org.springframework.security.access.AccessDeniedException("Usuário não autenticado");
         }
         return UUID.fromString(auth.getName());
     }

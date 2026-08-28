@@ -216,12 +216,54 @@ public class Agendamento {
     public void aplicarPagamentoFinal(String urlComprovanteFinal) {
         this.urlComprovanteFinal = urlComprovanteFinal;
         this.valorRestante = BigDecimal.ZERO;
-        this.valorEntradaPago = this.valorTotalFinal;
         this.status = StatusAgendamento.EM_EDICAO;
         this.dataEnvioSelecao = LocalDateTime.now();
     }
 
     public void alternarDestaque() {
         this.ensaioDestaque = !this.ensaioDestaque;
+    }
+
+    /**
+     * Registra um pagamento parcial ou total no agendamento.
+     * Atualiza valorEntradaPago, recalcula valorRestante e,
+     * se quitado, transiciona para AGUARDANDO_PAGAMENTO_FINAL.
+     *
+     * Pattern: Domain Method — encapsula regra de negócio de pagamento no aggregate root.
+     */
+    public void registrarPagamento(BigDecimal valorPago) {
+        if (valorPago == null || valorPago.signum() <= 0) return;
+        this.valorEntradaPago = this.valorEntradaPago.add(valorPago);
+        this.valorRestante = this.valorRestante.subtract(valorPago).max(BigDecimal.ZERO);
+        if (this.valorRestante.compareTo(BigDecimal.ZERO) <= 0
+            && (this.status == StatusAgendamento.CONFIRMADO
+                || this.status == StatusAgendamento.REALIZADO)) {
+            this.status = StatusAgendamento.AGUARDANDO_PAGAMENTO_FINAL;
+        }
+    }
+
+    /**
+     * Registra pagamento de compra extra do e-commerce.
+     * NÃO altera valorEntradaPago (que é exclusivo do pacote).
+     * Apenas diminui valorRestante — o impacto no valorTotalFinal
+     * já foi aplicado quando a compra foi criada (via adicionarExtras).
+     */
+    public void registrarPagamentoEcommerce(BigDecimal valorPago) {
+        if (valorPago == null || valorPago.signum() <= 0) return;
+        this.valorRestante = this.valorRestante.subtract(valorPago).max(BigDecimal.ZERO);
+    }
+
+    /**
+     * Adiciona valor de extras (fotos/vídeos) ao agendamento.
+     * Atualiza valorExtras e recalcula valorTotalFinal.
+     *
+     * Pattern: Domain Method — encapsula regra de cálculo de valor total.
+     */
+    public void adicionarExtras(BigDecimal valorExtras) {
+        if (valorExtras == null || valorExtras.signum() <= 0) return;
+        this.valorExtras = this.valorExtras.add(valorExtras);
+        this.valorTotalFinal = this.valorTotal.add(this.valorExtras);
+        this.valorRestante = this.valorTotalFinal.subtract(this.valorEntradaPago)
+            .max(BigDecimal.ZERO);
     }
 }

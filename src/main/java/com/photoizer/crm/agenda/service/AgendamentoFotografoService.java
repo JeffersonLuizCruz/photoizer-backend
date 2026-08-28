@@ -1,5 +1,6 @@
 package com.photoizer.crm.agenda.service;
 
+import com.photoizer.crm.agenda.exception.AgendamentoNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.FotografoNaoEncontradoException;
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.AgendamentoFotografo;
@@ -46,7 +47,7 @@ public class AgendamentoFotografoService {
     public AgendamentoFotografo adicionarFotografo(UUID agendamentoId, UUID fotografoId, BigDecimal valorRepassar,
                                                    TipoRepasse tipoValor, BigDecimal percentual) {
         var agendamento = agendamentoRepository.findById(agendamentoId)
-            .orElseThrow(() -> new IllegalArgumentException("Agendamento não encontrado: " + agendamentoId));
+            .orElseThrow(() -> new AgendamentoNaoEncontradoException(agendamentoId));
         var fotografo = userRepository.findById(fotografoId)
             .orElseThrow(() -> new FotografoNaoEncontradoException(fotografoId));
 

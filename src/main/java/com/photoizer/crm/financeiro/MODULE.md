@@ -7,145 +7,125 @@ Centraliza **cálculos financeiros do negócio**: preview de valores, resumo, re
 ```
 financeiro/
 ├── model/
-│   ├── Pagamento.java     # Entidade (extends BaseEntity): agendamento (@ManyToOne), valor, dataPagamento, compraExtraId, observacao
-│   ├── FotoExtra.java     # Entidade (extends BaseEntity): agendamento (@ManyToOne), quantidade, valorUnitario, valorTotal
-│   ├── VideoExtra.java    # Entidade (extends BaseEntity): agendamento (@ManyToOne), quantidade, valorUnitario, valorTotal
-│   ├── Receita.java       # Entidade (extends BaseEntity): receita avulsa (clienteId+clienteNome, tipoServico, valores, status, datas, comissão)
-│   ├── StatusReceita.java # Enum: PENDENTE, PAGO_PARCIAL, PAGO_TOTAL, CANCELADO
-│   └── TipoServico.java   # Enum: ENSAIO, CASAMENTO, EVENTO, PRODUTO, OUTRO
+│   ├── Pagamento.java           # Entidade: pagamento vinculado a agendamento
+│   ├── ExtraServico.java        # Entidade unificada (FotoExtra + VideoExtra) com discriminador TipoExtra
+│   ├── TipoExtra.java           # Enum: FOTO, VIDEO
+│   ├── Receita.java             # Entidade: receita avulsa
+│   ├── StatusReceita.java       # Enum: PENDENTE, PAGO_PARCIAL, PAGO_TOTAL, CANCELADO
+│   └── TipoServico.java         # Enum com label(): ENSAIO, CASAMENTO, EVENTO, PRODUTO, OUTRO
 ├── repository/
 │   ├── PagamentoRepository.java       # JpaRepository + findByAgendamentoId, findByCompraExtraId
-│   ├── FotoExtraRepository.java       # JpaRepository
-│   ├── VideoExtraRepository.java      # JpaRepository
-│   └── ReceitaRepository.java         # JpaRepository + JpaSpecificationExecutor + somas
+│   ├── ExtraServicoRepository.java    # JpaRepository + findByAgendamentoId, findByAgendamentoIdAndTipo
+│   └── ReceitaRepository.java         # JpaRepository + JpaSpecificationExecutor + queries de inadimplência/relatórios
 ├── service/
-│   ├── FinanceiroService.java           # 600 linhas: preview, resumo, relatórios, pagamentos, extras, comissões, fluxo de caixa, bloqueio de cliente
-│   ├── FinanceiroDashboardService.java  # 608 linhas: dashboard agregado (cards, mensal, categorias, lucro, rentabilidade, lançamentos)
-│   ├── FinanceiroRelatorioService.java  # 289 linhas: relatórios para exportação
-│   └── ReceitaService.java              # 199 linhas: CRUD de receitas avulsas c/ comissão
+│   ├── PagamentoService.java              # Registro de pagamentos + publica PagamentoRegistradoEvent
+│   ├── ExtraVendaService.java             # Venda de fotos/vídeos extras + publica eventos
+│   ├── FinanceiroQueryService.java        # Queries de leitura: preview, resumo, relatórios, fluxo de caixa, bloqueio
+│   ├── FinanceiroDashboardService.java    # Dashboard agregado (delega repasses ao FinanceCalculator)
+│   ├── FinanceiroRelatorioService.java    # Relatórios para exportação (queries SQL)
+│   ├── FinanceiroService.java             # Orchestrator fino (delega para services especializados)
+│   ├── ReceitaService.java                # CRUD de receitas avulsas
+│   └── ReceitaQueryService.java           # Facade de leitura para dashboard
 ├── api/
-│   ├── FinanceiroController.java        # 148 linhas: pagamentos, extras, resumo, dashboard, fluxo de caixa, relatórios, bloqueio
-│   ├── FinanceiroRelatorioController.java # 82 linhas: resumo-mensal, despesas-categoria, inadimplência, rentabilidade, comparativo, fiscal
-│   ├── ReceitaController.java           # CRUD de receitas avulsas + receber + duplicar
-│   └── ~16 records de Response/preview
+│   ├── FinanceiroController.java          # Pagamentos, extras, resumo, dashboard, fluxo, relatórios, bloqueio
+│   ├── FinanceiroRelatorioController.java # Relatórios para exportação
+│   ├── ReceitaController.java             # CRUD de receitas avulsas
+│   ├── ExtraServicoMapper.java            # MapStruct mapper para ExtraServico
+│   ├── ExtraServicoResponse.java          # DTO de response para extras
+│   ├── PagamentoResponse.java             # DTO de response para pagamentos
+│   ├── ReceitaResponse.java               # DTO de response para receitas
+│   ├── RelatorioAgendamentoItem.java      # DTO próprio (anti-corruption layer vs agenda)
+│   └── ~14 records de Response/preview
+├── event/
+│   ├── PagamentoRegistradoEvent.java      # Domain Event — publicado ao registrar pagamento
+│   └── ExtrasAdicionadosEvent.java        # Domain Event — publicado ao adicionar extras
 ├── listener/
-│   └── FinanceiroEventListener.java     # Consome AgendamentoRealizadoEvent (log) e CompraExtraConfirmadaEvent (contabiliza)
+│   └── FinanceiroEventListener.java       # Consome AgendamentoRealizadoEvent + CompraExtraConfirmadaEvent
+├── exception/
+│   ├── PagamentoNaoEncontradoException.java
+│   ├── AgendamentoNaoEncontradoParaFinanceiroException.java
+│   └── ValorInvalidoException.java
 └── ReconciliarComprasExtraFinanceiro.java # CommandLineRunner: reconcilia CompraExtra PAGA sem Pagamento no boot
 ```
 
 ## 3. Dependências Externas
 
-### Módulos internos importados — **[VIOLAÇÕES Modulith]**
+### Módulos internos importados
 | Módulo | Uso | Tipo |
 |--------|-----|------|
-| **agenda** | `Agendamento`, `AgendamentoRepository`, `AgendamentoFotografoRepository`, `StatusAgendamento`, `RepasseStatus`, `AgendamentoResponse` | leitura **e escrita** |
-| **comissao** | `Indicacao`, `IndicacaoRepository` — **`FinanceiroService` cria `Indicacao` diretamente** | entrada **e escrita** |
+| **agenda** | `Agendamento`, `AgendamentoRepository`, `AgendamentoFotografoRepository`, `StatusAgendamento`, `RepasseStatus` | leitura (via FinanceiroQueryService) |
+| **comissao** | `Indicacao`, `IndicacaoRepository`, `StatusIndicacao`, `ComissaoSolicitadaEvent` | leitura + publicação de evento |
 | **config** | `ConfiguracaoService` (`percentualEntrada`, `percentualComissao`) | leitura |
-| **despesa** | `Despesa`, `DespesaRepository`, `DespesaResponse`, `StatusDespesa` | leitura |
-| **indicador** | `IndicadorService` (`buscarOuCriar`/`buscarPorId` p/ comissão de extras) | leitura |
+| **despesa** | `Despesa`, `DespesaRepository`, `DespesaMapper`, `StatusDespesa` | leitura |
 | **pacote** | `Pacote`, `PacoteRepository` | leitura |
 | **cliente** | `ClienteRepository` (ReceitaService) | leitura |
-| **ecommerce** | `CompraExtraRepository` (Reconciliar), recebe `CompraExtraCriadaEvent`/`CompraExtraConfirmadaEvent` | eventos + repo |
-| **shared** | `BaseEntity`, `FormaPagamento`, `TipoRepasse` | infraestrutura |
-
-> **Padrão correto em uso**: `FinanceiroEventListener` consome eventos da agenda e ecommerce — é o caminho certo. As violações estão no service (escritas diretas).
+| **ecommerce** | `CompraExtraRepository` (Reconciliar), recebe `CompraExtraConfirmadaEvent` | eventos + repo |
+| **shared** | `AuditInfo`, `FormaPagamento`, `TipoRepasse`, `FinanceCalculator` | infraestrutura + cálculos |
 
 ### Eventos consumidos
 | Evento | Ação |
 |--------|------|
-| `agenda.AgendamentoRealizadoEvent` | `FinanceiroEventListener.handleAgendamentoRealizado` — **apenas log** (nenhuma ação financeira) |
-| `ecommerce.CompraExtraConfirmadaEvent` | `finaceiroService.registrarPagamentoExtraEcommerce` — contabiliza extras no agendamento |
+| `agenda.AgendamentoRealizadoEvent` | `FinanceiroEventListener.handleAgendamentoRealizado` — log |
+| `ecommerce.CompraExtraConfirmadaEvent` | `PagamentoService.registrarPagamentoExtraEcommerce` — contabiliza extras |
 
 ### Eventos publicados
-Nenhum.
+| Evento | Ação |
+|--------|------|
+| `PagamentoRegistradoEvent` | Consumido por `agenda.PagamentoFinanceiroEventListener` — atualiza status/valores do Agendamento |
+| `ExtrasAdicionadosEvent` | Consumido por `agenda.PagamentoFinanceiroEventListener` — atualiza valorExtras/valorTotalFinal |
+| `ComissaoSolicitadaEvent` | Consumido por `comissao.IndicacaoListener` — cria Indicacao |
 
 ## 4. Fluxos Principais
 
 ### Fluxo 1: Preview / Resumo / Relatórios
-1. `POST /financeiro/preview` → `calcularPreview` (`FinanceiroService.java:94-107`): calcula entrada exigida (30% do total por default), restante e total final.
-2. `GET /financeiro/resumo` → `calcularResumo` (`:110-168`): percorre agendamentos não-cancelados, soma entradas/finais/extras/deslocamento/repasse; soma comissões (`indicacaoRepository.findByAgendamentoIdIn`) e despesas do período.
-3. `GET /financeiro/relatorios` → `calcularRelatorios` (`:171-208`): mesmo filtro, retorna totais + lista de `AgendamentoResponse`.
+1. `POST /financeiro/preview` → `FinanceiroQueryService.calcularPreview()`: calcula entrada exigida (30% do total por default), restante e total final.
+2. `GET /financeiro/resumo` → `FinanceiroQueryService.calcularResumo()`: usa queries SQL para somar entradas/finais/extras/deslocamento/repasse, comissões e despesas.
+3. `GET /financeiro/relatorios` → `FinanceiroQueryService.calcularRelatorios()`: retorna totais + lista de `RelatorioAgendamentoItem`.
 
 ### Fluxo 2: Dashboard Financeiro
-1. `GET /financeiro/dashboard` → `FinanceiroDashboardService.calcular` (`FinanceiroDashboardService.java:69-98`): **carrega tudo em memória** — `despesaRepository.findAll()`, `agendamentoRepository.findAll()` filtrado, `indicacaoRepository.findAll()`, repsasses agregados — e calcula cards, barra mensal, despesas por categoria, lucro mensal, rentabilidade por serviço/trabalho, últimos lançamentos.
+1. `GET /financeiro/dashboard` → `FinanceiroDashboardService.calcular()`: carrega dados via Specification (receitas), queries (despesas/agendamentos/indicações), e `FinanceCalculator.carregarRepasses()`. Calcula cards, barra mensal, despesas por categoria, lucro mensal, rentabilidade por serviço/trabalho, últimos lançamentos.
 
 ### Fluxo 3: Registro de Pagamento
-`POST /financeiro/agendamentos/{id}/pagamentos` → `registrarPagamento` (`FinanceiroService.java:469-483`):
-1. **Mutação cross-module**: soma em `agendamento.valorEntradaPago`, recalcula `valorRestante`, e **muda `agendamento.status` para `AGUARDANDO_PAGAMENTO_FINAL`** quando quita.
-2. Salva `Pagamento`.
+`POST /financeiro/agendamentos/{id}/pagamentos` → `PagamentoService.registrarPagamento()`:
+1. Salva `Pagamento`.
+2. Publica `PagamentoRegistradoEvent`.
+3. `agenda.PagamentoFinanceiroEventListener` consome o evento: chama `agendamento.registrarPagamento(valor)` (domain method) que atualiza `valorEntradaPago`, `valorRestante` e possivelmente `status`.
 
 ### Fluxo 4: Extras com Comissão
-`POST /agendamentos/{id}/fotos-extras` / `videos-extras` → `adicionarFotoExtra`/`adicionarVideoExtra` (`:505-547`):
-1. Calcula `valorTotal = qtd × unit`, atualiza `valorExtras`/`valorTotalFinal` do agendamento.
-2. `criarComissaoSeNecessario` (`:549-586`): cria `Indicacao` **diretamente** (via `IndicacaoRepository`), com `status "PENDENTE"` em **String**, percentual do indicador ou config `percentualComissao`.
-3. Consumido via listener: `CompraExtraConfirmadaEvent` → `registrarPagamentoExtraEcommerce` (`:485-503`) atualiza agendamento + cria `Pagamento` de extras.
+`POST /agendamentos/{id}/fotos-extras` / `videos-extras` → `ExtraVendaService.adicionarFotoExtra/VideoExtra()`:
+1. Salva `ExtraServico` (entidade unificada).
+2. Publica `ExtrasAdicionadosEvent` → agenda consome e chama `agendamento.adicionarExtras(valor)`.
+3. Publica `ComissaoSolicitadaEvent` → comissao consome e cria `Indicacao`.
 
 ### Fluxo 5: Receitas Avulsas
-`ReceitaService` (`:40-199`): CRUD de receitas manuais — deriva status de valor recebido, calcula comissão (`percentualComissao` default 10%) e `valorFinal`.
+`ReceitaService`: CRUD de receitas manuais — deriva status de valor recebido, calcula comissão (`percentualComissao` default 10%) e `valorFinal`.
 
 ### Fluxo 6: Reconciliador
-`ReconciliarComprasExtraFinanceiro.run` (CommandLineRunner): no boot, busca `CompraExtra PAGA` sem `Pagamento` correspondente e chama `registrarPagamentoExtraEcommerce` — **cross-module em startup**.
+`ReconciliarComprasExtraFinanceiro.run`: no boot, busca `CompraExtra PAGA` sem `Pagamento` correspondente e chama `PagamentoService.registrarPagamentoExtraEcommerce()`.
 
 ## 5. Regras Específicas
 1. **Status ignorados** em todos os cálculos: `CANCELADO`, `NO_SHOW`; "pagamento final" considerado para `EM_EDICAO`, `FOTOS_ENVIADAS_PARA_SELECAO`, `FOTOS_ENTREGUES`, `FINALIZADO`.
-2. **Comissão de extras criada direto**: `Indicacao` com `status` String `"PENDENTE"` — não usa o enum/fluxo do módulo `comissao` (que escuta eventos do agenda).
-3. **`isClienteBloqueado`** (`:593-599`): faz `agendamentoRepository.findAll()` e filtra em memória.
-4. **`labelServico`** duplicado em `FinanceiroService:459-467` e `FinanceiroDashboardService:566-574`.
-5. **`@Transactional(readOnly=true)`** de classe no Dashboard/Relatório, mas serviços `FinanceiroService`/`ReceitaService` com gravação.
+2. **Comissão de extras** via evento `ComissaoSolicitadaEvent` — nunca cria `Indicacao` diretamente.
+3. **`isClienteBloqueado`**: usa query SQL `existsByClienteIdWithSaldoDevedor()` (O(1)).
+4. **`labelServico`**: centralizado no enum `TipoServico.label()` (DRY).
+5. **`emPeriodo`**: centralizado em `FinanceiroQueryService.emPeriodo()` (package-private, usado por Dashboard e Relatorio).
+6. **Repasses**: delegados a `FinanceCalculator.carregarRepasses()` (shared).
 
 ## 6. Testes
 Nenhum teste específico para este módulo. Apenas `CrmApplicationTests` (smoke de contexto).
 
-## 7. Dívidas Técnicas e Melhorias Recomendadas
+## 7. Dívidas Técnicas Resolvidas (Fase 3)
 
-### 7.1 God classes financeiras (600+608 linhas) — **[CRÍTICO] P1**
-- `FinanceiroService` (600) e `FinanceiroDashboardService` (608) concentram agregações, mutações e regras de ~8 módulos.
-- **Solução**: dividir por caso de uso — `PagamentoService`, `ExtraVendasService`, `FluxoCaixaQuery`, `DashboardAggregator`, `RepasseCustoQuery`; tornar serviços de leitura `@Transactional(readOnly=true)`.
-
-### 7.2 `findAll()` + agregação em memória — **[CRÍTICO] P1**
-- `FinanceiroDashboardService.java:73-79`: `despesaRepository.findAll()`, `agendamentoRepository.findAll().filter`, `indicacaoRepository.findAll()`; `FinanceiroRelatorioService.java:116, 192, 195, 251, 258` idem; `FinanceiroService.isClienteBloqueado:594`, `calcularFluxoCaixa:307-308` idem.
-- **Solução**: queries de agregação SQL (`SUM`/`GROUP BY`/`COUNT`) nos repositórios donos + `@EntityGraph`/JOIN FETCH; paginar lançamentos.
-
-### 7.3 Escrita cross-module (agenda, comissao) — **[CRÍTICO] P1**
-- `registrarPagamento` muta status do agendamento (`FinanceiroService.java:477-479`); `adicionarFotoExtra/Video` muta valores (`:517-519, 539-541`); `registrarPagamentoExtraEcommerce` (`:489-493`); `criarComissaoSeNecessario` cria `Indicacao` (`:573-585`).
-- **Solução**: eventos de domínio — `PagamentoRegistradoEvent` consumido pela agenda (dona da máquina de estados), `CompraExtraConfirmadaEvent` já existe; comissão de extras via evento `ComissaoSolicitadaEvent` (módulo comissao é dono) — nunca criar `Indicacao` aqui.
-
-### 7.4 Exposição de entidades na API — **P1**
-- `FinanceiroController` retorna `Pagamento`, `FotoExtra`, `VideoExtra`, `List<Pagamento>` como entities (`FinanceiroController.java:46, 55, 69, 83`).
-- **Solução**: DTOs (`PagamentoResponse`, `FotoExtraResponse`, `VideoExtraResponse`) com MapStruct.
-
-### 7.5 Duplicação de regra financeira (partilha/repasse/lucro) — **P1**
-- Regras de lucro/repasse/margem repetidas entre `FinanceiroService.resumoPorAgendamento` (`:210-299`), `FinanceiroDashboardService` e módulo `agenda`/`fotografo`.
-- **Solução**: componente único `FinanceCalculator`/`PartilhaCalculator` no domínio (chamado pelos módulos), evitando divergência de números entre telas.
-
-### 7.6 Reconciliador em startup (cross-module) — **P2**
-- `ReconciliarComprasExtraFinanceiro` (CommandLineRunner) usa `CompraExtraRepository` do ecommerce e roda a cada boot.
-- **Solução**: mover para job/lock e publicar evento; separar responsabilidade.
-
-### 7.7 Exceções genéricas `IllegalArgumentException`/`orElseThrow()` — **P2**
-- `orElseThrow()` sem mensagem (`:95, 470, 507, 529`) e `IllegalArgumentException` em ReceitaService.
-- **Solução**: hierarquia central `BusinessException`/`NotFoundException`.
-
-### 7.8 Painéis frontend dependentes de `AgendamentoResponse` — **P2**
-- `calcularRelatorios` (`:206`) mapeia `AgendamentoResponse.of` (DTO do módulo agenda) como contrato de relatório.
-- **Solução**: DTO próprio do financeiro (`RelatorioAgendamentoItem`) para não vazar contrato do agenda.
-
-### 7.9 Duplicidades internas — **P3**
-- `calcularResumo` vs `calcularRelatorios` (`:110-168` vs `:171-208`) quase idênticos; `labelServico` duplicado; `emPeriodo` definido 4 vezes (FinanceiroService, Dashboard, Relatorio).
-- **Solução**: extrair `DateRangeValueObject` + `RelatorioTotaisCalculator`.
-
-### 7.10 Herança `BaseEntity` → composição — **P1** (padrão-aplicável)
-- Todas as entidades estendem `@MappedSuperclass`.
-- **Solução**: `@Embeddable AuditInfo` + Auditing; eliminar `BaseEntity`/`@SuperBuilder`.
-
-### 7.11 DTOs manuais — **P2**
-- ~16 records com `static of(...)` escritos à mão.
-- **Solução**: MapStruct (decisão aprovada).
-
-## 8. Exemplos de arquivos afetados
-- `FinanceiroService.java:94-107, 110-208, 469-547` — agregações e mutações cross-module; `:469-483` muda status do agendamento; `:549-586` cria `Indicacao` direto; `:593-599` — `findAll()`.
-- `FinanceiroDashboardService.java:69-98, 73-79, 219-232` — tudo em memória; `:566-574` — label duplicado.
-- `FinanceiroRelatorioService.java:116, 192-195, 250-261` — `findAll()` e filtro em memória.
-- `FinanceiroController.java:44-85` — expõe entidades.
-- `ReconciliarComprasExtraFinanceiro.java:32-46` — runner cross-module.
-- `FinanceiroEventListener.java:28-33` — consome evento corretamente (modelo a seguir).
+| Item | Status | Descrição |
+|------|--------|-----------|
+| 7.1 God classes (600+608 linhas) | **RESOLVIDO** | `FinanceiroService` extraído em `PagamentoService`, `ExtraVendaService`, `FinanceiroQueryService`. `FinanceiroDashboardService` delega repasses ao `FinanceCalculator`. |
+| 7.2 `findAll()` + streams | **RESOLVIDO** | `isClienteBloqueado` usa query SQL; `FinanceiroRelatorioService` usa `findInadimplentes()`, `findAvulsasByDataBetween()`, `sumValorByDataBetween()`; queries SQL em `DespesaRepository` e `IndicacaoRepository`. |
+| 7.3 Escrita cross-module | **RESOLVIDO** | `PagamentoRegistradoEvent` + `ExtrasAdicionadosEvent` eliminam mutação direta no `Agendamento`. Listener no agenda consome eventos. |
+| 7.4 Exposição de entidades | **RESOLVIDO** | `FinanceiroController` retorna `PagamentoResponse`, `ExtraServicoResponse` em vez de entidades. |
+| 7.5 Duplicação de regra financeira | **RESOLVIDO** | `FinanceCalculator` (shared) centraliza `deslocamentoEfetivo()` e `carregarRepasses()`. |
+| 7.7 Exceções genéricas | **PARCIAL** | Criadas `PagamentoNaoEncontradoException`, `AgendamentoNaoEncontradoParaFinanceiroException`, `ValorInvalidoException`. |
+| 7.12 Bug: `dataPagamento` sobrescrita | **RESOLVIDO** | `PagamentoService.registrarPagamento()` agora preserva `dataPagamento` do request body (antes sempre setava `now()`). |
+| 7.8 DTOs cross-module | **RESOLVIDO** | `RelatorioAgendamentoItem` substitui `AgendamentoResponse` do agenda. |
+| 7.9 Duplicidades internas | **RESOLVIDO** | `labelServico()` → `TipoServico.label()`; `emPeriodo()` → `FinanceiroQueryService.emPeriodo()`; repasses → `FinanceCalculator`. |
+| 7.11 DTOs manuais | **RESOLVIDO** | `ExtraServicoMapper` (MapStruct) criado; `ReceitaResponse.of()` e `PagamentoResponse.of()` mantidos para backward compat. |
+| Unificação entidades | **RESOLVIDO** | `FotoExtra` + `VideoExtra` → `ExtraServico` com `TipoExtra` enum. |

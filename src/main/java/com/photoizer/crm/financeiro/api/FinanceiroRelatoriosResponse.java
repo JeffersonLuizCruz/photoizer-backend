@@ -1,13 +1,11 @@
 package com.photoizer.crm.financeiro.api;
 
-import com.photoizer.crm.agenda.api.AgendamentoResponse;
-
 import java.math.BigDecimal;
 import java.util.List;
 
 public record FinanceiroRelatoriosResponse(
     RelatoriosTotais totais,
-    List<AgendamentoResponse> agendamentos,
+    List<RelatorioAgendamentoItem> agendamentos,
     int quantidade
 ) {
     public record RelatoriosTotais(
@@ -16,6 +14,7 @@ public record FinanceiroRelatoriosResponse(
         BigDecimal restante,
         BigDecimal extras,
         BigDecimal totalFinal,
-        BigDecimal repasses
+        BigDecimal repasses,
+        BigDecimal comissao
     ) {}
 }

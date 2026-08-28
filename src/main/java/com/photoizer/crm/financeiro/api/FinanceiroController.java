@@ -1,16 +1,15 @@
 package com.photoizer.crm.financeiro.api;
 
-import com.photoizer.crm.financeiro.model.FotoExtra;
-import com.photoizer.crm.financeiro.model.Pagamento;
 import com.photoizer.crm.financeiro.model.StatusReceita;
 import com.photoizer.crm.financeiro.model.TipoServico;
-import com.photoizer.crm.financeiro.model.VideoExtra;
 import com.photoizer.crm.financeiro.service.FinanceiroDashboardService;
+import com.photoizer.crm.financeiro.service.FinanceiroQueryService;
 import com.photoizer.crm.financeiro.service.FinanceiroService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,8 +22,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -35,56 +32,59 @@ public class FinanceiroController {
 
     private final FinanceiroService financeiroService;
     private final FinanceiroDashboardService financeiroDashboardService;
+    private final FinanceiroQueryService financeiroQueryService;
 
     public FinanceiroController(FinanceiroService financeiroService,
-                                FinanceiroDashboardService financeiroDashboardService) {
+                                FinanceiroDashboardService financeiroDashboardService,
+                                FinanceiroQueryService financeiroQueryService) {
         this.financeiroService = financeiroService;
         this.financeiroDashboardService = financeiroDashboardService;
+        this.financeiroQueryService = financeiroQueryService;
     }
 
     @PostMapping("/agendamentos/{agendamentoId}/pagamentos")
     @Operation(summary = "Registrar pagamento")
     @RolesAllowed("ADMIN")
-    public ResponseEntity<Pagamento> registrarPagamento(
+    public ResponseEntity<PagamentoResponse> registrarPagamento(
             @PathVariable UUID agendamentoId,
-            @Valid @RequestBody Pagamento pagamento) {
+            @Valid @RequestBody PagamentoRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(financeiroService.registrarPagamento(agendamentoId, pagamento));
+            .body(PagamentoResponse.of(financeiroService.registrarPagamento(agendamentoId, request)));
     }
 
     @PostMapping("/agendamentos/{agendamentoId}/fotos-extras")
     @Operation(summary = "Adicionar fotos extras (com comissão opcional)")
     @RolesAllowed("ADMIN")
-    public ResponseEntity<FotoExtra> adicionarFotoExtra(
+    public ResponseEntity<ExtraServicoResponse> adicionarFotoExtra(
             @PathVariable UUID agendamentoId,
-            @RequestParam int quantidade,
-            @RequestParam BigDecimal valorUnitario,
+            @RequestParam @Positive int quantidade,
+            @RequestParam @Positive BigDecimal valorUnitario,
             @RequestParam(required = false) UUID indicadorId,
             @RequestParam(required = false) String indicadorNome,
             @RequestParam(required = false) String indicadorTelefone) {
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(financeiroService.adicionarFotoExtra(agendamentoId, quantidade, valorUnitario,
-                indicadorNome, indicadorTelefone, indicadorId));
+            .body(ExtraServicoResponse.of(financeiroService.adicionarFotoExtra(agendamentoId, quantidade, valorUnitario,
+                indicadorNome, indicadorTelefone, indicadorId)));
     }
 
     @PostMapping("/agendamentos/{agendamentoId}/videos-extras")
     @Operation(summary = "Adicionar vídeos extras (com comissão opcional)")
     @RolesAllowed("ADMIN")
-    public ResponseEntity<VideoExtra> adicionarVideoExtra(
+    public ResponseEntity<ExtraServicoResponse> adicionarVideoExtra(
             @PathVariable UUID agendamentoId,
-            @RequestParam int quantidade,
-            @RequestParam BigDecimal valorUnitario,
+            @RequestParam @Positive int quantidade,
+            @RequestParam @Positive BigDecimal valorUnitario,
             @RequestParam(required = false) UUID indicadorId,
             @RequestParam(required = false) String indicadorNome,
             @RequestParam(required = false) String indicadorTelefone) {
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(financeiroService.adicionarVideoExtra(agendamentoId, quantidade, valorUnitario,
-                indicadorNome, indicadorTelefone, indicadorId));
+            .body(ExtraServicoResponse.of(financeiroService.adicionarVideoExtra(agendamentoId, quantidade, valorUnitario,
+                indicadorNome, indicadorTelefone, indicadorId)));
     }
 
     @GetMapping("/agendamentos/{agendamentoId}/pagamentos")
     @Operation(summary = "Listar pagamentos de um agendamento")
-    public ResponseEntity<List<Pagamento>> listarPagamentos(@PathVariable UUID agendamentoId) {
+    public ResponseEntity<List<PagamentoResponse>> listarPagamentos(@PathVariable UUID agendamentoId) {
         return ResponseEntity.ok(financeiroService.listarPagamentos(agendamentoId));
     }
 
@@ -121,7 +121,7 @@ public class FinanceiroController {
             @RequestParam(required = false) LocalDate dataInicio,
             @RequestParam(required = false) LocalDate dataFim,
             @RequestParam(required = false, defaultValue = "MENSAL") String visao) {
-        return ResponseEntity.ok(financeiroService.calcularFluxoCaixa(dataInicio, dataFim, visao));
+        return ResponseEntity.ok(financeiroQueryService.calcularFluxoCaixa(dataInicio, dataFim, visao));
     }
 
     @GetMapping("/resumo")
@@ -130,7 +130,7 @@ public class FinanceiroController {
             @RequestParam(required = false) LocalDate dataInicio,
             @RequestParam(required = false) LocalDate dataFim) {
         var inicio = dataInicio != null ? dataInicio.atStartOfDay() : null;
-        var fim = dataFim != null ? dataFim.atTime(LocalTime.MAX) : null;
+        var fim = dataFim != null ? dataFim.plusDays(1).atStartOfDay() : null;
         return ResponseEntity.ok(financeiroService.calcularResumo(inicio, fim));
     }
 
@@ -140,7 +140,7 @@ public class FinanceiroController {
             @RequestParam(required = false) LocalDate dataInicio,
             @RequestParam(required = false) LocalDate dataFim) {
         var inicio = dataInicio != null ? dataInicio.atStartOfDay() : null;
-        var fim = dataFim != null ? dataFim.atTime(LocalTime.MAX) : null;
+        var fim = dataFim != null ? dataFim.plusDays(1).atStartOfDay() : null;
         return ResponseEntity.ok(financeiroService.calcularRelatorios(inicio, fim));
     }
 

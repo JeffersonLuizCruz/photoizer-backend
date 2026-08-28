@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public interface DespesaRepository extends JpaRepository<Despesa, UUID>, JpaSpecificationExecutor<Despesa> {
@@ -64,4 +65,21 @@ public interface DespesaRepository extends JpaRepository<Despesa, UUID>, JpaSpec
     List<DespesaPorMesProjection> sumByMesBetween(
         @Param("inicio") LocalDate inicio,
         @Param("fim") LocalDate fim);
+
+    @Query("SELECT COALESCE(SUM(d.valor), 0) FROM Despesa d WHERE d.data BETWEEN :inicio AND :fim AND d.status = :status")
+    BigDecimal sumValorByDataBetweenAndStatus(
+        @Param("inicio") LocalDate inicio,
+        @Param("fim") LocalDate fim,
+        @Param("status") StatusDespesa status);
+
+    @Query("SELECT d.categoria FROM Despesa d WHERE d.data BETWEEN :inicio AND :fim GROUP BY d.categoria ORDER BY SUM(d.valor) DESC")
+    List<String> findCategoriasByDataBetween(@Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
+
+    @Query("SELECT COALESCE(SUM(d.valor), 0) FROM Despesa d WHERE d.data BETWEEN :inicio AND :fim AND d.categoria = :categoria")
+    BigDecimal sumValorByDataBetweenAndCategoria(
+        @Param("inicio") LocalDate inicio,
+        @Param("fim") LocalDate fim,
+        @Param("categoria") String categoria);
+
+    List<Despesa> findByStatusAndDataBetween(@Param("status") StatusDespesa status, @Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
 }

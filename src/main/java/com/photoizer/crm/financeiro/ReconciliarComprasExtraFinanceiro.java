@@ -3,7 +3,7 @@ package com.photoizer.crm.financeiro;
 import com.photoizer.crm.ecommerce.model.StatusCompraExtra;
 import com.photoizer.crm.ecommerce.repository.CompraExtraRepository;
 import com.photoizer.crm.financeiro.repository.PagamentoRepository;
-import com.photoizer.crm.financeiro.service.FinanceiroService;
+import com.photoizer.crm.financeiro.service.PagamentoService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -17,14 +17,14 @@ public class ReconciliarComprasExtraFinanceiro implements CommandLineRunner {
 
     private final CompraExtraRepository compraExtraRepository;
     private final PagamentoRepository pagamentoRepository;
-    private final FinanceiroService financeiroService;
+    private final PagamentoService pagamentoService;
 
     public ReconciliarComprasExtraFinanceiro(CompraExtraRepository compraExtraRepository,
                                              PagamentoRepository pagamentoRepository,
-                                             FinanceiroService financeiroService) {
+                                             PagamentoService pagamentoService) {
         this.compraExtraRepository = compraExtraRepository;
         this.pagamentoRepository = pagamentoRepository;
-        this.financeiroService = financeiroService;
+        this.pagamentoService = pagamentoService;
     }
 
     @Override
@@ -32,16 +32,19 @@ public class ReconciliarComprasExtraFinanceiro implements CommandLineRunner {
     public void run(String... args) {
         var pagas = compraExtraRepository.findByStatus(StatusCompraExtra.PAGA);
         var reconciliadas = 0;
+        var jaReconciliadas = 0;
         for (var compra : pagas) {
             if (pagamentoRepository.findByCompraExtraId(compra.getId()).isPresent()) {
+                jaReconciliadas++;
                 continue;
             }
-            financeiroService.registrarPagamentoExtraEcommerce(
+            pagamentoService.registrarPagamentoExtraEcommerce(
                 compra.getAgendamentoId(), compra.getValorTotal(), compra.getId());
             reconciliadas++;
         }
-        if (reconciliadas > 0) {
-            log.info("Reconciliação financeira: {} compra(s) extra(s) PAGA contabilizada(s) no agendamento.", reconciliadas);
+        if (reconciliadas > 0 || jaReconciliadas > 0) {
+            log.info("Reconciliação financeira: {} nova(s), {} já contabilizada(s) de {} compra(s) PAGA.",
+                reconciliadas, jaReconciliadas, pagas.size());
         }
     }
 }

@@ -4,6 +4,9 @@ import com.photoizer.crm.cliente.repository.ClienteRepository;
 import com.photoizer.crm.config.model.ConfigKey;
 import com.photoizer.crm.config.service.ConfiguracaoService;
 import com.photoizer.crm.financeiro.api.ReceitaRequest;
+import com.photoizer.crm.financeiro.exception.ClienteObrigatorioException;
+import com.photoizer.crm.financeiro.exception.ReceitaNaoEncontradaException;
+import com.photoizer.crm.financeiro.exception.ValorRecebidoExcedeFinalException;
 import com.photoizer.crm.financeiro.model.Receita;
 import com.photoizer.crm.financeiro.model.StatusReceita;
 import com.photoizer.crm.financeiro.model.TipoServico;
@@ -60,7 +63,7 @@ public class ReceitaService {
 
     public Receita atualizar(UUID id, ReceitaRequest request) {
         var receita = receitaRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Receita não encontrada: " + id));
+            .orElseThrow(() -> new ReceitaNaoEncontradaException(id));
 
         receita.setAgendamentoId(null);
         receita.setTipoServico(request.tipoServico() != null ? request.tipoServico() : TipoServico.ENSAIO);
@@ -81,14 +84,14 @@ public class ReceitaService {
 
     public void excluir(UUID id) {
         if (!receitaRepository.existsById(id)) {
-            throw new IllegalArgumentException("Receita não encontrada: " + id);
+            throw new ReceitaNaoEncontradaException(id);
         }
         receitaRepository.deleteById(id);
     }
 
     public Receita receber(UUID id) {
         var receita = receitaRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Receita não encontrada: " + id));
+            .orElseThrow(() -> new ReceitaNaoEncontradaException(id));
         receita.setStatus(StatusReceita.PAGO_TOTAL);
         receita.setValorRecebido(receita.getValorFinal());
         receita.setDataRecebimentoReal(LocalDateTime.now());
@@ -97,7 +100,7 @@ public class ReceitaService {
 
     public Receita duplicar(UUID id) {
         var origem = receitaRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Receita não encontrada: " + id));
+            .orElseThrow(() -> new ReceitaNaoEncontradaException(id));
         var copia = Receita.builder()
             .agendamentoId(null)
             .clienteId(origem.getClienteId())
@@ -105,8 +108,6 @@ public class ReceitaService {
             .tipoServico(origem.getTipoServico())
             .descricao(origem.getDescricao())
             .valorBruto(origem.getValorBruto())
-            .valorComissao(origem.getValorComissao())
-            .valorFinal(origem.getValorFinal())
             .status(StatusReceita.PENDENTE)
             .valorRecebido(BigDecimal.ZERO)
             .dataPrevisaoRecebimento(null)
@@ -114,13 +115,15 @@ public class ReceitaService {
             .formaPagamento(origem.getFormaPagamento())
             .observacoes(origem.getObservacoes())
             .build();
+        preencherComissao(copia);
+        preencherStatus(copia, null);
         return receitaRepository.save(copia);
     }
 
     @Transactional(readOnly = true)
     public Receita buscarPorId(UUID id) {
         return receitaRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Receita não encontrada: " + id));
+            .orElseThrow(() -> new ReceitaNaoEncontradaException(id));
     }
 
     @Transactional(readOnly = true)
@@ -139,7 +142,11 @@ public class ReceitaService {
             if (clienteId != null) predicates.add(cb.equal(root.get("clienteId"), clienteId));
             if (tipoServico != null) predicates.add(cb.equal(root.get("tipoServico"), tipoServico));
             if (formaPagamento != null && !formaPagamento.isBlank()) {
-                predicates.add(cb.equal(root.get("formaPagamento"), com.photoizer.crm.shared.model.FormaPagamento.valueOf(formaPagamento)));
+                try {
+                    predicates.add(cb.equal(root.get("formaPagamento"),
+                        com.photoizer.crm.shared.model.FormaPagamento.valueOf(formaPagamento)));
+                } catch (IllegalArgumentException ignored) {
+                }
             }
             return cb.and(predicates.toArray(new Predicate[0]));
         };
@@ -156,10 +163,10 @@ public class ReceitaService {
 
     private void preencherCliente(Receita receita, ReceitaRequest request) {
         if (request.clienteId() == null) {
-            throw new IllegalArgumentException("Informe um cliente para a receita");
+            throw new ClienteObrigatorioException();
         }
         var cliente = clienteRepository.findById(request.clienteId())
-            .orElseThrow(() -> new IllegalArgumentException("Cliente não encontrado: " + request.clienteId()));
+            .orElseThrow(() -> new com.photoizer.crm.cliente.exception.ClienteNaoEncontradoException(request.clienteId()));
         receita.setClienteId(cliente.getId());
         receita.setClienteNome(cliente.getNome());
     }
@@ -176,7 +183,7 @@ public class ReceitaService {
     private void preencherStatus(Receita receita, StatusReceita statusExplicito) {
         var valorRecebido = receita.getValorRecebido() != null ? receita.getValorRecebido() : BigDecimal.ZERO;
         if (valorRecebido.compareTo(receita.getValorFinal()) > 0) {
-            throw new IllegalArgumentException("Valor recebido não pode ser maior que o valor final");
+            throw new ValorRecebidoExcedeFinalException();
         }
         receita.setValorRecebido(valorRecebido);
 

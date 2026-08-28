@@ -11,9 +11,21 @@ import com.photoizer.crm.despesa.exception.AgendamentoVinculadoInvalidoException
 import org.springframework.security.access.AccessDeniedException;
 import com.photoizer.crm.agenda.exception.AgendamentoNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.AgendamentoNoPassadoException;
+import com.photoizer.crm.agenda.exception.ComprovanteObrigatorioException;
 import com.photoizer.crm.agenda.exception.ConflitoDeAgendaException;
 import com.photoizer.crm.agenda.exception.EditorNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.EnsaioNaoFinalizadoException;
+import com.photoizer.crm.agenda.exception.FotografoNaoEncontradoException;
+import com.photoizer.crm.agenda.exception.PagamentoInsuficienteException;
+import com.photoizer.crm.financeiro.exception.AgendamentoNaoEncontradoParaFinanceiroException;
+import com.photoizer.crm.financeiro.exception.ClienteObrigatorioException;
+import com.photoizer.crm.financeiro.exception.IndicadorInvalidoException;
+import com.photoizer.crm.financeiro.exception.OperacaoNaoPermitidaException;
+import com.photoizer.crm.financeiro.exception.PacoteNaoEncontradoParaPreviewException;
+import com.photoizer.crm.financeiro.exception.PagamentoNaoEncontradoException;
+import com.photoizer.crm.financeiro.exception.ReceitaNaoEncontradaException;
+import com.photoizer.crm.financeiro.exception.ValorInvalidoException;
+import com.photoizer.crm.financeiro.exception.ValorRecebidoExcedeFinalException;
 import com.photoizer.crm.pacote.exception.PacoteInativoException;
 import com.photoizer.crm.pacote.exception.PacoteNaoEncontradoException;
 
@@ -71,6 +83,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(EditorNaoEncontradoException.class)
     public ResponseEntity<ErrorResponse> handleEditorNaoEncontrado(EditorNaoEncontradoException e) {
         log.warn("Editor nao encontrado: {}", e.getMessage());
+        return build(HttpStatus.NOT_FOUND, e);
+    }
+
+    @ExceptionHandler(FotografoNaoEncontradoException.class)
+    public ResponseEntity<ErrorResponse> handleFotografoNaoEncontrado(FotografoNaoEncontradoException e) {
+        log.warn("Fotografo nao encontrado: {}", e.getMessage());
         return build(HttpStatus.NOT_FOUND, e);
     }
 
@@ -227,6 +245,72 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(EnsaioNaoFinalizadoException.class)
     public ResponseEntity<ErrorResponse> handleEnsaioNaoFinalizado(EnsaioNaoFinalizadoException e) {
         log.warn("Ensaio nao finalizado: {}", e.getMessage());
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
+    }
+
+    @ExceptionHandler(ComprovanteObrigatorioException.class)
+    public ResponseEntity<ErrorResponse> handleComprovanteObrigatorio(ComprovanteObrigatorioException e) {
+        log.warn("Comprovante obrigatorio: {}", e.getMessage());
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
+    }
+
+    @ExceptionHandler(PagamentoInsuficienteException.class)
+    public ResponseEntity<ErrorResponse> handlePagamentoInsuficiente(PagamentoInsuficienteException e) {
+        log.warn("Pagamento insuficiente: {}", e.getMessage());
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
+    }
+
+    @ExceptionHandler(AgendamentoNaoEncontradoParaFinanceiroException.class)
+    public ResponseEntity<ErrorResponse> handleAgendamentoNaoEncontradoFinanceiro(AgendamentoNaoEncontradoParaFinanceiroException e) {
+        log.warn("Agendamento nao encontrado para financeiro: {}", e.getMessage());
+        return build(HttpStatus.NOT_FOUND, e);
+    }
+
+    @ExceptionHandler(PagamentoNaoEncontradoException.class)
+    public ResponseEntity<ErrorResponse> handlePagamentoNaoEncontrado(PagamentoNaoEncontradoException e) {
+        log.warn("Pagamento nao encontrado: {}", e.getMessage());
+        return build(HttpStatus.NOT_FOUND, e);
+    }
+
+    @ExceptionHandler(ReceitaNaoEncontradaException.class)
+    public ResponseEntity<ErrorResponse> handleReceitaNaoEncontrada(ReceitaNaoEncontradaException e) {
+        log.warn("Receita nao encontrada: {}", e.getMessage());
+        return build(HttpStatus.NOT_FOUND, e);
+    }
+
+    @ExceptionHandler(PacoteNaoEncontradoParaPreviewException.class)
+    public ResponseEntity<ErrorResponse> handlePacoteNaoEncontradoPreview(PacoteNaoEncontradoParaPreviewException e) {
+        log.warn("Pacote nao encontrado para preview: {}", e.getMessage());
+        return build(HttpStatus.NOT_FOUND, e);
+    }
+
+    @ExceptionHandler(OperacaoNaoPermitidaException.class)
+    public ResponseEntity<ErrorResponse> handleOperacaoNaoPermitida(OperacaoNaoPermitidaException e) {
+        log.warn("Operacao nao permitida: {}", e.getMessage());
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
+    }
+
+    @ExceptionHandler(ValorInvalidoException.class)
+    public ResponseEntity<ErrorResponse> handleValorInvalido(ValorInvalidoException e) {
+        log.warn("Valor invalido: {}", e.getMessage());
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
+    }
+
+    @ExceptionHandler(IndicadorInvalidoException.class)
+    public ResponseEntity<ErrorResponse> handleIndicadorInvalido(IndicadorInvalidoException e) {
+        log.warn("Indicador invalido: {}", e.getMessage());
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
+    }
+
+    @ExceptionHandler(ClienteObrigatorioException.class)
+    public ResponseEntity<ErrorResponse> handleClienteObrigatorio(ClienteObrigatorioException e) {
+        log.warn("Cliente obrigatorio: {}", e.getMessage());
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
+    }
+
+    @ExceptionHandler(ValorRecebidoExcedeFinalException.class)
+    public ResponseEntity<ErrorResponse> handleValorRecebidoExcedeFinal(ValorRecebidoExcedeFinalException e) {
+        log.warn("Valor recebido excede final: {}", e.getMessage());
         return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
     }
 
