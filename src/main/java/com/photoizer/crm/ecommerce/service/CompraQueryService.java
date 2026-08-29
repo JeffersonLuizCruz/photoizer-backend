@@ -7,8 +7,8 @@ import com.photoizer.crm.ecommerce.exception.CompraNaoEncontradaException;
 import com.photoizer.crm.ecommerce.model.CompraExtra;
 import com.photoizer.crm.ecommerce.model.StatusCompraExtra;
 import com.photoizer.crm.ecommerce.repository.CompraExtraRepository;
-import com.photoizer.crm.foto.api.FotoEnsaioResponse;
-import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
+import com.photoizer.crm.foto.api.FotoMapper;
+import com.photoizer.crm.foto.service.FotoService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -36,18 +36,21 @@ import java.util.UUID;
 public class CompraQueryService {
 
     private final CompraExtraRepository compraExtraRepository;
-    private final FotoEnsaioRepository fotoEnsaioRepository;
+    private final FotoService fotoService;
     private final GaleriaQueryService galeriaQueryService;
     private final EcommerceMapper ecommerceMapper;
+    private final FotoMapper fotoMapper;
 
     public CompraQueryService(CompraExtraRepository compraExtraRepository,
-                              FotoEnsaioRepository fotoEnsaioRepository,
+                              FotoService fotoService,
                               GaleriaQueryService galeriaQueryService,
-                              EcommerceMapper ecommerceMapper) {
+                              EcommerceMapper ecommerceMapper,
+                              FotoMapper fotoMapper) {
         this.compraExtraRepository = compraExtraRepository;
-        this.fotoEnsaioRepository = fotoEnsaioRepository;
+        this.fotoService = fotoService;
         this.galeriaQueryService = galeriaQueryService;
         this.ecommerceMapper = ecommerceMapper;
+        this.fotoMapper = fotoMapper;
     }
 
     // ==================== Queries por Token (galeria do cliente) ====================
@@ -127,8 +130,8 @@ public class CompraQueryService {
     // ==================== Helper ====================
 
     private AdminCompraDetalheResponse buildDetalheResponse(CompraExtra compra, boolean publico) {
-        var fotos = fotoEnsaioRepository.findByCompraExtraId(compra.getId()).stream()
-            .map(publico ? FotoEnsaioResponse::ofPublic : FotoEnsaioResponse::of)
+        var fotos = fotoService.listarPorCompraExtraId(compra.getId()).stream()
+            .map(publico ? fotoMapper::toPublicResponse : fotoMapper::toResponse)
             .toList();
         var comprovanteUrl = (!publico && compra.getUrlComprovante() != null)
             ? "/api/v1/admin/ecommerce/compras/" + compra.getId() + "/comprovante"

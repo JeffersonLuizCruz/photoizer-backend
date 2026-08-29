@@ -1,11 +1,14 @@
 package com.photoizer.crm.foto.api;
 
+import com.photoizer.crm.foto.exception.FotoNaoPertenceAoAgendamentoException;
+import com.photoizer.crm.foto.model.FotoEnsaio;
 import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.service.FotoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -30,9 +33,11 @@ import java.util.UUID;
 public class FotoController {
 
     private final FotoService fotoService;
+    private final FotoMapper fotoMapper;
 
-    public FotoController(FotoService fotoService) {
+    public FotoController(FotoService fotoService, FotoMapper fotoMapper) {
         this.fotoService = fotoService;
+        this.fotoMapper = fotoMapper;
     }
 
     @PostMapping
@@ -45,43 +50,49 @@ public class FotoController {
         }
         var fotos = fotoService.uploadFotos(agendamentoId, arquivos);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(fotos.stream().map(FotoEnsaioResponse::of).toList());
+            .body(fotos.stream().map(fotoMapper::toResponse).toList());
     }
 
     @GetMapping
     @Operation(summary = "Listar fotos do ensaio")
     public ResponseEntity<List<FotoEnsaioResponse>> listar(@PathVariable UUID agendamentoId) {
         var fotos = fotoService.listar(agendamentoId);
-        return ResponseEntity.ok(fotos.stream().map(FotoEnsaioResponse::of).toList());
+        return ResponseEntity.ok(fotos.stream().map(fotoMapper::toResponse).toList());
     }
 
     @GetMapping("/{fotoId}/original")
     @Operation(summary = "Servir foto original")
-    public ResponseEntity<Resource> servirOriginal(@PathVariable UUID fotoId) {
-        var foto = fotoService.buscarPorId(fotoId);
+    public ResponseEntity<Resource> servirOriginal(
+            @PathVariable UUID agendamentoId,
+            @PathVariable UUID fotoId) {
+        var foto = buscarEValidarPropriedade(agendamentoId, fotoId);
         var file = new FileSystemResource(foto.getOriginalPath());
         return ResponseEntity.ok()
-            .contentType(MediaType.IMAGE_JPEG)
+            .contentType(resolverMediaType(foto.getFileName()))
             .body(file);
     }
 
     @GetMapping("/{fotoId}/watermarked")
     @Operation(summary = "Servir foto com marca d'água")
-    public ResponseEntity<Resource> servirWatermarked(@PathVariable UUID fotoId) {
-        var foto = fotoService.buscarPorId(fotoId);
+    public ResponseEntity<Resource> servirWatermarked(
+            @PathVariable UUID agendamentoId,
+            @PathVariable UUID fotoId) {
+        var foto = buscarEValidarPropriedade(agendamentoId, fotoId);
         var file = new FileSystemResource(Path.of(foto.getWatermarkedPath()));
         return ResponseEntity.ok()
-            .contentType(MediaType.IMAGE_JPEG)
+            .contentType(resolverMediaType(foto.getFileName()))
             .body(file);
     }
 
     @GetMapping("/{fotoId}/thumb")
     @Operation(summary = "Servir thumbnail")
-    public ResponseEntity<Resource> servirThumb(@PathVariable UUID fotoId) {
-        var foto = fotoService.buscarPorId(fotoId);
+    public ResponseEntity<Resource> servirThumb(
+            @PathVariable UUID agendamentoId,
+            @PathVariable UUID fotoId) {
+        var foto = buscarEValidarPropriedade(agendamentoId, fotoId);
         var file = new FileSystemResource(Path.of(foto.getThumbPath()));
         return ResponseEntity.ok()
-            .contentType(MediaType.IMAGE_JPEG)
+            .contentType(resolverMediaType(foto.getFileName()))
             .body(file);
     }
 
@@ -89,22 +100,26 @@ public class FotoController {
     @Operation(summary = "Publicar todas as fotos do ensaio")
     public ResponseEntity<List<FotoEnsaioResponse>> publicar(@PathVariable UUID agendamentoId) {
         var fotos = fotoService.publicar(agendamentoId);
-        return ResponseEntity.ok(fotos.stream().map(FotoEnsaioResponse::of).toList());
+        return ResponseEntity.ok(fotos.stream().map(fotoMapper::toResponse).toList());
     }
 
     @PatchMapping("/{fotoId}/metadata")
     @Operation(summary = "Atualizar metadados da foto (título, tags, categoria, destaque)")
     public ResponseEntity<FotoEnsaioResponse> atualizarMetadata(
+            @PathVariable UUID agendamentoId,
             @PathVariable UUID fotoId,
             @org.springframework.web.bind.annotation.RequestBody FotoMetadataRequest request) {
+        buscarEValidarPropriedade(agendamentoId, fotoId);
         var foto = fotoService.atualizarMetadata(fotoId, request);
-        return ResponseEntity.ok(FotoEnsaioResponse.of(foto));
+        return ResponseEntity.ok(fotoMapper.toResponse(foto));
     }
 
     @DeleteMapping("/{fotoId}")
     @Operation(summary = "Remover foto")
-    public ResponseEntity<Void> deletar(@PathVariable UUID fotoId) {
-        fotoService.deletar(fotoId);
+    public ResponseEntity<Void> deletar(
+            @PathVariable UUID agendamentoId,
+            @PathVariable UUID fotoId) {
+        fotoService.deletar(agendamentoId, fotoId);
         return ResponseEntity.noContent().build();
     }
 
@@ -115,7 +130,7 @@ public class FotoController {
             @PathVariable UUID fotoId,
             @RequestParam boolean visivel) {
         var foto = fotoService.alterarVisibilidade(agendamentoId, fotoId, visivel);
-        return ResponseEntity.ok(FotoEnsaioResponse.of(foto));
+        return ResponseEntity.ok(fotoMapper.toResponse(foto));
     }
 
     @PatchMapping("/{fotoId}/status")
@@ -125,7 +140,7 @@ public class FotoController {
             @PathVariable UUID fotoId,
             @RequestParam StatusFoto status) {
         var foto = fotoService.alterarStatus(agendamentoId, fotoId, status);
-        return ResponseEntity.ok(FotoEnsaioResponse.of(foto));
+        return ResponseEntity.ok(fotoMapper.toResponse(foto));
     }
 
     @PutMapping("/{fotoId}/imagem")
@@ -138,6 +153,25 @@ public class FotoController {
             return ResponseEntity.badRequest().build();
         }
         var foto = fotoService.substituirImagem(agendamentoId, fotoId, arquivo);
-        return ResponseEntity.ok(FotoEnsaioResponse.of(foto));
+        return ResponseEntity.ok(fotoMapper.toResponse(foto));
+    }
+
+    private FotoEnsaio buscarEValidarPropriedade(UUID agendamentoId, UUID fotoId) {
+        var foto = fotoService.buscarPorId(fotoId);
+        if (!foto.getAgendamentoId().equals(agendamentoId)) {
+            throw new FotoNaoPertenceAoAgendamentoException(fotoId, agendamentoId);
+        }
+        return foto;
+    }
+
+    private MediaType resolverMediaType(String fileName) {
+        if (fileName == null) return MediaType.IMAGE_JPEG;
+        return switch (fileName.toLowerCase()) {
+            case String s when s.endsWith(".png") -> MediaType.IMAGE_PNG;
+            case String s when s.endsWith(".gif") -> MediaType.IMAGE_GIF;
+            case String s when s.endsWith(".webp") -> MediaType.parseMediaType("image/webp");
+            case String s when s.endsWith(".bmp") -> MediaType.parseMediaType("image/bmp");
+            default -> MediaType.IMAGE_JPEG;
+        };
     }
 }

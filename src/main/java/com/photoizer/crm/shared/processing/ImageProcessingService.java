@@ -1,4 +1,4 @@
-package com.photoizer.crm.foto.service;
+package com.photoizer.crm.shared.processing;
 
 import net.coobird.thumbnailator.Thumbnails;
 import org.springframework.stereotype.Service;
@@ -11,6 +11,12 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Path;
 
+/**
+ * PATTERN: Shared Infrastructure
+ * Serviço de processamento técnico de imagens (Thumbnailator + AWT).
+ * Sem regra de negócio de domínio — pertence à infraestrutura compartilhada.
+ * Usado pelos módulos foto e edicao.
+ */
 @Service
 public class ImageProcessingService {
 

@@ -4,6 +4,11 @@ import java.util.UUID;
 
 public record FotosPublicadasEvent(
     UUID agendamentoId,
-    int totalFotos
+    int totalFotos,
+    TipoPublicacao tipo
 ) {
+    public enum TipoPublicacao {
+        ECOMMERCE,
+        LOJA
+    }
 }

@@ -17,6 +17,7 @@ import com.photoizer.crm.agenda.exception.EditorNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.EnsaioNaoFinalizadoException;
 import com.photoizer.crm.agenda.exception.FotografoNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.PagamentoInsuficienteException;
+import com.photoizer.crm.agenda.exception.StatusAgendamentoInvalidoException;
 import com.photoizer.crm.financeiro.exception.AgendamentoNaoEncontradoParaFinanceiroException;
 import com.photoizer.crm.financeiro.exception.ClienteObrigatorioException;
 import com.photoizer.crm.financeiro.exception.IndicadorInvalidoException;
@@ -50,6 +51,10 @@ import com.photoizer.crm.contrato.exception.ContratoEstadoInvalidoException;
 import com.photoizer.crm.contrato.exception.ContratoNaoEncontradoException;
 import com.photoizer.crm.contrato.exception.ContratoTokenExpiradoException;
 import com.photoizer.crm.documento.exception.TipoComprovanteInvalidoException;
+import com.photoizer.crm.foto.exception.AgendamentoNaoPermitidoParaUploadException;
+import com.photoizer.crm.foto.exception.FotoEnsaioNaoEncontradaException;
+import com.photoizer.crm.foto.exception.FotoNaoPertenceAoAgendamentoException;
+import com.photoizer.crm.foto.exception.StatusFotoInvalidoException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -260,6 +265,12 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
     }
 
+    @ExceptionHandler(StatusAgendamentoInvalidoException.class)
+    public ResponseEntity<ErrorResponse> handleStatusAgendamentoInvalido(StatusAgendamentoInvalidoException e) {
+        log.warn("Transição de status de agendamento inválida: {}", e.getMessage());
+        return build(HttpStatus.CONFLICT, e);
+    }
+
     @ExceptionHandler(AgendamentoNaoEncontradoParaFinanceiroException.class)
     public ResponseEntity<ErrorResponse> handleAgendamentoNaoEncontradoFinanceiro(AgendamentoNaoEncontradoParaFinanceiroException e) {
         log.warn("Agendamento nao encontrado para financeiro: {}", e.getMessage());
@@ -388,6 +399,30 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleTipoComprovanteInvalido(TipoComprovanteInvalidoException e) {
         log.warn("Tipo de comprovante invalido: {}", e.getMessage());
         return build(HttpStatus.BAD_REQUEST, e);
+    }
+
+    @ExceptionHandler(FotoEnsaioNaoEncontradaException.class)
+    public ResponseEntity<ErrorResponse> handleFotoEnsaioNaoEncontrada(FotoEnsaioNaoEncontradaException e) {
+        log.warn("Foto não encontrada: {}", e.getMessage());
+        return build(HttpStatus.NOT_FOUND, e);
+    }
+
+    @ExceptionHandler(FotoNaoPertenceAoAgendamentoException.class)
+    public ResponseEntity<ErrorResponse> handleFotoNaoPertenceAoAgendamento(FotoNaoPertenceAoAgendamentoException e) {
+        log.warn("Foto nao pertence ao agendamento: {}", e.getMessage());
+        return build(HttpStatus.FORBIDDEN, e);
+    }
+
+    @ExceptionHandler(AgendamentoNaoPermitidoParaUploadException.class)
+    public ResponseEntity<ErrorResponse> handleAgendamentoNaoPermitidoParaUpload(AgendamentoNaoPermitidoParaUploadException e) {
+        log.warn("Upload nao permitido: {}", e.getMessage());
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
+    }
+
+    @ExceptionHandler(StatusFotoInvalidoException.class)
+    public ResponseEntity<ErrorResponse> handleStatusFotoInvalido(StatusFotoInvalidoException e) {
+        log.warn("Transição de status de foto inválida: {}", e.getMessage());
+        return build(HttpStatus.CONFLICT, e);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

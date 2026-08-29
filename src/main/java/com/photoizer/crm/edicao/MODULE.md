@@ -20,8 +20,8 @@ edicao/
 │   ├── RawUploadService.java        # Upload de fotos RAW
 │   ├── EdicaoUploadEditadasService.java  # Upload de fotos editadas
 │   ├── PublicacaoService.java       # Publicação unificada (ecommerce/loja) — Strategy Pattern
-│   ├── EdicaoRevisaoService.java    # Revisão individual — Command Pattern
-│   ├── FotoEdicaoProcessor.java     # Watermark + thumbnail — Template Method
+│   ├── EdicaoRevisaoService.java    # Revisão individual — Command Pattern (publica eventos)
+│   ├── FotoEdicaoProcessor.java     # Delega para FotoProcessingHelper (módulo foto)
 │   └── EdicaoZipService.java        # Geração de ZIPs
 ├── api/
 │   ├── EdicaoController.java    # 16 endpoints REST
@@ -52,7 +52,7 @@ edicao/
 |--------|-----|------|
 | **agenda** | `Agendamento`, `AgendamentoRepository`, `StatusAgendamento` — service muta status do agendamento | entrada **e escrita** |
 | **auth** | `User`, `UserRepository` — `getCurrentUser()` no upload RAW | leitura |
-| **foto** | `FotoEnsaio`, `FotoEnsaioRepository`, `StatusFoto`, `ImageProcessingService` — cria/atualiza/remove `FotoEnsaio` | entrada **e escrita** |
+| **foto** | `FotoEnsaio`, `FotoEnsaioRepository`, `StatusFoto` — **resolvido**: eventos `FotoEdicaoPublicadaEvent`/`FotoEdicaoRemovidaEvent` substituem escrita direta | ~~escrita~~ **eventos** |
 | **shared** | `AuditInfo`, `FileStorageService` | infraestrutura |
 
 > A boa prática está presente: `EdicaoListener` **consome eventos** (`PagamentoFinalRegistradoEvent`). As violações de escrita cross-module permanecem por decisão do usuário (serão resolvidas quando todos os módulos forem refatorados).
@@ -77,7 +77,7 @@ edicao/
 | **Facade/Query Service** | `EdicaoQueryService` | Separa leitura de escrita, facilita cache e testes |
 | **Strategy Pattern** | `PublicacaoService.publicar(tipo)` | Unifica dois fluxos de publicação em uma única operação |
 | **Command Pattern** | `EdicaoRevisaoService.revisarFoto()` | Encapsula revisão com efeitos colaterais controlados |
-| **Template Method** | `FotoEdicaoProcessor.processar()` | Centraliza processamento de imagem duplicado em 3 locais |
+| **Template Method** | `FotoEdicaoProcessor.processar()` | Delega para `FotoProcessingHelper` (módulo foto) para processamento de imagem |
 | **MapStruct Mapper** | `EdicaoMapper` | Elimina mapeamento manual, segue padrão do `AgendamentoMapper` |
 
 ## 5. Fluxos Principais
@@ -103,12 +103,12 @@ edicao/
 
 ### Fluxo 4: Revisão (Aprovação Individual)
 `PATCH /fotos/{fotoId}/revisao` → `EdicaoRevisaoService.revisarFoto()`:
-- `aprovado=true` + `editedPath`: gera watermark + thumbnail via `FotoEdicaoProcessor`, cria `FotoEnsaio.INEDITA` (escrita no módulo **foto**).
-- `aprovado=false`: deleta `FotoEnsaio.INEDITA` existente.
+- `aprovado=true` + `editedPath`: publica `FotoEdicaoPublicadaEvent` (listener no foto cria `FotoEnsaio.INEDITA` com watermark + thumbnail).
+- `aprovado=false`: publica `FotoEdicaoRemovidaEvent` (listener no foto remove `FotoEnsaio.INEDITA` existente).
 
 ### Fluxo 5: Conclusão e Publicação
 1. `PATCH /concluir` → `EdicaoService.concluirEdicao()`: exige ≥1 editada, seta `EDICAO_CONCLUIDA`, publica `EdicaoConcluidaEvent`.
-2. `PATCH /publicar` → `PublicacaoService.publicar(ECOMMERCE)`: valida `EDICAO_CONCLUIDA`; para cada editada gera watermark+thumbnail via `FotoEdicaoProcessor`, cria `FotoEnsaio.PUBLICADA` (**escrita em foto**), avança agendamento → `SELECAO_DAS_FOTOS` (**escrita em agenda**), publica `FotosPublicadasEvent`.
+2. `PATCH /publicar` → `PublicacaoService.publicar(ECOMMERCE)`: valida `EDICAO_CONCLUIDA`; para cada editada publica `FotoEdicaoPublicadaEvent` (listener no foto cria `FotoEnsaio.PUBLICADA`), avança agendamento → `SELECAO_DAS_FOTOS` (**escrita em agenda**), publica `FotosPublicadasEvent`.
 3. `PATCH /publicar-loja` → `PublicacaoService.publicar(LOJA)`: publica as `INEDITA` → `PUBLICADA`; fluxo unificado via Strategy Pattern.
 
 ### Fluxo 6: Zips e reordenação
@@ -128,8 +128,8 @@ Nenhum teste específico para este módulo. Apenas `CrmApplicationTests` (smoke 
 ## 7. Dívidas Técnicas e Status (pós-refactor)
 
 ### 7.1 Escrita cross-module em `agenda` e `foto` — **[CRÍTICO] P1**
-- `EdicaoService.uploadRaw()` (`:192-195`) e `publicarNoEcommerce`/`publicarLoja` (`:322-325, 441-444`) **mutam `Agendamento.status`**; `revisarFoto`/`publicar` **criam/excluem/atualizam `FotoEnsaio`** (`:352-401, 416-439`).
-- **Solução**: publicação deveria acontecer via eventos (`FotosPublicadasEvent` já existe mas é reservado) com listener no módulo `foto` criando as `FotoEnsaio`; transição do agendamento via evento `EdicaoConcluidaEvent` consumido pelo módulo `agenda` (que já é dono do status machine). Manter `ImageProcessingService` como serviço de infraestrutura independente.
+- `EdicaoService.uploadRaw()` (`:192-195`) **muta `Agendamento.status`** — **pendente**.
+- ~~`revisarFoto`/`publicar` **criam/excluem `FotoEnsaio`**~~ **RESOLVIDO**: `PublicacaoService` e `EdicaoRevisaoService` publicam eventos `FotoEdicaoPublicadaEvent`/`FotoEdicaoRemovidaEvent`; listener `FotoEdicaoEventListener` no módulo foto cria/remove `FotoEnsaio`.
 
 ### 7.2 `EdicaoService` oversized — **RESOLVIDO** ✅
 - Extraídos: `EdicaoQueryService`, `RawUploadService`, `EdicaoUploadEditadasService`, `PublicacaoService`, `EdicaoRevisaoService`, `FotoEdicaoProcessor`, `EdicaoZipService`.

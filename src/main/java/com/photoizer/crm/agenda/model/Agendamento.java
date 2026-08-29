@@ -200,6 +200,7 @@ public class Agendamento {
     private LocalDateTime tokenExpiracao;
 
     public void transicionarPara(StatusAgendamento novoStatus) {
+        this.status.validarTransicao(novoStatus);
         this.status = novoStatus;
         if (novoStatus == StatusAgendamento.REALIZADO) {
             this.dataRealizacao = LocalDateTime.now();
@@ -216,7 +217,7 @@ public class Agendamento {
     public void aplicarPagamentoFinal(String urlComprovanteFinal) {
         this.urlComprovanteFinal = urlComprovanteFinal;
         this.valorRestante = BigDecimal.ZERO;
-        this.status = StatusAgendamento.EM_EDICAO;
+        transicionarPara(StatusAgendamento.EM_EDICAO);
         this.dataEnvioSelecao = LocalDateTime.now();
     }
 
@@ -236,9 +237,8 @@ public class Agendamento {
         this.valorEntradaPago = this.valorEntradaPago.add(valorPago);
         this.valorRestante = this.valorRestante.subtract(valorPago).max(BigDecimal.ZERO);
         if (this.valorRestante.compareTo(BigDecimal.ZERO) <= 0
-            && (this.status == StatusAgendamento.CONFIRMADO
-                || this.status == StatusAgendamento.REALIZADO)) {
-            this.status = StatusAgendamento.AGUARDANDO_PAGAMENTO_FINAL;
+            && this.status.podeTransicionarPara(StatusAgendamento.AGUARDANDO_PAGAMENTO_FINAL)) {
+            transicionarPara(StatusAgendamento.AGUARDANDO_PAGAMENTO_FINAL);
         }
     }
 

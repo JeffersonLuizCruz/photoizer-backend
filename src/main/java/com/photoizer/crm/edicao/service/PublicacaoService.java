@@ -13,9 +13,7 @@ import com.photoizer.crm.edicao.model.StatusEdicao;
 import com.photoizer.crm.edicao.model.StatusFotoEdicao;
 import com.photoizer.crm.edicao.repository.EdicaoRepository;
 import com.photoizer.crm.edicao.repository.FotoEdicaoRepository;
-import com.photoizer.crm.foto.model.FotoEnsaio;
-import com.photoizer.crm.foto.model.StatusFoto;
-import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
+import com.photoizer.crm.foto.event.FotoEdicaoPublicadaEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -29,6 +27,10 @@ import java.util.UUID;
  * Strategy Pattern — unifica dois fluxos de publicação (ecommerce/loja)
  * em uma única operação com comportamento variável.
  * Elimina duplicação entre publicarNoEcommerce e publicarLoja.
+ *
+ * MODULITH: Publica eventos FotoEdicaoPublicadaEvent em vez de escrever
+ * diretamente em FotoEnsaio/FotoEnsaioRepository. O listener no módulo foto
+ * cria as FotoEnsaio.
  */
 @Service
 @Transactional
@@ -38,22 +40,16 @@ public class PublicacaoService {
 
     private final EdicaoRepository edicaoRepository;
     private final FotoEdicaoRepository fotoEdicaoRepository;
-    private final FotoEnsaioRepository fotoEnsaioRepository;
     private final AgendamentoRepository agendamentoRepository;
-    private final FotoEdicaoProcessor fotoEdicaoProcessor;
     private final ApplicationEventPublisher eventPublisher;
 
     public PublicacaoService(EdicaoRepository edicaoRepository,
                              FotoEdicaoRepository fotoEdicaoRepository,
-                             FotoEnsaioRepository fotoEnsaioRepository,
                              AgendamentoRepository agendamentoRepository,
-                             FotoEdicaoProcessor fotoEdicaoProcessor,
                              ApplicationEventPublisher eventPublisher) {
         this.edicaoRepository = edicaoRepository;
         this.fotoEdicaoRepository = fotoEdicaoRepository;
-        this.fotoEnsaioRepository = fotoEnsaioRepository;
         this.agendamentoRepository = agendamentoRepository;
-        this.fotoEdicaoProcessor = fotoEdicaoProcessor;
         this.eventPublisher = eventPublisher;
     }
 
@@ -90,30 +86,19 @@ public class PublicacaoService {
             throw new FotoEdicaoNaoEncontradaException("Nenhuma foto editada encontrada para publicar.");
         }
 
-        var count = fotoEnsaioRepository.countByAgendamentoId(agendamentoId);
-
-        for (int i = 0; i < fotosEditadas.size(); i++) {
-            var fotoEdicao = fotosEditadas.get(i);
-            var editedPath = java.nio.file.Path.of(fotoEdicao.getEditedPath());
-
-            var processada = fotoEdicaoProcessor.processar(editedPath, fotoEdicao.getId());
-
-            var fotoEnsaio = FotoEnsaio.builder()
-                .agendamentoId(agendamentoId)
-                .fileName(fotoEdicao.getEditedFileName() != null ? fotoEdicao.getEditedFileName() : fotoEdicao.getRawFileName())
-                .originalPath(fotoEdicao.getEditedPath())
-                .watermarkedPath(processada.watermarkedPath())
-                .thumbPath(processada.thumbPath())
-                .ordem(count + i)
-                .status(StatusFoto.PUBLICADA)
-                .selecionadaPacote(false)
-                .visivel(true)
-                .build();
-
-            fotoEnsaioRepository.save(fotoEnsaio);
+        for (var fotoEdicao : fotosEditadas) {
+            var fotoId = fotoEdicao.getId();
+            eventPublisher.publishEvent(new FotoEdicaoPublicadaEvent(
+                agendamentoId,
+                fotoEdicao.getId(),
+                fotoEdicao.getEditedFileName() != null ? fotoEdicao.getEditedFileName() : fotoEdicao.getRawFileName(),
+                fotoEdicao.getEditedPath(),
+                fotoId
+            ));
         }
 
-        eventPublisher.publishEvent(new FotosPublicadasEvent(agendamentoId, fotosEditadas.size()));
+        eventPublisher.publishEvent(new FotosPublicadasEvent(agendamentoId, fotosEditadas.size(),
+            FotosPublicadasEvent.TipoPublicacao.ECOMMERCE));
 
         avancarAgendamentoParaSelecao(agendamentoId);
     }
@@ -125,35 +110,21 @@ public class PublicacaoService {
             );
         }
 
-        var fotosIneditas = fotoEnsaioRepository.findByAgendamentoIdAndStatusOrderByOrdemAsc(
-            agendamentoId, StatusFoto.INEDITA);
-
-        if (fotosIneditas.isEmpty()) {
-            var fotosPublicadas = fotoEnsaioRepository.findByAgendamentoIdAndStatusOrderByOrdemAsc(
-                agendamentoId, StatusFoto.PUBLICADA);
-            if (!fotosPublicadas.isEmpty()) {
-                avancarAgendamentoParaSelecao(agendamentoId);
-                return;
-            }
-            throw new FotoEdicaoNaoEncontradaException("Nenhuma foto aprovada encontrada para publicar.");
-        }
-
-        for (var foto : fotosIneditas) {
-            foto.setStatus(StatusFoto.PUBLICADA);
-        }
-        fotoEnsaioRepository.saveAll(fotosIneditas);
+        eventPublisher.publishEvent(new FotosPublicadasEvent(agendamentoId, 0,
+            FotosPublicadasEvent.TipoPublicacao.LOJA));
 
         avancarAgendamentoParaSelecao(agendamentoId);
 
-        eventPublisher.publishEvent(new FotosPublicadasEvent(agendamentoId, fotosIneditas.size()));
-
-        log.info("Fotos publicadas na loja para agendamento {}: {} fotos", agendamentoId, fotosIneditas.size());
+        log.info("Evento de publicação na loja publicado para agendamento {}", agendamentoId);
     }
 
     private void avancarAgendamentoParaSelecao(UUID agendamentoId) {
         var agendamento = agendamentoRepository.findById(agendamentoId)
             .orElseThrow(() -> new EdicaoNaoEncontradaException("Agendamento não encontrado: " + agendamentoId));
-        agendamento.setStatus(StatusAgendamento.SELECAO_DAS_FOTOS);
+        if (agendamento.getStatus() == StatusAgendamento.SELECAO_DAS_FOTOS) {
+            return;
+        }
+        agendamento.transicionarPara(StatusAgendamento.SELECAO_DAS_FOTOS);
         agendamentoRepository.save(agendamento);
     }
 }

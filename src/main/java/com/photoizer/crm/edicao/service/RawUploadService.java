@@ -103,7 +103,7 @@ public class RawUploadService {
         edicaoRepository.save(edicao);
 
         if (agendamento.getStatus() == StatusAgendamento.AGUARDANDO_PAGAMENTO_FINAL) {
-            agendamento.setStatus(StatusAgendamento.EM_EDICAO);
+            agendamento.transicionarPara(StatusAgendamento.EM_EDICAO);
             agendamentoRepository.save(agendamento);
         }
 

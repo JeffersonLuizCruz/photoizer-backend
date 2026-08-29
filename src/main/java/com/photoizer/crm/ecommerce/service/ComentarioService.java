@@ -8,7 +8,7 @@ import com.photoizer.crm.ecommerce.exception.FotoIndisponivelException;
 import com.photoizer.crm.ecommerce.model.FotoComentario;
 import com.photoizer.crm.ecommerce.model.OrigemComentario;
 import com.photoizer.crm.ecommerce.repository.FotoComentarioRepository;
-import com.photoizer.crm.foto.api.FotoEnsaioResponse;
+import com.photoizer.crm.foto.api.FotoMapper;
 import com.photoizer.crm.foto.model.StatusFoto;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,13 +31,16 @@ public class ComentarioService {
     private final GaleriaQueryService galeriaQueryService;
     private final FotoComentarioRepository comentarioRepository;
     private final EcommerceMapper ecommerceMapper;
+    private final FotoMapper fotoMapper;
 
     public ComentarioService(GaleriaQueryService galeriaQueryService,
                              FotoComentarioRepository comentarioRepository,
-                             EcommerceMapper ecommerceMapper) {
+                             EcommerceMapper ecommerceMapper,
+                             FotoMapper fotoMapper) {
         this.galeriaQueryService = galeriaQueryService;
         this.comentarioRepository = comentarioRepository;
         this.ecommerceMapper = ecommerceMapper;
+        this.fotoMapper = fotoMapper;
     }
 
     private void validarFotoPertencenteAoAgendamento(UUID agendamentoId, UUID fotoId) {
@@ -88,7 +91,7 @@ public class ComentarioService {
 
         return galeriaQueryService.listarFotosPorAgendamento(agendamentoId).stream()
             .map(foto -> new ComentariosPorFotoResponse(
-                FotoEnsaioResponse.of(foto),
+                fotoMapper.toResponse(foto),
                 porFoto.getOrDefault(foto.getId(), List.of()).stream()
                     .map(ecommerceMapper::toComentarioResponse)
                     .toList(),

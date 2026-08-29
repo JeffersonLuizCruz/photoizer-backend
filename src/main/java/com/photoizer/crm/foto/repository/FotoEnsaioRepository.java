@@ -36,4 +36,7 @@ public interface FotoEnsaioRepository extends JpaRepository<FotoEnsaio, UUID> {
     List<FotoEnsaio> findPublicadasVisiveisByAgendamentoId(@Param("agendamentoId") UUID agendamentoId);
 
     List<FotoEnsaio> findByCompraExtraId(UUID compraExtraId);
+
+    @Query("SELECT COALESCE(MAX(f.ordem), -1) FROM FotoEnsaio f WHERE f.agendamentoId = :agendamentoId")
+    int findMaxOrdemByAgendamentoId(@Param("agendamentoId") UUID agendamentoId);
 }

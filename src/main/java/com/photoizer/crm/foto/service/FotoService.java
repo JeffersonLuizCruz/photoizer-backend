@@ -1,13 +1,14 @@
 package com.photoizer.crm.foto.service;
 
-import com.photoizer.crm.agenda.exception.EnsaioNaoFinalizadoException;
-import com.photoizer.crm.agenda.model.Agendamento;
-import com.photoizer.crm.agenda.model.StatusAgendamento;
-import com.photoizer.crm.agenda.repository.AgendamentoRepository;
+import com.photoizer.crm.foto.exception.AgendamentoNaoPermitidoParaUploadException;
+import com.photoizer.crm.foto.exception.FotoEnsaioNaoEncontradaException;
+import com.photoizer.crm.foto.exception.FotoNaoPertenceAoAgendamentoException;
 import com.photoizer.crm.foto.model.FotoEnsaio;
 import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
 import com.photoizer.crm.shared.storage.FileStorageService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -23,30 +24,21 @@ import java.util.UUID;
 @Transactional
 public class FotoService {
 
-    private static final String TEXTO_MARCA_DAGUA = "© Photoizer Studio";
-    private static final float OPACIDADE_MARCA = 0.35f;
-
-    private static final List<StatusAgendamento> STATUS_ALLOW_UPLOAD = List.of(
-        StatusAgendamento.EM_EDICAO,
-        StatusAgendamento.SELECAO_DAS_FOTOS,
-        StatusAgendamento.FOTOS_ENVIADAS_PARA_SELECAO,
-        StatusAgendamento.FOTOS_ENTREGUES,
-        StatusAgendamento.FINALIZADO
-    );
+    private static final Logger log = LoggerFactory.getLogger(FotoService.class);
 
     private final FotoEnsaioRepository fotoEnsaioRepository;
     private final FileStorageService fileStorageService;
-    private final ImageProcessingService imageProcessingService;
-    private final AgendamentoRepository agendamentoRepository;
+    private final FotoProcessingHelper fotoProcessingHelper;
+    private final com.photoizer.crm.foto.acl.AgendamentoReadService agendamentoReadService;
 
     public FotoService(FotoEnsaioRepository fotoEnsaioRepository,
                        FileStorageService fileStorageService,
-                       ImageProcessingService imageProcessingService,
-                       AgendamentoRepository agendamentoRepository) {
+                       FotoProcessingHelper fotoProcessingHelper,
+                       com.photoizer.crm.foto.acl.AgendamentoReadService agendamentoReadService) {
         this.fotoEnsaioRepository = fotoEnsaioRepository;
         this.fileStorageService = fileStorageService;
-        this.imageProcessingService = imageProcessingService;
-        this.agendamentoRepository = agendamentoRepository;
+        this.fotoProcessingHelper = fotoProcessingHelper;
+        this.agendamentoReadService = agendamentoReadService;
     }
 
     @Transactional(readOnly = true)
@@ -55,21 +47,23 @@ public class FotoService {
     }
 
     @Transactional(readOnly = true)
+    public List<FotoEnsaio> listarPorCompraExtraId(UUID compraExtraId) {
+        return fotoEnsaioRepository.findByCompraExtraId(compraExtraId);
+    }
+
+    @Transactional(readOnly = true)
     public FotoEnsaio buscarPorId(UUID id) {
         return fotoEnsaioRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Foto não encontrada: " + id));
+            .orElseThrow(() -> new FotoEnsaioNaoEncontradaException(id));
     }
 
     public List<FotoEnsaio> uploadFotos(UUID agendamentoId, List<MultipartFile> arquivos) {
-        var agendamento = agendamentoRepository.findById(agendamentoId)
-            .orElseThrow(() -> new RuntimeException("Agendamento não encontrado: " + agendamentoId));
-
-        if (!STATUS_ALLOW_UPLOAD.contains(agendamento.getStatus())) {
-            throw new EnsaioNaoFinalizadoException();
+        if (!agendamentoReadService.isStatusPermitidoParaUpload(agendamentoId)) {
+            throw new AgendamentoNaoPermitidoParaUploadException();
         }
 
         var fotos = new ArrayList<FotoEnsaio>();
-        var count = fotoEnsaioRepository.countByAgendamentoId(agendamentoId);
+        var count = fotoEnsaioRepository.findMaxOrdemByAgendamentoId(agendamentoId) + 1;
 
         for (int i = 0; i < arquivos.size(); i++) {
             var arquivo = arquivos.get(i);
@@ -78,27 +72,19 @@ public class FotoService {
             var original = Path.of(originalPath);
             var targetDir = original.getParent();
 
-            String watermarkedPath;
-            String thumbPath;
-            try {
-                var wm = imageProcessingService.aplicarMarcaDagua(original, targetDir, TEXTO_MARCA_DAGUA, OPACIDADE_MARCA);
-                watermarkedPath = wm.toString();
-            } catch (Exception e) {
-                watermarkedPath = originalPath;
-            }
-            try {
-                var thumb = imageProcessingService.gerarThumbnail(original, targetDir);
-                thumbPath = thumb.toString();
-            } catch (Exception e) {
-                thumbPath = originalPath;
+            var processada = fotoProcessingHelper.processar(original, targetDir, UUID.randomUUID());
+
+            var fileName = arquivo.getOriginalFilename();
+            if (fileName == null || fileName.isBlank()) {
+                fileName = "foto_" + UUID.randomUUID() + ".jpg";
             }
 
             var foto = FotoEnsaio.builder()
                 .agendamentoId(agendamentoId)
-                .fileName(arquivo.getOriginalFilename())
+                .fileName(fileName)
                 .originalPath(originalPath)
-                .watermarkedPath(watermarkedPath)
-                .thumbPath(thumbPath)
+                .watermarkedPath(processada.watermarkedPath())
+                .thumbPath(processada.thumbPath())
                 .ordem(count + i)
                 .status(StatusFoto.INEDITA)
                 .selecionadaPacote(false)
@@ -111,8 +97,11 @@ public class FotoService {
         return fotos;
     }
 
-    public void deletar(UUID id) {
+    public void deletar(UUID agendamentoId, UUID id) {
         var foto = buscarPorId(id);
+        if (!foto.getAgendamentoId().equals(agendamentoId)) {
+            throw new FotoNaoPertenceAoAgendamentoException(id, agendamentoId);
+        }
         deletarArquivo(foto.getOriginalPath());
         deletarArquivo(foto.getWatermarkedPath());
         deletarArquivo(foto.getThumbPath());
@@ -121,16 +110,13 @@ public class FotoService {
 
     public List<FotoEnsaio> publicar(UUID agendamentoId) {
         var fotos = fotoEnsaioRepository.findByAgendamentoIdOrderByOrdemAsc(agendamentoId);
-        for (var foto : fotos) {
+        var fotosParaPublicar = fotos.stream()
+            .filter(f -> f.getStatus() == StatusFoto.INEDITA)
+            .toList();
+        for (var foto : fotosParaPublicar) {
             foto.setStatus(StatusFoto.PUBLICADA);
         }
-        return fotoEnsaioRepository.saveAll(fotos);
-    }
-
-    public FotoEnsaio atualizarOrdem(UUID id, int ordem) {
-        var foto = buscarPorId(id);
-        foto.setOrdem(ordem);
-        return fotoEnsaioRepository.save(foto);
+        return fotoEnsaioRepository.saveAll(fotosParaPublicar);
     }
 
     /**
@@ -151,7 +137,7 @@ public class FotoService {
     public FotoEnsaio alterarVisibilidade(UUID agendamentoId, UUID fotoId, boolean visivel) {
         var foto = buscarPorId(fotoId);
         if (!foto.getAgendamentoId().equals(agendamentoId)) {
-            throw new RuntimeException("Foto não pertence a este agendamento");
+            throw new FotoNaoPertenceAoAgendamentoException(fotoId, agendamentoId);
         }
         foto.setVisivel(visivel);
         return fotoEnsaioRepository.save(foto);
@@ -160,44 +146,31 @@ public class FotoService {
     public FotoEnsaio alterarStatus(UUID agendamentoId, UUID fotoId, StatusFoto status) {
         var foto = buscarPorId(fotoId);
         if (!foto.getAgendamentoId().equals(agendamentoId)) {
-            throw new RuntimeException("Foto não pertence a este agendamento");
+            throw new FotoNaoPertenceAoAgendamentoException(fotoId, agendamentoId);
         }
-        foto.setStatus(status);
+        foto.setStatus(foto.getStatus().transicionarPara(status));
         return fotoEnsaioRepository.save(foto);
     }
 
     public FotoEnsaio substituirImagem(UUID agendamentoId, UUID fotoId, MultipartFile arquivo) {
         var foto = buscarPorId(fotoId);
         if (!foto.getAgendamentoId().equals(agendamentoId)) {
-            throw new RuntimeException("Foto não pertence a este agendamento");
+            throw new FotoNaoPertenceAoAgendamentoException(fotoId, agendamentoId);
         }
-
-        deletarArquivo(foto.getOriginalPath());
-        deletarArquivo(foto.getWatermarkedPath());
-        deletarArquivo(foto.getThumbPath());
 
         var originalPath = fileStorageService.salvarEmSubdiretorio(arquivo, agendamentoId, "orig");
         var original = Path.of(originalPath);
         var targetDir = original.getParent();
 
-        String watermarkedPath;
-        String thumbPath;
-        try {
-            var wm = imageProcessingService.aplicarMarcaDagua(original, targetDir, TEXTO_MARCA_DAGUA, OPACIDADE_MARCA);
-            watermarkedPath = wm.toString();
-        } catch (Exception e) {
-            watermarkedPath = originalPath;
-        }
-        try {
-            var thumb = imageProcessingService.gerarThumbnail(original, targetDir);
-            thumbPath = thumb.toString();
-        } catch (Exception e) {
-            thumbPath = originalPath;
-        }
+        var processada = fotoProcessingHelper.processar(original, targetDir, fotoId);
+
+        deletarArquivo(foto.getOriginalPath());
+        deletarArquivo(foto.getWatermarkedPath());
+        deletarArquivo(foto.getThumbPath());
 
         foto.setOriginalPath(originalPath);
-        foto.setWatermarkedPath(watermarkedPath);
-        foto.setThumbPath(thumbPath);
+        foto.setWatermarkedPath(processada.watermarkedPath());
+        foto.setThumbPath(processada.thumbPath());
         foto.setFileName(arquivo.getOriginalFilename());
 
         return fotoEnsaioRepository.save(foto);
@@ -206,6 +179,8 @@ public class FotoService {
     private void deletarArquivo(String caminho) {
         try {
             Files.deleteIfExists(Path.of(caminho));
-        } catch (IOException ignored) {}
+        } catch (IOException e) {
+            log.warn("Falha ao deletar arquivo: {}", caminho, e);
+        }
     }
 }

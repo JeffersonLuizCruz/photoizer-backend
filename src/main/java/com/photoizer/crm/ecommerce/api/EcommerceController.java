@@ -11,6 +11,7 @@ import com.photoizer.crm.ecommerce.service.FavoritoService;
 import com.photoizer.crm.ecommerce.service.PagamentoExtraService;
 import com.photoizer.crm.ecommerce.service.SessionService;
 import com.photoizer.crm.foto.api.FotoEnsaioResponse;
+import com.photoizer.crm.foto.api.FotoMapper;
 import com.photoizer.crm.foto.model.FotoEnsaio;
 import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.service.FotoService;
@@ -58,6 +59,7 @@ public class EcommerceController {
     private final ComentarioService comentarioService;
     private final EcommerceMapper ecommerceMapper;
     private final CompraQueryService compraQueryService;
+    private final FotoMapper fotoMapper;
 
     public EcommerceController(EcommerceService ecommerceService,
                                GaleriaQueryService galeriaQueryService,
@@ -69,7 +71,8 @@ public class EcommerceController {
                                SessionService sessionService,
                                ComentarioService comentarioService,
                                EcommerceMapper ecommerceMapper,
-                               CompraQueryService compraQueryService) {
+                               CompraQueryService compraQueryService,
+                               FotoMapper fotoMapper) {
         this.ecommerceService = ecommerceService;
         this.galeriaQueryService = galeriaQueryService;
         this.carrinhoService = carrinhoService;
@@ -81,6 +84,7 @@ public class EcommerceController {
         this.comentarioService = comentarioService;
         this.ecommerceMapper = ecommerceMapper;
         this.compraQueryService = compraQueryService;
+        this.fotoMapper = fotoMapper;
     }
 
     @PostMapping("/sessao")
@@ -93,7 +97,11 @@ public class EcommerceController {
         if (sessionId == null || sessionId.isBlank() || !sessionService.valida(sessionId)) {
             throw new IllegalArgumentException("Sessão inválida");
         }
-        return UUID.fromString(sessionId.substring(0, sessionId.indexOf('.')));
+        var dotIndex = sessionId.indexOf('.');
+        if (dotIndex <= 0) {
+            throw new IllegalArgumentException("Sessão inválida");
+        }
+        return UUID.fromString(sessionId.substring(0, dotIndex));
     }
 
     @GetMapping("/galeria/{token}")
@@ -102,7 +110,7 @@ public class EcommerceController {
         var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
         var fotos = ecommerceService.listarFotosPublicadas(token);
         var response = new GaleriaResponse(
-            fotos.stream().map(FotoEnsaioResponse::ofPublic).toList(),
+            fotos.stream().map(fotoMapper::toPublicResponse).toList(),
             agendamento.getPacote().getQuantidadeFotos(),
             ecommerceService.getValorUnitarioFotoExtra(agendamento.getId()),
             agendamento.getPacote().getNome(),
@@ -117,7 +125,7 @@ public class EcommerceController {
             @PathVariable UUID token,
             @RequestBody SelecionarRequest request) {
         var fotos = ecommerceService.selecionarFotos(token, request.fotoIds(), request.selecionada());
-        return ResponseEntity.ok(fotos.stream().map(FotoEnsaioResponse::ofPublic).toList());
+        return ResponseEntity.ok(fotos.stream().map(fotoMapper::toPublicResponse).toList());
     }
 
     @PostMapping("/galeria/{token}/carrinho")
@@ -150,7 +158,7 @@ public class EcommerceController {
         var itensResponse = itens.stream()
             .map(com.photoizer.crm.ecommerce.model.ItemCarrinho::getFotoId)
             .map(fotoService::buscarPorId)
-            .map(FotoEnsaioResponse::ofPublic)
+            .map(fotoMapper::toPublicResponse)
             .map(fotoResponse -> CarrinhoItemResponse.of(fotoResponse, itens.size(), 0, valorUnitario))
             .toList();
         return ResponseEntity.ok(CarrinhoResponse.of(itensResponse, valorUnitario));
@@ -232,13 +240,6 @@ public class EcommerceController {
             @PathVariable UUID compraExtraId) {
         var compra = pagamentoExtraService.simularPagamento(token, compraExtraId);
         return ResponseEntity.ok(ecommerceMapper.toPublicResponse(compra));
-    }
-
-    @PatchMapping("/admin/compras/{compraExtraId}/confirmar")
-    @Operation(summary = "Confirmar pagamento da compra de extras (admin)")
-    public ResponseEntity<Void> confirmarPagamento(@PathVariable UUID compraExtraId) {
-        pagamentoExtraService.confirmarPagamento(compraExtraId);
-        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/galeria/{token}/favoritos/{fotoId}")

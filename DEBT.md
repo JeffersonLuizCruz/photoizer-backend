@@ -19,7 +19,7 @@
 | 6 | **God classes** (`EcommerceService` 574, ~~`FinanceiroService` 600~~, ~~`FinanceiroDashboardService` 608~~, `AgendamentoService` 768, ~~`EdicaoService` 534~~) | ecommerce, ~~financeiro~~, agenda, ~~edicao~~ | **RESOLVIDO** (edicao, financeiro) |
 | 7 | ~~**`findAll()` + agregação em memória** em dashboards/relatórios (tabelas crescentes)~~ | ~~dashboard, financeiro~~, comissao, indicador | **RESOLVIDO** (dashboard, financeiro) |
 | 8 | ~~**Vazamento de hash de senha do `Cliente`** nas respostas~~ | cliente | **RESOLVIDO** |
-| 9 | ~~**`Entidade` JPA como contrato da API** (retorna entidade em vez de DTO)~~ | ~~fotografo~~ | **RESOLVIDO** (fotografo) |
+| 9 | ~~**`Entidade` JPA como contrato da API** (retorna entidade em vez de DTO)~~ | ~~fotografo~~, foto | **RESOLVIDO** (fotografo, foto parcial via FotoMapper) |
 | 10 | **Máquinas de estado sem validação central** (`if` espalhados, status como `String`) | agenda, contrato, comissao | Pendente |
 
 ---
@@ -103,7 +103,7 @@
 - **RESOLVIDO**: `ZipJobResponse` código morto: removido.
 - **RESOLVIDO**: `StatusFotoEdicao.EM_EDICAO` valor não utilizado: removido.
 - **RESOLVIDO**: `StatusEdicao` sem transições: State Pattern com `podeTransicionarPara()`.
-- **Pendente (P1)**: Escrita cross-module em `Agendamento`/`FotoEnsaio` — mantida por decisão (resolver transversalmente).
+- **Pendente (P1)**: Escrita cross-module em `Agendamento` — mantida por decisão (resolver transversalmente). Escrita em `FotoEnsaio` **RESOLVIDO** via eventos.
 - **Pendente (P2)**: N+1 de counts em listagens — `@Query` agregado pendente.
 - **Pendente (P3)**: `getCurrentUser()` N+1 — resolver via JWT claims.
 
@@ -120,7 +120,12 @@
 - **Pendente (P2)**: `ReconciliarComprasExtraFinanceiro` (CommandLineRunner) roda a cada boot — migrar para job com lock.
 
 ### foto
-- Dependência **inversa** foto→agenda (exceção cruzada); expõe entidade JPA; `RuntimeException`; **publicação por escrita direta do edicao** (3ª cópia de watermark/thumbnail).
+- ~~Dependência **inversa** foto→agenda (exceção cruzada)~~ **RESOLVIDO**: porta `AgendamentoReadService` + adapter `AgendamentoReadServiceAdapter`.
+- ~~Expõe entidade JPA~~ **PARCIALMENTE RESOLVIDO**: `FotoMapper` (MapStruct) + controller usa DTO; service retorna entidade para módulos internos.
+- ~~`RuntimeException` genéricas~~ **RESOLVIDO**: `FotoEnsaioNaoEncontradaException` (404), `FotoNaoPertenceAoAgendamentoException` (403), `AgendamentoNaoPermitidoParaUploadException` (422), `StatusFotoInvalidoException` (409).
+- ~~**Publicação por escrita direta do edicao** (3ª cópia de watermark/thumbnail)~~ **RESOLVIDO**: eventos `FotoEdicaoPublicadaEvent`/`FotoEdicaoRemovidaEvent` + listener `FotoEdicaoEventListener`; `FotoProcessingHelper` centraliza processamento.
+- ~~Fallback silencioso~~ **RESOLVIDO**: `FotoProcessingHelper` + `deletarArquivo()` com `log.warn`.
+- **Pendente**: `Tags @ElementCollection` sem `orphanRemoval` (limitação JPA); `atualizarOrdem` sem endpoint.
 
 ### fotografo
 - ~~**`User` (com `password`) exposto via `/api/v1/fotografos`**~~ **RESOLVIDO**: agora retorna `UserResponse` (sem password).
@@ -157,7 +162,7 @@
 | **`status`/`origem` em `String`** | comissao, agenda, foto, despesa, contrato, ecommerce | enums com métodos de transição; nunca comparar `String.equals` — **despesa RESOLVIDO** (State Pattern) |
 | **Exceções genéricas** | maioria | hierarquia central `BusinessException` + `HttpStatus`/código (decisão já aprovada) |
 | **DTOs manuais (`static of`/`Map`)** | quase todos | MapStruct (decisão já aprovada; Fase 2) — **iniciado em `agenda`** (AgendamentoMapper/RascunhoAgendamentoMapper); **despesa RESOLVIDO** (static of() removido); **ecommerce RESOLVIDO** (EcommerceMapper) |
-| ~~**Escrita em entidade alheia** (ecommerce)~~ | ~~ecommerce, edicao, foto, financeiro, comissao, documento, notificacao~~ | **RESOLVIDO** (ecommerce): eventos de domínio + listeners; **RESOLVIDO** (edicao): decidido manter escrita direta até refatoração transversal; outros módulos pendentes |
+| ~~**Escrita em entidade alheia** (ecommerce)~~ | ~~ecommerce, edicao, foto, financeiro, comissao, documento, notificacao~~ | **RESOLVIDO** (ecommerce): eventos de domínio + listeners; **RESOLVIDO** (foto): eventos `FotoEdicaoPublicadaEvent`/`FotoEdicaoRemovidaEvent` + listener; **RESOLVIDO** (edicao): `PublicacaoService` e `EdicaoRevisaoService` publicam eventos; outros módulos pendentes |
 | **Agregação em memória** | dashboard, financeiro, comissao, indicador, agenda | queries agregadas SQL (`SUM`/`GROUP BY`/`COUNT`) nos repositórios donos — **despesa RESOLVIDO** (DespesaQueryService) |
 
 ---
