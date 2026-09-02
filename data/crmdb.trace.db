@@ -1,0 +1,3 @@
+2026-08-21 14:26:28.428479-03:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLDataException: Value too long for column "TOKEN CHARACTER VARYING(255)": "'eyJhbGciOiJIUzUxMiJ9.eyJqdGkiOiIzNmQxNmRmNy1kODBiLTQ1ZGItOTljYS03MWY0Y2Q2OGMzMj... (359)"; SQL statement:
+insert into refresh_tokens (created_at,expires_at,token,user_id,id) values (?,?,?,?,?) [22001-240]

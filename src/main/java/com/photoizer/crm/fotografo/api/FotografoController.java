@@ -3,6 +3,7 @@ package com.photoizer.crm.fotografo.api;
 import com.photoizer.crm.auth.api.UserResponse;
 import com.photoizer.crm.despesa.api.DespesaMapper;
 import com.photoizer.crm.fotografo.service.FotografoCsvExporter;
+import com.photoizer.crm.fotografo.service.FotografoQueryService;
 import com.photoizer.crm.fotografo.service.FotografoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,11 +32,16 @@ import java.util.UUID;
 public class FotografoController {
 
     private final FotografoService fotografoService;
+    private final FotografoQueryService fotografoQueryService;
     private final FotografoCsvExporter csvExporter;
     private final DespesaMapper despesaMapper;
 
-    public FotografoController(FotografoService fotografoService, FotografoCsvExporter csvExporter, DespesaMapper despesaMapper) {
+    public FotografoController(FotografoService fotografoService,
+                               FotografoQueryService fotografoQueryService,
+                               FotografoCsvExporter csvExporter,
+                               DespesaMapper despesaMapper) {
         this.fotografoService = fotografoService;
+        this.fotografoQueryService = fotografoQueryService;
         this.csvExporter = csvExporter;
         this.despesaMapper = despesaMapper;
     }
@@ -49,11 +55,7 @@ public class FotografoController {
     @GetMapping("/{id}")
     @Operation(summary = "Buscar fotógrafo por ID")
     public ResponseEntity<UserResponse> buscarPorId(@PathVariable UUID id) {
-        var fotografo = fotografoService.listarFotografos().stream()
-            .filter(u -> u.id().equals(id))
-            .findFirst()
-            .orElseThrow(() -> new IllegalArgumentException("Fotógrafo não encontrado: " + id));
-        return ResponseEntity.ok(fotografo);
+        return ResponseEntity.ok(fotografoService.buscarPorId(id));
     }
 
     @PostMapping
@@ -90,19 +92,19 @@ public class FotografoController {
     @GetMapping("/{id}/dashboard")
     @Operation(summary = "Dashboard do fotógrafo com resumo financeiro")
     public ResponseEntity<FotografoDashboardResponse> dashboard(@PathVariable UUID id) {
-        return ResponseEntity.ok(fotografoService.dashboard(id));
+        return ResponseEntity.ok(fotografoQueryService.dashboard(id));
     }
 
     @GetMapping("/{id}/ensaios")
     @Operation(summary = "Listar ensaios do fotógrafo")
     public ResponseEntity<List<FotografoEnsaiosResponse>> listarEnsaios(@PathVariable UUID id) {
-        return ResponseEntity.ok(fotografoService.listarEnsaios(id));
+        return ResponseEntity.ok(fotografoQueryService.listarEnsaios(id));
     }
 
     @GetMapping("/{id}/resumo-financeiro")
     @Operation(summary = "Resumo financeiro detalhado do fotógrafo")
     public ResponseEntity<FotografoResumoFinanceiroResponse> resumoFinanceiro(@PathVariable UUID id) {
-        return ResponseEntity.ok(fotografoService.resumoFinanceiro(id));
+        return ResponseEntity.ok(fotografoQueryService.resumoFinanceiro(id));
     }
 
     @GetMapping("/{id}/custos")
@@ -117,18 +119,15 @@ public class FotografoController {
     @GetMapping("/relatorio-global")
     @Operation(summary = "Relatório consolidado de todos os fotógrafos")
     public ResponseEntity<FotografoRelatorioGlobalResponse> relatorioGlobal() {
-        return ResponseEntity.ok(fotografoService.relatorioGlobal());
+        return ResponseEntity.ok(fotografoQueryService.relatorioGlobal());
     }
 
     @GetMapping("/{id}/financeiro/csv")
     @Operation(summary = "Exportar finanças do fotógrafo em CSV")
     public ResponseEntity<byte[]> exportarCsv(@PathVariable UUID id) {
-        var fotografo = fotografoService.listarFotografos().stream()
-            .filter(u -> u.id().equals(id))
-            .findFirst()
-            .orElseThrow(() -> new IllegalArgumentException("Fotógrafo não encontrado: " + id));
+        var fotografo = fotografoService.buscarPorId(id);
 
-        var ensaios = fotografoService.listarEnsaios(id);
+        var ensaios = fotografoQueryService.listarEnsaios(id);
         var csv = csvExporter.exportar(ensaios, fotografo.nome());
 
         var filename = "financas-" + fotografo.nome().replaceAll("\\s+", "-").toLowerCase() + ".csv";

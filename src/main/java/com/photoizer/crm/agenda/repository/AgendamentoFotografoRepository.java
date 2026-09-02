@@ -24,7 +24,7 @@ public interface AgendamentoFotografoRepository extends JpaRepository<Agendament
         """)
     List<RepasseAggregation> sumRepassesAtivosPorAgendamento(@Param("statusCancelado") RepasseStatus statusCancelado);
 
-    @Query("SELECT af FROM AgendamentoFotografo af JOIN FETCH af.agendamento a JOIN FETCH a.cliente LEFT JOIN FETCH a.pacote WHERE af.fotografo.id = :fotografoId ORDER BY a.dataHoraEnsaio DESC")
+    @Query("SELECT af FROM AgendamentoFotografo af JOIN FETCH af.fotografo JOIN FETCH af.agendamento a JOIN FETCH a.cliente LEFT JOIN FETCH a.pacote WHERE af.fotografo.id = :fotografoId ORDER BY a.dataHoraEnsaio DESC")
     List<AgendamentoFotografo> findByFotografoIdWithAgendamento(@Param("fotografoId") UUID fotografoId);
 
     @Query("SELECT af FROM AgendamentoFotografo af JOIN FETCH af.fotografo WHERE af.agendamento.id = :agendamentoId")

@@ -97,6 +97,12 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, e);
     }
 
+    @ExceptionHandler(com.photoizer.crm.fotografo.exception.FotografoComEnsaiosVinculadosException.class)
+    public ResponseEntity<ErrorResponse> handleFotografoComEnsaiosVinculados(com.photoizer.crm.fotografo.exception.FotografoComEnsaiosVinculadosException e) {
+        log.warn("Fotografo com ensaios vinculados: {}", e.getMessage());
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
+    }
+
     @ExceptionHandler(AgendamentoNaoEncontradoException.class)
     public ResponseEntity<ErrorResponse> handleAgendamentoNaoEncontrado(AgendamentoNaoEncontradoException e) {
         log.warn("Agendamento nao encontrado: {}", e.getMessage());
