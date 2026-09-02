@@ -1,6 +1,8 @@
 package com.photoizer.crm.indicador.repository;
 
 import com.photoizer.crm.indicador.model.Indicador;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,11 +19,14 @@ public interface IndicadorRepository extends JpaRepository<Indicador, UUID> {
 
     boolean existsByNomeAndTelefone(String nome, String telefone);
 
-    List<Indicador> findByTelefone(String telefone);
+    Optional<Indicador> findByTelefone(String telefone);
 
     @Query("SELECT i FROM Indicador i WHERE " +
            "LOWER(i.nome) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
            "i.telefone LIKE CONCAT('%', :search, '%') " +
            "ORDER BY i.nome ASC")
-    List<Indicador> search(@Param("search") String search);
+    Page<Indicador> search(@Param("search") String search, Pageable pageable);
+
+    @Query("SELECT i FROM Indicador i ORDER BY i.nome ASC")
+    Page<Indicador> findAllPaginated(Pageable pageable);
 }

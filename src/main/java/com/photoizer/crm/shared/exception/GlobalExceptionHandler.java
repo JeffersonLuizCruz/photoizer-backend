@@ -55,8 +55,11 @@ import com.photoizer.crm.foto.exception.AgendamentoNaoPermitidoParaUploadExcepti
 import com.photoizer.crm.foto.exception.FotoEnsaioNaoEncontradaException;
 import com.photoizer.crm.foto.exception.FotoNaoPertenceAoAgendamentoException;
 import com.photoizer.crm.foto.exception.StatusFotoInvalidoException;
+import com.photoizer.crm.indicador.exception.IndicadorDuplicadoException;
+import com.photoizer.crm.indicador.exception.IndicadorNaoEncontradoException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -319,6 +322,18 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
     }
 
+    @ExceptionHandler(IndicadorNaoEncontradoException.class)
+    public ResponseEntity<ErrorResponse> handleIndicadorNaoEncontrado(IndicadorNaoEncontradoException e) {
+        log.warn("Indicador nao encontrado: {}", e.getMessage());
+        return build(HttpStatus.NOT_FOUND, e);
+    }
+
+    @ExceptionHandler(IndicadorDuplicadoException.class)
+    public ResponseEntity<ErrorResponse> handleIndicadorDuplicado(IndicadorDuplicadoException e) {
+        log.warn("Indicador duplicado: {}", e.getMessage());
+        return build(HttpStatus.CONFLICT, e);
+    }
+
     @ExceptionHandler(ClienteObrigatorioException.class)
     public ResponseEntity<ErrorResponse> handleClienteObrigatorio(ClienteObrigatorioException e) {
         log.warn("Cliente obrigatorio: {}", e.getMessage());
@@ -447,6 +462,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException e) {
         log.warn("Acesso negado: {}", e.getMessage());
         return build(HttpStatus.FORBIDDEN, "Acesso negado");
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException e) {
+        log.warn("Violação de integridade de dados: {}", e.getMessage());
+        return build(HttpStatus.CONFLICT, "Violação de integridade de dados: registro duplicado ou referência inválida");
     }
 
     @ExceptionHandler(Exception.class)

@@ -1,0 +1,5 @@
+com/photoizer/crm/ecommerce/service/SessionServiceTest.class
+com/photoizer/crm/ecommerce/service/EcommerceServiceTest.class
+com/photoizer/crm/dashboard/service/DashboardServiceTest.class
+com/photoizer/crm/CrmApplicationTests.class
+com/photoizer/crm/ecommerce/EcommerceSecurityTests.class

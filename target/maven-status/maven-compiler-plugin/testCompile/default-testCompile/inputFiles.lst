@@ -1,0 +1,8 @@
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/test/java/com/photoizer/crm/CrmApplicationTests.java
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/test/java/com/photoizer/crm/dashboard/service/DashboardServiceTest.java
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/test/java/com/photoizer/crm/ecommerce/EcommerceSecurityTests.java
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/test/java/com/photoizer/crm/ecommerce/service/EcommerceServiceTest.java
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/test/java/com/photoizer/crm/ecommerce/service/SessionServiceTest.java
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/test/java/com/photoizer/crm/financeiro/ReconciliarComprasExtraFinanceiroTest.java
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/test/java/com/photoizer/crm/financeiro/service/FinanceiroDashboardServiceTest.java
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/test/java/com/photoizer/crm/financeiro/service/FinanceiroServiceTest.java

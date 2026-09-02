@@ -1,0 +1,4 @@
+com/photoizer/crm/comissao/service/ComissaoQueryService$IndicadorComissaoResumo.class
+com/photoizer/crm/indicador/exception/IndicadorDuplicadoException.class
+com/photoizer/crm/indicador/exception/IndicadorNaoEncontradoException.class
+com/photoizer/crm/indicador/service/IndicadorCommand.class

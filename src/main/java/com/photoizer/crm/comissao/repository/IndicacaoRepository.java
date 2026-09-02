@@ -42,6 +42,28 @@ public interface IndicacaoRepository extends JpaRepository<Indicacao, UUID> {
         """)
     List<IndicadorComissaoProjection> findIndicadoresComResumo();
 
+    /**
+     * Query agregada filtrada por IDs de indicadores.
+     * Usada pelo módulo indicador para obter resumo de comissões em lote
+     * (1 query), evitando N+1 no controller.
+     */
+    @Query("""
+        SELECT i.indicadorTelefone AS telefone,
+               i.indicadorNome AS nome,
+               i.indicadorId AS indicadorId,
+               SUM(CASE WHEN i.status = com.photoizer.crm.comissao.model.StatusIndicacao.PENDENTE
+                        THEN i.valorComissao ELSE 0 END) AS totalPendente,
+               SUM(CASE WHEN i.status = com.photoizer.crm.comissao.model.StatusIndicacao.PAGA
+                        THEN i.valorComissao ELSE 0 END) AS totalPago,
+               SUM(CASE WHEN i.status = com.photoizer.crm.comissao.model.StatusIndicacao.CANCELADA
+                        THEN i.valorComissao ELSE 0 END) AS totalCancelado,
+               COUNT(i) AS totalIndicacoes
+        FROM Indicacao i
+        WHERE i.indicadorId IN :indicadorIds
+        GROUP BY i.indicadorTelefone, i.indicadorNome, i.indicadorId
+        """)
+    List<IndicadorComissaoProjection> findResumoByIndicadorIds(@Param("indicadorIds") List<UUID> indicadorIds);
+
     @Query("SELECT DISTINCT i.indicadorTelefone FROM Indicacao i")
     List<String> findAllDistinctTelefones();
 
