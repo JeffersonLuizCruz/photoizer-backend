@@ -1,7 +1,10 @@
 package com.photoizer.crm.ecommerce.exception;
 
-public class TokenExpiradoException extends RuntimeException {
+import com.photoizer.crm.shared.exception.ErrorCode;
+import com.photoizer.crm.shared.exception.GoneException;
+
+public class TokenExpiradoException extends GoneException {
     public TokenExpiradoException(String message) {
-        super(message);
+        super(ErrorCode.TOKEN_EXPIRADO, message);
     }
 }

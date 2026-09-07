@@ -11,6 +11,7 @@ import com.photoizer.crm.edicao.model.StatusFotoEdicao;
 import com.photoizer.crm.edicao.repository.EdicaoRepository;
 import com.photoizer.crm.edicao.repository.FotoEdicaoRepository;
 import com.photoizer.crm.shared.storage.FileStorageService;
+import com.photoizer.crm.shared.storage.FileValidator;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -29,13 +30,16 @@ public class EdicaoUploadEditadasService {
     private final EdicaoRepository edicaoRepository;
     private final FotoEdicaoRepository fotoEdicaoRepository;
     private final FileStorageService fileStorageService;
+    private final FileValidator fileValidator;
 
     public EdicaoUploadEditadasService(EdicaoRepository edicaoRepository,
                                        FotoEdicaoRepository fotoEdicaoRepository,
-                                       FileStorageService fileStorageService) {
+                                       FileStorageService fileStorageService,
+                                       FileValidator fileValidator) {
         this.edicaoRepository = edicaoRepository;
         this.fotoEdicaoRepository = fotoEdicaoRepository;
         this.fileStorageService = fileStorageService;
+        this.fileValidator = fileValidator;
     }
 
     public List<FotoEdicaoResponse> uploadEditadas(UUID agendamentoId,
@@ -51,6 +55,7 @@ public class EdicaoUploadEditadasService {
         var fotosRaw = fotoEdicaoRepository.findByEdicaoIdAndStatus(edicao.getId(), StatusFotoEdicao.RAW);
 
         for (var arquivo : arquivos) {
+            fileValidator.validate(arquivo, "edited");
             var editedPath = fileStorageService.salvarEmSubdiretorio(arquivo, agendamentoId, "edit");
             var nomeArquivo = arquivo.getOriginalFilename();
 

@@ -1,8 +1,11 @@
 package com.photoizer.crm.ecommerce.exception;
 
-public class FotoJaBaixadaException extends RuntimeException {
+import com.photoizer.crm.shared.exception.ConflictException;
+import com.photoizer.crm.shared.exception.ErrorCode;
+
+public class FotoJaBaixadaException extends ConflictException {
 
     public FotoJaBaixadaException() {
-        super("Foto já baixada não pode ser removida do pacote");
+        super(ErrorCode.FOTO_JA_BAIXADA, "Foto já baixada não pode ser removida do pacote");
     }
 }

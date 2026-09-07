@@ -8,14 +8,11 @@ import java.time.LocalDateTime;
 
 /**
  * PATTERN: Value Object / Embeddable
- * Centraliza os campos de auditoria (createdAt, updatedAt) em um único lugar.
- * Motivo: eliminar a herança de BaseEntity (padrão herdado não idiomático)
- * e usar composição em vez de herança.
+ * Centraliza os campos de auditoria (createdAt, updatedAt, createdBy) em um único lugar.
+ * Composição em vez de herança — entidades usam @Embedded private AuditInfo auditInfo.
  *
- * Uso: @Embedded private AuditInfo auditInfo;
- *
- * Usa @EntityListeners (JPA 2.1 spec) em vez de callbacks diretos no @Embeddable,
- * que não é suportado pelo spec (warn HHH90000035 no Hibernate 7.x).
+ * createdBy é populado automaticamente pelo AuditInfoListener via SecurityContextHolder.
+ * Em operações sem request HTTP (DataSeeder, schedulers, eventos), assume "SYSTEM".
  */
 @Embeddable
 @EntityListeners(AuditInfoListener.class)
@@ -27,14 +24,25 @@ public class AuditInfo {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column(nullable = false, updatable = false)
+    private String createdBy;
+
     public AuditInfo() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
+        this.createdBy = "SYSTEM";
     }
 
     public AuditInfo(LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+        this.createdBy = "SYSTEM";
+    }
+
+    public AuditInfo(LocalDateTime createdAt, LocalDateTime updatedAt, String createdBy) {
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+        this.createdBy = createdBy;
     }
 
     public LocalDateTime getCreatedAt() {
@@ -45,11 +53,19 @@ public class AuditInfo {
         return updatedAt;
     }
 
+    public String getCreatedBy() {
+        return createdBy;
+    }
+
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
     }
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public void setCreatedBy(String createdBy) {
+        this.createdBy = createdBy;
     }
 }

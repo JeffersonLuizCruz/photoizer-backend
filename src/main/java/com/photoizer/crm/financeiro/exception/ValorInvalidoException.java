@@ -1,7 +1,10 @@
 package com.photoizer.crm.financeiro.exception;
 
-public class ValorInvalidoException extends RuntimeException {
+import com.photoizer.crm.shared.exception.ErrorCode;
+import com.photoizer.crm.shared.exception.UnprocessableException;
+
+public class ValorInvalidoException extends UnprocessableException {
     public ValorInvalidoException(String message) {
-        super(message);
+        super(ErrorCode.VALOR_INVALIDO, message);
     }
 }

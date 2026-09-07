@@ -1,8 +1,11 @@
 package com.photoizer.crm.ecommerce.exception;
 
-public class CompraJaPagaException extends RuntimeException {
+import com.photoizer.crm.shared.exception.ConflictException;
+import com.photoizer.crm.shared.exception.ErrorCode;
+
+public class CompraJaPagaException extends ConflictException {
 
     public CompraJaPagaException() {
-        super("Compra já paga não pode ser cancelada");
+        super(ErrorCode.COMPRA_JA_PAGA, "Compra já paga não pode ser cancelada");
     }
 }

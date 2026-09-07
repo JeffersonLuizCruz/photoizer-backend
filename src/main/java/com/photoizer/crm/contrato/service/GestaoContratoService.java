@@ -17,6 +17,7 @@ import com.photoizer.crm.contrato.repository.ContratoRepository;
 import com.photoizer.crm.pacote.exception.PacoteInativoException;
 import com.photoizer.crm.pacote.service.PacoteQueryService;
 import com.photoizer.crm.auth.repository.UserRepository;
+import com.photoizer.crm.shared.exception.BadRequestException;
 import com.photoizer.crm.shared.model.TipoRepasse;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -137,7 +138,7 @@ public class GestaoContratoService {
             .map(ContratoFotografo::getValorRepassar)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
         if (soma.compareTo(valorTotal) > 0) {
-            throw new IllegalArgumentException(
+            throw new BadRequestException(
                 "A soma dos repasses (R$ " + soma.toPlainString() + ") excede o valor total do ensaio (R$ "
                     + valorTotal.toPlainString() + ")");
         }

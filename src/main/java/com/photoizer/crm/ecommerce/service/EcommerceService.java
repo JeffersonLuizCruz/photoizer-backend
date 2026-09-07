@@ -13,6 +13,7 @@ import com.photoizer.crm.ecommerce.repository.CompraExtraRepository;
 import com.photoizer.crm.foto.model.FotoEnsaio;
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
 import com.photoizer.crm.shared.storage.FileStorageService;
+import com.photoizer.crm.shared.storage.FileValidator;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,6 +47,7 @@ public class EcommerceService {
     private final GaleriaQueryService galeriaQueryService;
     private final CarrinhoService carrinhoService;
     private final SelecaoFotosService selecaoFotosService;
+    private final FileValidator fileValidator;
 
     public EcommerceService(FotoEnsaioRepository fotoEnsaioRepository,
                             CompraExtraRepository compraExtraRepository,
@@ -53,7 +55,8 @@ public class EcommerceService {
                             ApplicationEventPublisher eventPublisher,
                             GaleriaQueryService galeriaQueryService,
                             CarrinhoService carrinhoService,
-                            SelecaoFotosService selecaoFotosService) {
+                            SelecaoFotosService selecaoFotosService,
+                            FileValidator fileValidator) {
         this.fotoEnsaioRepository = fotoEnsaioRepository;
         this.compraExtraRepository = compraExtraRepository;
         this.fileStorageService = fileStorageService;
@@ -61,6 +64,7 @@ public class EcommerceService {
         this.galeriaQueryService = galeriaQueryService;
         this.carrinhoService = carrinhoService;
         this.selecaoFotosService = selecaoFotosService;
+        this.fileValidator = fileValidator;
     }
 
     // ==================== Galeria (delegado para GaleriaQueryService) ====================
@@ -152,6 +156,7 @@ public class EcommerceService {
             throw new CompraNaoEncontradaException(compraExtraId);
         }
 
+        fileValidator.validate(comprovante, "receipt");
         var caminho = fileStorageService.salvarEmSubdiretorio(comprovante, agendamento.getId(), "comprovante_extra");
         compra.setUrlComprovante(caminho);
         compra.setStatus(StatusCompraExtra.AGUARDANDO_CONFIRMACAO);

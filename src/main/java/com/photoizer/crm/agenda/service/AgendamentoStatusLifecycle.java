@@ -12,6 +12,7 @@ import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.shared.storage.FileStorageService;
+import com.photoizer.crm.shared.storage.FileValidator;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,17 +34,20 @@ public class AgendamentoStatusLifecycle {
     private final DisponibilidadeService disponibilidadeService;
     private final ApplicationEventPublisher eventPublisher;
     private final FileStorageService fileStorageService;
+    private final FileValidator fileValidator;
 
     public AgendamentoStatusLifecycle(AgendamentoRepository agendamentoRepository,
                                       AgendamentoFotografoRepository agendamentoFotografoRepository,
                                       DisponibilidadeService disponibilidadeService,
                                       ApplicationEventPublisher eventPublisher,
-                                      FileStorageService fileStorageService) {
+                                      FileStorageService fileStorageService,
+                                      FileValidator fileValidator) {
         this.agendamentoRepository = agendamentoRepository;
         this.agendamentoFotografoRepository = agendamentoFotografoRepository;
         this.disponibilidadeService = disponibilidadeService;
         this.eventPublisher = eventPublisher;
         this.fileStorageService = fileStorageService;
+        this.fileValidator = fileValidator;
     }
 
     public Agendamento atualizarStatus(UUID id, String novoStatus) {
@@ -125,6 +129,7 @@ public class AgendamentoStatusLifecycle {
                 + " precisa ser quitado antes de finalizar o ensaio");
         }
 
+        fileValidator.validate(comprovante, "any");
         var url = fileStorageService.salvar(comprovante);
         agendamento.aplicarPagamentoFinal(url);
 

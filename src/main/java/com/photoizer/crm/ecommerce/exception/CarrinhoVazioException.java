@@ -1,8 +1,11 @@
 package com.photoizer.crm.ecommerce.exception;
 
-public class CarrinhoVazioException extends RuntimeException {
+import com.photoizer.crm.shared.exception.ErrorCode;
+import com.photoizer.crm.shared.exception.UnprocessableException;
+
+public class CarrinhoVazioException extends UnprocessableException {
 
     public CarrinhoVazioException() {
-        super("Carrinho vazio");
+        super(ErrorCode.CARRINHO_VAZIO, "Carrinho vazio");
     }
 }

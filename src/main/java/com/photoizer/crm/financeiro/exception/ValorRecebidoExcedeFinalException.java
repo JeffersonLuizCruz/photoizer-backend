@@ -1,7 +1,10 @@
 package com.photoizer.crm.financeiro.exception;
 
-public class ValorRecebidoExcedeFinalException extends RuntimeException {
+import com.photoizer.crm.shared.exception.ErrorCode;
+import com.photoizer.crm.shared.exception.UnprocessableException;
+
+public class ValorRecebidoExcedeFinalException extends UnprocessableException {
     public ValorRecebidoExcedeFinalException() {
-        super("Valor recebido não pode ser maior que o valor final");
+        super(ErrorCode.VALOR_RECEBIDO_EXCEDE_FINAL, "Valor recebido não pode ser maior que o valor final");
     }
 }

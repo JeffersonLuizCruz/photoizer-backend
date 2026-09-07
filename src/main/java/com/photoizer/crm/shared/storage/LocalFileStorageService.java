@@ -15,9 +15,13 @@ import java.util.UUID;
 public class LocalFileStorageService implements FileStorageService {
 
     private final Path uploadDir;
+    private final FileValidator fileValidator;
 
-    public LocalFileStorageService(@Value("${app.storage.upload-dir:uploads}") String uploadDir) {
+    public LocalFileStorageService(
+            @Value("${app.storage.upload-dir:uploads}") String uploadDir,
+            FileValidator fileValidator) {
         this.uploadDir = Paths.get(uploadDir).toAbsolutePath().normalize();
+        this.fileValidator = fileValidator;
         try {
             Files.createDirectories(this.uploadDir);
         } catch (IOException e) {
@@ -31,8 +35,13 @@ public class LocalFileStorageService implements FileStorageService {
             throw new IllegalArgumentException("Arquivo é obrigatório");
         }
 
-        var nomeArquivo = UUID.randomUUID() + "_" + arquivo.getOriginalFilename();
-        var caminho = uploadDir.resolve(nomeArquivo);
+        // Sanitiza o nome original (previne path traversal)
+        var safeName = fileValidator.sanitizeFilename(arquivo.getOriginalFilename());
+        var nomeArquivo = UUID.randomUUID() + "_" + safeName;
+        var caminho = uploadDir.resolve(nomeArquivo).normalize();
+
+        // Verifica que o caminho resolvido permanece dentro de uploadDir
+        fileValidator.validateResolvedPath(caminho, uploadDir);
 
         try {
             Files.copy(arquivo.getInputStream(), caminho, StandardCopyOption.REPLACE_EXISTING);
@@ -56,13 +65,18 @@ public class LocalFileStorageService implements FileStorageService {
             throw new RuntimeException("Erro ao criar diretório: " + subDir, e);
         }
 
+        // Extrai extensão do nome sanitizado
+        var safeName = fileValidator.sanitizeFilename(arquivo.getOriginalFilename());
         var ext = "";
-        var originalName = arquivo.getOriginalFilename();
-        if (originalName != null && originalName.contains(".")) {
-            ext = originalName.substring(originalName.lastIndexOf("."));
+        if (safeName.contains(".")) {
+            ext = safeName.substring(safeName.lastIndexOf(".")).toLowerCase();
         }
+
         var nomeArquivo = prefix + "_" + UUID.randomUUID() + ext;
-        var caminho = subDir.resolve(nomeArquivo);
+        var caminho = subDir.resolve(nomeArquivo).normalize();
+
+        // Verifica que o caminho resolvido permanece dentro de uploadDir
+        fileValidator.validateResolvedPath(caminho, uploadDir);
 
         try {
             Files.copy(arquivo.getInputStream(), caminho, StandardCopyOption.REPLACE_EXISTING);
@@ -76,7 +90,10 @@ public class LocalFileStorageService implements FileStorageService {
     @Override
     public void deletar(String caminho) {
         try {
-            Files.deleteIfExists(Path.of(caminho));
+            var path = Path.of(caminho).toAbsolutePath().normalize();
+            // Verifica que não está deletando fora do uploadDir
+            fileValidator.validateResolvedPath(path, uploadDir);
+            Files.deleteIfExists(path);
         } catch (IOException e) {
             throw new RuntimeException("Erro ao deletar arquivo: " + caminho, e);
         }

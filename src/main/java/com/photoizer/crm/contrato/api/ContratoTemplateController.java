@@ -60,7 +60,7 @@ public class ContratoTemplateController {
     @PutMapping("/padrao")
     @Operation(summary = "Restaurar template padrao do contrato")
     public ResponseEntity<Map<String, String>> restaurarPadrao() {
-        var templatePadrao = ContratoTemplateService.TEMPLATE_PADRAO;
+        var templatePadrao = ConfigKey.CONTRATO_TEMPLATE_PADRAO;
         configuracaoService.atualizar(ConfigKey.CONTRATO_TEMPLATE, templatePadrao);
         return ResponseEntity.ok(Map.of("template", templatePadrao));
     }

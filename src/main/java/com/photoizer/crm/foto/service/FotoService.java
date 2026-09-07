@@ -7,6 +7,7 @@ import com.photoizer.crm.foto.model.FotoEnsaio;
 import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
 import com.photoizer.crm.shared.storage.FileStorageService;
+import com.photoizer.crm.shared.storage.FileValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -30,15 +31,18 @@ public class FotoService {
     private final FileStorageService fileStorageService;
     private final FotoProcessingHelper fotoProcessingHelper;
     private final com.photoizer.crm.foto.acl.AgendamentoReadService agendamentoReadService;
+    private final FileValidator fileValidator;
 
     public FotoService(FotoEnsaioRepository fotoEnsaioRepository,
                        FileStorageService fileStorageService,
                        FotoProcessingHelper fotoProcessingHelper,
-                       com.photoizer.crm.foto.acl.AgendamentoReadService agendamentoReadService) {
+                       com.photoizer.crm.foto.acl.AgendamentoReadService agendamentoReadService,
+                       FileValidator fileValidator) {
         this.fotoEnsaioRepository = fotoEnsaioRepository;
         this.fileStorageService = fileStorageService;
         this.fotoProcessingHelper = fotoProcessingHelper;
         this.agendamentoReadService = agendamentoReadService;
+        this.fileValidator = fileValidator;
     }
 
     @Transactional(readOnly = true)
@@ -68,6 +72,7 @@ public class FotoService {
         for (int i = 0; i < arquivos.size(); i++) {
             var arquivo = arquivos.get(i);
 
+            fileValidator.validate(arquivo, "image");
             var originalPath = fileStorageService.salvarEmSubdiretorio(arquivo, agendamentoId, "orig");
             var original = Path.of(originalPath);
             var targetDir = original.getParent();
@@ -158,6 +163,7 @@ public class FotoService {
             throw new FotoNaoPertenceAoAgendamentoException(fotoId, agendamentoId);
         }
 
+        fileValidator.validate(arquivo, "image");
         var originalPath = fileStorageService.salvarEmSubdiretorio(arquivo, agendamentoId, "orig");
         var original = Path.of(originalPath);
         var targetDir = original.getParent();

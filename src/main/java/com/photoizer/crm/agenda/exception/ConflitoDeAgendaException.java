@@ -1,8 +1,11 @@
 package com.photoizer.crm.agenda.exception;
 
-public class ConflitoDeAgendaException extends RuntimeException {
+import com.photoizer.crm.shared.exception.ConflictException;
+import com.photoizer.crm.shared.exception.ErrorCode;
+
+public class ConflitoDeAgendaException extends ConflictException {
 
     public ConflitoDeAgendaException(String message) {
-        super(message);
+        super(ErrorCode.CONFLITO_DE_AGENDA, message);
     }
 }

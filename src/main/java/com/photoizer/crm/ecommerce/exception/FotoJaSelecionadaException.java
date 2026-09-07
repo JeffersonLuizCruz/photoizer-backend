@@ -1,8 +1,11 @@
 package com.photoizer.crm.ecommerce.exception;
 
-public class FotoJaSelecionadaException extends RuntimeException {
+import com.photoizer.crm.shared.exception.ConflictException;
+import com.photoizer.crm.shared.exception.ErrorCode;
+
+public class FotoJaSelecionadaException extends ConflictException {
 
     public FotoJaSelecionadaException(String message) {
-        super(message);
+        super(ErrorCode.FOTO_JA_SELECIONADA, message);
     }
 }

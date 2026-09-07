@@ -26,7 +26,9 @@ import com.photoizer.crm.financeiro.model.StatusReceita;
 import com.photoizer.crm.financeiro.repository.PagamentoRepository;
 import com.photoizer.crm.financeiro.repository.ReceitaRepository;
 import com.photoizer.crm.pacote.service.PacoteQueryService;
-import com.photoizer.crm.shared.service.FinanceCalculator;
+import com.photoizer.crm.shared.port.DisplacementCostPort;
+import com.photoizer.crm.shared.port.RepasseAggregationPort;
+import com.photoizer.crm.shared.port.StatusClassificationPort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -69,7 +71,9 @@ public class FinanceiroQueryService {
     private final ReceitaRepository receitaRepository;
     private final PagamentoRepository pagamentoRepository;
     private final ConfiguracaoService configuracaoService;
-    private final FinanceCalculator financeCalculator;
+    private final StatusClassificationPort statusClassificationPort;
+    private final DisplacementCostPort displacementCostPort;
+    private final RepasseAggregationPort repasseAggregationPort;
     private final DespesaMapper despesaMapper;
 
     public FinanceiroQueryService(AgendamentoRepository agendamentoRepository,
@@ -80,7 +84,9 @@ public class FinanceiroQueryService {
                                   ReceitaRepository receitaRepository,
                                   PagamentoRepository pagamentoRepository,
                                   ConfiguracaoService configuracaoService,
-                                  FinanceCalculator financeCalculator,
+                                  StatusClassificationPort statusClassificationPort,
+                                  DisplacementCostPort displacementCostPort,
+                                  RepasseAggregationPort repasseAggregationPort,
                                   DespesaMapper despesaMapper) {
         this.agendamentoRepository = agendamentoRepository;
         this.agendamentoFotografoRepository = agendamentoFotografoRepository;
@@ -90,7 +96,9 @@ public class FinanceiroQueryService {
         this.receitaRepository = receitaRepository;
         this.pagamentoRepository = pagamentoRepository;
         this.configuracaoService = configuracaoService;
-        this.financeCalculator = financeCalculator;
+        this.statusClassificationPort = statusClassificationPort;
+        this.displacementCostPort = displacementCostPort;
+        this.repasseAggregationPort = repasseAggregationPort;
         this.despesaMapper = despesaMapper;
     }
 
@@ -109,7 +117,7 @@ public class FinanceiroQueryService {
     }
 
     public FinanceiroResumoResponse calcularResumo(LocalDateTime dataInicio, LocalDateTime dataFim) {
-        var statusIgnorados = financeCalculator.statusIgnorados();
+        var statusIgnorados = statusClassificationPort.statusIgnorados();
         List<Agendamento> agendamentos;
         if (dataInicio != null && dataFim != null) {
             agendamentos = agendamentoRepository.findByDataBetween(dataInicio, dataFim, List.copyOf(statusIgnorados));
@@ -119,7 +127,7 @@ public class FinanceiroQueryService {
                 .toList();
         }
 
-        var repasses = financeCalculator.carregarRepasses(agendamentoFotografoRepository);
+        var repasses = repasseAggregationPort.carregarRepasses();
 
         var totalEntradas = BigDecimal.ZERO;
         var totalFinal = BigDecimal.ZERO;
@@ -133,7 +141,7 @@ public class FinanceiroQueryService {
             totalExtras = totalExtras.add(a.getValorExtras());
             faturamentoTotal = faturamentoTotal.add(a.getValorTotalFinal());
             repasse = repasse.add(repasses.previstos().getOrDefault(a.getId(), BigDecimal.ZERO));
-            deslocamento = deslocamento.add(financeCalculator.deslocamentoEfetivo(a));
+            deslocamento = deslocamento.add(displacementCostPort.deslocamentoEfetivo(a));
 
             if (a.getValorRestante().compareTo(BigDecimal.ZERO) > 0) {
                 totalFinal = totalFinal.add(a.getValorRestante());
@@ -154,7 +162,7 @@ public class FinanceiroQueryService {
     }
 
     public FinanceiroRelatoriosResponse calcularRelatorios(LocalDateTime dataInicio, LocalDateTime dataFim) {
-        var statusIgnorados = financeCalculator.statusIgnorados();
+        var statusIgnorados = statusClassificationPort.statusIgnorados();
         List<Agendamento> agendamentos;
         if (dataInicio != null && dataFim != null) {
             agendamentos = agendamentoRepository.findByDataBetween(dataInicio, dataFim, List.copyOf(statusIgnorados));
@@ -168,7 +176,7 @@ public class FinanceiroQueryService {
             .sorted(Comparator.comparing(Agendamento::getDataHoraEnsaio).reversed())
             .toList();
 
-        var repasses = financeCalculator.carregarRepasses(agendamentoFotografoRepository);
+        var repasses = repasseAggregationPort.carregarRepasses();
 
         var total = BigDecimal.ZERO;
         var entrada = BigDecimal.ZERO;
@@ -207,7 +215,7 @@ public class FinanceiroQueryService {
         var totalDespesas = despesas.stream()
             .map(Despesa::getValor)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
-        var custoDeslocamento = financeCalculator.deslocamentoEfetivo(agendamento);
+        var custoDeslocamento = displacementCostPort.deslocamentoEfetivo(agendamento);
         var comissao = indicacaoRepository.findByAgendamentoIdIn(List.of(agendamentoId)).stream()
             .map(Indicacao::getValorComissao)
             .reduce(BigDecimal.ZERO, BigDecimal::add);

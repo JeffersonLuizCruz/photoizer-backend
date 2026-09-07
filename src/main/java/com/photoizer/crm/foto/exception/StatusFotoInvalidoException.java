@@ -1,12 +1,11 @@
 package com.photoizer.crm.foto.exception;
 
 import com.photoizer.crm.foto.model.StatusFoto;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ResponseStatus;
+import com.photoizer.crm.shared.exception.ConflictException;
+import com.photoizer.crm.shared.exception.ErrorCode;
 
-@ResponseStatus(HttpStatus.CONFLICT)
-public class StatusFotoInvalidoException extends RuntimeException {
+public class StatusFotoInvalidoException extends ConflictException {
     public StatusFotoInvalidoException(StatusFoto atual, StatusFoto proximo) {
-        super("Transição de status inválida: " + atual + " → " + proximo);
+        super(ErrorCode.STATUS_FOTO_INVALIDO, "Transição de status inválida: " + atual + " → " + proximo);
     }
 }

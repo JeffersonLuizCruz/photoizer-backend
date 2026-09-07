@@ -3,7 +3,7 @@ package com.photoizer.crm.agenda.service;
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
-import com.photoizer.crm.shared.service.FinanceCalculator;
+import com.photoizer.crm.shared.port.StatusClassificationPort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,14 +25,14 @@ public class AgendamentoQueryService {
 
     private final AgendamentoRepository agendamentoRepository;
     private final AgendamentoFotografoRepository agendamentoFotografoRepository;
-    private final FinanceCalculator financeCalculator;
+    private final StatusClassificationPort statusClassificationPort;
 
     public AgendamentoQueryService(AgendamentoRepository agendamentoRepository,
                                    AgendamentoFotografoRepository agendamentoFotografoRepository,
-                                   FinanceCalculator financeCalculator) {
+                                   StatusClassificationPort statusClassificationPort) {
         this.agendamentoRepository = agendamentoRepository;
         this.agendamentoFotografoRepository = agendamentoFotografoRepository;
-        this.financeCalculator = financeCalculator;
+        this.statusClassificationPort = statusClassificationPort;
     }
 
     /**
@@ -40,7 +40,7 @@ public class AgendamentoQueryService {
      */
     public List<Agendamento> obterPorPeriodo(LocalDateTime inicio, LocalDateTime fim) {
         return agendamentoRepository.findByDataBetween(inicio, fim,
-            List.copyOf(financeCalculator.statusIgnorados()));
+            List.copyOf(statusClassificationPort.statusIgnorados()));
     }
 
     /**
@@ -71,15 +71,8 @@ public class AgendamentoQueryService {
      */
     public BigDecimal calcularReceitaPeriodo(LocalDateTime inicio, LocalDateTime fim) {
         return obterPorPeriodo(inicio, fim).stream()
-            .filter(a -> financeCalculator.isConfirmadoOuFinalizado(a.getStatus()))
+            .filter(a -> statusClassificationPort.isConfirmadoOuFinalizado(a.getStatus()))
             .map(a -> a.getValorTotalFinal() != null ? a.getValorTotalFinal() : BigDecimal.ZERO)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    /**
-     * Retorna o repositório de repasses para uso pelo FinanceCalculator.
-     */
-    public AgendamentoFotografoRepository repasseRepository() {
-        return agendamentoFotografoRepository;
     }
 }

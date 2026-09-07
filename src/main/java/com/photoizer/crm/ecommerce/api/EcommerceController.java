@@ -15,6 +15,7 @@ import com.photoizer.crm.foto.api.FotoMapper;
 import com.photoizer.crm.foto.model.FotoEnsaio;
 import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.service.FotoService;
+import com.photoizer.crm.shared.exception.BadRequestException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -95,11 +96,11 @@ public class EcommerceController {
 
     private UUID resolverSessionId(@RequestHeader(value = HEADER_SESSION, required = false) String sessionId) {
         if (sessionId == null || sessionId.isBlank() || !sessionService.valida(sessionId)) {
-            throw new IllegalArgumentException("Sessão inválida");
+            throw new BadRequestException("Sessão inválida");
         }
         var dotIndex = sessionId.indexOf('.');
         if (dotIndex <= 0) {
-            throw new IllegalArgumentException("Sessão inválida");
+            throw new BadRequestException("Sessão inválida");
         }
         return UUID.fromString(sessionId.substring(0, dotIndex));
     }

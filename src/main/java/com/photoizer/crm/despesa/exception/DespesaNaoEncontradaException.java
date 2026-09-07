@@ -2,9 +2,12 @@ package com.photoizer.crm.despesa.exception;
 
 import java.util.UUID;
 
-public class DespesaNaoEncontradaException extends RuntimeException {
+import com.photoizer.crm.shared.exception.ErrorCode;
+import com.photoizer.crm.shared.exception.NotFoundException;
+
+public class DespesaNaoEncontradaException extends NotFoundException {
 
     public DespesaNaoEncontradaException(UUID id) {
-        super("Despesa não encontrada: " + id);
+        super(ErrorCode.DESPESA_NAO_ENCONTRADA, "Despesa não encontrada: " + id);
     }
 }

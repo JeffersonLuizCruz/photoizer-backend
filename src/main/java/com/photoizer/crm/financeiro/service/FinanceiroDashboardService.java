@@ -13,7 +13,9 @@ import com.photoizer.crm.financeiro.model.Receita;
 import com.photoizer.crm.financeiro.model.StatusReceita;
 import com.photoizer.crm.financeiro.model.TipoServico;
 import com.photoizer.crm.financeiro.repository.ReceitaRepository;
-import com.photoizer.crm.shared.service.FinanceCalculator;
+import com.photoizer.crm.shared.port.DisplacementCostPort;
+import com.photoizer.crm.shared.port.RepasseAggregationPort;
+import com.photoizer.crm.shared.port.StatusClassificationPort;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -47,20 +49,26 @@ public class FinanceiroDashboardService {
     private final AgendamentoRepository agendamentoRepository;
     private final AgendamentoFotografoRepository agendamentoFotografoRepository;
     private final IndicacaoRepository indicacaoRepository;
-    private final FinanceCalculator financeCalculator;
+    private final StatusClassificationPort statusClassificationPort;
+    private final DisplacementCostPort displacementCostPort;
+    private final RepasseAggregationPort repasseAggregationPort;
 
     public FinanceiroDashboardService(ReceitaRepository receitaRepository,
                                       DespesaRepository despesaRepository,
                                       AgendamentoRepository agendamentoRepository,
                                       AgendamentoFotografoRepository agendamentoFotografoRepository,
                                       IndicacaoRepository indicacaoRepository,
-                                      FinanceCalculator financeCalculator) {
+                                      StatusClassificationPort statusClassificationPort,
+                                      DisplacementCostPort displacementCostPort,
+                                      RepasseAggregationPort repasseAggregationPort) {
         this.receitaRepository = receitaRepository;
         this.despesaRepository = despesaRepository;
         this.agendamentoRepository = agendamentoRepository;
         this.agendamentoFotografoRepository = agendamentoFotografoRepository;
         this.indicacaoRepository = indicacaoRepository;
-        this.financeCalculator = financeCalculator;
+        this.statusClassificationPort = statusClassificationPort;
+        this.displacementCostPort = displacementCostPort;
+        this.repasseAggregationPort = repasseAggregationPort;
     }
 
     public FinanceiroDashboardResponse calcular(LocalDate dataInicio, LocalDate dataFim,
@@ -76,11 +84,11 @@ public class FinanceiroDashboardService {
             despesas = despesaRepository.findByDataBetweenOrderByDataDesc(dataInicio, dataFim);
             agendamentos = agendamentoRepository.findByDataBetween(
                 dataInicio.atStartOfDay(), dataFim.plusDays(1).atStartOfDay(),
-                List.copyOf(financeCalculator.statusIgnorados()));
+                List.copyOf(statusClassificationPort.statusIgnorados()));
         } else {
             despesas = despesaRepository.findAll();
             agendamentos = agendamentoRepository.findAll().stream()
-                .filter(a -> !financeCalculator.statusIgnorados().contains(a.getStatus()))
+                .filter(a -> !statusClassificationPort.statusIgnorados().contains(a.getStatus()))
                 .toList();
         }
         if (clienteId != null) {
@@ -92,7 +100,7 @@ public class FinanceiroDashboardService {
         var agendamentoIds = agendamentos.stream().map(Agendamento::getId).toList();
         List<Indicacao> indicacoes = agendamentoIds.isEmpty() ? List.of()
             : indicacaoRepository.findByAgendamentoIdIn(agendamentoIds);
-        var repasses = financeCalculator.carregarRepasses(agendamentoFotografoRepository);
+        var repasses = repasseAggregationPort.carregarRepasses();
 
         var inicio = dataInicio != null ? dataInicio : LocalDate.of(1970, 1, 1);
         var fim = dataFim != null ? dataFim : MAX_FIM;
@@ -135,7 +143,7 @@ public class FinanceiroDashboardService {
     private FinanceiroDashboardResponse.CardsResumo calcularCards(
             LocalDate inicio, LocalDate fim, List<Receita> receitas, List<Despesa> despesas,
             List<Agendamento> agendamentos, List<Indicacao> indicacoes,
-            FinanceCalculator.RepassesResumo repasses,
+            RepasseAggregationPort.RepassesResumo repasses,
             boolean temPeriodo) {
 
         var agg = calcularAgregados(inicio, fim, receitas, despesas, agendamentos, indicacoes, repasses);
@@ -172,7 +180,7 @@ public class FinanceiroDashboardService {
     private Agregados calcularAgregados(
             LocalDate inicio, LocalDate fim, List<Receita> receitas, List<Despesa> despesas,
             List<Agendamento> agendamentos, List<Indicacao> indicacoes,
-            FinanceCalculator.RepassesResumo repasses) {
+            RepasseAggregationPort.RepassesResumo repasses) {
 
         var ensaiosPeriodo = agendamentos.stream()
             .filter(a -> emPeriodo(a.getDataHoraEnsaio() != null ? a.getDataHoraEnsaio().toLocalDate() : null, inicio, fim))
@@ -180,10 +188,10 @@ public class FinanceiroDashboardService {
 
         var entradaEnsaios = somar(ensaiosPeriodo, Agendamento::getValorEntradaPago);
         var restanteEnsaios = somar(ensaiosPeriodo, Agendamento::getValorRestante);
-        var deslocamentoEfetivo = somar(ensaiosPeriodo, financeCalculator::deslocamentoEfetivo);
+        var deslocamentoEfetivo = somar(ensaiosPeriodo, displacementCostPort::deslocamentoEfetivo);
         var deslocamentoEfetivoPago = somar(ensaiosPeriodo.stream()
             .filter(a -> a.getValorRestante() != null && a.getValorRestante().compareTo(BigDecimal.ZERO) <= 0)
-            .toList(), financeCalculator::deslocamentoEfetivo);
+            .toList(), displacementCostPort::deslocamentoEfetivo);
         var repassesPrevistos = somarRepassesEnsaios(ensaiosPeriodo, repasses.previstos());
         var repassesPagos = somarRepassesEnsaios(ensaiosPeriodo, repasses.pagos());
         var qtdTrabalhos = ensaiosPeriodo.size();
@@ -237,7 +245,7 @@ public class FinanceiroDashboardService {
     private FinanceiroDashboardResponse.VariacaoCards calcularVariacoes(
             LocalDate inicio, LocalDate fim, List<Receita> receitas, List<Despesa> despesas,
             List<Agendamento> agendamentos, List<Indicacao> indicacoes,
-            FinanceCalculator.RepassesResumo repasses) {
+            RepasseAggregationPort.RepassesResumo repasses) {
         var prevYM = YearMonth.from(inicio).minusMonths(1);
         var prevInicio = prevYM.atDay(1);
         var prevFim = prevYM.atEndOfMonth();
@@ -245,7 +253,7 @@ public class FinanceiroDashboardService {
         var prevDespesas = despesaRepository.findByDataBetweenOrderByDataDesc(prevInicio, prevFim);
         var prevAgendamentos = agendamentoRepository.findByDataBetween(
             prevInicio.atStartOfDay(), prevFim.plusDays(1).atStartOfDay(),
-            List.copyOf(financeCalculator.statusIgnorados()));
+            List.copyOf(statusClassificationPort.statusIgnorados()));
         var prevAgendamentoIds = prevAgendamentos.stream().map(Agendamento::getId).toList();
         var prevIndicacoes = prevAgendamentoIds.isEmpty()
             ? List.<Indicacao>of()
@@ -261,7 +269,7 @@ public class FinanceiroDashboardService {
     private List<FinanceiroDashboardResponse.DadoMensal> calcularBarraMensal(
             List<YearMonth> meses, LocalDate inicio, LocalDate fim,
             List<Receita> receitas, List<Despesa> despesas, List<Agendamento> agendamentos,
-            List<Indicacao> indicacoes, FinanceCalculator.RepassesResumo repasses, boolean temPeriodo) {
+            List<Indicacao> indicacoes, RepasseAggregationPort.RepassesResumo repasses, boolean temPeriodo) {
         var receitasPorMes = new HashMap<YearMonth, BigDecimal>();
         var despesasPorMes = new HashMap<YearMonth, BigDecimal>();
         var dataEnsaioPorId = dataEnsaioPorId(agendamentos);
@@ -272,7 +280,7 @@ public class FinanceiroDashboardService {
             if (data == null) continue;
             var ym = YearMonth.from(data);
             receitasPorMes.merge(ym, a.getValorTotalFinal(), BigDecimal::add);
-            despesasPorMes.merge(ym, financeCalculator.deslocamentoEfetivo(a), BigDecimal::add);
+            despesasPorMes.merge(ym, displacementCostPort.deslocamentoEfetivo(a), BigDecimal::add);
             despesasPorMes.merge(ym, repassePrevisto(a.getId(), repasses), BigDecimal::add);
         }
         for (var i : indicacoes) {
@@ -326,7 +334,7 @@ public class FinanceiroDashboardService {
     private List<FinanceiroDashboardResponse.DadoLucroMensal> calcularLucroMensal(
             List<YearMonth> meses, LocalDate inicio, LocalDate fim,
             List<Receita> receitas, List<Despesa> despesas, List<Agendamento> agendamentos,
-            List<Indicacao> indicacoes, FinanceCalculator.RepassesResumo repasses, boolean temPeriodo) {
+            List<Indicacao> indicacoes, RepasseAggregationPort.RepassesResumo repasses, boolean temPeriodo) {
         var recebidoPorMes = new HashMap<YearMonth, BigDecimal>();
         var despesasPorMes = new HashMap<YearMonth, BigDecimal>();
         var dataEnsaioPorId = dataEnsaioPorId(agendamentos);
@@ -337,7 +345,7 @@ public class FinanceiroDashboardService {
             if (data == null) continue;
             var ym = YearMonth.from(data);
             recebidoPorMes.merge(ym, a.getValorEntradaPago(), BigDecimal::add);
-            despesasPorMes.merge(ym, financeCalculator.deslocamentoEfetivo(a), BigDecimal::add);
+            despesasPorMes.merge(ym, displacementCostPort.deslocamentoEfetivo(a), BigDecimal::add);
             despesasPorMes.merge(ym, repassePago(a.getId(), repasses), BigDecimal::add);
         }
         for (var i : indicacoes) {
@@ -374,7 +382,7 @@ public class FinanceiroDashboardService {
     private List<FinanceiroDashboardResponse.RentabilidadeServico> calcularRentabilidadePorServico(
             LocalDate inicio, LocalDate fim, List<Receita> receitas, List<Despesa> despesas,
             List<Agendamento> agendamentos, List<Indicacao> indicacoes,
-            FinanceCalculator.RepassesResumo repasses) {
+            RepasseAggregationPort.RepassesResumo repasses) {
         var custoPorTrabalho = custoDespesasPorTrabalho(despesas);
         var comissaoPorTrabalho = comissaoPorTrabalho(indicacoes);
 
@@ -385,7 +393,7 @@ public class FinanceiroDashboardService {
             if (!emPeriodo(data, inicio, fim)) continue;
             var valor = a.getValorTotalFinal();
             var custo = custoPorTrabalho.getOrDefault(a.getId(), BigDecimal.ZERO)
-                .add(financeCalculator.deslocamentoEfetivo(a))
+                .add(displacementCostPort.deslocamentoEfetivo(a))
                 .add(comissaoPorTrabalho.getOrDefault(a.getId(), BigDecimal.ZERO))
                 .add(repassePrevisto(a.getId(), repasses));
             receita.merge("ENSAIO", valor, BigDecimal::add);
@@ -416,7 +424,7 @@ public class FinanceiroDashboardService {
     private List<FinanceiroDashboardResponse.RentabilidadeTrabalho> calcularRentabilidadePorTrabalho(
             LocalDate inicio, LocalDate fim, List<Despesa> despesas,
             List<Agendamento> agendamentos, List<Indicacao> indicacoes,
-            FinanceCalculator.RepassesResumo repasses) {
+            RepasseAggregationPort.RepassesResumo repasses) {
         var custoPorTrabalho = custoDespesasPorTrabalho(despesas);
         var comissaoPorTrabalho = comissaoPorTrabalho(indicacoes);
 
@@ -426,7 +434,7 @@ public class FinanceiroDashboardService {
             if (!emPeriodo(data, inicio, fim)) continue;
             var valor = a.getValorTotalFinal();
             var custo = custoPorTrabalho.getOrDefault(a.getId(), BigDecimal.ZERO)
-                .add(financeCalculator.deslocamentoEfetivo(a))
+                .add(displacementCostPort.deslocamentoEfetivo(a))
                 .add(comissaoPorTrabalho.getOrDefault(a.getId(), BigDecimal.ZERO))
                 .add(repassePrevisto(a.getId(), repasses));
             var roi = custo.signum() > 0
@@ -446,7 +454,7 @@ public class FinanceiroDashboardService {
     private List<FinanceiroDashboardResponse.Lancamento> calcularUltimosLancamentos(
             LocalDate inicio, LocalDate fim, List<Receita> receitas,
             List<Despesa> despesas, List<Agendamento> agendamentos,
-            FinanceCalculator.RepassesResumo repasses) {
+            RepasseAggregationPort.RepassesResumo repasses) {
         var lancamentos = new ArrayList<FinanceiroDashboardResponse.Lancamento>();
 
         for (var a : agendamentos) {
@@ -540,11 +548,11 @@ public class FinanceiroDashboardService {
         return total;
     }
 
-    private BigDecimal repassePrevisto(UUID agendamentoId, FinanceCalculator.RepassesResumo repasses) {
+    private BigDecimal repassePrevisto(UUID agendamentoId, RepasseAggregationPort.RepassesResumo repasses) {
         return repasses.previstos().getOrDefault(agendamentoId, BigDecimal.ZERO);
     }
 
-    private BigDecimal repassePago(UUID agendamentoId, FinanceCalculator.RepassesResumo repasses) {
+    private BigDecimal repassePago(UUID agendamentoId, RepasseAggregationPort.RepassesResumo repasses) {
         return repasses.pagos().getOrDefault(agendamentoId, BigDecimal.ZERO);
     }
 

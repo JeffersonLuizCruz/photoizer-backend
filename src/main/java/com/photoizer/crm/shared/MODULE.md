@@ -1,131 +1,131 @@
 # Módulo: Shared
 
 ## 1. Responsabilidade
-Módulo de infraestrutura compartilhada entre todos os módulos. Fornece classe base de entidade, tratamento global de exceções, configurações de infraestrutura, logging via AOP, rate limiting e armazenamento de arquivos.
+Módulo de infraestrutura compartilhada entre todos os módulos. Fornece composição de auditoria, hierarquia de exceções, tratamento global de erros, configurações de infraestrutura, logging via AOP, rate limiting, armazenamento de arquivos, geração de PDF, processamento de imagens e portas para cálculos financeiros.
 
 ## 2. Estrutura
 ```
 shared/
-├── model/
-│   ├── BaseEntity.java               # @MappedSuperclass: id (UUID), createdAt, updatedAt, createdBy + @PrePersist/@PreUpdate
-│   ├── FormaPagamento.java           # Enum: PIX, CARTAO, DINHEIRO, TRANSFERENCIA, OUTRO
-│   └── TipoRepasse.java              # Enum: FIXO, PERCENTUAL
 ├── api/
 │   └── PageResponse.java             # Record genérico: data, total, page, perPage, totalPages
+├── auth/
+│   └── TokenService.java             # Interface para geração de tokens (Dependency Inversion)
 ├── config/
 │   ├── CorsConfig.java               # CORS filter (localhost:5173)
-│   ├── DataSeeder.java               # CommandLineRunner: usuários, configurações, categorias de despesa, backfill
 │   ├── LoggingConfig.java            # @EnableAspectJAutoProxy(proxyTargetClass=true)
 │   ├── OpenApiConfig.java            # Configuração SpringDoc OpenAPI/Swagger
-│   └── RateLimitFilter.java          # Rate limiting em memória para endpoints da galeria pública
+│   ├── RateLimitFilter.java          # Rate limiting com Caffeine cache para galeria pública
+│   └── RateLimitProperties.java      # @ConfigurationProperties: window-ms, maximum-size, limits
 ├── exception/
-│   ├── ErrorResponse.java            # Record: status, error, message, timestamp, fieldErrors (NON_NULL)
-│   └── GlobalExceptionHandler.java   # @RestControllerAdvice: mapeia ~17 exceções de domínio + genéricas
+│   ├── ErrorCode.java                # Enum: códigos de erro de negócio (~60 constantes)
+│   ├── BusinessException.java        # Base: HttpStatus + ErrorCode
+│   ├── NotFoundException.java        # 404
+│   ├── BadRequestException.java      # 400
+│   ├── ConflictException.java        # 409
+│   ├── UnprocessableException.java   # 422
+│   ├── GoneException.java            # 410
+│   ├── UnauthorizedException.java    # 401
+│   ├── ForbiddenException.java       # 403
+│   ├── ErrorResponse.java            # Record: status, error, message, code, timestamp(UTC), fieldErrors
+│   └── GlobalExceptionHandler.java   # @RestControllerAdvice: 7 handlers de hierarquia + genéricos Spring
 ├── logging/
 │   ├── LoggingAspect.java            # @Around em controllers (INFO), services (DEBUG), repositories (TRACE)
 │   └── SensitiveDataMask.java        # Mascara CPF, telefone, email em logs
+├── model/
+│   ├── AuditInfo.java                # @Embeddable: createdAt, updatedAt, createdBy (composição > herança)
+│   ├── AuditInfoListener.java        # JPA EntityListener: @PrePersist/@PreUpdate + createdBy via SecurityContext
+│   ├── FormaPagamento.java           # Enum: PIX, CARTAO, DINHEIRO, TRANSFERENCIA, OUTRO
+│   └── TipoRepasse.java              # Enum: FIXO, PERCENTUAL
+├── pdf/
+│   └── PdfWriter.java                # Facade: geração de PDF via OpenPDF
+├── port/
+│   ├── StatusClassificationPort.java # Porta: classificação de status de agendamentos (lógica pura)
+│   ├── DisplacementCostPort.java     # Porta: cálculo de custo de deslocamento (lógica pura)
+│   └── RepasseAggregationPort.java   # Porta: agregação de repasses (I/O via adaptador no agenda)
+├── processing/
+│   └── ImageProcessingService.java   # Thumbnail + watermark via Thumbnailator + AWT
+├── service/
+│   ├── StatusClassificationAdapter.java  # Adaptador: lógica de classificação de status
+│   └── DisplacementCostAdapter.java      # Adaptador: regra de deslocamento efetivo
 └── storage/
+    ├── FileServeHelper.java          # Helper: servir arquivos via HTTP com validação de segurança
     ├── FileStorageService.java       # Interface: salvar, salvarEmSubdiretorio, deletar, getUploadDir
-    └── LocalFileStorageService.java  # Implementação: grava em uploads/ (caminho absoluto)
+    ├── FileValidator.java            # Validator: whitelist de extensões, sanitização, path traversal
+    └── LocalFileStorageService.java  # Implementação: grava em uploads/ com validação de segurança
 ```
 
 ## 3. Dependências Externas
 
-### Módulos internos importados — **[VIOLAÇÕES Modulith]**
-O AGENTS.md afirma que `shared` é fundacional e não importa módulos de negócio — **isso está incorreto**:
-- `GlobalExceptionHandler.java:4-21` importa exceções de `agenda`, `pacote`, `cliente`, `comissao`, `edicao`, `ecommerce`, `contrato`. Dependência invertida: **infraestrutura depende do domínio**.
-- `DataSeeder.java:3-14` importa `auth`, `config`, `despesa`, `indicador`. O seeder cruza módulos para semear dados.
+### Módulos internos importados — **[TODAS RESOLVIDAS]**
+- `GlobalExceptionHandler`: zero imports de domínio.
+- `FinanceCalculator`: **deletado** — substituído por portas em `shared/port/` + adaptadores em `shared/service/` e `agenda/adapter/`.
+- `DataSeeder`: **deletado** — decomposto em 5 seeders por módulo (`auth/seed/`, `config/seed/`, `indicador/seed/`, `despesa/seed/`).
 
 ### Módulos que dependem deste
-Todos: `BaseEntity` (26 entidades), `FileStorageService` (agenda, edicao, ecommerce, foto), `GlobalExceptionHandler`, `PageResponse`, `FormaPagamento`/`TipoRepasse` (agenda, financeiro), `CorsConfig` (auth), `LoggingAspect`/`SensitiveDataMask`.
+Todos: `AuditInfo` (25 entidades), `FileStorageService` (agenda, edicao, ecommerce, foto), `FileValidator` (agenda, edicao, ecommerce, despesa), `GlobalExceptionHandler`, `PageResponse`, `FormaPagamento`/`TipoRepasse` (agenda, financeiro), `CorsConfig` (auth), `LoggingAspect`/`SensitiveDataMask`, hierarquia `BusinessException` (todos), portas financeiras (`StatusClassificationPort`, `DisplacementCostPort`, `RepasseAggregationPort` — dashboard, financeiro, agenda).
 
 ## 4. Componentes
 
-### BaseEntity
-- `@MappedSuperclass` + Lombok `@SuperBuilder`, `@Getter/@Setter`, `@NoArgsConstructor(protected)`.
-- Campos: `id` (UUID, `@GeneratedValue(GenerationType.UUID)`), `createdAt`, `updatedAt`, `createdBy` (String).
-- `@PrePersist`/`@PreUpdate` manuais para timestamps (`BaseEntity.java:40-49`).
+### Hierarquia de Exceções
+- `BusinessException extends RuntimeException` com `HttpStatus` + `ErrorCode` enum.
+- 7 subclasses marcadoras: `NotFoundException`(404), `BadRequestException`(400), `ConflictException`(409), `UnprocessableException`(422), `GoneException`(410), `UnauthorizedException`(401), `ForbiddenException`(403).
+- 61 exceções de domínio em 14 módulos migradas para extender as subclasses.
+- `GlobalExceptionHandler`: 7 handlers genéricos + handlers Spring → zero imports de domínio.
 
-### GlobalExceptionHandler
-- 17 handlers de exceções de domínio mapeando para status HTTP (404/409/422/410/401).
-- 6 handlers genéricos: validação (422), upload (413), `IllegalArgumentException` (422), parte ausente (422), acesso negado (403), genérica (500).
-- `ErrorResponse` com `@JsonInclude(NON_NULL)` — campos nulos omitidos.
+### AuditInfo
+- `@Embeddable` com `createdAt`, `updatedAt`, `createdBy`. Composição em vez de herança.
+- `AuditInfoListener` popula `createdBy` via `SecurityContextHolder`. Fallback `"SYSTEM"`.
 
-### LoggingAspect
-- AOP intercepta: controllers (INFO, method+path+duração), services (DEBUG, args mascarados+resultado), repositories (TRACE).
-- `getResultSummary` resume resultados por tipo (`LoggingAspect.java:123-141`).
+### Portas Financeiras (Ports & Adapters)
+- `StatusClassificationPort`: classificação de status (pura)
+- `DisplacementCostPort`: cálculo de deslocamento (pura)
+- `RepasseAggregationPort`: agregação de repasses (I/O)
 
 ### RateLimitFilter
-- Janela fixa de 60s por IP+path em memória (`ConcurrentHashMap`) — `RateLimitFilter.java:32`.
-- Limites: `/download-zip` 5, `/checkout` 10, `/comprovante` 10, `/selecionar` 60, `/sessao` 30.
-- Aplica-se apenas a paths contendo `/ecommerce/galeria/` ou `/ecommerce/sessao` (`shouldNotFilter`).
+- Caffeine cache com `expireAfterWrite` + `maximumSize`.
+- Config externa via `RateLimitProperties` (`app.rate-limit.*`).
 
-### DataSeeder
-- Semearia 5 usuários, 5+6 configurações, 11 categorias de despesa, backfill de despesas legadas e limpeza de indicadores duplicados via `EntityManager` (HQL `GROUP BY ... HAVING COUNT > 1`).
-- Template de contrato em texto (`TEMPLATO_PADRAO`) com placeholders `{{...}}`.
+### FileValidator
+- Whitelist de extensões fixa por contexto (image, raw, edited, receipt, any).
+- Sanitização de filename e validação de path traversal.
+
+### LoggingAspect
+- AOP: controllers (INFO), services (DEBUG), repositories (TRACE).
+
+### PdfWriter
+- Facade: geração de PDF via OpenPDF.
 
 ## 5. Regras Específicas
-1. **`BaseEntity` gera UUID via Hibernate** (`GenerationType.UUID`). Entidades fora da herança (`User`, `Notificacao`, `Configuracao`) gerenciam ID manualmente — inconsistência.
-2. **`CorsConfig` regista 2 beans quase idênticos** (`corsFilter` e `corsConfigurationSource`), ambos com mesmo `corsConfig()`.
-3. **Rate limit é em memória**: resetado a cada restart; não funciona com múltiplas instâncias; sujeito a estouro de memória no `ConcurrentHashMap` (sem eviction de janelas antigas).
-4. **`SensitiveDataMask` máscara por regex** após truncar strings > 500 chars.
+1. **`AuditInfo` composto** em todas as 25 entidades. `createdBy` populado automaticamente via SecurityContext.
+2. **`CorsConfig`** regista 2 beans (pendente simplificação P3).
+3. **`FileValidator`** whitelist fixa no código — não parametrizável via properties.
+4. **`IndicadorCleanupSeeder`** roda apenas em `@Profile("!prod")`.
 
 ## 6. Testes
-Nenhum teste específico para este módulo. Apenas `CrmApplicationTests` (smoke de contexto).
+`CrmApplicationTests` (smoke de contexto). Testes unitários em módulos consumidores.
 
-## 7. Dívidas Técnicas e Melhorias Recomendadas
+## 7. Dívidas Restantes
 
-### 7.1 Herança → Composição (`BaseEntity`) — **P1**
-- **Problema**: 26 entidades estendem `@MappedSuperclass` (`BaseEntity.java`). O usuário do projeto não quer herança; `@SuperBuilder` só existe para suportar a cadeia de herança; campos de auditoria são intrinsecamente composição.
-- **Solução**: substituir por **composição** via `@Embeddable` + Spring Data JPA Auditing:
-  1. Criar `@Embeddable AuditInfo` (createdAt, updatedAt, createdBy) e um `@Embeddable EntityId`? Melhor: manter `id` via `@Embeddable` não resolve `@GeneratedValue`; alternativa limpa é:
-     - `@Embeddable AuditInfo` composto em cada entidade (sem herança) + `@EntityListeners(AuditingEntityListener.class)` global via `@EnableJpaAuditing`.
-     - `id` UUID: ou repetir o campo com `@GeneratedValue(UUID)` em cada entidade, ou criar componente JPA de configuração de ID. Recomendação: `@Embeddable AuditInfo` (composição de verdade) + anotação de auditoria; eliminar `BaseEntity`, `@SuperBuilder` e os `@PrePersist/@PreUpdate` manuais.
-  2. Resultado: entidades deixam de herdar; lombok passa a usar `@Builder` (em vez de `@SuperBuilder`); auditoria delegada ao Spring.
-- Benefício secundário: `equals`/`hashCode` das entidades podem ser definidos pelo `id` sem herança.
+### 7.1 `CorsConfig` duplicação de beans — **P3**
+- Dois beans com a mesma configuração. Origens hardcoded.
 
-### 7.2 Dependência invertida `shared → módulos` — **P1**
-- `GlobalExceptionHandler.java:4-28` e `DataSeeder.java:3-14` importam módulos de negócio. Infraestrutura depende do domínio, quebrando o ciclo recomendado do Modulith.
-- **Solução**:
-  - Para exceções: criar hierarquia central em `shared` (`BusinessException` com `HttpStatus` + código), eliminar os ~17 handlers específicos (ver 7.3).
-  - Para o seeder: mover `DataSeeder` para o módulo `config` (que já é dono do `Configuracao`) e/ou criar eventos `DadosSemeadosEvent`; o seeder não deveria conhecer `auth`/`despesa`/`indicador` internamente.
+### 7.2 `SensitiveDataMask` — mascaramento pós-truncamento — **P3**
+- Strings > 500 chars truncadas antes de mascarar.
 
-### 7.3 Hierarquia de exceções e `GlobalExceptionHandler` — **P1**
-- **Problema**: 18 classes de exceção quase idênticas em 7 módulos + 17 métodos boilerplate no handler (`GlobalExceptionHandler.java:40-146`).
-- **Solução** (aprovada pelo usuário — "Hierarquia central"):
-  1. Criar em `shared/exception`:
-     - `BusinessException extends RuntimeException` com `HttpStatus status` (default 4xx/5xx) e opcional `ErrorCode` enum.
-     - Subclasses marcadoras: `NotFoundException`, `ConflictException`, `UnprocessableEntityException`, `UnauthorizedException`, `GoneException`.
-  2. Cada módulo troca suas classes por uma dessas subclasses (ou usa `new NotFoundException("Cliente não encontrado: " + id)`).
-  3. `GlobalExceptionHandler` reduz para ~5 handlers (`BusinessException`, validação, upload, acesso negado, genérica).
-
-### 7.4 `ErrorResponse` sem suporte a múltiplos erros e sem código — **P1**
-- `ErrorResponse.java` tem `fieldErrors` mas nenhum campo de código de erro de negócio; `timestamp` é `LocalDateTime` (não ISO-8601 UTC).
-- **Solução**: adicionar `code` (String) opcional ao record; usar `Instant`/`OffsetDateTime` em UTC para consistência entre nós.
-
-### 7.5 RateLimitFilter — falta eviction e escala — **P2**
-- `ConcurrentHashMap` (`RateLimitFilter.java:32`) cresce sem limite (1 entry por IP+path); janelas antigas nunca são limpas.
-- **Solução**: `Caffeine cache` com `expireAfterWrite(WINDOW_MS)` (já é uma lib padrão de cache), ou `cleanup()` periódico; parametrizar limites via `application.properties`.
-
-### 7.6 `CorsConfig` duplicação de beans — **P3**
-- `CorsConfig.java:16-26` define `corsFilter` e `corsConfigurationSource` com o mesmo `corsConfig()`. Manter apenas o `CorsConfigurationSource` + `@EnableWebMvc`/`SecurityConfig` o consome; origens e métodos deveriam vir de configuração por profile.
-
-### 7.7 `LocalFileStorageService` — sem validação de extensão e caminho — **P2**
-- `salvarEmSubdiretorio` extrai extensão do nome original (`LocalFileStorageService.java:59-64`) sem saneamento; `salvar` (`:29-44`) aceita qualquer tipo; nomes originais podem conter path traversal.
-- **Solução**: whitelist de extensões por tipo (imagem/pdf/zip), sanitizar nome de arquivo, retornar caminho relativo segurto para o banco, e validar na camada de serviço.
-
-### 7.8 `DataSeeder` — responsabilidades demais e não-idempotência parcial — **P2**
-- Seeda usuários, configurações, categorias, backfill de despesas, limpeza de duplicados e template de contrato — 6 responsabilidades em um único arquivo (`DataSeeder.java`).
-- `limparIndicadoresDuplicados` deleta em loop (N+1 deletes); `backfillDespesasLegadas` usa JPQL em `EntityManager`.
-- **Solução**: separar em `Seeders` por módulo (via eventos ou profiles); usar `@ConditionalOnProperty`/profile `dev`; remover lógica de limpeza de produção.
-
-### 7.9 Lombok — exposição de setters em entidades — **P2**
-- Todas as entidades usam `@Setter` de classe, permitindo mutação arbitrária fora de invariantes.
-- **Solução**: usar `@Setter(AccessLevel.PRIVATE)` + métodos de domínio que validam transições de estado; `@Builder` para construção; `@Getter` para leitura.
-
-### 7.10 Ausência de testes e auditoria não auditada — **P1**
-- `createdBy` nunca é preenchido (nenhum código seta), e não há `@CreatedBy`/`AuditorAware` com o usuário do JWT.
-- **Solução**: ativar `@EnableJpaAuditing` + `AuditorAware` lendo o `SecurityContext`.
-
-## 8. Exemplos de arquivos afetados
-- `BaseEntity.java:24-49` — herança a remover; `GlobalExceptionHandler.java:40-146` — handlers a consolidar; `DataSeeder.java:58-94` — seeder cross-module; `RateLimitFilter.java:32` — cache sem eviction; `LocalFileStorageService.java:29-74` — salvamento sem validação; `CorsConfig.java:16-26` — beans duplicados.
+## 8. Exemplos de arquivos afetados nesta refatoração
+- `GlobalExceptionHandler.java` — 509→~130 linhas, zero imports de domínio
+- `ErrorResponse.java` — campo `code` + `OffsetDateTime`
+- `AuditInfo.java` — campo `createdBy`
+- `AuditInfoListener.java` — `SecurityContextHolder` para createdBy
+- `LocalFileStorageService.java` — path traversal fix + FileValidator
+- `RateLimitFilter.java` — Caffeine + config externa
+- 61 arquivos de exceção em 14 módulos — migrados para hierarquia
+- 9 arquivos novos em `shared/exception/` — hierarquia de exceções
+- 3 arquivos novos em `shared/port/` — portas financeiras
+- 2 arquivos novos em `shared/service/` — adaptadores puros
+- 1 arquivo novo em `agenda/adapter/` — adaptador de repasses
+- 1 arquivo novo em `shared/storage/FileValidator.java`
+- 1 arquivo novo em `shared/config/RateLimitProperties.java`
+- 5 arquivos novos de seeders em módulos (auth, config, indicador, despesa)
+- `DataSeeder.java` — deletado
+- `FinanceCalculator.java` — deletado

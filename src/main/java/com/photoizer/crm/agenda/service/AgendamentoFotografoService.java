@@ -5,6 +5,9 @@ import com.photoizer.crm.agenda.exception.FotografoNaoEncontradoException;
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.AgendamentoFotografo;
 import com.photoizer.crm.agenda.model.RepasseStatus;
+import com.photoizer.crm.shared.exception.BadRequestException;
+import com.photoizer.crm.shared.exception.ConflictException;
+import com.photoizer.crm.shared.exception.NotFoundException;
 import com.photoizer.crm.shared.model.TipoRepasse;
 import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
@@ -55,7 +58,7 @@ public class AgendamentoFotografoService {
             .filter(af -> af.getFotografo().getId().equals(fotografoId))
             .findFirst();
         if (existente.isPresent()) {
-            throw new IllegalArgumentException("Parceiro já vinculado a este agendamento");
+            throw new ConflictException("Parceiro já vinculado a este agendamento");
         }
 
         var tipo = tipoValor != null ? tipoValor : TipoRepasse.FIXO;
@@ -114,10 +117,10 @@ public class AgendamentoFotografoService {
     public AgendamentoFotografo pagarRepasse(UUID agendamentoId, UUID fotografoId) {
         var link = buscarLink(agendamentoId, fotografoId);
         if (link.getStatus() == RepasseStatus.PAGO) {
-            throw new IllegalArgumentException("Este repasse já foi pago");
+            throw new ConflictException("Este repasse já foi pago");
         }
         if (link.getStatus() == RepasseStatus.CANCELADO) {
-            throw new IllegalArgumentException("Repasse cancelado não pode ser pago");
+            throw new ConflictException("Repasse cancelado não pode ser pago");
         }
         link.pagar(LocalDateTime.now());
         return agendamentoFotografoRepository.save(link);
@@ -126,7 +129,7 @@ public class AgendamentoFotografoService {
     public AgendamentoFotografo cancelarRepasse(UUID agendamentoId, UUID fotografoId) {
         var link = buscarLink(agendamentoId, fotografoId);
         if (link.getStatus() == RepasseStatus.PAGO) {
-            throw new IllegalArgumentException("Repasse já pago não pode ser cancelado");
+            throw new ConflictException("Repasse já pago não pode ser cancelado");
         }
         link.cancelar();
         link = agendamentoFotografoRepository.save(link);
@@ -141,7 +144,7 @@ public class AgendamentoFotografoService {
         var links = agendamentoFotografoRepository.findAllById(ids);
         for (var link : links) {
             if (link.getStatus() == RepasseStatus.CANCELADO) {
-                throw new IllegalArgumentException("Repasse cancelado não pode ser pago: " + link.getId());
+                throw new ConflictException("Repasse cancelado não pode ser pago: " + link.getId());
             }
             if (link.getStatus() == RepasseStatus.PAGO) continue;
             link.pagar(LocalDateTime.now());
@@ -164,15 +167,15 @@ public class AgendamentoFotografoService {
         return agendamentoFotografoRepository.findByAgendamentoId(agendamentoId).stream()
             .filter(af -> af.getFotografo().getId().equals(fotografoId))
             .findFirst()
-            .orElseThrow(() -> new IllegalArgumentException(
+            .orElseThrow(() -> new NotFoundException(
                 "Parceiro " + fotografoId + " não está vinculado ao agendamento " + agendamentoId));
     }
 
     private void validarPercentual(TipoRepasse tipo, BigDecimal percentual) {
         if (tipo == TipoRepasse.PERCENTUAL) {
-            if (percentual == null) throw new IllegalArgumentException("Percentual é obrigatório para repasse percentual");
+            if (percentual == null) throw new BadRequestException("Percentual é obrigatório para repasse percentual");
             if (percentual.signum() <= 0 || percentual.compareTo(BigDecimal.valueOf(100)) > 0) {
-                throw new IllegalArgumentException("Percentual deve estar entre 0 e 100");
+                throw new BadRequestException("Percentual deve estar entre 0 e 100");
             }
         }
     }

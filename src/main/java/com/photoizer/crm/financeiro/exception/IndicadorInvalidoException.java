@@ -1,7 +1,10 @@
 package com.photoizer.crm.financeiro.exception;
 
-public class IndicadorInvalidoException extends RuntimeException {
+import com.photoizer.crm.shared.exception.ErrorCode;
+import com.photoizer.crm.shared.exception.UnprocessableException;
+
+public class IndicadorInvalidoException extends UnprocessableException {
     public IndicadorInvalidoException(String message) {
-        super(message);
+        super(ErrorCode.INDICADOR_INVALIDO, message);
     }
 }

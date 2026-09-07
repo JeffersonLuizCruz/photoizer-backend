@@ -1,14 +1,16 @@
 package com.photoizer.crm.ecommerce.exception;
 
+import com.photoizer.crm.shared.exception.ErrorCode;
+import com.photoizer.crm.shared.exception.NotFoundException;
 import java.util.UUID;
 
-public class GaleriaNaoEncontradaException extends RuntimeException {
+public class GaleriaNaoEncontradaException extends NotFoundException {
 
     public GaleriaNaoEncontradaException(UUID token) {
-        super("Galeria não encontrada para o token: " + token);
+        super(ErrorCode.GALERIA_NAO_ENCONTRADA, "Galeria não encontrada para o token: " + token);
     }
 
     public GaleriaNaoEncontradaException(String message) {
-        super(message);
+        super(ErrorCode.GALERIA_NAO_ENCONTRADA, message);
     }
 }

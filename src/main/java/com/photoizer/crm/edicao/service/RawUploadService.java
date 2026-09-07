@@ -15,6 +15,7 @@ import com.photoizer.crm.edicao.model.StatusFotoEdicao;
 import com.photoizer.crm.edicao.repository.EdicaoRepository;
 import com.photoizer.crm.edicao.repository.FotoEdicaoRepository;
 import com.photoizer.crm.shared.storage.FileStorageService;
+import com.photoizer.crm.shared.storage.FileValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -43,19 +44,22 @@ public class RawUploadService {
     private final FileStorageService fileStorageService;
     private final ApplicationEventPublisher eventPublisher;
     private final UserRepository userRepository;
+    private final FileValidator fileValidator;
 
     public RawUploadService(EdicaoRepository edicaoRepository,
                             FotoEdicaoRepository fotoEdicaoRepository,
                             AgendamentoRepository agendamentoRepository,
                             FileStorageService fileStorageService,
                             ApplicationEventPublisher eventPublisher,
-                            UserRepository userRepository) {
+                            UserRepository userRepository,
+                            FileValidator fileValidator) {
         this.edicaoRepository = edicaoRepository;
         this.fotoEdicaoRepository = fotoEdicaoRepository;
         this.agendamentoRepository = agendamentoRepository;
         this.fileStorageService = fileStorageService;
         this.eventPublisher = eventPublisher;
         this.userRepository = userRepository;
+        this.fileValidator = fileValidator;
     }
 
     public java.util.List<FotoEdicaoResponse> uploadRaw(UUID agendamentoId,
@@ -82,6 +86,7 @@ public class RawUploadService {
 
         for (int i = 0; i < arquivos.size(); i++) {
             var arquivo = arquivos.get(i);
+            fileValidator.validate(arquivo, "raw");
             var rawPath = fileStorageService.salvarEmSubdiretorio(arquivo, agendamentoId, "raw");
 
             var foto = FotoEdicao.builder()

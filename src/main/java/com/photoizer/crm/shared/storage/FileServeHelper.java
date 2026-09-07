@@ -28,7 +28,11 @@ import java.nio.file.Path;
 @Component
 public class FileServeHelper {
 
-    private static final String UPLOAD_DIR = "uploads";
+    private final Path uploadDir;
+
+    public FileServeHelper(@org.springframework.beans.factory.annotation.Value("${app.storage.upload-dir:uploads}") String uploadDir) {
+        this.uploadDir = Path.of(uploadDir).toAbsolutePath().normalize();
+    }
 
     /**
      * Serve um arquivo do filesystem com validação de segurança.
@@ -43,7 +47,6 @@ public class FileServeHelper {
             return ResponseEntity.notFound().build();
         }
 
-        var uploadDir = Path.of(UPLOAD_DIR).toAbsolutePath().normalize();
         var file = Path.of(caminho).toAbsolutePath().normalize();
 
         if (!file.startsWith(uploadDir)) {

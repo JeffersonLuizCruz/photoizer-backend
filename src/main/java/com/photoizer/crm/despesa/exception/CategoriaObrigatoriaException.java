@@ -1,8 +1,11 @@
 package com.photoizer.crm.despesa.exception;
 
-public class CategoriaObrigatoriaException extends RuntimeException {
+import com.photoizer.crm.shared.exception.ErrorCode;
+import com.photoizer.crm.shared.exception.UnprocessableException;
+
+public class CategoriaObrigatoriaException extends UnprocessableException {
 
     public CategoriaObrigatoriaException() {
-        super("Categoria é obrigatória");
+        super(ErrorCode.CATEGORIA_OBRIGATORIA, "Categoria é obrigatória");
     }
 }

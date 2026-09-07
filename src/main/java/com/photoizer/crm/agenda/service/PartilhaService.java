@@ -3,6 +3,7 @@ package com.photoizer.crm.agenda.service;
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.AgendamentoFotografo;
 import com.photoizer.crm.agenda.model.RepasseStatus;
+import com.photoizer.crm.shared.exception.BadRequestException;
 import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.despesa.service.DespesaService;
@@ -39,7 +40,7 @@ public class PartilhaService {
         var partilhaGlobal = calcularPartilhaGlobal(agendamento);
         var somaRepasses = somarRepassesNaoCancelados(agendamento.getId());
         if (somaRepasses.compareTo(partilhaGlobal) > 0) {
-            throw new IllegalArgumentException(
+            throw new BadRequestException(
                 "A soma dos repasses (R$ " + somaRepasses.toPlainString() + ") excede a partilha do ensaio (R$ "
                     + partilhaGlobal.toPlainString() + ")");
         }
@@ -60,7 +61,7 @@ public class PartilhaService {
         var somaRepasses = somarRepassesNaoCancelados(agendamentoId);
 
         if (somaRepasses.compareTo(partilhaGlobal) > 0) {
-            throw new IllegalArgumentException(
+            throw new BadRequestException(
                 "A soma dos repasses (R$ " + somaRepasses.toPlainString() + ") excede a partilha do ensaio (R$ "
                     + partilhaGlobal.toPlainString() + ")");
         }

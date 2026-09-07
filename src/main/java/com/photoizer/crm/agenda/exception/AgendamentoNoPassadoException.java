@@ -1,8 +1,11 @@
 package com.photoizer.crm.agenda.exception;
 
-public class AgendamentoNoPassadoException extends RuntimeException {
+import com.photoizer.crm.shared.exception.ErrorCode;
+import com.photoizer.crm.shared.exception.UnprocessableException;
+
+public class AgendamentoNoPassadoException extends UnprocessableException {
 
     public AgendamentoNoPassadoException() {
-        super("Não é permitido agendar no passado");
+        super(ErrorCode.AGENDAMENTO_NO_PASSADO, "Não é permitido agendar no passado");
     }
 }

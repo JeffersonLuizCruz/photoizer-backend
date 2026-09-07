@@ -1,7 +1,11 @@
 package com.photoizer.crm.agenda.exception;
 
-public class ComprovanteObrigatorioException extends RuntimeException {
+import com.photoizer.crm.shared.exception.ErrorCode;
+import com.photoizer.crm.shared.exception.UnprocessableException;
+
+public class ComprovanteObrigatorioException extends UnprocessableException {
+
     public ComprovanteObrigatorioException() {
-        super("Comprovante de pagamento é obrigatório para finalizar o ensaio");
+        super(ErrorCode.COMPROVANTE_OBRIGATORIO, "Comprovante de pagamento é obrigatório para finalizar o ensaio");
     }
 }

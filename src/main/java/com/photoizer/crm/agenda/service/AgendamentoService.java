@@ -24,7 +24,9 @@ import com.photoizer.crm.cliente.repository.ClienteRepository;
 import com.photoizer.crm.config.model.ConfigKey;
 import com.photoizer.crm.config.service.ConfiguracaoService;
 import com.photoizer.crm.contrato.event.ContratoAprovadoEvent;
+import com.photoizer.crm.shared.exception.BadRequestException;
 import com.photoizer.crm.shared.storage.FileStorageService;
+import com.photoizer.crm.shared.storage.FileValidator;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -64,6 +66,7 @@ public class AgendamentoService {
     private final PartilhaService partilhaService;
     private final AgendamentoValoresCalculator agendamentoValoresCalculator;
     private final AgendamentoMapper agendamentoMapper;
+    private final FileValidator fileValidator;
 
     public AgendamentoService(ClienteRepository clienteRepository,
                               PacoteQueryService pacoteQueryService,
@@ -77,7 +80,8 @@ public class AgendamentoService {
                               DisponibilidadeService disponibilidadeService,
                               PartilhaService partilhaService,
                               AgendamentoValoresCalculator agendamentoValoresCalculator,
-                              AgendamentoMapper agendamentoMapper) {
+                              AgendamentoMapper agendamentoMapper,
+                              FileValidator fileValidator) {
         this.clienteRepository = clienteRepository;
         this.pacoteQueryService = pacoteQueryService;
         this.userRepository = userRepository;
@@ -91,6 +95,7 @@ public class AgendamentoService {
         this.partilhaService = partilhaService;
         this.agendamentoValoresCalculator = agendamentoValoresCalculator;
         this.agendamentoMapper = agendamentoMapper;
+        this.fileValidator = fileValidator;
     }
 
     public Agendamento criarAgendamento(CriarAgendamentoCommand command) {
@@ -110,6 +115,7 @@ public class AgendamentoService {
         var valores = agendamentoValoresCalculator.calcularValoresNovo(
             pacote.getValorBase(), taxaDeslocamento, percentualEntrada);
 
+        fileValidator.validate(command.comprovanteEntrada(), "any");
         var urlComprovante = fileStorageService.salvar(command.comprovanteEntrada());
 
         return criarAgendamentoBase(new DadosNovoAgendamento(
@@ -551,10 +557,10 @@ public class AgendamentoService {
         }
 
         if (nome == null || nome.isBlank()) {
-            throw new IllegalArgumentException("Nome do cliente é obrigatório quando não informado um clienteId");
+            throw new BadRequestException("Nome do cliente é obrigatório quando não informado um clienteId");
         }
         if (telefone == null || telefone.isBlank()) {
-            throw new IllegalArgumentException("Telefone do cliente é obrigatório quando não informado um clienteId");
+            throw new BadRequestException("Telefone do cliente é obrigatório quando não informado um clienteId");
         }
 
         OrigemCliente origemCliente = OrigemCliente.OUTROS;
@@ -594,6 +600,6 @@ public class AgendamentoService {
             var time = LocalTime.parse(command.hora(), DateTimeFormatter.ofPattern("HH:mm"));
             return LocalDateTime.of(command.data(), time);
         }
-        throw new IllegalArgumentException("Data e hora do ensaio são obrigatórias (dataHoraEnsaio ou data + hora)");
+        throw new BadRequestException("Data e hora do ensaio são obrigatórias (dataHoraEnsaio ou data + hora)");
     }
 }

@@ -1,5 +1,6 @@
 package com.photoizer.crm.agenda.service;
 
+import com.photoizer.crm.shared.exception.BadRequestException;
 import com.photoizer.crm.shared.model.TipoRepasse;
 import org.springframework.stereotype.Service;
 
@@ -55,7 +56,7 @@ public class AgendamentoValoresCalculator {
                                            BigDecimal percentual) {
         if (tipo == TipoRepasse.PERCENTUAL) {
             if (percentual == null) {
-                throw new IllegalArgumentException("Percentual é obrigatório quando o tipo é PERCENTUAL");
+                throw new BadRequestException("Percentual é obrigatório quando o tipo é PERCENTUAL");
             }
             return valorRepasseEfetivo(base, tipo, valorRepassar, percentual);
         }

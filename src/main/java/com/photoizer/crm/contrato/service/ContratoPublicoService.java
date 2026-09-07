@@ -16,6 +16,8 @@ import com.photoizer.crm.contrato.repository.AssinaturaRepository;
 import com.photoizer.crm.contrato.repository.ContratoRepository;
 import com.photoizer.crm.shared.pdf.PdfWriter;
 import com.photoizer.crm.shared.storage.FileStorageService;
+import com.photoizer.crm.shared.exception.BadRequestException;
+import com.photoizer.crm.shared.storage.FileValidator;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,6 +47,7 @@ public class ContratoPublicoService {
     private final ContratoTemplateService templateService;
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
+    private final FileValidator fileValidator;
 
     public ContratoPublicoService(ContratoRepository contratoRepository,
                                   AssinaturaRepository assinaturaRepository,
@@ -53,7 +56,8 @@ public class ContratoPublicoService {
                                   ConfiguracaoService configuracaoService,
                                   ContratoTemplateService templateService,
                                   ApplicationEventPublisher eventPublisher,
-                                  ObjectMapper objectMapper) {
+                                  ObjectMapper objectMapper,
+                                  FileValidator fileValidator) {
         this.contratoRepository = contratoRepository;
         this.assinaturaRepository = assinaturaRepository;
         this.fileStorageService = fileStorageService;
@@ -62,6 +66,7 @@ public class ContratoPublicoService {
         this.templateService = templateService;
         this.eventPublisher = eventPublisher;
         this.objectMapper = objectMapper;
+        this.fileValidator = fileValidator;
     }
 
     @Transactional(readOnly = true)
@@ -167,6 +172,7 @@ public class ContratoPublicoService {
         validarComprovante(comprovante);
 
         var autoriza = Boolean.parseBoolean(autorizaUsoImagem);
+        fileValidator.validate(comprovante, "receipt");
         var urlComprovante = fileStorageService.salvarEmSubdiretorio(
             comprovante, contrato.getId(), "comprovante_entrada");
 
@@ -215,20 +221,20 @@ public class ContratoPublicoService {
 
     private void validarCamposCliente(String nome, String telefone, String cpf,
                                       String nomeAssina, String autorizaUsoImagem) {
-        if (isBlank(nome)) throw new IllegalArgumentException("Nome completo do cliente é obrigatório");
-        if (isBlank(telefone)) throw new IllegalArgumentException("Telefone do cliente é obrigatório");
-        if (isBlank(cpf)) throw new IllegalArgumentException("CPF do cliente é obrigatório");
-        if (isBlank(nomeAssina)) throw new IllegalArgumentException("A assinatura (nome do contratante) é obrigatória");
-        if (isBlank(autorizaUsoImagem)) throw new IllegalArgumentException("Selecione uma opção de uso de imagem");
+        if (isBlank(nome)) throw new BadRequestException("Nome completo do cliente é obrigatório");
+        if (isBlank(telefone)) throw new BadRequestException("Telefone do cliente é obrigatório");
+        if (isBlank(cpf)) throw new BadRequestException("CPF do cliente é obrigatório");
+        if (isBlank(nomeAssina)) throw new BadRequestException("A assinatura (nome do contratante) é obrigatória");
+        if (isBlank(autorizaUsoImagem)) throw new BadRequestException("Selecione uma opção de uso de imagem");
     }
 
     private void validarComprovante(MultipartFile arquivo) {
         if (arquivo == null || arquivo.isEmpty()) {
-            throw new IllegalArgumentException("Comprovante de pagamento da reserva é obrigatório");
+            throw new BadRequestException("Comprovante de pagamento da reserva é obrigatório");
         }
         var contentType = arquivo.getContentType();
         if (contentType == null || !List.of("application/pdf", "image/jpeg", "image/png").contains(contentType)) {
-            throw new IllegalArgumentException("Tipo de arquivo inválido. Permitidos: PDF, JPG, PNG");
+            throw new BadRequestException("Tipo de arquivo inválido. Permitidos: PDF, JPG, PNG");
         }
     }
 

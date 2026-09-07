@@ -28,15 +28,26 @@
 
 ### shared — infraestrutura transversal
 - ~~Herança → composição~~ **RESOLVIDO**: `@Embeddable AuditInfo` + composição em todas as 25 entidades; `BaseEntity.java` removido.
-- **Dependência invertida `shared → módulos`**: `GlobalExceptionHandler` importa exceções de todos os módulos (deveria ser os módulos → shared).
-- Hierarquia de exceções ausente: falta `BusinessException` base + código + `HttpStatus` (padrões atuais: `RuntimeException`/`IllegalArgumentException` espalhadas).
-- `ErrorResponse` sem suporte a múltiplos erros (`bindingResult`) e sem código de domínio.
-- `handler(Exception.class)` genérico captura tudo; auditoria (`createdBy`) e testes ausentes (`CrmApplicationTests` é smoke).
+- ~~Dependência invertida `GlobalExceptionHandler → módulos`~~ **RESOLVIDO**: hierarquia `BusinessException` com 7 subclasses marcadoras; `GlobalExceptionHandler` reduzido de 509→~130 linhas com zero imports de domínio; fallback `BusinessException` handler + `SecurityException` handler adicionados.
+- ~~Hierarquia de exceções ausente~~ **RESOLVIDO**: `BusinessException` + `ErrorCode` enum (~60 códigos) + 7 subclasses; 61+ exceções de domínio migradas em 14+ módulos.
+- ~~`ErrorResponse` sem código e com `LocalDateTime`~~ **RESOLVIDO**: campo `code` (String) + `OffsetDateTime` em UTC.
+- ~~`FinanceCalculator` violação Modulith~~ **RESOLVIDO**: substituído por portas (`StatusClassificationPort`, `DisplacementCostPort`, `RepasseAggregationPort`) + adaptadores; zero imports de agenda/comissao em shared.
+- ~~`DataSeeder` cross-module~~ **RESOLVIDO**: decomposto em 5 seeders por módulo (`AuthUserSeeder`, `ConfigBaseSeeder`, `ConfigContratoSeeder`, `IndicadorCleanupSeeder`, `DespesaCategoriaSeeder`); `DataSeeder.java` deletado.
+- ~~`createdBy` nunca preenchido~~ **RESOLVIDO**: campo adicionado a `AuditInfo`; `AuditInfoListener` popula via `SecurityContextHolder` (fallback `"SYSTEM"`).
+- ~~`RateLimitFilter` memory leak~~ **RESOLVIDO**: `ConcurrentHashMap` substituído por Caffeine cache com `expireAfterWrite` + `maximumSize`; config externa via `RateLimitProperties`; `ErrorResponse` serializado como JSON no 429.
+- ~~`LocalFileStorageService` path traversal~~ **RESOLVIDO**: `FileValidator` com whitelist de extensões, sanitização de filename, verificação `resolved.startsWith(uploadDir)`.
+- ~~`FileServeHelper` hardcoded~~ **RESOLVIDO**: `uploadDir` via `@Value`, configuração externa.
+- ~~`createdBy` nunca preenchido~~ **RESOLVIDO**: `AuditInfoListener` popula via `SecurityContextHolder` com fallback `"SYSTEM"`.
+- ~~`IndicadorCleanupSeeder` roda em prod~~ **RESOLVIDO**: `@Profile("!prod")`.
+- ~~`TEMPLATE_PADRAO` cross-module~~ **RESOLVIDO**: movido para `ConfigKey.CONTRATO_TEMPLATE_PADRAO` (config module).
+- ~~`DocumentService.getTemplateKey()` hardcoded~~ **RESOLVIDO**: usa `ConfigKey.CONTRATO_TEMPLATE.getKey()`.
+- `CorsConfig` duplicação de beans — pendente (P3).
+- `SensitiveDataMask` mascaramento pós-truncamento — pendente (P3).
 
 ### auth
 - ~~`SecurityConfig` é god config~~ **RESOLVIDO**: migrado para `@RolesAllowed` nos controllers + `anyRequest().authenticated()`.
 - ~~`User` sem Lombok/auditoria/consistência~~ **RESOLVIDO**: Lombok + `@Embeddable AuditInfo`.
-- ~~Tratamento de erros inconsistente~~ **RESOLVIDO**: `ResponseStatusException(404/409)` + mensagem uniforme no login.
+- ~~Tratamento de erros inconsistente~~ **RESOLVIDO**: `NotFoundException`/`ConflictException` via hierarchy.
 - ~~`LoginResponse.userId` como String~~ **RESOLVIDO**: trocado para `UUID`.
 - ~~`User` expõe hash de senha~~ **RESOLVIDO**: `@JsonIgnore` + `FotografoController` retorna DTO.
 - ~~**P2**: Token JWT 24h sem refresh/logout/revogação~~ **RESOLVIDO**: refresh token (7 dias) + blocklist + logout endpoint.
@@ -57,8 +68,8 @@
 
 ### dashboard
 - ~~`findAll()` em 3 pontos~~ **RESOLVIDO**: usa facades com queries agregadas SQL.
-- ~~**7 repositórios de 6 módulos** sem facades~~ **RESOLVIDO**: 6 QueryService facades + FinanceCalculator.
-- ~~regras financeiras (deslocamento/comissão/repasse) duplicadas com o financeiro~~ **RESOLVIDO**: `FinanceCalculator` compartilhado.
+- ~~**7 repositórios de 6 módulos** sem facades~~ **RESOLVIDO**: 6 QueryService facades + portas (`StatusClassificationPort`, `DisplacementCostPort`, `RepasseAggregationPort`).
+- ~~regras financeiras (deslocamento/comissão/repasse) duplicadas com o financeiro~~ **RESOLVIDO**: portas + adaptadores centralizam cálculos; zero imports de agenda/comissao em shared.
 - **RESOLVIDO**: projeção `Object[]` → `RepasseAggregation` interface tipada.
 - **RESOLVIDO**: `@Cacheable` em todos os 4 endpoints.
 
@@ -108,7 +119,7 @@
 - **Pendente (P3)**: `getCurrentUser()` N+1 — resolver via JWT claims.
 
 ### financeiro
-- **RESOLVIDO**: God classes — extraídos `PagamentoService`, `ExtraVendaService`, `FinanceiroQueryService` de `FinanceiroService` (575→~80 linhas orchestrator). `FinanceiroDashboardService` delega repasses ao `FinanceCalculator`.
+- **RESOLVIDO**: God classes — extraídos `PagamentoService`, `ExtraVendaService`, `FinanceiroQueryService` de `FinanceiroService` (575→~80 linhas orchestrator). `FinanceiroDashboardService` delega repasses às portas.
 - **RESOLVIDO**: `findAll()` + Streams — `isClienteBloqueado` usa query SQL; `FinanceiroRelatorioService` usa `findInadimplentes()`, `findAvulsasByDataBetween()`; queries SQL em `DespesaRepository` e `IndicacaoRepository`.
 - **RESOLVIDO**: Escrita cross-module — `PagamentoRegistradoEvent` + `ExtrasAdicionadosEvent` + listener `PagamentoFinanceiroEventListener` no agenda. Elimina mutação direta no `Agendamento`.
 - **RESOLVIDO**: Exposição de entidades — `FinanceiroController` retorna `PagamentoResponse`, `ExtraServicoResponse`.
@@ -167,7 +178,7 @@
 |--------|------------------|------------|
 | ~~**Herança `BaseEntity`**~~ | ~~todos com entidades~~ | **RESOLVIDO**: `@Embeddable AuditInfo` + composição; `BaseEntity.java` removido |
 | **`status`/`origem` em `String`** | comissao, agenda, foto, despesa, contrato, ecommerce | enums com métodos de transição; nunca comparar `String.equals` — **despesa RESOLVIDO** (State Pattern) |
-| **Exceções genéricas** | maioria | hierarquia central `BusinessException` + `HttpStatus`/código (decisão já aprovada) |
+| ~~**Exceções genéricas**~~ | ~~maioria~~ | **RESOLVIDO**: hierarquia central `BusinessException` + `ErrorCode` + 7 subclasses; 61 exceções migradas em 14 módulos |
 | **DTOs manuais (`static of`/`Map`)** | quase todos | MapStruct (decisão já aprovada; Fase 2) — **iniciado em `agenda`** (AgendamentoMapper/RascunhoAgendamentoMapper); **despesa RESOLVIDO** (static of() removido); **ecommerce RESOLVIDO** (EcommerceMapper); **pacote RESOLVIDO** (PacoteMapper) |
 | ~~**Escrita em entidade alheia** (ecommerce)~~ | ~~ecommerce, edicao, foto, financeiro, comissao, documento, notificacao~~ | **RESOLVIDO** (ecommerce): eventos de domínio + listeners; **RESOLVIDO** (foto): eventos `FotoEdicaoPublicadaEvent`/`FotoEdicaoRemovidaEvent` + listener; **RESOLVIDO** (edicao): `PublicacaoService` e `EdicaoRevisaoService` publicam eventos; **RESOLVIDO** (notificacao): Event Enrichment nos eventos de agenda elimina acesso a repositórios alheios; outros módulos pendentes |
 | **Agregação em memória** | dashboard, financeiro, comissao, indicador, agenda | queries agregadas SQL (`SUM`/`GROUP BY`/`COUNT`) nos repositórios donos — **despesa RESOLVIDO** (DespesaQueryService) |
@@ -179,7 +190,7 @@
 Ordem proposta (valor × risco):
 
 1. **Segurança imediata** — ~~IDOR notificações~~ **RESOLVIDO**, exposição de `password`/hash, `denyAll` documentos, exposição de entidades.
-2. **Hierarquia de exceções** no `shared` + conversão das exceções genéricas (P1 dos módulos).
+2. ~~**Hierarquia de exceções** no `shared` + conversão das exceções genéricas~~ **RESOLVIDO**.
 3. ~~**Padding cross-module** — substituir escritas diretas por eventos~~ **PARCIAL**: resolvido para ecommerce, notificacao; pendente para edicao, foto, financeiro, comissao, documento.
 4. **Enums e máquinas de estado** — `StatusAgendamento`, `StatusIndicacao`, `StatusContrato` com transições.
 5. **Queries agregadas** + facades públicas por módulo (dashboard/financeiro deixam de puxar repositório alheio).

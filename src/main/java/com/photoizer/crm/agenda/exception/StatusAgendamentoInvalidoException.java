@@ -1,12 +1,12 @@
 package com.photoizer.crm.agenda.exception;
 
 import com.photoizer.crm.agenda.model.StatusAgendamento;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ResponseStatus;
+import com.photoizer.crm.shared.exception.ConflictException;
+import com.photoizer.crm.shared.exception.ErrorCode;
 
-@ResponseStatus(HttpStatus.CONFLICT)
-public class StatusAgendamentoInvalidoException extends RuntimeException {
+public class StatusAgendamentoInvalidoException extends ConflictException {
+
     public StatusAgendamentoInvalidoException(StatusAgendamento atual, StatusAgendamento proximo) {
-        super("Transição de status inválida: " + atual + " → " + proximo);
+        super(ErrorCode.STATUS_AGENDAMENTO_INVALIDO, "Transição de status inválida: " + atual + " → " + proximo);
     }
 }

@@ -7,6 +7,7 @@ import com.photoizer.crm.agenda.service.AgendamentoStatusLifecycle;
 import com.photoizer.crm.agenda.service.CriarAgendamentoCommand;
 import com.photoizer.crm.agenda.service.DisponibilidadeService;
 import com.photoizer.crm.comissao.repository.IndicacaoRepository;
+import com.photoizer.crm.shared.exception.BadRequestException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -137,7 +138,7 @@ public class AgendamentoController {
                 fotografosList = objectMapper.readValue(fotografos,
                     new TypeReference<List<CriarAgendamentoCommand.FotografoRepasse>>() {});
             } catch (Exception e) {
-                throw new IllegalArgumentException("Formato inválido para o campo 'fotografos'. Use JSON array.", e);
+                throw new BadRequestException("Formato inválido para o campo 'fotografos'. Use JSON array.");
             }
         } else if (fotografoId != null && !fotografoId.isBlank()) {
             var parsedFotografoId = UUID.fromString(fotografoId);
@@ -265,11 +266,11 @@ public class AgendamentoController {
 
     private void validarComprovante(MultipartFile arquivo) {
         if (arquivo == null || arquivo.isEmpty()) {
-            throw new IllegalArgumentException("Comprovante de pagamento é obrigatório");
+            throw new BadRequestException("Comprovante de pagamento é obrigatório");
         }
         var contentType = arquivo.getContentType();
         if (contentType == null || !List.of("application/pdf", "image/jpeg", "image/png").contains(contentType)) {
-            throw new IllegalArgumentException("Tipo de arquivo inválido. Permitidos: PDF, JPG, PNG");
+            throw new BadRequestException("Tipo de arquivo inválido. Permitidos: PDF, JPG, PNG");
         }
     }
 }

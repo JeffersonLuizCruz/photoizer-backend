@@ -2,9 +2,12 @@ package com.photoizer.crm.despesa.exception;
 
 import java.util.UUID;
 
-public class AgendamentoVinculadoInvalidoException extends RuntimeException {
+import com.photoizer.crm.shared.exception.ErrorCode;
+import com.photoizer.crm.shared.exception.UnprocessableException;
+
+public class AgendamentoVinculadoInvalidoException extends UnprocessableException {
 
     public AgendamentoVinculadoInvalidoException(UUID agendamentoId) {
-        super("Trabalho vinculado não encontrado: " + agendamentoId);
+        super(ErrorCode.AGENDAMENTO_VINCULADO_INVALIDO, "Trabalho vinculado não encontrado: " + agendamentoId);
     }
 }

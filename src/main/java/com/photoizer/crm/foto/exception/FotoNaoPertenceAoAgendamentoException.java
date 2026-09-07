@@ -1,13 +1,12 @@
 package com.photoizer.crm.foto.exception;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ResponseStatus;
+import com.photoizer.crm.shared.exception.ErrorCode;
+import com.photoizer.crm.shared.exception.ForbiddenException;
 
 import java.util.UUID;
 
-@ResponseStatus(HttpStatus.FORBIDDEN)
-public class FotoNaoPertenceAoAgendamentoException extends RuntimeException {
+public class FotoNaoPertenceAoAgendamentoException extends ForbiddenException {
     public FotoNaoPertenceAoAgendamentoException(UUID fotoId, UUID agendamentoId) {
-        super("Foto " + fotoId + " não pertence ao agendamento " + agendamentoId);
+        super(ErrorCode.FOTO_NAO_PERTENCE_AO_AGENDAMENTO, "Foto " + fotoId + " não pertence ao agendamento " + agendamentoId);
     }
 }

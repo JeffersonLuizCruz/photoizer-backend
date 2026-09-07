@@ -1,8 +1,11 @@
 package com.photoizer.crm.ecommerce.exception;
 
-public class FotoIndisponivelException extends RuntimeException {
+import com.photoizer.crm.shared.exception.ErrorCode;
+import com.photoizer.crm.shared.exception.UnprocessableException;
+
+public class FotoIndisponivelException extends UnprocessableException {
 
     public FotoIndisponivelException(String message) {
-        super(message);
+        super(ErrorCode.FOTO_INDISPONIVEL, message);
     }
 }

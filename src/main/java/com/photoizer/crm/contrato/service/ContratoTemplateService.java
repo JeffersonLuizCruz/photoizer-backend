@@ -12,67 +12,10 @@ public class ContratoTemplateService {
     private final ConfiguracaoService configuracaoService;
 
     /**
-     * Template padrao do contrato de prestacao de servicos fotograficos.
-     * Utilizado pelo DataSeeder e pelo endpoint de restauracao de template.
+     * @deprecated Use {@link ConfigKey#CONTRATO_TEMPLATE_PADRAO} diretamente.
      */
-    public static final String TEMPLATE_PADRAO = """
-= PRESTAÇÃO DE SERVIÇOS FOTOGRÁFICOS =
-
-# 1. Dados do Cliente
-Nome completo: {{clienteNome}}
-CPF: {{clienteCPF}}
-E-mail: {{clienteEmail}}
-Telefone: {{clienteTelefone}}
-Cidade / Estado: {{clienteCidade}} / {{clienteEstado}}
-
-Contratada: {{contratadaNome}}, inscrita no CNPJ nº {{contratadaCnpj}}, com sede em {{contratadaCidade}}.
-
-# 2. Informações do Ensaio
-Data do ensaio: {{dataEnsaio}}
-Horário do ensaio: {{horarioEnsaio}}
-Local do ensaio: {{localEnsaio}}
-Endereço completo: {{enderecoEnsaio}}
-Profissionais do ensaio: {{fotografosEnsaio}}
-
-# 3. Pacote Contratado
-Pacote: {{pacoteNome}}
-Inclui: serviço conforme pacote contratado.
-
-# 4. Valores
-Valor total do serviço: {{valorTotal}}
-Valor pago como reserva ({{percentualEntrada}}%): {{valorEntrada}}
-Valor restante a pagar no final do ensaio: {{valorRestante}}
-O pagamento da reserva garante o bloqueio da data e horário na agenda da Contratada.
-O valor restante deverá ser pago ao final da realização do ensaio fotográfico.
-
-Dados para pagamento (PIX)
-Chave PIX ({{pixTipoChave}}): {{pixChave}}
-
-# 5. Entrega das Fotografias
-As fotos do ensaio serão enviadas ao Cliente em até 2 dias após a realização do ensaio para que ele faça a seleção das imagens desejadas.
-Após a seleção, a entrega final das fotografias ocorrerá em até 2 dias.
-As fotos serão entregues em formato digital, em alta resolução.
-Caso o Cliente opte por fotos extras além do pacote contratado, será cobrado o valor de {{precoFotoExtra}} por foto adicional.
-
-# 6. Cancelamento
-Caso o Cliente cancele o ensaio por qualquer motivo, o valor pago como reserva não será reembolsado, pois garante a reserva da data na agenda da Contratada.
-Caso ocorra algum imprevisto que impeça a presença da Contratada, poderá haver a substituição por outro fotógrafo profissional de padrão equivalente.
-Caso não seja possível a substituição, o valor pago será devolvido integralmente ao Cliente.
-Se houver algum imprevisto relacionado à antecipação de voo, chuva ou doença, o ensaio será cancelado e haverá o reembolso completo do valor da reserva.
-
-# 7. USO DE IMAGEM (OPCIONAL)
-{{autorizaUsoImagem}}
-
-# 8. Disposições Gerais
-Este contrato passa a vigorar a partir da assinatura das partes.
-Qualquer alteração neste contrato deverá ser realizada por escrito.
-
-# 9. Assinatura Digital
-Ao assinar este documento, o Cliente declara que leu e concorda com todos os termos acima descritos.
-Resposta do cliente sobre uso de imagem: {{autorizaUsoImagem}}
-Assinatura do contratante: {{clienteNome}}
-Assinatura da Contratada: {{contratadaNome}}
-""";
+    @Deprecated
+    public static final String TEMPLATE_PADRAO = ConfigKey.CONTRATO_TEMPLATE_PADRAO;
 
     public ContratoTemplateService(ConfiguracaoService configuracaoService) {
         this.configuracaoService = configuracaoService;

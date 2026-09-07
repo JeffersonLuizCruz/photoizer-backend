@@ -16,7 +16,9 @@ import com.photoizer.crm.dashboard.api.DashboardMensalResponse.ResumoMesAtual;
 import com.photoizer.crm.despesa.service.DespesaQueryService;
 import com.photoizer.crm.ecommerce.service.EcommerceQueryService;
 import com.photoizer.crm.financeiro.service.ReceitaQueryService;
-import com.photoizer.crm.shared.service.FinanceCalculator;
+import com.photoizer.crm.shared.port.DisplacementCostPort;
+import com.photoizer.crm.shared.port.RepasseAggregationPort;
+import com.photoizer.crm.shared.port.StatusClassificationPort;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,7 +49,9 @@ public class DashboardService {
     private final ReceitaQueryService receitaQueryService;
     private final EcommerceQueryService ecommerceQueryService;
     private final ClienteQueryService clienteQueryService;
-    private final FinanceCalculator financeCalculator;
+    private final StatusClassificationPort statusClassificationPort;
+    private final DisplacementCostPort displacementCostPort;
+    private final RepasseAggregationPort repasseAggregationPort;
 
     public DashboardService(AgendamentoQueryService agendamentoQueryService,
                             ComissaoQueryService comissaoQueryService,
@@ -55,14 +59,18 @@ public class DashboardService {
                             ReceitaQueryService receitaQueryService,
                             EcommerceQueryService ecommerceQueryService,
                             ClienteQueryService clienteQueryService,
-                            FinanceCalculator financeCalculator) {
+                            StatusClassificationPort statusClassificationPort,
+                            DisplacementCostPort displacementCostPort,
+                            RepasseAggregationPort repasseAggregationPort) {
         this.agendamentoQueryService = agendamentoQueryService;
         this.comissaoQueryService = comissaoQueryService;
         this.despesaQueryService = despesaQueryService;
         this.receitaQueryService = receitaQueryService;
         this.ecommerceQueryService = ecommerceQueryService;
         this.clienteQueryService = clienteQueryService;
-        this.financeCalculator = financeCalculator;
+        this.statusClassificationPort = statusClassificationPort;
+        this.displacementCostPort = displacementCostPort;
+        this.repasseAggregationPort = repasseAggregationPort;
     }
 
     @Cacheable(value = "dashboard-financeiro", key = "#mesesHistorico")
@@ -80,7 +88,7 @@ public class DashboardService {
         var todosIds = agendamentos.stream().map(Agendamento::getId).toList();
         var comissaoPorAgendamento = comissaoQueryService.obterComissaoPorAgendamentos(todosIds);
         var despesas = despesaQueryService.obterPorPeriodo(inicioLocalDate, fimLocalDate);
-        var repasses = financeCalculator.carregarRepasses(agendamentoQueryService.repasseRepository());
+        var repasses = repasseAggregationPort.carregarRepasses();
         var receitasAvulsas = receitaQueryService.obterAvulsasPorPeriodo(inicioLocalDate, fimLocalDate);
 
         Map<YearMonth, List<Agendamento>> porMes = new TreeMap<>();
@@ -110,7 +118,7 @@ public class DashboardService {
             int qtdFinalizados = 0;
 
             for (var a : lista) {
-                var desloc = financeCalculator.deslocamentoEfetivo(a);
+                var desloc = displacementCostPort.deslocamentoEfetivo(a);
                 deslocamentoEfetivo = deslocamentoEfetivo.add(desloc);
                 if (a.getValorRestante() != null && a.getValorRestante().compareTo(BigDecimal.ZERO) <= 0) {
                     deslocamentoEfetivoPago = deslocamentoEfetivoPago.add(desloc);
@@ -124,12 +132,12 @@ public class DashboardService {
                 repasse = repasse.add(repasses.previstos().getOrDefault(a.getId(), BigDecimal.ZERO));
                 repassePago = repassePago.add(repasses.pagos().getOrDefault(a.getId(), BigDecimal.ZERO));
 
-                if (financeCalculator.statusFinalizados().contains(a.getStatus())) {
+                if (statusClassificationPort.statusFinalizados().contains(a.getStatus())) {
                     qtdFinalizados++;
                     valorFinalizados = valorFinalizados.add(a.getValorTotalFinal());
                 }
 
-                if (financeCalculator.isConfirmadoOuFinalizado(a.getStatus())) {
+                if (statusClassificationPort.isConfirmadoOuFinalizado(a.getStatus())) {
                     qtdConfirmados++;
                     valorEnsaiosConfirmados = valorEnsaiosConfirmados.add(a.getValorTotalFinal());
                     entradasRecebidas = entradasRecebidas.add(

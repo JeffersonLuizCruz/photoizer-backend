@@ -45,6 +45,7 @@ import com.photoizer.crm.despesa.repository.DespesaCategoriaRepository;
 import com.photoizer.crm.despesa.repository.DespesaRepository;
 import com.photoizer.crm.despesa.repository.DespesaSpecification;
 import com.photoizer.crm.shared.storage.FileStorageService;
+import com.photoizer.crm.shared.storage.FileValidator;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -65,6 +66,7 @@ public class DespesaService {
     private final DespesaCategoriaRepository categoriaRepository;
     private final DespesaAgendamentoGateway agendamentoGateway;
     private final FileStorageService fileStorageService;
+    private final FileValidator fileValidator;
 
     /*
      * REFACTORED — Injeção via Facade Pattern (DespesaAgendamentoGateway)
@@ -78,11 +80,13 @@ public class DespesaService {
     public DespesaService(DespesaRepository despesaRepository,
                           DespesaCategoriaRepository categoriaRepository,
                           DespesaAgendamentoGateway agendamentoGateway,
-                          FileStorageService fileStorageService) {
+                          FileStorageService fileStorageService,
+                          FileValidator fileValidator) {
         this.despesaRepository = despesaRepository;
         this.categoriaRepository = categoriaRepository;
         this.agendamentoGateway = agendamentoGateway;
         this.fileStorageService = fileStorageService;
+        this.fileValidator = fileValidator;
     }
 
     /*
@@ -221,6 +225,7 @@ public class DespesaService {
 
     public Despesa anexarComprovante(UUID id, MultipartFile arquivo) {
         var despesa = buscarPorId(id);
+        fileValidator.validate(arquivo, "any");
         var caminho = fileStorageService.salvar(arquivo);
         despesa.setUrlComprovante(caminho);
         return despesaRepository.save(despesa);

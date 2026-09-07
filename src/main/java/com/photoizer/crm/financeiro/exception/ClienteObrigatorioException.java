@@ -1,7 +1,10 @@
 package com.photoizer.crm.financeiro.exception;
 
-public class ClienteObrigatorioException extends RuntimeException {
+import com.photoizer.crm.shared.exception.ErrorCode;
+import com.photoizer.crm.shared.exception.UnprocessableException;
+
+public class ClienteObrigatorioException extends UnprocessableException {
     public ClienteObrigatorioException() {
-        super("Informe um cliente para a receita");
+        super(ErrorCode.CLIENTE_OBRIGATORIO, "Informe um cliente para a receita");
     }
 }
