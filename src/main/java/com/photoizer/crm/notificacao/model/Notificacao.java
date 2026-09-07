@@ -10,12 +10,22 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Entidade de notificação do sistema.
+ *
+ * Nota: Não estende BaseEntity — tem id/createdAt próprios sem updatedAt/createdBy.
+ * Única entidade fora do padrão (documentado no AGENTS.md).
+ */
 @Entity
 @Table(name = "notificacoes")
+@Getter
+@Setter
 public class Notificacao {
 
     @Id
@@ -42,7 +52,6 @@ public class Notificacao {
     @Column(nullable = false, length = 30)
     private TipoNotificacao tipo;
 
-    @NotNull
     @Column(nullable = false)
     private boolean lida = false;
 
@@ -61,21 +70,4 @@ public class Notificacao {
         this.lida = false;
         this.createdAt = LocalDateTime.now();
     }
-
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
-    public UUID getUserId() { return userId; }
-    public void setUserId(UUID userId) { this.userId = userId; }
-    public String getTitulo() { return titulo; }
-    public void setTitulo(String titulo) { this.titulo = titulo; }
-    public String getMensagem() { return mensagem; }
-    public void setMensagem(String mensagem) { this.mensagem = mensagem; }
-    public String getLink() { return link; }
-    public void setLink(String link) { this.link = link; }
-    public TipoNotificacao getTipo() { return tipo; }
-    public void setTipo(TipoNotificacao tipo) { this.tipo = tipo; }
-    public boolean isLida() { return lida; }
-    public void setLida(boolean lida) { this.lida = lida; }
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

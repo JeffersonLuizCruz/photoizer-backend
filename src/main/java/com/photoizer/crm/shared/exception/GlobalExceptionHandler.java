@@ -57,6 +57,7 @@ import com.photoizer.crm.foto.exception.FotoNaoPertenceAoAgendamentoException;
 import com.photoizer.crm.foto.exception.StatusFotoInvalidoException;
 import com.photoizer.crm.indicador.exception.IndicadorDuplicadoException;
 import com.photoizer.crm.indicador.exception.IndicadorNaoEncontradoException;
+import com.photoizer.crm.notificacao.exception.NotificacaoBusinessException;
 import com.photoizer.crm.notificacao.exception.NotificacaoNaoEncontradaException;
 import com.photoizer.crm.notificacao.exception.NotificacaoNaoPertenceAoUsuarioException;
 import org.slf4j.Logger;
@@ -458,6 +459,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleNotificacaoNaoPertenceAoUsuario(NotificacaoNaoPertenceAoUsuarioException e) {
         log.warn("Tentativa de acesso a notificação de outro usuário: {}", e.getMessage());
         return build(HttpStatus.FORBIDDEN, e);
+    }
+
+    @ExceptionHandler(NotificacaoBusinessException.class)
+    public ResponseEntity<ErrorResponse> handleNotificacaoBusiness(NotificacaoBusinessException e) {
+        log.warn("Exceção de negócio do módulo notificação: {}", e.getMessage());
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, e);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

@@ -2,7 +2,11 @@ package com.photoizer.crm.notificacao.exception;
 
 import java.util.UUID;
 
-public class NotificacaoNaoEncontradaException extends RuntimeException {
+/**
+ * Exceção lançada quando uma notificação não é encontrada pelo ID.
+ * HTTP 404 Not Found.
+ */
+public class NotificacaoNaoEncontradaException extends NotificacaoBusinessException {
 
     public NotificacaoNaoEncontradaException(UUID id) {
         super("Notificação não encontrada: " + id);

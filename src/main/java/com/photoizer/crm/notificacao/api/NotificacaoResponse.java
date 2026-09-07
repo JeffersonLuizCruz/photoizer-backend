@@ -1,11 +1,16 @@
 package com.photoizer.crm.notificacao.api;
 
-import com.photoizer.crm.notificacao.model.Notificacao;
 import com.photoizer.crm.notificacao.model.TipoNotificacao;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * DTO de resposta para notificações.
+ *
+ * Mapeamento feito via NotificacaoMapper (MapStruct) — não usar static of().
+ * Segue padrão dos módulos despesa, edicao e ecommerce.
+ */
 public record NotificacaoResponse(
     UUID id,
     String titulo,
@@ -15,10 +20,4 @@ public record NotificacaoResponse(
     boolean lida,
     LocalDateTime createdAt
 ) {
-    public static NotificacaoResponse of(Notificacao n) {
-        return new NotificacaoResponse(
-            n.getId(), n.getTitulo(), n.getMensagem(),
-            n.getLink(), n.getTipo(), n.isLida(), n.getCreatedAt()
-        );
-    }
 }

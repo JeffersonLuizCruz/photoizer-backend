@@ -7,8 +7,8 @@ Cria e gerencia notificações do sistema para usuários (fotógrafos/equipe). �
 ```
 notificacao/
 ├── model/
-│   ├── Notificacao.java       # Entidade (NÃO estende BaseEntity): userId, titulo, mensagem, link, tipo (enum), lida, createdAt
-│   └── TipoNotificacao.java   # Enum: NOVO_ENSAIO, ENSAIO_REALIZADO, PAGAMENTO_FINAL, LEMBRETE_ENSAIO, REPASSE_FOTOGRAFO, SISTEMA
+│   ├── Notificacao.java       # Entidade (NÃO estende BaseEntity): userId, titulo, mensagem, link, tipo (enum), lida, createdAt — usa Lombok @Getter/@Setter
+│   └── TipoNotificacao.java   # Enum: NOVO_ENSAIO, ENSAIO_REALIZADO, PAGAMENTO_FINAL
 ├── repository/
 │   └── NotificacaoRepository.java # JpaRepository + findByUserIdOrderByCreatedAtDesc, countByUserIdAndLidaFalse
 ├── service/
@@ -16,11 +16,13 @@ notificacao/
 ├── event/
 │   └── NotificacaoEventListener.java # Consome 3 eventos enriquecidos de agenda e cria notificações por fotógrafo
 ├── exception/
+│   ├── NotificacaoBusinessException.java          # Base para exceções do módulo (Exception Hierarchy)
 │   ├── NotificacaoNaoEncontradaException.java       # 404
 │   └── NotificacaoNaoPertenceAoUsuarioException.java # 403
 └── api/
     ├── NotificacaoController.java  # GET (listar, nao-lidas), PATCH (ler, ler-todas, limpar) — via @AuthenticationPrincipal
-    └── NotificacaoResponse.java    # Record com static of() manual
+    ├── NotificacaoMapper.java      # MapStruct mapper (toResponse)
+    └── NotificacaoResponse.java    # Record (mapeamento via NotificacaoMapper)
 ```
 
 ## 3. Dependências Externas
@@ -64,9 +66,8 @@ Nenhum.
 1. **Identificador por `@AuthenticationPrincipal`** — o controller extrai o userId do JWT (`SecurityContext`), não aceita parâmetro externo. Cada usuário só acessa suas próprias notificações.
 2. **Ownership check em `marcarComoLida`** — valida que a notificação pertence ao usuário autenticado; caso contrário, lança `NotificacaoNaoPertenceAoUsuarioException` (403).
 3. **Entidade sem `BaseEntity`**: `Notificacao` tem `id`/`createdAt` próprios, sem `updatedAt`/`createdBy` — única entidade fora do padrão (documentado no AGENTS.md).
-4. **Sem paginação** em `listar`.
-5. **Enum com valores mortos**: `LEMBRETE_ENSAIO`, `REPASSE_FOTOGRAFO` e `SISTEMA` nunca são criados — não existe job de lembretes nem notificação de repasse.
-6. **Listeners sem `@Transactional`**: cada `criar` é um `save` isolado; falha no meio do loop deixa notificações parciais.
+4. **Paginação com limite**: `size` máximo de 100 para prevenir abuso.
+5. **Transactional por método**: `@Transactional` explícito em cada método de escrita, `readOnly=true` em leituras.
 
 ## 6. Testes
 Nenhum teste específico. Apenas `CrmApplicationTests` (smoke de contexto).
@@ -88,14 +89,23 @@ Nenhum teste específico. Apenas `CrmApplicationTests` (smoke de contexto).
 ### ~~7.5 Exceção genérica~~ — **[RESOLVIDO] P1**
 - **Resolvido**: `NotificacaoNaoEncontradaException` (404) e `NotificacaoNaoPertenceAoUsuarioException` (403) criadas. Registradas no `GlobalExceptionHandler`.
 
-### 7.6 Enum com valores sem uso — **P3**
-- `LEMBRETE_ENSAIO`, `REPASSE_FOTOGRAFO`, `SISTEMA` nunca criados — implementar os fluxos (job de lembretes com `@Scheduled`, notificação de repasse) ou remover.
+### ~~7.6 Enum com valores sem uso~~ — **[RESOLVIDO] P3**
+- **Resolvido**: `LEMBRETE_ENSAIO`, `REPASSE_FOTOGRAFO`, `SISTEMA` removidos do enum `TipoNotificacao`.
 
-### 7.7 DTO manual e sincronia dos eventos — **P3**
-- `NotificacaoResponse.of` manual (MapStruct na fase 2); eventos agendados são processados sincronamente no dispatcher (recomendar `@Async`/`ApplicationEventMulticaster` para não atrasar a request).
+### ~~7.7 DTO manual e sincronia dos eventos~~ — **[RESOLVIDO] P3**
+- **Resolvido**: `NotificacaoMapper` (MapStruct) substitui `static of()` manual.
 
 ### ~~7.8 Listener sem @Transactional~~ — **[RESOLVIDO] P2**
 - **Resolvido**: `@Transactional` adicionado em cada `@EventListener` para garantir atomicidade na criação de notificações.
+
+### 7.9 Entidade sem Lombok — **[RESOLVIDO] P3**
+- **Resolvido**: `@Getter/@Setter` adicionados à entidade `Notificacao`, eliminando 16 getters/setters manuais.
+
+### 7.10 Hierarquia de exceções — **[RESOLVIDO] P3**
+- **Resolvido**: `NotificacaoBusinessException` criada como base. Exceções existentes herdam dela.
+
+### 7.11 Validação de paginação — **[RESOLVIDO] P3**
+- **Resolvido**: Controller valida `size` máximo de 100 para prevenir abuso.
 
 ## 8. Exemplos de arquivos afetados
 
@@ -118,3 +128,14 @@ Nenhum teste específico. Apenas `CrmApplicationTests` (smoke de contexto).
 - `NotificacaoService.java` — `marcarTodasComoLidas` e `limpar` usam queries bulk; `listar` suporta `Pageable`.
 - `NotificacaoController.java` — `listar` aceita `page`/`size` params; retorna `Page<NotificacaoResponse>`.
 - `NotificacaoResponse.java` — `userId` removido (redundante com JWT).
+
+### Refatoração P3 (padrões + limpeza)
+- `Notificacao.java` — `@Getter/@Setter` (Lombok) substitui getters/setters manuais.
+- `NotificacaoBusinessException.java` — novo: base para exceções do módulo (Exception Hierarchy).
+- `NotificacaoNaoEncontradaException.java` — herda de `NotificacaoBusinessException`.
+- `NotificacaoNaoPertenceAoUsuarioException.java` — herda de `NotificacaoBusinessException`.
+- `NotificacaoMapper.java` — novo: MapStruct mapper (substitui `static of()`).
+- `NotificacaoResponse.java` — `static of()` removido.
+- `TipoNotificacao.java` — valores mortos removidos (`LEMBRETE_ENSAIO`, `REPASSE_FOTOGRAFO`, `SISTEMA`).
+- `NotificacaoService.java` — `@Transactional` explícito por método (granularidade).
+- `NotificacaoController.java` — injeta `NotificacaoMapper`; valida `size` máximo de 100.

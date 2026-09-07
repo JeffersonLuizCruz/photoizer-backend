@@ -12,8 +12,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
+/**
+ * Service de notificações.
+ *
+ * PATTERN: Transactional Script — métodos de escrita com @Transactional explícito,
+ * leituras com @Transactional(readOnly = true) para otimização do Hibernate.
+ */
 @Service
-@Transactional
 public class NotificacaoService {
 
     private final NotificacaoRepository repository;
@@ -22,6 +27,7 @@ public class NotificacaoService {
         this.repository = repository;
     }
 
+    @Transactional
     public Notificacao criar(UUID userId, String titulo, String mensagem, String link, TipoNotificacao tipo) {
         return repository.save(new Notificacao(userId, titulo, mensagem, link, tipo));
     }
@@ -40,6 +46,7 @@ public class NotificacaoService {
      * Marca uma notificação como lida com validação de ownership.
      * P1: garante que o usuário autenticado só manipula suas próprias notificações.
      */
+    @Transactional
     public void marcarComoLida(UUID id, UUID userId) {
         var notificacao = repository.findById(id)
             .orElseThrow(() -> new NotificacaoNaoEncontradaException(id));
@@ -53,6 +60,7 @@ public class NotificacaoService {
     /**
      * Marca todas as notificações como lidas via query bulk (1 UPDATE, não N+1).
      */
+    @Transactional
     public void marcarTodasComoLidas(UUID userId) {
         repository.marcarTodasComoLidas(userId);
     }
@@ -60,6 +68,7 @@ public class NotificacaoService {
     /**
      * Remove todas as notificações do usuário via query derivada (1 DELETE, não carrega em memória).
      */
+    @Transactional
     public void limpar(UUID userId) {
         repository.deleteByUserId(userId);
     }

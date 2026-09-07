@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.UUID;
 
 /**
+ * Controller de notificações.
+ *
  * PATTERN: @AuthenticationPrincipal (Spring Security) — refatorado (P1).
  *
  * Antes, o controller aceitava userId como @RequestParam, permitindo que qualquer
@@ -30,10 +32,15 @@ import java.util.UUID;
 @Tag(name = "Notificações", description = "Notificações do sistema para usuários")
 public class NotificacaoController {
 
-    private final NotificacaoService notificacaoService;
+    private static final int MAX_PAGE_SIZE = 100;
 
-    public NotificacaoController(NotificacaoService notificacaoService) {
+    private final NotificacaoService notificacaoService;
+    private final NotificacaoMapper notificacaoMapper;
+
+    public NotificacaoController(NotificacaoService notificacaoService,
+                                 NotificacaoMapper notificacaoMapper) {
         this.notificacaoService = notificacaoService;
+        this.notificacaoMapper = notificacaoMapper;
     }
 
     @GetMapping
@@ -43,9 +50,10 @@ public class NotificacaoController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
         var userId = UUID.fromString(userIdStr);
-        var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        var safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        var pageable = PageRequest.of(page, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
         var notificacoes = notificacaoService.listar(userId, pageable)
-            .map(NotificacaoResponse::of);
+            .map(notificacaoMapper::toResponse);
         return ResponseEntity.ok(notificacoes);
     }
 
