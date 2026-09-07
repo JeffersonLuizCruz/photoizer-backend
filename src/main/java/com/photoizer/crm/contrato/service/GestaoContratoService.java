@@ -15,8 +15,7 @@ import com.photoizer.crm.contrato.model.ContratoFotografo;
 import com.photoizer.crm.contrato.model.StatusContrato;
 import com.photoizer.crm.contrato.repository.ContratoRepository;
 import com.photoizer.crm.pacote.exception.PacoteInativoException;
-import com.photoizer.crm.pacote.exception.PacoteNaoEncontradoException;
-import com.photoizer.crm.pacote.repository.PacoteRepository;
+import com.photoizer.crm.pacote.service.PacoteQueryService;
 import com.photoizer.crm.auth.repository.UserRepository;
 import com.photoizer.crm.shared.model.TipoRepasse;
 import org.springframework.context.ApplicationEventPublisher;
@@ -43,26 +42,25 @@ import java.util.UUID;
 public class GestaoContratoService {
 
     private final ContratoRepository contratoRepository;
-    private final PacoteRepository pacoteRepository;
+    private final PacoteQueryService pacoteQueryService;
     private final UserRepository userRepository;
     private final ConfiguracaoService configuracaoService;
     private final ApplicationEventPublisher eventPublisher;
 
     public GestaoContratoService(ContratoRepository contratoRepository,
-                           PacoteRepository pacoteRepository,
+                           PacoteQueryService pacoteQueryService,
                            UserRepository userRepository,
                            ConfiguracaoService configuracaoService,
                            ApplicationEventPublisher eventPublisher) {
         this.contratoRepository = contratoRepository;
-        this.pacoteRepository = pacoteRepository;
+        this.pacoteQueryService = pacoteQueryService;
         this.userRepository = userRepository;
         this.configuracaoService = configuracaoService;
         this.eventPublisher = eventPublisher;
     }
 
     public Contrato criar(CriarContratoRequest request) {
-        var pacote = pacoteRepository.findById(request.pacoteId())
-            .orElseThrow(() -> new PacoteNaoEncontradoException(request.pacoteId()));
+        var pacote = pacoteQueryService.buscarEntityPorId(request.pacoteId());
 
         if (!pacote.getAtivo()) {
             throw new PacoteInativoException(pacote.getId());

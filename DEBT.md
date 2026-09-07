@@ -141,7 +141,12 @@
 - ~~**Listener sem `@Transactional`**: notificações parciais em caso de falha.~~ **RESOLVIDO**: `@Transactional` em cada `@EventListener`.
 
 ### pacote
-- Merge manual de 10 campos no `atualizar`.
+- ~~Merge manual de 10 campos no `atualizar`~~ **RESOLVIDO**: MapStruct `PacoteMapper.updateEntity()`.
+- ~~Campo `valorTotalMinimo` redundante~~ **RESOLVIDO**: removido do `PacoteResponse`.
+- ~~Defaults inconsistentes criar/atualizar~~ **RESOLVIDO**: tratamento uniforme via mapper.
+- ~~`ResponseEntity<?>` no controller~~ **RESOLVIDO**: tipado como `ResponseEntity<PageResponse<PacoteResponse>>`.
+- ~~Injeção de `PacoteRepository` por 3 módulos (agenda, contrato, financeiro)~~ **RESOLVIDO**: `PacoteQueryService` (fachada read-only).
+- ~~`PacoteService` mistura command/query~~ **RESOLVIDO**: separado em `PacoteService` (command) + `PacoteQueryService` (query).
 
 ### agenda
 - God class; máquina de estados sem validação (`StatusAgendamento` sem methods); duplicação de cálculo financeiro; violações Modulith (repos/services de outros módulos); vazamento de web (`HttpServletRequest`/`MultipartFile`) na camada de serviço.
@@ -163,7 +168,7 @@
 | ~~**Herança `BaseEntity`**~~ | ~~todos com entidades~~ | **RESOLVIDO**: `@Embeddable AuditInfo` + composição; `BaseEntity.java` removido |
 | **`status`/`origem` em `String`** | comissao, agenda, foto, despesa, contrato, ecommerce | enums com métodos de transição; nunca comparar `String.equals` — **despesa RESOLVIDO** (State Pattern) |
 | **Exceções genéricas** | maioria | hierarquia central `BusinessException` + `HttpStatus`/código (decisão já aprovada) |
-| **DTOs manuais (`static of`/`Map`)** | quase todos | MapStruct (decisão já aprovada; Fase 2) — **iniciado em `agenda`** (AgendamentoMapper/RascunhoAgendamentoMapper); **despesa RESOLVIDO** (static of() removido); **ecommerce RESOLVIDO** (EcommerceMapper) |
+| **DTOs manuais (`static of`/`Map`)** | quase todos | MapStruct (decisão já aprovada; Fase 2) — **iniciado em `agenda`** (AgendamentoMapper/RascunhoAgendamentoMapper); **despesa RESOLVIDO** (static of() removido); **ecommerce RESOLVIDO** (EcommerceMapper); **pacote RESOLVIDO** (PacoteMapper) |
 | ~~**Escrita em entidade alheia** (ecommerce)~~ | ~~ecommerce, edicao, foto, financeiro, comissao, documento, notificacao~~ | **RESOLVIDO** (ecommerce): eventos de domínio + listeners; **RESOLVIDO** (foto): eventos `FotoEdicaoPublicadaEvent`/`FotoEdicaoRemovidaEvent` + listener; **RESOLVIDO** (edicao): `PublicacaoService` e `EdicaoRevisaoService` publicam eventos; **RESOLVIDO** (notificacao): Event Enrichment nos eventos de agenda elimina acesso a repositórios alheios; outros módulos pendentes |
 | **Agregação em memória** | dashboard, financeiro, comissao, indicador, agenda | queries agregadas SQL (`SUM`/`GROUP BY`/`COUNT`) nos repositórios donos — **despesa RESOLVIDO** (DespesaQueryService) |
 
@@ -182,4 +187,4 @@ Ordem proposta (valor × risco):
 7. ~~**AuditInfo `@Embeddable` + Auditing**~~ **RESOLVIDO**: `AuditInfo` criado, todas as 25 entidades migradas, `BaseEntity.java` removido.
 8. **PDF unificado** (escolher lib; eliminar stub do documento e duplicação com contrato).
 
-> **Fase 2 em andamento**: extração de services + encapsulamento de domínio + MapStruct foram aplicados ao módulo `agenda` (ver `agenda/MODULE.md §7`). As demais etapas desta lista ainda não foram executadas; as decisões arquiteturais (layering, exceções, MapStruct) já foram aprovadas em conversa anterior e estão refletidas nos `MODULE.md`.
+> **Fase 2 em andamento**: extração de services + encapsulamento de domínio + MapStruct foram aplicados ao módulo `agenda` (ver `agenda/MODULE.md §7`) e ao módulo `pacote` (ver `pacote/MODULE.md §7`). As demais etapas desta lista ainda não foram executadas; as decisões arquiteturais (layering, exceções, MapStruct) já foram aprovadas em conversa anterior e estão refletidas nos `MODULE.md`.

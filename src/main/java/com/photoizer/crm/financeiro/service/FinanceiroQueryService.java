@@ -22,11 +22,10 @@ import com.photoizer.crm.financeiro.api.FluxoCaixaResponse;
 import com.photoizer.crm.financeiro.api.PagamentoResponse;
 import com.photoizer.crm.financeiro.api.RelatorioAgendamentoItem;
 import com.photoizer.crm.financeiro.exception.AgendamentoNaoEncontradoParaFinanceiroException;
-import com.photoizer.crm.financeiro.exception.PacoteNaoEncontradoParaPreviewException;
 import com.photoizer.crm.financeiro.model.StatusReceita;
 import com.photoizer.crm.financeiro.repository.PagamentoRepository;
 import com.photoizer.crm.financeiro.repository.ReceitaRepository;
-import com.photoizer.crm.pacote.repository.PacoteRepository;
+import com.photoizer.crm.pacote.service.PacoteQueryService;
 import com.photoizer.crm.shared.service.FinanceCalculator;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -64,7 +63,7 @@ public class FinanceiroQueryService {
 
     private final AgendamentoRepository agendamentoRepository;
     private final AgendamentoFotografoRepository agendamentoFotografoRepository;
-    private final PacoteRepository pacoteRepository;
+    private final PacoteQueryService pacoteQueryService;
     private final IndicacaoRepository indicacaoRepository;
     private final DespesaRepository despesaRepository;
     private final ReceitaRepository receitaRepository;
@@ -75,7 +74,7 @@ public class FinanceiroQueryService {
 
     public FinanceiroQueryService(AgendamentoRepository agendamentoRepository,
                                   AgendamentoFotografoRepository agendamentoFotografoRepository,
-                                  PacoteRepository pacoteRepository,
+                                  PacoteQueryService pacoteQueryService,
                                   IndicacaoRepository indicacaoRepository,
                                   DespesaRepository despesaRepository,
                                   ReceitaRepository receitaRepository,
@@ -85,7 +84,7 @@ public class FinanceiroQueryService {
                                   DespesaMapper despesaMapper) {
         this.agendamentoRepository = agendamentoRepository;
         this.agendamentoFotografoRepository = agendamentoFotografoRepository;
-        this.pacoteRepository = pacoteRepository;
+        this.pacoteQueryService = pacoteQueryService;
         this.indicacaoRepository = indicacaoRepository;
         this.despesaRepository = despesaRepository;
         this.receitaRepository = receitaRepository;
@@ -96,8 +95,7 @@ public class FinanceiroQueryService {
     }
 
     public FinanceiroPreviewResponse calcularPreview(UUID pacoteId, BigDecimal taxaDeslocamento) {
-        var pacote = pacoteRepository.findById(pacoteId)
-            .orElseThrow(() -> new PacoteNaoEncontradoParaPreviewException(pacoteId));
+        var pacote = pacoteQueryService.buscarEntityPorId(pacoteId);
         var taxa = taxaDeslocamento != null ? taxaDeslocamento : BigDecimal.ZERO;
 
         var percentualEntrada = configuracaoService.getValorDecimal(ConfigKey.PERCENTUAL_ENTRADA);

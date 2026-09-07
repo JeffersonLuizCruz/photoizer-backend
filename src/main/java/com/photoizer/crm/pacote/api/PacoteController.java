@@ -1,5 +1,6 @@
 package com.photoizer.crm.pacote.api;
 
+import com.photoizer.crm.pacote.service.PacoteQueryService;
 import com.photoizer.crm.pacote.service.PacoteService;
 import com.photoizer.crm.shared.api.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -28,9 +29,11 @@ import java.util.UUID;
 public class PacoteController {
 
     private final PacoteService pacoteService;
+    private final PacoteQueryService pacoteQueryService;
 
-    public PacoteController(PacoteService pacoteService) {
+    public PacoteController(PacoteService pacoteService, PacoteQueryService pacoteQueryService) {
         this.pacoteService = pacoteService;
+        this.pacoteQueryService = pacoteQueryService;
     }
 
     @PostMapping
@@ -41,7 +44,7 @@ public class PacoteController {
 
     @GetMapping
     @Operation(summary = "Listar pacotes")
-    public ResponseEntity<?> listar(
+    public ResponseEntity<PageResponse<PacoteResponse>> listar(
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int perPage,
@@ -49,20 +52,20 @@ public class PacoteController {
             @RequestParam(defaultValue = "asc") String sortOrder) {
         var sort = Sort.by(Sort.Direction.fromString(sortOrder), sortBy);
         var pageable = PageRequest.of(page - 1, perPage, sort);
-        var result = pacoteService.listarPaginado(search, pageable);
+        var result = pacoteQueryService.listarPaginado(search, pageable);
         return ResponseEntity.ok(PageResponse.from(result, page));
     }
 
     @GetMapping("/all")
     @Operation(summary = "Listar todos os pacotes (sem paginação)")
     public ResponseEntity<List<PacoteResponse>> listarTodos() {
-        return ResponseEntity.ok(pacoteService.listarTodos());
+        return ResponseEntity.ok(pacoteQueryService.listarTodos());
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Buscar pacote por ID")
     public ResponseEntity<PacoteResponse> buscarPorId(@PathVariable UUID id) {
-        return ResponseEntity.ok(pacoteService.buscarPorId(id));
+        return ResponseEntity.ok(pacoteQueryService.buscarPorId(id));
     }
 
     @PutMapping("/{id}")

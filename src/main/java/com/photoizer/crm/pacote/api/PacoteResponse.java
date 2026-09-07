@@ -16,7 +16,6 @@ public record PacoteResponse(
     BigDecimal precoFotoExtra,
     String imagemCapa,
     String beneficios,
-    BigDecimal valorTotalMinimo,
     String duracaoEstimada,
     boolean bloqueiaDiaInteiro,
     boolean ativo,
@@ -24,24 +23,4 @@ public record PacoteResponse(
     LocalDateTime createdAt,
     LocalDateTime updatedAt
 ) {
-    public static PacoteResponse of(Pacote p) {
-        return new PacoteResponse(
-            p.getId(),
-            p.getNome(),
-            p.getDescricao(),
-            p.getQuantidadeFotos(),
-            p.getQuantidadeVideos(),
-            p.getValorBase(),
-            p.getPrecoFotoExtra(),
-            p.getImagemCapa(),
-            p.getBeneficios(),
-            p.getValorBase(),
-            p.getDuracaoEstimada(),
-            p.getBloqueiaDiaInteiro(),
-            p.getAtivo(),
-            p.getDiasParaEntrega(),
-            p.getAuditInfo().getCreatedAt(),
-            p.getAuditInfo().getUpdatedAt()
-        );
-    }
 }

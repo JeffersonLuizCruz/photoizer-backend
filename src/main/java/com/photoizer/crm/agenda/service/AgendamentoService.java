@@ -15,9 +15,8 @@ import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.auth.repository.UserRepository;
 import com.photoizer.crm.pacote.exception.PacoteInativoException;
-import com.photoizer.crm.pacote.exception.PacoteNaoEncontradoException;
 import com.photoizer.crm.pacote.model.Pacote;
-import com.photoizer.crm.pacote.repository.PacoteRepository;
+import com.photoizer.crm.pacote.service.PacoteQueryService;
 import com.photoizer.crm.cliente.exception.ClienteNaoEncontradoException;
 import com.photoizer.crm.cliente.model.Cliente;
 import com.photoizer.crm.cliente.model.OrigemCliente;
@@ -53,7 +52,7 @@ import org.springframework.data.jpa.domain.Specification;
 public class AgendamentoService {
 
     private final ClienteRepository clienteRepository;
-    private final PacoteRepository pacoteRepository;
+    private final PacoteQueryService pacoteQueryService;
     private final UserRepository userRepository;
     private final AgendamentoRepository agendamentoRepository;
     private final FileStorageService fileStorageService;
@@ -67,7 +66,7 @@ public class AgendamentoService {
     private final AgendamentoMapper agendamentoMapper;
 
     public AgendamentoService(ClienteRepository clienteRepository,
-                              PacoteRepository pacoteRepository,
+                              PacoteQueryService pacoteQueryService,
                                UserRepository userRepository,
                               AgendamentoRepository agendamentoRepository,
                               FileStorageService fileStorageService,
@@ -80,7 +79,7 @@ public class AgendamentoService {
                               AgendamentoValoresCalculator agendamentoValoresCalculator,
                               AgendamentoMapper agendamentoMapper) {
         this.clienteRepository = clienteRepository;
-        this.pacoteRepository = pacoteRepository;
+        this.pacoteQueryService = pacoteQueryService;
         this.userRepository = userRepository;
         this.agendamentoRepository = agendamentoRepository;
         this.fileStorageService = fileStorageService;
@@ -97,8 +96,7 @@ public class AgendamentoService {
     public Agendamento criarAgendamento(CriarAgendamentoCommand command) {
         var cliente = resolverCliente(command);
 
-        var pacote = pacoteRepository.findById(command.pacoteId())
-            .orElseThrow(() -> new PacoteNaoEncontradoException(command.pacoteId()));
+        var pacote = pacoteQueryService.buscarEntityPorId(command.pacoteId());
 
         var dataHoraEnsaio = resolverDataHora(command);
 
@@ -217,8 +215,7 @@ public class AgendamentoService {
     public AgendamentoResponse atualizar(UUID id, AtualizarAgendamentoRequest request) {
         var agendamento = buscarPorId(id);
 
-        var pacote = pacoteRepository.findById(request.pacoteId())
-            .orElseThrow(() -> new PacoteNaoEncontradoException(request.pacoteId()));
+        var pacote = pacoteQueryService.buscarEntityPorId(request.pacoteId());
         if (!pacote.getAtivo()) {
             throw new PacoteInativoException(pacote.getId());
         }
@@ -277,8 +274,7 @@ public class AgendamentoService {
     }
 
     public Agendamento criarAgendamentoDeContrato(ContratoAprovadoEvent event) {
-        var pacote = pacoteRepository.findById(event.pacoteId())
-            .orElseThrow(() -> new PacoteNaoEncontradoException(event.pacoteId()));
+        var pacote = pacoteQueryService.buscarEntityPorId(event.pacoteId());
 
         var cliente = resolverCliente(
             event.clienteId(), event.nome(), event.telefone(), event.email(),
