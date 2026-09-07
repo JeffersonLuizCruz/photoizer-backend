@@ -9,6 +9,7 @@ import com.photoizer.crm.agenda.exception.ComprovanteObrigatorioException;
 import com.photoizer.crm.agenda.exception.PagamentoInsuficienteException;
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
+import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.shared.storage.FileStorageService;
 import org.springframework.context.ApplicationEventPublisher;
@@ -20,6 +21,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -27,15 +29,18 @@ import java.util.UUID;
 public class AgendamentoStatusLifecycle {
 
     private final AgendamentoRepository agendamentoRepository;
+    private final AgendamentoFotografoRepository agendamentoFotografoRepository;
     private final DisponibilidadeService disponibilidadeService;
     private final ApplicationEventPublisher eventPublisher;
     private final FileStorageService fileStorageService;
 
     public AgendamentoStatusLifecycle(AgendamentoRepository agendamentoRepository,
+                                      AgendamentoFotografoRepository agendamentoFotografoRepository,
                                       DisponibilidadeService disponibilidadeService,
                                       ApplicationEventPublisher eventPublisher,
                                       FileStorageService fileStorageService) {
         this.agendamentoRepository = agendamentoRepository;
+        this.agendamentoFotografoRepository = agendamentoFotografoRepository;
         this.disponibilidadeService = disponibilidadeService;
         this.eventPublisher = eventPublisher;
         this.fileStorageService = fileStorageService;
@@ -52,9 +57,15 @@ public class AgendamentoStatusLifecycle {
         agendamento = agendamentoRepository.save(agendamento);
 
         if (status == StatusAgendamento.REALIZADO) {
+            var fotografoIds = agendamentoFotografoRepository.findByAgendamentoId(agendamento.getId())
+                .stream().map(af -> af.getFotografo().getId()).toList();
+            var clienteNome = agendamento.getCliente() != null
+                ? agendamento.getCliente().getNome() : "";
             eventPublisher.publishEvent(new AgendamentoRealizadoEvent(
                 agendamento.getId(),
-                agendamento.getCliente().getId()
+                agendamento.getCliente().getId(),
+                clienteNome,
+                fotografoIds
             ));
         }
 
@@ -119,9 +130,15 @@ public class AgendamentoStatusLifecycle {
 
         agendamento = agendamentoRepository.save(agendamento);
 
+        var fotografoIds = agendamentoFotografoRepository.findByAgendamentoId(agendamento.getId())
+            .stream().map(af -> af.getFotografo().getId()).toList();
+        var clienteNome = agendamento.getCliente() != null
+            ? agendamento.getCliente().getNome() : "";
         eventPublisher.publishEvent(new PagamentoFinalRegistradoEvent(
             agendamento.getId(),
-            agendamento.getValorTotalFinal()
+            agendamento.getValorTotalFinal(),
+            clienteNome,
+            fotografoIds
         ));
 
         return agendamento;

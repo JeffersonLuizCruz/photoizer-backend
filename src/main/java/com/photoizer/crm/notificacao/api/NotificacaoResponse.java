@@ -8,7 +8,6 @@ import java.util.UUID;
 
 public record NotificacaoResponse(
     UUID id,
-    UUID userId,
     String titulo,
     String mensagem,
     String link,
@@ -18,7 +17,7 @@ public record NotificacaoResponse(
 ) {
     public static NotificacaoResponse of(Notificacao n) {
         return new NotificacaoResponse(
-            n.getId(), n.getUserId(), n.getTitulo(), n.getMensagem(),
+            n.getId(), n.getTitulo(), n.getMensagem(),
             n.getLink(), n.getTipo(), n.isLida(), n.getCreatedAt()
         );
     }

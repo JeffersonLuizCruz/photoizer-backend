@@ -12,7 +12,7 @@
 | # | Dívida | Módulo(s) | Status |
 |---|--------|-----------|--------|
 | 1 | ~~**`/api/v1/documentos/**` inacessível**: sem regra no `SecurityConfig`, cai em `anyRequest().denyAll()` → módulo inteiro bloqueado~~ | documento | **RESOLVIDO** (`@RolesAllowed`) |
-| 2 | **IDOR em notificações**: `userId` vem da request sem verificação de dono (qualquer usuário lê/apaga notificações de outro) | notificacao | Pendente |
+| 2 | ~~**IDOR em notificações**: `userId` vem da request sem verificação de dono (qualquer usuário lê/apaga notificações de outro)~~ | notificacao | **RESOLVIDO** (`@AuthenticationPrincipal` + ownership check) |
 | 3 | ~~**Exposição de `User` com `password`** na API~~ | fotografo | **RESOLVIDO** |
 | 4 | ~~**PDF de contrato gerado "na mão"** (bytes nativos) + `PdfGeneratorService` do documento é **stub** (`byte[0]`)~~ | contrato, documento | **RESOLVIDO** (PdfWriter shared + Strategy Pattern) |
 | 5 | ~~**Escrita cross-module**: serviços mutam entidades de outros módulos~~ | ~~ecommerce, financeiro~~ | **RESOLVIDO** (ecommerce: eventos + listeners; financeiro: `PagamentoRegistradoEvent` + `ExtrasAdicionadosEvent` + listener no agenda) |
@@ -136,7 +136,9 @@
 - N+1 na listagem + acoplamento com comissao; exceções genéricas.
 
 ### notificacao
-- **IDOR (ownership)**: qualquer autenticado manipula notificações de outro; listener atravessa repositório do agenda + acesso LAZY (`getCliente().getNome()` fora de transação).
+- ~~**IDOR (ownership)**: qualquer autenticado manipula notificações de outro; listener atravessa repositório do agenda + acesso LAZY (`getCliente().getNome()` fora de transação).~~ **RESOLVIDO**: `@AuthenticationPrincipal` no controller; ownership check em `marcarComoLida`; eventos enriquecidos (Event Enrichment) eliminam dependência de repositórios do agenda; helper `notificarFotografos()` elimina duplicação.
+- ~~**Operações em massa N+1**: `marcarTodasComoLidas` salva em loop; `limpar` carrega tudo; `listar` sem paginação.~~ **RESOLVIDO**: `@Modifying` bulk update; `deleteByUserId`; `Pageable` no `listar`.
+- ~~**Listener sem `@Transactional`**: notificações parciais em caso de falha.~~ **RESOLVIDO**: `@Transactional` em cada `@EventListener`.
 
 ### pacote
 - Merge manual de 10 campos no `atualizar`.
@@ -162,7 +164,7 @@
 | **`status`/`origem` em `String`** | comissao, agenda, foto, despesa, contrato, ecommerce | enums com métodos de transição; nunca comparar `String.equals` — **despesa RESOLVIDO** (State Pattern) |
 | **Exceções genéricas** | maioria | hierarquia central `BusinessException` + `HttpStatus`/código (decisão já aprovada) |
 | **DTOs manuais (`static of`/`Map`)** | quase todos | MapStruct (decisão já aprovada; Fase 2) — **iniciado em `agenda`** (AgendamentoMapper/RascunhoAgendamentoMapper); **despesa RESOLVIDO** (static of() removido); **ecommerce RESOLVIDO** (EcommerceMapper) |
-| ~~**Escrita em entidade alheia** (ecommerce)~~ | ~~ecommerce, edicao, foto, financeiro, comissao, documento, notificacao~~ | **RESOLVIDO** (ecommerce): eventos de domínio + listeners; **RESOLVIDO** (foto): eventos `FotoEdicaoPublicadaEvent`/`FotoEdicaoRemovidaEvent` + listener; **RESOLVIDO** (edicao): `PublicacaoService` e `EdicaoRevisaoService` publicam eventos; outros módulos pendentes |
+| ~~**Escrita em entidade alheia** (ecommerce)~~ | ~~ecommerce, edicao, foto, financeiro, comissao, documento, notificacao~~ | **RESOLVIDO** (ecommerce): eventos de domínio + listeners; **RESOLVIDO** (foto): eventos `FotoEdicaoPublicadaEvent`/`FotoEdicaoRemovidaEvent` + listener; **RESOLVIDO** (edicao): `PublicacaoService` e `EdicaoRevisaoService` publicam eventos; **RESOLVIDO** (notificacao): Event Enrichment nos eventos de agenda elimina acesso a repositórios alheios; outros módulos pendentes |
 | **Agregação em memória** | dashboard, financeiro, comissao, indicador, agenda | queries agregadas SQL (`SUM`/`GROUP BY`/`COUNT`) nos repositórios donos — **despesa RESOLVIDO** (DespesaQueryService) |
 
 ---
@@ -171,9 +173,9 @@
 
 Ordem proposta (valor × risco):
 
-1. **Segurança imediata** — IDOR notificações, exposição de `password`/hash, `denyAll` documentos, exposição de entidades.
+1. **Segurança imediata** — ~~IDOR notificações~~ **RESOLVIDO**, exposição de `password`/hash, `denyAll` documentos, exposição de entidades.
 2. **Hierarquia de exceções** no `shared` + conversão das exceções genéricas (P1 dos módulos).
-3. ~~**Padding cross-module** — substituir escritas diretas por eventos~~ **PARCIAL**: resolvido para ecommerce; pendente para edicao, foto, financeiro, comissao, documento, notificacao.
+3. ~~**Padding cross-module** — substituir escritas diretas por eventos~~ **PARCIAL**: resolvido para ecommerce, notificacao; pendente para edicao, foto, financeiro, comissao, documento.
 4. **Enums e máquinas de estado** — `StatusAgendamento`, `StatusIndicacao`, `StatusContrato` com transições.
 5. **Queries agregadas** + facades públicas por módulo (dashboard/financeiro deixam de puxar repositório alheio).
 6. **MapStruct total** nos DTOs.

@@ -57,6 +57,8 @@ import com.photoizer.crm.foto.exception.FotoNaoPertenceAoAgendamentoException;
 import com.photoizer.crm.foto.exception.StatusFotoInvalidoException;
 import com.photoizer.crm.indicador.exception.IndicadorDuplicadoException;
 import com.photoizer.crm.indicador.exception.IndicadorNaoEncontradoException;
+import com.photoizer.crm.notificacao.exception.NotificacaoNaoEncontradaException;
+import com.photoizer.crm.notificacao.exception.NotificacaoNaoPertenceAoUsuarioException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -444,6 +446,18 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleStatusFotoInvalido(StatusFotoInvalidoException e) {
         log.warn("Transição de status de foto inválida: {}", e.getMessage());
         return build(HttpStatus.CONFLICT, e);
+    }
+
+    @ExceptionHandler(NotificacaoNaoEncontradaException.class)
+    public ResponseEntity<ErrorResponse> handleNotificacaoNaoEncontrada(NotificacaoNaoEncontradaException e) {
+        log.warn("Notificação não encontrada: {}", e.getMessage());
+        return build(HttpStatus.NOT_FOUND, e);
+    }
+
+    @ExceptionHandler(NotificacaoNaoPertenceAoUsuarioException.class)
+    public ResponseEntity<ErrorResponse> handleNotificacaoNaoPertenceAoUsuario(NotificacaoNaoPertenceAoUsuarioException e) {
+        log.warn("Tentativa de acesso a notificação de outro usuário: {}", e.getMessage());
+        return build(HttpStatus.FORBIDDEN, e);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

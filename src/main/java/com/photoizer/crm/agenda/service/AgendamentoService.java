@@ -414,6 +414,12 @@ public class AgendamentoService {
         criarFotografosNoAgendamento(agendamento, dados.fotografos());
         partilhaService.calcularPartilhaFotografo(agendamento);
 
+        var fotografoIds = dados.fotografos() != null
+            ? dados.fotografos().stream().map(CriarAgendamentoCommand.FotografoRepasse::fotografoId).toList()
+            : List.<UUID>of();
+
+        var clienteNome = agendamento.getCliente() != null
+            ? agendamento.getCliente().getNome() : "";
         eventPublisher.publishEvent(new AgendamentoCriadoEvent(
             agendamento.getId(),
             agendamento.getCliente().getId(),
@@ -423,7 +429,9 @@ public class AgendamentoService {
             dados.indicadorNome(),
             dados.indicadorTelefone(),
             null,
-            dados.valorBasePacote()
+            dados.valorBasePacote(),
+            clienteNome,
+            fotografoIds
         ));
 
         eventPublisher.publishEvent(new AgendamentoConfirmadoEvent(

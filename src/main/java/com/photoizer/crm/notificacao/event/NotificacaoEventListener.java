@@ -3,88 +3,94 @@ package com.photoizer.crm.notificacao.event;
 import com.photoizer.crm.agenda.event.AgendamentoCriadoEvent;
 import com.photoizer.crm.agenda.event.AgendamentoRealizadoEvent;
 import com.photoizer.crm.agenda.event.PagamentoFinalRegistradoEvent;
-import com.photoizer.crm.agenda.model.AgendamentoFotografo;
-import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
-import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.notificacao.model.TipoNotificacao;
 import com.photoizer.crm.notificacao.service.NotificacaoService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.UUID;
 
+/**
+ * PATTERN: Event Listener (Modulith) — refatorado (P1).
+ *
+ * Antes, este listener injetava AgendamentoRepository e AgendamentoFotografoRepository
+ * do módulo agenda, violando fronteiras entre módulos e correndo risco de
+ * LazyInitializationException (acesso a getCliente().getNome() fora de transação).
+ *
+ * Agora, os eventos de agenda são enriquecidos (Event Enrichment) com clienteNome
+ * e fotografoIds resolvidos pelo publisher, eliminando a dependência de repositórios
+ * alheios. O método helper notificarFotografos() elimina a duplicação dos 3 handlers.
+ */
 @Component
 public class NotificacaoEventListener {
 
-    private final NotificacaoService notificacaoService;
-    private final AgendamentoRepository agendamentoRepository;
-    private final AgendamentoFotografoRepository agendamentoFotografoRepository;
-
+    private static final Logger log = LoggerFactory.getLogger(NotificacaoEventListener.class);
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy 'às' HH:mm");
 
-    public NotificacaoEventListener(NotificacaoService notificacaoService,
-                                    AgendamentoRepository agendamentoRepository,
-                                    AgendamentoFotografoRepository agendamentoFotografoRepository) {
+    private final NotificacaoService notificacaoService;
+
+    public NotificacaoEventListener(NotificacaoService notificacaoService) {
         this.notificacaoService = notificacaoService;
-        this.agendamentoRepository = agendamentoRepository;
-        this.agendamentoFotografoRepository = agendamentoFotografoRepository;
     }
 
     @EventListener
+    @Transactional
     public void onAgendamentoCriado(AgendamentoCriadoEvent event) {
-        var agendamento = agendamentoRepository.findById(event.agendamentoId()).orElse(null);
-        if (agendamento == null) return;
-        var links = agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(event.agendamentoId());
-        if (links.isEmpty()) return;
+        if (event.fotografoIds().isEmpty()) return;
 
-        var dataStr = agendamento.getDataHoraEnsaio().format(DATE_FMT);
-        for (var link : links) {
-            notificacaoService.criar(
-                link.getFotografo().getId(),
-                "Novo Ensaio Agendado",
-                "Você tem um novo ensaio com " + agendamento.getCliente().getNome() + " em " + dataStr + ".",
-                "/agenda/" + agendamento.getId(),
-                TipoNotificacao.NOVO_ENSAIO
-            );
-        }
+        var dataStr = event.dataHoraEnsaio().format(DATE_FMT);
+        notificarFotografos(
+            event.fotografoIds(),
+            "Novo Ensaio Agendado",
+            "Você tem um novo ensaio com " + event.clienteNome() + " em " + dataStr + ".",
+            "/agenda/" + event.agendamentoId(),
+            TipoNotificacao.NOVO_ENSAIO
+        );
     }
 
     @EventListener
+    @Transactional
     public void onAgendamentoRealizado(AgendamentoRealizadoEvent event) {
-        var links = agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(event.agendamentoId());
-        if (links.isEmpty()) return;
+        if (event.fotografoIds().isEmpty()) return;
 
-        var agendamento = agendamentoRepository.findById(event.agendamentoId()).orElse(null);
-        if (agendamento == null) return;
-
-        for (var link : links) {
-            notificacaoService.criar(
-                link.getFotografo().getId(),
-                "Ensaio Realizado",
-                "O ensaio com " + agendamento.getCliente().getNome() + " foi realizado com sucesso.",
-                "/agenda/" + agendamento.getId(),
-                TipoNotificacao.ENSAIO_REALIZADO
-            );
-        }
+        notificarFotografos(
+            event.fotografoIds(),
+            "Ensaio Realizado",
+            "O ensaio com " + event.clienteNome() + " foi realizado com sucesso.",
+            "/agenda/" + event.agendamentoId(),
+            TipoNotificacao.ENSAIO_REALIZADO
+        );
     }
 
     @EventListener
+    @Transactional
     public void onPagamentoFinalRegistrado(PagamentoFinalRegistradoEvent event) {
-        var links = agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(event.agendamentoId());
-        if (links.isEmpty()) return;
+        if (event.fotografoIds().isEmpty()) return;
 
-        var agendamento = agendamentoRepository.findById(event.agendamentoId()).orElse(null);
-        if (agendamento == null) return;
+        notificarFotografos(
+            event.fotografoIds(),
+            "Pagamento Final Recebido",
+            "O pagamento final do ensaio com " + event.clienteNome()
+                + " foi confirmado. Sua partilha já está disponível para consulta.",
+            "/minhas-financas",
+            TipoNotificacao.PAGAMENTO_FINAL
+        );
+    }
 
-        for (var link : links) {
-            notificacaoService.criar(
-                link.getFotografo().getId(),
-                "Pagamento Final Recebido",
-                "O pagamento final do ensaio com " + agendamento.getCliente().getNome()
-                    + " foi confirmado. Sua partilha já está disponível para consulta.",
-                "/minhas-financas",
-                TipoNotificacao.PAGAMENTO_FINAL
-            );
+    /**
+     * Cria notificações para todos os fotógrafos de forma atômica.
+     * PATTERN: Transactional script — se qualquer notificação falhar, todas as anteriores
+     * são revertidas via rollback, evitando notificações parciais.
+     */
+    private void notificarFotografos(List<UUID> fotografoIds, String titulo,
+                                     String mensagem, String link, TipoNotificacao tipo) {
+        for (UUID fotografoId : fotografoIds) {
+            notificacaoService.criar(fotografoId, titulo, mensagem, link, tipo);
         }
     }
 }

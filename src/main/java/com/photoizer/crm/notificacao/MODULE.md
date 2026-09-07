@@ -1,7 +1,7 @@
 # Módulo: Notificação
 
 ## 1. Responsabilidade
-Cria e gerencia notificações do sistema para usuários (fotógrafos/equipe). É um módulo **puramente reativo** — as notificações nascem de eventos do módulo `agenda` (novo ensaio, ensaio realizado, pagamento final) consumidos pelo `NotificacaoEventListener`; nenhum outro módulo o importa. Expõe endpoints de consulta/gerenciamento por **userId** (ver dívida 7.1).
+Cria e gerencia notificações do sistema para usuários (fotógrafos/equipe). É um módulo **puramente reativo** — as notificações nascem de eventos do módulo `agenda` (novo ensaio, ensaio realizado, pagamento final) consumidos pelo `NotificacaoEventListener`; nenhum outro módulo o importa. Expõe endpoints de consulta/gerenciamento autenticados via JWT.
 
 ## 2. Estrutura
 ```
@@ -12,30 +12,32 @@ notificacao/
 ├── repository/
 │   └── NotificacaoRepository.java # JpaRepository + findByUserIdOrderByCreatedAtDesc, countByUserIdAndLidaFalse
 ├── service/
-│   └── NotificacaoService.java    # criar, listar, contarNaoLidas, marcarComoLida, marcarTodasComoLidas, limpar
+│   └── NotificacaoService.java    # criar, listar, contarNaoLidas, marcarComoLida (com ownership), marcarTodasComoLidas, limpar
 ├── event/
-│   └── NotificacaoEventListener.java # Consome 3 eventos de agenda e cria notificações por fotógrafo
+│   └── NotificacaoEventListener.java # Consome 3 eventos enriquecidos de agenda e cria notificações por fotógrafo
+├── exception/
+│   ├── NotificacaoNaoEncontradaException.java       # 404
+│   └── NotificacaoNaoPertenceAoUsuarioException.java # 403
 └── api/
-    ├── NotificacaoController.java  # GET (listar, nao-lidas), PATCH (ler, ler-todas, limpar)
+    ├── NotificacaoController.java  # GET (listar, nao-lidas), PATCH (ler, ler-todas, limpar) — via @AuthenticationPrincipal
     └── NotificacaoResponse.java    # Record com static of() manual
 ```
 
 ## 3. Dependências Externas
 
-### Módulos internos importados — **[VIOLAÇÕES Modulith]**
+### Módulos internos importados
 | Módulo | Onde | Uso |
 |--------|------|-----|
-| **agenda** | `NotificacaoEventListener` | eventos `AgendamentoCriadoEvent`, `AgendamentoRealizadoEvent`, `PagamentoFinalRegistradoEvent` (uso correto) |
-| **agenda** | `NotificacaoEventListener` | **`AgendamentoRepository` + `AgendamentoFotografoRepository`** injetados para buscar agendamento/fotógrafos do evento — acesso direto a repositório de outro módulo |
+| **agenda** | `NotificacaoEventListener` | eventos `AgendamentoCriadoEvent`, `AgendamentoRealizadoEvent`, `PagamentoFinalRegistradoEvent` (uso correto — dados enriquecidos pelo publisher) |
 
-> Nenhum módulo importa `notificacao` — é terminal **para os outros módulos**. Porém, ao buscar os dados que precisa, atravessa direto o repositório do `agenda`.
+> Nenhum módulo importa `notificacao` — é terminal **para os outros módulos**. A violação Modulith anterior (acesso a repositórios do agenda) foi resolvida via **Event Enrichment**.
 
 ### Eventos consumidos
-| Evento (agenda) | Ação |
-|------------------|------|
-| `AgendamentoCriadoEvent` | Para cada fotógrafo do agendamento cria "Novo Ensaio Agendado" (`NOVO_ENSAIO`) |
-| `AgendamentoRealizadoEvent` | Para cada fotógrafo cria "Ensaio Realizado" (`ENSAIO_REALIZADO`) |
-| `PagamentoFinalRegistradoEvent` | Para cada fotógrafo cria "Pagamento Final Recebido" (`PAGAMENTO_FINAL`) |
+| Evento (agenda) | Dados enriquecidos | Ação |
+|------------------|-------------------|------|
+| `AgendamentoCriadoEvent` | `clienteNome`, `fotografoIds`, `dataHoraEnsaio` | Para cada fotógrafo cria "Novo Ensaio Agendado" (`NOVO_ENSAIO`) |
+| `AgendamentoRealizadoEvent` | `clienteNome`, `fotografoIds` | Para cada fotógrafo cria "Ensaio Realizado" (`ENSAIO_REALIZADO`) |
+| `PagamentoFinalRegistradoEvent` | `clienteNome`, `fotografoIds` | Para cada fotógrafo cria "Pagamento Final Recebido" (`PAGAMENTO_FINAL`) |
 
 ### Eventos publicados
 Nenhum.
@@ -43,50 +45,48 @@ Nenhum.
 ## 4. Fluxos Principais
 
 ### Fluxo 1: Notificar fotógrafos de um novo ensaio
-1. `agenda` publica `AgendamentoCriadoEvent` com `agendamentoId`.
-2. `NotificacaoEventListener.onAgendamentoCriado` (`:34-50`):
-   - Busca o agendamento e os vínculos `AgendamentoFotografo` via **repositório do módulo agenda** (`:35,37`).
-   - Para cada fotógrafo, chama `notificacaoService.criar` com link `/agenda/{id}`.
-   - **Silenciosamente retorna** se agendamento não existir (`:36`).
+1. `agenda` publica `AgendamentoCriadoEvent` com `agendamentoId`, `clienteNome`, `fotografoIds`, `dataHoraEnsaio`.
+2. `NotificacaoEventListener.onAgendamentoCriado`:
+   - Usa `fotografoIds` e `clienteNome` diretamente do evento (sem acesso a repositório).
+   - Chama helper `notificarFotografos()` que cria notificação para cada fotógrafo.
 
 ### Fluxo 2/3: Ensaio realizado e pagamento final
-- Mesmo padrão: `:52-69` e `:71-89` — busca links + agendamento via repositório do agenda, faz loop e cria notificação com link (`/agenda/{id}` ou `/minhas-financas`).
+- Mesmo padrão: consome dados enriquecidos do evento, usa helper `notificarFotografos()`.
 
-### Fluxo 4: Consulta e gerenciamento
-- `GET /api/v1/notificacoes?userId=` → lista ordenada por `createdAt` desc; `GET /notificacoes/nao-lidas?userId=` → contagem.
-- `PATCH /notificacoes/{id}/ler`, `PATCH /notificacoes/ler-todas?userId=`, `PATCH /notificacoes/limpar?userId=`.
+### Fluxo 4: Consulta e gerenciamento (autenticado)
+- `GET /api/v1/notificacoes` → lista do usuário autenticado (via `@AuthenticationPrincipal`).
+- `GET /api/v1/notificacoes/nao-lidas` → contagem do usuário autenticado.
+- `PATCH /api/v1/notificacoes/{id}/ler` → marca como lida com **validação de ownership**.
+- `PATCH /api/v1/notificacoes/ler-todas` → marca todas como lidas do usuário autenticado.
+- `PATCH /api/v1/notificacoes/limpar` → limpa notificações do usuário autenticado.
 
 ## 5. Regras Específicas
-1. **Identificador por `userId` vindo da requisição** — o controller não deriva o usuário do JWT (`SecurityContext`); confia no parâmetro (ver 7.1).
-2. **Entidade sem `BaseEntity`**: `Notificacao` tem `id`/`createdAt` próprios, sem `updatedAt`/`createdBy` — única entidade fora do padrão (documentado no AGENTS.md).
-3. **Sem paginação** em `listar`.
-4. **Enum com valores mortos**: `LEMBRETE_ENSAIO`, `REPASSE_FOTOGRAFO` e `SISTEMA` nunca são criados — não existe job de lembretes nem notificação de repasse (o AGENTS.md cita "agenda lembretes" mas não há implementação).
-5. **Listeners sem `@Transactional`**: cada `criar` é um `save` isolado; falha no meio do loop deixa notificações parciais.
+1. **Identificador por `@AuthenticationPrincipal`** — o controller extrai o userId do JWT (`SecurityContext`), não aceita parâmetro externo. Cada usuário só acessa suas próprias notificações.
+2. **Ownership check em `marcarComoLida`** — valida que a notificação pertence ao usuário autenticado; caso contrário, lança `NotificacaoNaoPertenceAoUsuarioException` (403).
+3. **Entidade sem `BaseEntity`**: `Notificacao` tem `id`/`createdAt` próprios, sem `updatedAt`/`createdBy` — única entidade fora do padrão (documentado no AGENTS.md).
+4. **Sem paginação** em `listar`.
+5. **Enum com valores mortos**: `LEMBRETE_ENSAIO`, `REPASSE_FOTOGRAFO` e `SISTEMA` nunca são criados — não existe job de lembretes nem notificação de repasse.
+6. **Listeners sem `@Transactional`**: cada `criar` é um `save` isolado; falha no meio do loop deixa notificações parciais.
 
 ## 6. Testes
 Nenhum teste específico. Apenas `CrmApplicationTests` (smoke de contexto).
 
 ## 7. Dívidas Técnicas e Melhorias Recomendadas
 
-### 7.1 Falha de ownership/segurança: `userId` por request param — **[CRÍTICO] P1**
-- `NotificacaoController` aceita `userId` em `listar`/`nao-lidas`/`ler-todas`/`limpar` e `id` em `{id}/ler`; `SecurityConfig` permite `authenticated` (`SecurityConfig.java:80`). **Qualquer usuário autenticado pode ler/marcar/limpar notificações de outro usuário**.
-- **Solução**: obter o usuário do `JwtAuthenticationFilter`/`SecurityContextHolder` (o `User` está no token) e forçar `userId = usuário logado`; validar ownership no `marcarComoLida` (a notificação deve pertencer ao usuário).
+### ~~7.1 Falha de ownership/segurança: `userId` por request param~~ — **[RESOLVIDO] P1**
+- **Resolvido**: `NotificacaoController` agora usa `@AuthenticationPrincipal` para extrair o userId do JWT. `marcarComoLida` valida ownership.
 
-### 7.2 Listener atravessa repositório do agenda + risco de LAZY — **P1**
-- `NotificacaoEventListener` injeta `AgendamentoRepository` e `AgendamentoFotografoRepository` (`:20-21`) e acessa `agendamento.getCliente().getNome()` (`:45,64,83`) fora de transação — `cliente` e `fotografo` são LAZY (risco de `LazyInitializationException`) e repetição de lookup em cada evento.
-- **Solução**: os eventos de agenda devem carregar os dados necessários (ex.: `fotografoIds` + `clienteNome` + `dataHoraEnsaio` já resolvidos), ou usar `@Transactional` + query com JOIN FETCH; eliminar a dependência de repositório.
+### ~~7.2 Listener atravessa repositório do agenda + risco de LAZY~~ — **[RESOLVIDO] P1**
+- **Resolvido**: Eventos de agenda são enriquecidos (Event Enrichment) com `clienteNome`, `fotografoIds`. `NotificacaoEventListener` não mais injeta repositórios do agenda.
 
-### 7.3 Três handlers com mesmo padrão duplicado — **P2**
-- `onAgendamentoCriado`/`onAgendamentoRealizado`/`onPagamentoFinalRegistrado` repetem fetch + loop + `criar`.
-- **Solução**: método helper `notificarFotografos(agendamentoId, titulo, mensagem, link, tipo)`.
+### ~~7.3 Três handlers com mesmo padrão duplicado~~ — **[RESOLVIDO] P1**
+- **Resolvido**: Método helper `notificarFotografos()` elimina duplicação dos 3 handlers.
 
-### 7.4 Operações em massa ineficientes — **P2**
-- `marcarTodasComoLidas` salva cada item em loop (`NotificacaoService:44-52`); `limpar` carrega tudo para `deleteAll` (`:54-57`); `listar` sem paginação.
-- **Solução**: query de update bulk (`UPDATE ... SET lida=true WHERE userId`) e `deleteByUserId`, `Pageable`.
+### ~~7.4 Operações em massa ineficientes~~ — **[RESOLVIDO] P2**
+- **Resolvido**: `marcarTodasComoLidas` usa query bulk `@Modifying`. `limpar` usa `deleteByUserId`. `listar` suporta paginação via `Pageable`.
 
-### 7.5 Exceção genérica — **P2**
-- `marcarComoLida` lança `IllegalArgumentException` (`NotificacaoService:39`).
-- **Solução**: `NotificacaoNaoEncontradaException` + hierarquia central `BusinessException`.
+### ~~7.5 Exceção genérica~~ — **[RESOLVIDO] P1**
+- **Resolvido**: `NotificacaoNaoEncontradaException` (404) e `NotificacaoNaoPertenceAoUsuarioException` (403) criadas. Registradas no `GlobalExceptionHandler`.
 
 ### 7.6 Enum com valores sem uso — **P3**
 - `LEMBRETE_ENSAIO`, `REPASSE_FOTOGRAFO`, `SISTEMA` nunca criados — implementar os fluxos (job de lembretes com `@Scheduled`, notificação de repasse) ou remover.
@@ -94,10 +94,27 @@ Nenhum teste específico. Apenas `CrmApplicationTests` (smoke de contexto).
 ### 7.7 DTO manual e sincronia dos eventos — **P3**
 - `NotificacaoResponse.of` manual (MapStruct na fase 2); eventos agendados são processados sincronamente no dispatcher (recomendar `@Async`/`ApplicationEventMulticaster` para não atrasar a request).
 
+### ~~7.8 Listener sem @Transactional~~ — **[RESOLVIDO] P2**
+- **Resolvido**: `@Transactional` adicionado em cada `@EventListener` para garantir atomicidade na criação de notificações.
+
 ## 8. Exemplos de arquivos afetados
-- `NotificacaoController.java:30-62` — `userId` como `@RequestParam`, sem ownership (P1 7.1).
-- `NotificacaoEventListener.java:20-21,35-89` — repositórios do agenda + acesso LAZY + padrão duplicado.
-- `NotificacaoService.java:37-57` — `IllegalArgumentException` e operações em massa N+1.
-- `Notificacao.java:17-53` — entidade fora do padrão BaseEntity.
-- `TipoNotificacao.java:3-9` — valores `LEMBRETE_ENSAIO`/`REPASSE_FOTOGRAFO`/`SISTEMA` sem uso.
-- `auth/config/SecurityConfig.java:80` — rota `authenticated` sem checagem de dono.
+
+### Refatoração P1 (segurança + Modulith)
+- `NotificacaoController.java` — `@AuthenticationPrincipal` substitui `@RequestParam userId`.
+- `NotificacaoEventListener.java` — removidas injeções de `AgendamentoRepository`/`AgendamentoFotografoRepository`; helper `notificarFotografos()`.
+- `NotificacaoService.java` — `marcarComoLida(id, userId)` com ownership check; exceções de domínio.
+- `NotificacaoNaoEncontradaException.java` — novo.
+- `NotificacaoNaoPertenceAoUsuarioException.java` — novo.
+- `AgendamentoCriadoEvent.java` — campos `clienteNome`, `fotografoIds` adicionados.
+- `AgendamentoRealizadoEvent.java` — campos `clienteNome`, `fotografoIds` adicionados.
+- `PagamentoFinalRegistradoEvent.java` — campos `clienteNome`, `fotografoIds` adicionados.
+- `AgendamentoService.java` — publicação do `AgendamentoCriadoEvent` enriquecido; null-safe.
+- `AgendamentoStatusLifecycle.java` — injeção de `AgendamentoFotografoRepository`; publicação de eventos enriquecidos; null-safe.
+- `GlobalExceptionHandler.java` — handlers para `NotificacaoNaoEncontradaException` (404) e `NotificacaoNaoPertenceAoUsuarioException` (403).
+
+### Correções pós-implementação (P2)
+- `NotificacaoEventListener.java` — `@Transactional` em cada `@EventListener` para atomicidade.
+- `NotificacaoRepository.java` — queries bulk: `marcarTodasComoLidas` (`@Modifying`), `deleteByUserId`.
+- `NotificacaoService.java` — `marcarTodasComoLidas` e `limpar` usam queries bulk; `listar` suporta `Pageable`.
+- `NotificacaoController.java` — `listar` aceita `page`/`size` params; retorna `Page<NotificacaoResponse>`.
+- `NotificacaoResponse.java` — `userId` removido (redundante com JWT).

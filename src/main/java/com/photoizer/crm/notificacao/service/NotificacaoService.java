@@ -1,13 +1,15 @@
 package com.photoizer.crm.notificacao.service;
 
+import com.photoizer.crm.notificacao.exception.NotificacaoNaoEncontradaException;
+import com.photoizer.crm.notificacao.exception.NotificacaoNaoPertenceAoUsuarioException;
 import com.photoizer.crm.notificacao.model.Notificacao;
 import com.photoizer.crm.notificacao.model.TipoNotificacao;
 import com.photoizer.crm.notificacao.repository.NotificacaoRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -25,8 +27,8 @@ public class NotificacaoService {
     }
 
     @Transactional(readOnly = true)
-    public List<Notificacao> listar(UUID userId) {
-        return repository.findByUserIdOrderByCreatedAtDesc(userId);
+    public Page<Notificacao> listar(UUID userId, Pageable pageable) {
+        return repository.findByUserIdOrderByCreatedAtDesc(userId, pageable);
     }
 
     @Transactional(readOnly = true)
@@ -34,25 +36,31 @@ public class NotificacaoService {
         return repository.countByUserIdAndLidaFalse(userId);
     }
 
-    public void marcarComoLida(UUID id) {
+    /**
+     * Marca uma notificação como lida com validação de ownership.
+     * P1: garante que o usuário autenticado só manipula suas próprias notificações.
+     */
+    public void marcarComoLida(UUID id, UUID userId) {
         var notificacao = repository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Notificação não encontrada: " + id));
+            .orElseThrow(() -> new NotificacaoNaoEncontradaException(id));
+        if (!notificacao.getUserId().equals(userId)) {
+            throw new NotificacaoNaoPertenceAoUsuarioException();
+        }
         notificacao.setLida(true);
         repository.save(notificacao);
     }
 
+    /**
+     * Marca todas as notificações como lidas via query bulk (1 UPDATE, não N+1).
+     */
     public void marcarTodasComoLidas(UUID userId) {
-        var notificacoes = repository.findByUserIdOrderByCreatedAtDesc(userId);
-        for (var n : notificacoes) {
-            if (!n.isLida()) {
-                n.setLida(true);
-                repository.save(n);
-            }
-        }
+        repository.marcarTodasComoLidas(userId);
     }
 
+    /**
+     * Remove todas as notificações do usuário via query derivada (1 DELETE, não carrega em memória).
+     */
     public void limpar(UUID userId) {
-        var notificacoes = repository.findByUserIdOrderByCreatedAtDesc(userId);
-        repository.deleteAll(notificacoes);
+        repository.deleteByUserId(userId);
     }
 }

@@ -3,7 +3,10 @@ package com.photoizer.crm.notificacao.api;
 import com.photoizer.crm.notificacao.service.NotificacaoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -11,9 +14,17 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.UUID;
 
+/**
+ * PATTERN: @AuthenticationPrincipal (Spring Security) — refatorado (P1).
+ *
+ * Antes, o controller aceitava userId como @RequestParam, permitindo que qualquer
+ * usuário autenticado ler/editasse notificações de outro (IDOR — DEBT P1 #2).
+ *
+ * Agora, o userId é extraído diretamente do JWT via @AuthenticationPrincipal,
+ * garantindo que cada usuário só acessa suas próprias notificações.
+ */
 @RestController
 @RequestMapping("/api/v1/notificacoes")
 @Tag(name = "Notificações", description = "Notificações do sistema para usuários")
@@ -26,37 +37,46 @@ public class NotificacaoController {
     }
 
     @GetMapping
-    @Operation(summary = "Listar notificações de um usuário")
-    public ResponseEntity<List<NotificacaoResponse>> listar(@RequestParam UUID userId) {
-        var notificacoes = notificacaoService.listar(userId).stream()
-            .map(NotificacaoResponse::of)
-            .toList();
+    @Operation(summary = "Listar notificações do usuário autenticado (paginado)")
+    public ResponseEntity<?> listar(
+            @AuthenticationPrincipal String userIdStr,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        var userId = UUID.fromString(userIdStr);
+        var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        var notificacoes = notificacaoService.listar(userId, pageable)
+            .map(NotificacaoResponse::of);
         return ResponseEntity.ok(notificacoes);
     }
 
     @GetMapping("/nao-lidas")
-    @Operation(summary = "Contar notificações não lidas de um usuário")
-    public ResponseEntity<Long> contarNaoLidas(@RequestParam UUID userId) {
+    @Operation(summary = "Contar notificações não lidas do usuário autenticado")
+    public ResponseEntity<Long> contarNaoLidas(@AuthenticationPrincipal String userIdStr) {
+        var userId = UUID.fromString(userIdStr);
         return ResponseEntity.ok(notificacaoService.contarNaoLidas(userId));
     }
 
     @PatchMapping("/{id}/ler")
-    @Operation(summary = "Marcar notificação como lida")
-    public ResponseEntity<Void> marcarComoLida(@PathVariable UUID id) {
-        notificacaoService.marcarComoLida(id);
+    @Operation(summary = "Marcar notificação como lida (valida ownership)")
+    public ResponseEntity<Void> marcarComoLida(@PathVariable UUID id,
+                                                @AuthenticationPrincipal String userIdStr) {
+        var userId = UUID.fromString(userIdStr);
+        notificacaoService.marcarComoLida(id, userId);
         return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/ler-todas")
     @Operation(summary = "Marcar todas as notificações como lidas")
-    public ResponseEntity<Void> marcarTodasComoLidas(@RequestParam UUID userId) {
+    public ResponseEntity<Void> marcarTodasComoLidas(@AuthenticationPrincipal String userIdStr) {
+        var userId = UUID.fromString(userIdStr);
         notificacaoService.marcarTodasComoLidas(userId);
         return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/limpar")
-    @Operation(summary = "Limpar todas as notificações de um usuário")
-    public ResponseEntity<Void> limpar(@RequestParam UUID userId) {
+    @Operation(summary = "Limpar todas as notificações do usuário autenticado")
+    public ResponseEntity<Void> limpar(@AuthenticationPrincipal String userIdStr) {
+        var userId = UUID.fromString(userIdStr);
         notificacaoService.limpar(userId);
         return ResponseEntity.noContent().build();
     }
