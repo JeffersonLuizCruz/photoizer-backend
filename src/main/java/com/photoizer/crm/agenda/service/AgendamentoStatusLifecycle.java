@@ -6,7 +6,6 @@ import com.photoizer.crm.agenda.event.AgendamentoRealizadoEvent;
 import com.photoizer.crm.agenda.event.PagamentoFinalRegistradoEvent;
 import com.photoizer.crm.agenda.exception.AgendamentoNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.ComprovanteObrigatorioException;
-import com.photoizer.crm.agenda.exception.PagamentoInsuficienteException;
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
@@ -121,12 +120,6 @@ public class AgendamentoStatusLifecycle {
 
         if (comprovante == null || comprovante.isEmpty()) {
             throw new ComprovanteObrigatorioException();
-        }
-
-        if (agendamento.getValorRestante().compareTo(java.math.BigDecimal.ZERO) > 0) {
-            throw new PagamentoInsuficienteException(
-                "Saldo devedor de R$ " + agendamento.getValorRestante()
-                + " precisa ser quitado antes de finalizar o ensaio");
         }
 
         fileValidator.validate(comprovante, "any");

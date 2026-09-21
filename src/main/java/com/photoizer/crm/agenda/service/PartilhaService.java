@@ -30,13 +30,6 @@ public class PartilhaService {
     }
 
     public void calcularPartilhaFotografo(Agendamento agendamento) {
-        var links = agendamentoFotografoRepository.findByAgendamentoId(agendamento.getId());
-        if (links.isEmpty()) {
-            agendamento.setValorPartilhaGlobal(null);
-            agendamento.setValorLucroCrm(null);
-            return;
-        }
-
         var partilhaGlobal = calcularPartilhaGlobal(agendamento);
         var somaRepasses = somarRepassesNaoCancelados(agendamento.getId());
         if (somaRepasses.compareTo(partilhaGlobal) > 0) {
@@ -44,10 +37,9 @@ public class PartilhaService {
                 "A soma dos repasses (R$ " + somaRepasses.toPlainString() + ") excede a partilha do ensaio (R$ "
                     + partilhaGlobal.toPlainString() + ")");
         }
-        var lucro = partilhaGlobal.subtract(somaRepasses);
 
         agendamento.setValorPartilhaGlobal(partilhaGlobal);
-        agendamento.setValorLucroCrm(lucro);
+        agendamento.setValorLucroCrm(partilhaGlobal.subtract(somaRepasses));
         agendamentoRepository.save(agendamento);
     }
 

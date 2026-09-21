@@ -1,7 +1,9 @@
 package com.photoizer.crm.fotografo.service;
 
+import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.AgendamentoFotografo;
 import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
+import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.auth.model.Papel;
 import com.photoizer.crm.auth.model.User;
 import com.photoizer.crm.auth.repository.UserRepository;
@@ -32,13 +34,16 @@ public class FotografoDataFacade {
 
     private final UserRepository userRepository;
     private final AgendamentoFotografoRepository agendamentoFotografoRepository;
+    private final AgendamentoRepository agendamentoRepository;
     private final DespesaRepository despesaRepository;
 
     public FotografoDataFacade(UserRepository userRepository,
                                AgendamentoFotografoRepository agendamentoFotografoRepository,
+                               AgendamentoRepository agendamentoRepository,
                                DespesaRepository despesaRepository) {
         this.userRepository = userRepository;
         this.agendamentoFotografoRepository = agendamentoFotografoRepository;
+        this.agendamentoRepository = agendamentoRepository;
         this.despesaRepository = despesaRepository;
     }
 
@@ -60,6 +65,10 @@ public class FotografoDataFacade {
 
     public List<AgendamentoFotografo> findLinksByFotografoIdWithAgendamento(UUID fotografoId) {
         return agendamentoFotografoRepository.findByFotografoIdWithAgendamento(fotografoId);
+    }
+
+    public List<Agendamento> findEnsaiosByFotografoId(UUID fotografoId) {
+        return agendamentoRepository.findByFotografoIdWithDetails(fotografoId);
     }
 
     public BigDecimal calcularCustosFotografo(UUID agendamentoId, UUID fotografoId) {

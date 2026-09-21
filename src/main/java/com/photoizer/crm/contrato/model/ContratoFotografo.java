@@ -1,5 +1,7 @@
 package com.photoizer.crm.contrato.model;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import com.photoizer.crm.auth.model.Papel;
 import com.photoizer.crm.auth.model.User;
 import com.photoizer.crm.shared.model.AuditInfo;
@@ -59,6 +61,7 @@ public class ContratoFotografo {
     private User fotografo;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(length = 20)
     private TipoRepasse tipoValor;
 
@@ -67,6 +70,7 @@ public class ContratoFotografo {
     private BigDecimal percentual;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(length = 20)
     private Papel papelParceiro;
 

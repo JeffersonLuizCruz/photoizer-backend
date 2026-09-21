@@ -1,5 +1,7 @@
 package com.photoizer.crm.edicao.model;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import com.photoizer.crm.shared.model.AuditInfo;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
@@ -58,6 +60,7 @@ public class FotoEdicao {
 
     @NotNull
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 15)
     private StatusFotoEdicao status;
 

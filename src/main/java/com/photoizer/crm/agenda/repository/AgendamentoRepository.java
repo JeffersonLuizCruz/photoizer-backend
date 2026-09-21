@@ -86,4 +86,23 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID>,
            "WHERE a.cliente.id = :clienteId AND a.valorRestante > 0 AND a.status <> com.photoizer.crm.agenda.model.StatusAgendamento.CANCELADO")
     boolean existsByClienteIdWithSaldoDevedor(@Param("clienteId") UUID clienteId);
 
+    boolean existsByPacoteIdAndStatusNot(UUID pacoteId, StatusAgendamento status);
+
+    long countByPacoteIdAndStatusNot(UUID pacoteId, StatusAgendamento status);
+
+    @Query("SELECT a FROM Agendamento a JOIN FETCH a.pacote p " +
+           "WHERE a.fotografo.id = :fotografoId " +
+           "AND a.dataHoraEnsaio >= :diaInicio AND a.dataHoraEnsaio < :diaFim " +
+           "AND a.status <> :statusExcluido " +
+           "AND p.bloqueiaDiaInteiro = true")
+    List<Agendamento> findBloqueiaDiaInteiroByFotografoAndDataBetween(
+        @Param("fotografoId") UUID fotografoId,
+        @Param("diaInicio") LocalDateTime diaInicio,
+        @Param("diaFim") LocalDateTime diaFim,
+        @Param("statusExcluido") StatusAgendamento statusExcluido);
+
+    @Query("SELECT a FROM Agendamento a JOIN FETCH a.cliente LEFT JOIN FETCH a.pacote " +
+           "WHERE a.fotografo.id = :fotografoId ORDER BY a.dataHoraEnsaio DESC")
+    List<Agendamento> findByFotografoIdWithDetails(@Param("fotografoId") UUID fotografoId);
+
 }

@@ -92,8 +92,20 @@ public class FotografoQueryService {
         dataFacade.findFotografoById(fotografoId)
             .orElseThrow(() -> new FotografoNaoEncontradoException(fotografoId));
 
-        return dataFacade.findLinksByFotografoIdWithAgendamento(fotografoId).stream()
-            .map(this::toEnsaiosResponse)
+        var porAgendamento = new LinkedHashMap<UUID, FotografoEnsaiosResponse>();
+
+        // Ensaios em que é o fotógrafo responsável (podem não ter repasse associado)
+        for (var a : dataFacade.findEnsaiosByFotografoId(fotografoId)) {
+            porAgendamento.put(a.getId(), toEnsaiosResponsavel(a, fotografoId));
+        }
+
+        // Ensaios em que participa da equipe de repasse (sobrescreve com os valores do repasse)
+        for (var link : dataFacade.findLinksByFotografoIdWithAgendamento(fotografoId)) {
+            porAgendamento.put(link.getAgendamento().getId(), toEnsaiosResponse(link));
+        }
+
+        return porAgendamento.values().stream()
+            .sorted((a, b) -> b.dataHoraEnsaio().compareTo(a.dataHoraEnsaio()))
             .toList();
     }
 
@@ -241,6 +253,26 @@ public class FotografoQueryService {
             custos,
             a.getValorPartilhaGlobal() != null ? a.getValorPartilhaGlobal() : BigDecimal.ZERO,
             link.getValorRepassar() != null ? link.getValorRepassar() : BigDecimal.ZERO,
+            a.getValorLucroCrm() != null ? a.getValorLucroCrm() : BigDecimal.ZERO
+        );
+    }
+
+    /**
+     * Perspectiva do fotógrafo responsável que não participa do repasse:
+     * valores financeiros de repasse/partilha ficam zerados (não há rateio).
+     */
+    private FotografoEnsaiosResponse toEnsaiosResponsavel(Agendamento a, UUID fotografoId) {
+        var custos = dataFacade.calcularCustosFotografo(a.getId(), fotografoId);
+        return new FotografoEnsaiosResponse(
+            a.getId(),
+            a.getCliente().getNome(),
+            a.getPacote() != null ? a.getPacote().getNome() : null,
+            a.getDataHoraEnsaio(),
+            a.getStatus().name(),
+            a.getValorTotalFinal(),
+            custos,
+            BigDecimal.ZERO,
+            BigDecimal.ZERO,
             a.getValorLucroCrm() != null ? a.getValorLucroCrm() : BigDecimal.ZERO
         );
     }

@@ -1,5 +1,7 @@
 package com.photoizer.crm.agenda.model;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import com.photoizer.crm.auth.model.User;
 import com.photoizer.crm.cliente.model.Cliente;
 import com.photoizer.crm.pacote.model.Pacote;
@@ -147,6 +149,7 @@ public class Agendamento {
 
     @NotNull
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 40)
     private StatusAgendamento status;
 
@@ -214,9 +217,14 @@ public class Agendamento {
         this.dataConfirmacao = LocalDateTime.now();
     }
 
+    public void reatribuirFotografo(User novoResponsavel) {
+        this.fotografo = novoResponsavel;
+    }
+
     public void aplicarPagamentoFinal(String urlComprovanteFinal) {
         this.urlComprovanteFinal = urlComprovanteFinal;
         this.valorRestante = BigDecimal.ZERO;
+        this.valorEntradaPago = this.valorTotalFinal;
         transicionarPara(StatusAgendamento.EM_EDICAO);
         this.dataEnvioSelecao = LocalDateTime.now();
     }

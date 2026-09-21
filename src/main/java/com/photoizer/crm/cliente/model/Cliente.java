@@ -1,5 +1,7 @@
 package com.photoizer.crm.cliente.model;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import com.photoizer.crm.shared.model.AuditInfo;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
@@ -78,6 +80,7 @@ public class Cliente {
 
     @NotNull
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 20)
     private OrigemCliente origem;
 

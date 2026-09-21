@@ -1,5 +1,7 @@
 package com.photoizer.crm.despesa.model;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import com.photoizer.crm.shared.model.AuditInfo;
 import com.photoizer.crm.shared.model.FormaPagamento;
 import jakarta.persistence.Column;
@@ -70,16 +72,19 @@ public class Despesa {
     private LocalDate data;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(length = 20)
     private FormaPagamento formaPagamento;
 
     @NotNull
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 20)
     private StatusDespesa status;
 
     @NotNull
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 20)
     private RecorrenciaDespesa recorrencia;
 

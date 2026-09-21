@@ -30,6 +30,9 @@ public interface AgendamentoFotografoRepository extends JpaRepository<Agendament
     @Query("SELECT af FROM AgendamentoFotografo af JOIN FETCH af.fotografo WHERE af.agendamento.id = :agendamentoId")
     List<AgendamentoFotografo> findByAgendamentoIdWithFotografo(@Param("agendamentoId") UUID agendamentoId);
 
+    @Query("SELECT af FROM AgendamentoFotografo af JOIN FETCH af.fotografo JOIN FETCH af.agendamento WHERE af.agendamento.id IN :ids")
+    List<AgendamentoFotografo> findByAgendamentoIdInWithFotografo(@Param("ids") java.util.Collection<UUID> ids);
+
     @Query("SELECT af FROM AgendamentoFotografo af JOIN FETCH af.agendamento a JOIN FETCH a.cliente LEFT JOIN FETCH a.pacote WHERE af.status = :status")
     List<AgendamentoFotografo> findByStatusWithAgendamento(@Param("status") RepasseStatus status);
 

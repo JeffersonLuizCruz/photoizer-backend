@@ -60,7 +60,7 @@ public class GestaoContratoService {
         this.eventPublisher = eventPublisher;
     }
 
-    public Contrato criar(CriarContratoRequest request) {
+    public Contrato criar(CriarContratoRequest request, UUID responsavelId) {
         var pacote = pacoteQueryService.buscarEntityPorId(request.pacoteId());
 
         if (!pacote.getAtivo()) {
@@ -115,8 +115,7 @@ public class GestaoContratoService {
             .indicadorId(request.indicadorId())
             .indicadorNome(request.indicadorNome())
             .indicadorTelefone(request.indicadorTelefone())
-            .fotografoId(fotografos.isEmpty() ? null : fotografos.getFirst().getFotografo().getId())
-            .valorRepassarFotografo(fotografos.isEmpty() ? null : fotografos.getFirst().getValorRepassar())
+            .fotografoId(responsavelId)
             .build();
 
         fotografos.forEach(contrato::addFotografo);

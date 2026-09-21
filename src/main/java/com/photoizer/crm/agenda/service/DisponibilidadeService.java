@@ -41,6 +41,27 @@ public class DisponibilidadeService {
         var fimDia = data.atTime(23, 59, 59);
         var statusesIgnorados = List.of(StatusAgendamento.CANCELADO, StatusAgendamento.NO_SHOW);
 
+        var conflitos = new ArrayList<DisponibilidadeResponse.Conflito>();
+
+        if (fotografoId != null) {
+            var bloqueiosExistentes = agendamentoRepository
+                .findBloqueiaDiaInteiroByFotografoAndDataBetween(fotografoId, inicioDia, fimDia, StatusAgendamento.CANCELADO);
+
+            if (excluirAgendamentoId != null) {
+                bloqueiosExistentes.removeIf(a -> a.getId().equals(excluirAgendamentoId));
+            }
+
+            if (!bloqueiosExistentes.isEmpty()) {
+                for (var bloqueio : bloqueiosExistentes) {
+                    conflitos.add(new DisponibilidadeResponse.Conflito(
+                        bloqueio.getId(),
+                        bloqueio.getDataHoraEnsaio().toLocalTime().format(HORA_FORMAT),
+                        bloqueio.getCliente().getNome()
+                    ));
+                }
+            }
+        }
+
         List<Agendamento> agendamentosNoDia;
         if (fotografoId != null) {
             agendamentosNoDia = excluirAgendamentoId != null
@@ -54,8 +75,6 @@ public class DisponibilidadeService {
                     inicioDia, fimDia, statusesIgnorados, excluirAgendamentoId)
                 : agendamentoRepository.findByDataBetween(inicioDia, fimDia, statusesIgnorados);
         }
-
-        var conflitos = new ArrayList<DisponibilidadeResponse.Conflito>();
 
         if (Boolean.TRUE.equals(bloqueiaDiaInteiro)) {
             for (var existente : agendamentosNoDia) {
@@ -131,10 +150,22 @@ public class DisponibilidadeService {
                                      ConflitoAgendaParams params) {
         var fotografoId = params.fotografoId();
         var excluirId = params.excluirAgendamentoId();
+        var inicioDia = dataHora.toLocalDate().atStartOfDay();
+        var fimDia = dataHora.toLocalDate().atTime(23, 59, 59);
+
+        var bloqueiosExistentes = agendamentoRepository
+            .findBloqueiaDiaInteiroByFotografoAndDataBetween(fotografoId, inicioDia, fimDia, StatusAgendamento.CANCELADO);
+
+        if (excluirId != null) {
+            bloqueiosExistentes.removeIf(a -> a.getId().equals(excluirId));
+        }
+
+        if (!bloqueiosExistentes.isEmpty()) {
+            throw new ConflitoDeAgendaException(
+                "Já existe um agendamento de dia inteiro nesta data para este fotógrafo.");
+        }
 
         if (pacote.getBloqueiaDiaInteiro()) {
-            var inicioDia = dataHora.toLocalDate().atStartOfDay();
-            var fimDia = dataHora.toLocalDate().atTime(23, 59, 59);
             var conflito = excluirId != null
                 ? agendamentoRepository.existsByFotografoIdAndDataHoraEnsaioBetweenAndStatusNotAndIdNot(
                     fotografoId, inicioDia, fimDia, StatusAgendamento.CANCELADO, excluirId)
@@ -147,8 +178,6 @@ public class DisponibilidadeService {
             return;
         }
 
-        var inicioDia = dataHora.toLocalDate().atStartOfDay();
-        var fimDia = dataHora.toLocalDate().atTime(23, 59, 59);
         var statusesIgnorados = List.of(StatusAgendamento.CANCELADO, StatusAgendamento.NO_SHOW);
         var agendamentosNoDia = excluirId != null
             ? agendamentoRepository.findActiveByFotografoAndDataBetweenExcludingId(

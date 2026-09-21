@@ -1,9 +1,13 @@
 package com.photoizer.crm.pacote.service;
 
+import com.photoizer.crm.agenda.model.StatusAgendamento;
+import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.pacote.api.PacoteMapper;
 import com.photoizer.crm.pacote.api.PacoteRequest;
 import com.photoizer.crm.pacote.api.PacoteResponse;
+import com.photoizer.crm.pacote.exception.PacoteInativoException;
 import com.photoizer.crm.pacote.exception.PacoteNaoEncontradoException;
+import com.photoizer.crm.pacote.exception.PacoteVinculadoAgendamentoException;
 import com.photoizer.crm.pacote.repository.PacoteRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,10 +24,13 @@ public class PacoteService {
 
     private final PacoteRepository pacoteRepository;
     private final PacoteMapper pacoteMapper;
+    private final AgendamentoRepository agendamentoRepository;
 
-    public PacoteService(PacoteRepository pacoteRepository, PacoteMapper pacoteMapper) {
+    public PacoteService(PacoteRepository pacoteRepository, PacoteMapper pacoteMapper,
+                         AgendamentoRepository agendamentoRepository) {
         this.pacoteRepository = pacoteRepository;
         this.pacoteMapper = pacoteMapper;
+        this.agendamentoRepository = agendamentoRepository;
     }
 
     public PacoteResponse criar(PacoteRequest request) {
@@ -39,9 +46,22 @@ public class PacoteService {
     }
 
     public void deletar(UUID id) {
-        if (!pacoteRepository.existsById(id)) {
-            throw new PacoteNaoEncontradoException(id);
+        var pacote = pacoteRepository.findById(id)
+            .orElseThrow(() -> new PacoteNaoEncontradoException(id));
+
+        if (!pacote.getAtivo()) {
+            throw new PacoteInativoException(id);
         }
-        pacoteRepository.deleteById(id);
+
+        boolean possuiAgendamentosAtivos = agendamentoRepository
+            .existsByPacoteIdAndStatusNot(id, StatusAgendamento.CANCELADO);
+
+        if (possuiAgendamentosAtivos) {
+            long total = agendamentoRepository.countByPacoteIdAndStatusNot(id, StatusAgendamento.CANCELADO);
+            throw new PacoteVinculadoAgendamentoException(id, total);
+        }
+
+        pacote.setAtivo(false);
+        pacoteRepository.save(pacote);
     }
 }

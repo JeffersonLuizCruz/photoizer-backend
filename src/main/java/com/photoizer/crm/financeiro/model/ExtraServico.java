@@ -1,5 +1,7 @@
 package com.photoizer.crm.financeiro.model;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.shared.model.AuditInfo;
 import jakarta.persistence.Column;
@@ -62,6 +64,7 @@ public class ExtraServico {
 
     @NotNull
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 10)
     private TipoExtra tipo;
 

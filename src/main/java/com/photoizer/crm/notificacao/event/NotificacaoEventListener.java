@@ -2,6 +2,7 @@ package com.photoizer.crm.notificacao.event;
 
 import com.photoizer.crm.agenda.event.AgendamentoCriadoEvent;
 import com.photoizer.crm.agenda.event.AgendamentoRealizadoEvent;
+import com.photoizer.crm.agenda.event.AgendamentoReatribuidoEvent;
 import com.photoizer.crm.agenda.event.PagamentoFinalRegistradoEvent;
 import com.photoizer.crm.notificacao.model.TipoNotificacao;
 import com.photoizer.crm.notificacao.service.NotificacaoService;
@@ -80,6 +81,33 @@ public class NotificacaoEventListener {
             "/minhas-financas",
             TipoNotificacao.PAGAMENTO_FINAL
         );
+    }
+
+    @EventListener
+    @Transactional
+    public void onAgendamentoReatribuido(AgendamentoReatribuidoEvent event) {
+        var dataStr = event.dataHoraEnsaio() != null ? event.dataHoraEnsaio().format(DATE_FMT) : "";
+
+        if (event.novoFotografoId() != null) {
+            notificacaoService.criar(
+                event.novoFotografoId(),
+                "Ensaio Transferido para Você",
+                "Você é o novo responsável pelo ensaio com " + event.clienteNome() + " em " + dataStr + ".",
+                "/agenda/" + event.agendamentoId(),
+                TipoNotificacao.ENSAIO_REATRIBUIDO
+            );
+        }
+
+        if (event.fotografoAnteriorId() != null
+                && !event.fotografoAnteriorId().equals(event.novoFotografoId())) {
+            notificacaoService.criar(
+                event.fotografoAnteriorId(),
+                "Ensaio Transferido",
+                "O ensaio com " + event.clienteNome() + " foi transferido para outro fotógrafo.",
+                "/agenda/" + event.agendamentoId(),
+                TipoNotificacao.ENSAIO_REATRIBUIDO
+            );
+        }
     }
 
     /**

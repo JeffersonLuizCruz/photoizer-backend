@@ -1,5 +1,7 @@
 package com.photoizer.crm.financeiro.model;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import com.photoizer.crm.shared.model.AuditInfo;
 import com.photoizer.crm.shared.model.FormaPagamento;
 import jakarta.persistence.Column;
@@ -59,6 +61,7 @@ public class Receita {
 
     @NotNull
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 20)
     private TipoServico tipoServico;
 
@@ -83,6 +86,7 @@ public class Receita {
 
     @NotNull
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 20)
     private StatusReceita status;
 
@@ -98,6 +102,7 @@ public class Receita {
     private LocalDateTime dataRecebimentoReal;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(length = 20)
     private FormaPagamento formaPagamento;
 

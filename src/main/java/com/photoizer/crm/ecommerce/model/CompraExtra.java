@@ -1,5 +1,7 @@
 package com.photoizer.crm.ecommerce.model;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import com.photoizer.crm.shared.model.AuditInfo;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
@@ -51,6 +53,7 @@ public class CompraExtra {
 
     @NotNull
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 30)
     private StatusCompraExtra status;
 
@@ -64,6 +67,7 @@ public class CompraExtra {
     private Integer quantidadeFotos;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(length = 20)
     private MetodoPagamento metodoPagamento;
 

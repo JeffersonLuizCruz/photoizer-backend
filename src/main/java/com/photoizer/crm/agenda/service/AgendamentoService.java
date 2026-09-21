@@ -2,6 +2,7 @@ package com.photoizer.crm.agenda.service;
 
 import com.photoizer.crm.agenda.event.AgendamentoConfirmadoEvent;
 import com.photoizer.crm.agenda.event.AgendamentoCriadoEvent;
+import com.photoizer.crm.agenda.event.AgendamentoReatribuidoEvent;
 import com.photoizer.crm.agenda.exception.AgendamentoNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.AgendamentoNoPassadoException;
 import com.photoizer.crm.agenda.exception.EditorNaoEncontradoException;
@@ -9,10 +10,14 @@ import com.photoizer.crm.agenda.exception.FotografoNaoEncontradoException;
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.model.AgendamentoFotografo;
+import com.photoizer.crm.agenda.model.ReatribuicaoAgendamento;
 import com.photoizer.crm.agenda.model.RepasseStatus;
 import com.photoizer.crm.shared.model.TipoRepasse;
 import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
+import com.photoizer.crm.agenda.repository.ReatribuicaoAgendamentoRepository;
+import com.photoizer.crm.auth.model.Papel;
+import com.photoizer.crm.auth.model.User;
 import com.photoizer.crm.auth.repository.UserRepository;
 import com.photoizer.crm.pacote.exception.PacoteInativoException;
 import com.photoizer.crm.pacote.model.Pacote;
@@ -35,6 +40,7 @@ import com.photoizer.crm.agenda.api.AtualizarAgendamentoRequest;
 import com.photoizer.crm.agenda.api.AgendamentoMapper;
 import com.photoizer.crm.agenda.api.AgendamentoResponse;
 import com.photoizer.crm.agenda.api.AgendamentoClienteResponse;
+import com.photoizer.crm.agenda.api.ReatribuicaoResponse;
 import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
 
@@ -62,6 +68,7 @@ public class AgendamentoService {
     private final FotoEnsaioRepository fotoEnsaioRepository;
     private final ConfiguracaoService configuracaoService;
     private final AgendamentoFotografoRepository agendamentoFotografoRepository;
+    private final ReatribuicaoAgendamentoRepository reatribuicaoAgendamentoRepository;
     private final DisponibilidadeService disponibilidadeService;
     private final PartilhaService partilhaService;
     private final AgendamentoValoresCalculator agendamentoValoresCalculator;
@@ -77,6 +84,7 @@ public class AgendamentoService {
                               FotoEnsaioRepository fotoEnsaioRepository,
                               ConfiguracaoService configuracaoService,
                               AgendamentoFotografoRepository agendamentoFotografoRepository,
+                              ReatribuicaoAgendamentoRepository reatribuicaoAgendamentoRepository,
                               DisponibilidadeService disponibilidadeService,
                               PartilhaService partilhaService,
                               AgendamentoValoresCalculator agendamentoValoresCalculator,
@@ -91,6 +99,7 @@ public class AgendamentoService {
         this.fotoEnsaioRepository = fotoEnsaioRepository;
         this.configuracaoService = configuracaoService;
         this.agendamentoFotografoRepository = agendamentoFotografoRepository;
+        this.reatribuicaoAgendamentoRepository = reatribuicaoAgendamentoRepository;
         this.disponibilidadeService = disponibilidadeService;
         this.partilhaService = partilhaService;
         this.agendamentoValoresCalculator = agendamentoValoresCalculator;
@@ -185,6 +194,64 @@ public class AgendamentoService {
     public Agendamento buscarPorId(UUID id) {
         return agendamentoRepository.findById(id)
             .orElseThrow(() -> new AgendamentoNaoEncontradoException(id));
+    }
+
+    /**
+     * Transfere o ensaio para outro fotógrafo responsável.
+     * Não bloqueia por conflito de agenda (a decisão é do admin; o front apenas avisa),
+     * mas exige que o ensaio ainda não tenha sido realizado.
+     */
+    public AgendamentoResponse reatribuirFotografo(UUID id, UUID novoFotografoId, String motivo, UUID solicitanteId) {
+        var agendamento = agendamentoRepository.findByIdWithLock(id)
+            .orElseThrow(() -> new AgendamentoNaoEncontradoException(id));
+
+        if (agendamento.getStatus() != StatusAgendamento.CONFIRMADO) {
+            throw new BadRequestException("Só é possível transferir ensaios com status CONFIRMADO");
+        }
+
+        var novo = userRepository.findById(novoFotografoId)
+            .orElseThrow(() -> new FotografoNaoEncontradoException(novoFotografoId));
+
+        if (!novo.isAtivo()) {
+            throw new BadRequestException("O fotógrafo selecionado está inativo");
+        }
+        if (novo.getPapel() != Papel.FOTOGRAFO && novo.getPapel() != Papel.ADMIN) {
+            throw new BadRequestException("O responsável deve ser um fotógrafo ou administrador");
+        }
+
+        var anterior = agendamento.getFotografo();
+        if (anterior != null && anterior.getId().equals(novo.getId())) {
+            throw new BadRequestException("O agendamento já está atribuído a este fotógrafo");
+        }
+
+        var solicitante = solicitanteId != null
+            ? userRepository.findById(solicitanteId).orElse(null)
+            : null;
+
+        agendamento.reatribuirFotografo(novo);
+        agendamento = agendamentoRepository.save(agendamento);
+
+        reatribuicaoAgendamentoRepository.save(
+            ReatribuicaoAgendamento.registrar(agendamento, anterior, novo, solicitante, motivo));
+
+        var clienteNome = agendamento.getCliente() != null ? agendamento.getCliente().getNome() : "";
+        eventPublisher.publishEvent(new AgendamentoReatribuidoEvent(
+            agendamento.getId(),
+            clienteNome,
+            agendamento.getDataHoraEnsaio(),
+            anterior != null ? anterior.getId() : null,
+            novo.getId()
+        ));
+
+        var links = agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(agendamento.getId());
+        return agendamentoMapper.toResponse(agendamento, links, null, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ReatribuicaoResponse> listarReatribuicoes(UUID agendamentoId) {
+        return reatribuicaoAgendamentoRepository.findByAgendamentoIdWithUsuarios(agendamentoId).stream()
+            .map(ReatribuicaoResponse::of)
+            .toList();
     }
 
     /**
@@ -476,17 +543,27 @@ public class AgendamentoService {
             var fotografo = userRepository.findById(f.fotografoId())
                 .orElseThrow(() -> new FotografoNaoEncontradoException(f.fotografoId()));
             var tipo = f.tipoValor() != null ? f.tipoValor() : TipoRepasse.FIXO;
+            var valorRepassar = agendamentoValoresCalculator.valorRepasseEfetivo(
+                agendamento.getValorTotal(), tipo, f.valorRepassar(), f.percentual());
+            validarValorRepasse(fotografo, valorRepassar);
+
             var link = AgendamentoFotografo.builder()
                 .agendamento(agendamento)
                 .fotografo(fotografo)
                 .tipoValor(tipo)
                 .percentual(tipo == TipoRepasse.PERCENTUAL ? f.percentual() : null)
                 .papelParceiro(fotografo.getPapel())
-                .valorRepassar(agendamentoValoresCalculator.valorRepasseEfetivo(
-                    agendamento.getValorTotal(), tipo, f.valorRepassar(), f.percentual()))
+                .valorRepassar(valorRepassar)
                 .status(RepasseStatus.PENDENTE)
                 .build();
             agendamentoFotografoRepository.save(link);
+        }
+    }
+
+    private void validarValorRepasse(User fotografo, BigDecimal valorRepassar) {
+        if (valorRepassar == null || valorRepassar.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException(
+                "O valor a repassar para o fotógrafo " + fotografo.getNome() + " deve ser maior que zero");
         }
     }
 

@@ -1,5 +1,7 @@
 package com.photoizer.crm.contrato.model;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import com.photoizer.crm.shared.model.AuditInfo;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -68,6 +70,7 @@ public class Contrato {
 
     @NotNull
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 40)
     private StatusContrato status;
 

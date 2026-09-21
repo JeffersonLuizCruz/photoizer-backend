@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -54,8 +55,10 @@ public class ContratoController {
 
     @PostMapping
     @Operation(summary = "Criar contrato", description = "Cria um contrato em rascunho com os dados do sistema")
-    public ResponseEntity<ContratoResponse> criar(@Valid @RequestBody CriarContratoRequest request) {
-        var contrato = contratoService.criar(request);
+    public ResponseEntity<ContratoResponse> criar(
+            @AuthenticationPrincipal String userId,
+            @Valid @RequestBody CriarContratoRequest request) {
+        var contrato = contratoService.criar(request, UUID.fromString(userId));
         return ResponseEntity.status(HttpStatus.CREATED).body(ContratoResponse.of(contrato));
     }
 

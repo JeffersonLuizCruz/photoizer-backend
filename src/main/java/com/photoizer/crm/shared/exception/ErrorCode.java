@@ -35,6 +35,7 @@ public enum ErrorCode {
     // ─── Pacote ────────────────────────────────────────────────
     PACOTE_NAO_ENCONTRADO,
     PACOTE_INATIVO,
+    PACOTE_VINCULADO_A_AGENDAMENTOS,
 
     // ─── Edição ────────────────────────────────────────────────
     EDICAO_NAO_ENCONTRADA,

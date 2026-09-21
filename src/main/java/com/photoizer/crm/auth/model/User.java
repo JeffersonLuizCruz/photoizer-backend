@@ -1,5 +1,7 @@
 package com.photoizer.crm.auth.model;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.photoizer.crm.shared.model.AuditInfo;
 import jakarta.persistence.Column;
@@ -42,6 +44,7 @@ public class User {
     private String nome;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 20)
     @Setter
     private Papel papel;

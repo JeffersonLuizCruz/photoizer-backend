@@ -1,5 +1,7 @@
 package com.photoizer.crm.comissao.model;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import com.photoizer.crm.shared.model.AuditInfo;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
@@ -59,6 +61,7 @@ public class Indicacao {
 
     @NotNull
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 20)
     private OrigemIndicacao origem;
 
@@ -79,6 +82,7 @@ public class Indicacao {
 
     @NotNull
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 20)
     private StatusIndicacao status;
 

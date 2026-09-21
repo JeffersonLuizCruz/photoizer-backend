@@ -10,5 +10,6 @@ package com.photoizer.crm.notificacao.model;
 public enum TipoNotificacao {
     NOVO_ENSAIO,
     ENSAIO_REALIZADO,
-    PAGAMENTO_FINAL
+    PAGAMENTO_FINAL,
+    ENSAIO_REATRIBUIDO
 }
