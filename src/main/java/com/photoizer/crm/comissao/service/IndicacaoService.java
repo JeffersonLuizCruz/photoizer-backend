@@ -98,7 +98,7 @@ public class IndicacaoService {
             var agendamento = agendamentoMap.get(i.getAgendamentoId());
             if (agendamento == null) return null;
             return IndicacaoResponse.of(i,
-                agendamento.getCliente().getNome(),
+                agendamento.nomeCliente(),
                 agendamento.getPacote().getNome(),
                 agendamento.getValorTotalFinal(),
                 agendamento.getValorExtras(),

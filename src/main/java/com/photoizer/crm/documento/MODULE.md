@@ -1,7 +1,9 @@
 # Modulo: Documento
 
+> **ATUALIZAÇÃO**: o termo de prestação de serviços assinado passou a ser gerado pelo módulo `agenda` (fluxo de proposta pública, ver `agenda/MODULE.md`). O módulo `documento` agora gera apenas **recibos** e serve **comprovantes**; `ContratoPdfStrategy`, `DocumentoEventListener`, `ContratoGeradoEvent` e o endpoint `GET /documentos/contratos/{id}` foram removidos. O `TipoDocumento` agora possui apenas `RECIBO`.
+
 ## 1. Responsabilidade
-Geracao de **contratos e recibos em PDF** para agendamentos e servir **comprovantes de pagamento** (entrada/final). Reage ao `AgendamentoConfirmadoEvent` para gerar o contrato automaticamente.
+Geracao de **recibos em PDF** para agendamentos e servico de **comprovantes de pagamento** (entrada/final).
 
 ## 2. Estrutura
 ```

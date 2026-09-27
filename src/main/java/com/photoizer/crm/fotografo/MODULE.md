@@ -9,7 +9,7 @@ fotografo/
 ├── MODULE.md
 ├── api/
 │   ├── FotografoController.java            # CRUD + toggle status + relatórios
-│   ├── ParceiroController.java             # listagem de User papel FOTOGRAFO/EDITOR/AGENDADOR
+│   ├── ParceiroController.java             # listagem de User ATIVO papel FOTOGRAFO/EDITOR/AGENDADOR
 │   ├── FotografoMapper.java                # MapStruct: User → UserResponse
 │   ├── CriarFotografoRequest.java          # Record @Valid: nome, email, senha, telefone
 │   ├── AtualizarFotografoRequest.java      # Record @Valid: nome, email, telefone
@@ -69,6 +69,7 @@ Não publica nem consome eventos.
 3. **Exceções de domínio**: `FotografoNaoEncontradoException` (404) e `FotografoComEnsaiosVinculadosException` (422) substituem `IllegalArgumentException` genérica.
 4. **MapStruct**: `FotografoMapper` converte `User` → `UserResponse` (consistente com 7 módulos do projeto).
 5. **Enum type-safe**: `StatusAgendamento.CONFIRMADO` (enum) em vez de `"CONFIRMADO"` (string).
+6. **Parceiros ativos**: `listarParceiros()` retorna somente usuários com `ativo = true`. A seleção de parceiro vem exclusivamente do banco (cadastro via tela); não há parceiros semeados no código.
 
 ## 6. Testes
 Nenhum teste específico para este módulo. Apenas `CrmApplicationTests` (smoke de contexto).

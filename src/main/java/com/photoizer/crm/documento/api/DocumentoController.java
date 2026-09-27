@@ -43,17 +43,6 @@ public class DocumentoController {
         this.fileServeHelper = fileServeHelper;
     }
 
-    @GetMapping("/contratos/{agendamentoId}")
-    @Operation(summary = "Baixar contrato em PDF")
-    public ResponseEntity<byte[]> downloadContrato(@PathVariable UUID agendamentoId) {
-        var pdf = documentoService.gerarContrato(agendamentoId);
-        return ResponseEntity.ok()
-            .header(HttpHeaders.CONTENT_DISPOSITION,
-                "attachment; filename=contrato_" + agendamentoId + ".pdf")
-            .contentType(MediaType.APPLICATION_PDF)
-            .body(pdf);
-    }
-
     @GetMapping("/recibos/{agendamentoId}")
     @Operation(summary = "Baixar recibo em PDF")
     public ResponseEntity<byte[]> downloadRecibo(@PathVariable UUID agendamentoId) {

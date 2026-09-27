@@ -16,11 +16,15 @@ import java.util.UUID;
 @Service
 public class AgendamentoReadServiceAdapter implements AgendamentoReadService {
 
-    private static final List<StatusAgendamento> STATUS_ALLOW_UPLOAD = List.of(
+    /**
+     * Status em que o ensaio já teve o pagamento final registrado e, portanto,
+     * permite upload e publicação de fotos no ecommerce.
+     */
+    private static final List<StatusAgendamento> STATUS_PERMITIDOS_ECOMMERCE = List.of(
         StatusAgendamento.EM_EDICAO,
-        StatusAgendamento.SELECAO_DAS_FOTOS,
         StatusAgendamento.FOTOS_ENVIADAS_PARA_SELECAO,
-        StatusAgendamento.FOTOS_ENTREGUES
+        StatusAgendamento.FOTOS_ENTREGUES,
+        StatusAgendamento.FINALIZADO
     );
 
     private final AgendamentoRepository agendamentoRepository;
@@ -32,7 +36,14 @@ public class AgendamentoReadServiceAdapter implements AgendamentoReadService {
     @Override
     public boolean isStatusPermitidoParaUpload(UUID agendamentoId) {
         return agendamentoRepository.findById(agendamentoId)
-            .map(a -> STATUS_ALLOW_UPLOAD.contains(a.getStatus()))
+            .map(a -> STATUS_PERMITIDOS_ECOMMERCE.contains(a.getStatus()))
+            .orElse(false);
+    }
+
+    @Override
+    public boolean isStatusPermitidoParaPublicacao(UUID agendamentoId) {
+        return agendamentoRepository.findById(agendamentoId)
+            .map(a -> STATUS_PERMITIDOS_ECOMMERCE.contains(a.getStatus()))
             .orElse(false);
     }
 }

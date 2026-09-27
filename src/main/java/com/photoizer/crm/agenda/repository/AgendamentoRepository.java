@@ -16,11 +16,11 @@ import java.util.UUID;
 
 public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID>, JpaSpecificationExecutor<Agendamento> {
 
-    boolean existsByDataHoraEnsaioBetweenAndStatusNot(
-        LocalDateTime start, LocalDateTime end, StatusAgendamento statusExcluded);
+    boolean existsByDataHoraEnsaioBetweenAndStatusNotIn(
+        LocalDateTime start, LocalDateTime end, List<StatusAgendamento> statusesIgnorados);
 
-    boolean existsByDataHoraEnsaioBetweenAndStatusNotAndIdNot(
-        LocalDateTime start, LocalDateTime end, StatusAgendamento statusExcluded, UUID idExcluded);
+    boolean existsByDataHoraEnsaioBetweenAndStatusNotInAndIdNot(
+        LocalDateTime start, LocalDateTime end, List<StatusAgendamento> statusesIgnorados, UUID idExcluded);
 
     @Query("SELECT a FROM Agendamento a WHERE a.localEnsaio = :local " +
            "AND a.dataHoraEnsaio >= :diaInicio AND a.dataHoraEnsaio < :diaFim " +
@@ -65,16 +65,19 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID>,
         @Param("statusesIgnorados") List<StatusAgendamento> statusesIgnorados,
         @Param("excluirId") UUID excluirId);
 
-    boolean existsByFotografoIdAndDataHoraEnsaioBetweenAndStatusNot(
-        UUID fotografoId, LocalDateTime start, LocalDateTime end, StatusAgendamento statusExcluded);
+    boolean existsByFotografoIdAndDataHoraEnsaioBetweenAndStatusNotIn(
+        UUID fotografoId, LocalDateTime start, LocalDateTime end, List<StatusAgendamento> statusesIgnorados);
 
-    boolean existsByFotografoIdAndDataHoraEnsaioBetweenAndStatusNotAndIdNot(
-        UUID fotografoId, LocalDateTime start, LocalDateTime end, StatusAgendamento statusExcluded, UUID idExcluded);
+    boolean existsByFotografoIdAndDataHoraEnsaioBetweenAndStatusNotInAndIdNot(
+        UUID fotografoId, LocalDateTime start, LocalDateTime end, List<StatusAgendamento> statusesIgnorados, UUID idExcluded);
 
     @Query("SELECT a FROM Agendamento a WHERE a.cliente.id = :clienteId ORDER BY a.dataHoraEnsaio DESC")
     List<Agendamento> findByClienteId(@Param("clienteId") UUID clienteId);
 
     java.util.Optional<Agendamento> findByTokenGaleria(UUID tokenGaleria);
+
+    @Query("SELECT a FROM Agendamento a JOIN FETCH a.pacote LEFT JOIN FETCH a.editor WHERE a.tokenPropostaHash = :hash")
+    Optional<Agendamento> findByTokenPropostaHash(@Param("hash") String hash);
 
     long countByDataHoraEnsaioBetween(LocalDateTime start, LocalDateTime end);
 
@@ -93,13 +96,13 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID>,
     @Query("SELECT a FROM Agendamento a JOIN FETCH a.pacote p " +
            "WHERE a.fotografo.id = :fotografoId " +
            "AND a.dataHoraEnsaio >= :diaInicio AND a.dataHoraEnsaio < :diaFim " +
-           "AND a.status <> :statusExcluido " +
+           "AND a.status NOT IN :statusesIgnorados " +
            "AND p.bloqueiaDiaInteiro = true")
     List<Agendamento> findBloqueiaDiaInteiroByFotografoAndDataBetween(
         @Param("fotografoId") UUID fotografoId,
         @Param("diaInicio") LocalDateTime diaInicio,
         @Param("diaFim") LocalDateTime diaFim,
-        @Param("statusExcluido") StatusAgendamento statusExcluido);
+        @Param("statusesIgnorados") List<StatusAgendamento> statusesIgnorados);
 
     @Query("SELECT a FROM Agendamento a JOIN FETCH a.cliente LEFT JOIN FETCH a.pacote " +
            "WHERE a.fotografo.id = :fotografoId ORDER BY a.dataHoraEnsaio DESC")

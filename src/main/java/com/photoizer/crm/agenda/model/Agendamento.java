@@ -57,9 +57,8 @@ public class Agendamento {
     @Builder.Default
     private AuditInfo auditInfo = new AuditInfo();
 
-    @NotNull
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cliente_id", nullable = false)
+    @JoinColumn(name = "cliente_id")
     private Cliente cliente;
 
     @NotNull
@@ -153,8 +152,7 @@ public class Agendamento {
     @Column(nullable = false, length = 40)
     private StatusAgendamento status;
 
-    @NotNull
-    @Column(nullable = false)
+    @Column
     private LocalDateTime dataConfirmacao;
 
     @Column
@@ -169,9 +167,8 @@ public class Agendamento {
     @Column
     private LocalDateTime dataFinalizacao;
 
-    @NotBlank
     @Size(max = 500)
-    @Column(nullable = false, length = 500)
+    @Column(length = 500)
     private String urlComprovanteEntrada;
 
     @Size(max = 500)
@@ -187,11 +184,51 @@ public class Agendamento {
 
     @NotNull
     @Column(nullable = false)
-    private Boolean contratoGerado;
-
-    @NotNull
-    @Column(nullable = false)
     private Boolean ensaioDestaque;
+
+    @Size(max = 128)
+    @Column(length = 128)
+    private String tokenProposta;
+
+    @Size(max = 64)
+    @Column(unique = true, length = 64)
+    private String tokenPropostaHash;
+
+    @Column
+    private LocalDateTime tokenPropostaExpiracao;
+
+    @Column
+    private LocalDateTime dataAssinatura;
+
+    @Size(max = 64)
+    @Column(length = 64)
+    private String assinanteNome;
+
+    @Column(columnDefinition = "TEXT")
+    private String snapshotJson;
+
+    @Size(max = 64)
+    @Column(length = 64)
+    private String snapshotHash;
+
+    @Size(max = 500)
+    @Column(length = 500)
+    private String urlPdfAssinatura;
+
+    @Size(max = 500)
+    @Column(length = 500)
+    private String urlAssinaturaImagem;
+
+    @Column
+    private UUID indicadorId;
+
+    @Size(max = 150)
+    @Column(length = 150)
+    private String indicadorNome;
+
+    @Size(max = 30)
+    @Column(length = 30)
+    private String indicadorTelefone;
 
     @Column(columnDefinition = "TEXT")
     private String observacoes;
@@ -208,6 +245,52 @@ public class Agendamento {
         if (novoStatus == StatusAgendamento.REALIZADO) {
             this.dataRealizacao = LocalDateTime.now();
         }
+    }
+
+    public String nomeCliente() {
+        return cliente != null && cliente.getNome() != null ? cliente.getNome() : "Pré-reserva";
+    }
+
+    /** Gera/regera o token público do link de assinatura da proposta. */
+    public void definirTokenProposta(String token, String tokenHash, LocalDateTime expiracao) {
+        this.tokenProposta = token;
+        this.tokenPropostaHash = tokenHash;
+        this.tokenPropostaExpiracao = expiracao;
+    }
+
+    /**
+     * Assinatura pública da proposta: vincula o cliente (auto-cadastro), registra
+     * autorização de imagem, comprovante, assinatura e snapshot imutável,
+     * transitando PRE_RESERVA -> AGUARDANDO_APROVACAO.
+     */
+    public void assinarProposta(Cliente cliente, String autorizaUsoImagem,
+                                String urlComprovante, String assinanteNome,
+                                String snapshotJson, String snapshotHash,
+                                String urlPdf, String urlAssinaturaImagem) {
+        this.status.validarTransicao(StatusAgendamento.AGUARDANDO_APROVACAO);
+        this.cliente = cliente;
+        this.autorizaUsoImagem = "true".equalsIgnoreCase(autorizaUsoImagem);
+        this.urlComprovanteEntrada = urlComprovante;
+        this.assinanteNome = assinanteNome;
+        this.snapshotJson = snapshotJson;
+        this.snapshotHash = snapshotHash;
+        this.urlPdfAssinatura = urlPdf;
+        this.urlAssinaturaImagem = urlAssinaturaImagem;
+        this.dataAssinatura = LocalDateTime.now();
+        this.status = StatusAgendamento.AGUARDANDO_APROVACAO;
+    }
+
+    public void confirmarPagamento() {
+        this.status.validarTransicao(StatusAgendamento.PAGAMENTO_CONFIRMADO);
+        this.status = StatusAgendamento.PAGAMENTO_CONFIRMADO;
+    }
+
+    public void aprovar() {
+        this.status.validarTransicao(StatusAgendamento.CONFIRMADO);
+        this.status = StatusAgendamento.CONFIRMADO;
+        this.dataConfirmacao = LocalDateTime.now();
+        this.valorEntradaPago = this.valorEntradaExigido;
+        this.valorRestante = this.valorTotalFinal.subtract(this.valorEntradaPago).max(BigDecimal.ZERO);
     }
 
     public void reagendar(LocalDateTime novaDataHora, int novaDuracaoMinutos) {

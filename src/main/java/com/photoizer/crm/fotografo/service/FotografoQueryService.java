@@ -153,7 +153,7 @@ public class FotografoQueryService {
             var ag = l.getAgendamento();
             var custo = dataFacade.calcularCustosFotografo(ag.getId(), fotografoId);
             return new FotografoResumoFinanceiroResponse.CustoPorEnsaio(
-                ag.getId(), ag.getCliente().getNome(),
+                ag.getId(), ag.nomeCliente(),
                 ag.getDataHoraEnsaio().format(DATE_FORMAT), custo
             );
         }).filter(c -> c.total().compareTo(BigDecimal.ZERO) > 0).toList();
@@ -245,7 +245,7 @@ public class FotografoQueryService {
         var custos = dataFacade.calcularCustosFotografo(a.getId(), fotografoId);
         return new FotografoEnsaiosResponse(
             a.getId(),
-            a.getCliente().getNome(),
+            a.nomeCliente(),
             a.getPacote() != null ? a.getPacote().getNome() : null,
             a.getDataHoraEnsaio(),
             a.getStatus().name(),
@@ -265,7 +265,7 @@ public class FotografoQueryService {
         var custos = dataFacade.calcularCustosFotografo(a.getId(), fotografoId);
         return new FotografoEnsaiosResponse(
             a.getId(),
-            a.getCliente().getNome(),
+            a.nomeCliente(),
             a.getPacote() != null ? a.getPacote().getNome() : null,
             a.getDataHoraEnsaio(),
             a.getStatus().name(),

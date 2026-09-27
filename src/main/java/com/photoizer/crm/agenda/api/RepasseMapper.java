@@ -36,7 +36,7 @@ public abstract class RepasseMapper {
             if (agendamento.getCliente() != null) {
                 clienteResumo = new RepasseResponse.ClienteResumo(
                     agendamento.getCliente().getId(),
-                    agendamento.getCliente().getNome()
+                    agendamento.nomeCliente()
                 );
             }
 

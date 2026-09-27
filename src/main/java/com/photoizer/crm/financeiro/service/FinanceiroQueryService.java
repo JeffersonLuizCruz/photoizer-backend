@@ -274,7 +274,7 @@ public class FinanceiroQueryService {
 
         return new FinanceiroTrabalhoResponse(
             agendamentoId,
-            agendamento.getCliente().getNome(),
+            agendamento.nomeCliente(),
             agendamento.getPacote() != null ? agendamento.getPacote().getNome() : null,
             valorCobrado,
             agendamento.getValorEntradaPago() != null ? agendamento.getValorEntradaPago() : BigDecimal.ZERO,
@@ -352,7 +352,7 @@ public class FinanceiroQueryService {
                 : LocalDate.now();
             if (!emPeriodo(data, rangeInicio, rangeFim)) continue;
             var descricao = "Repasse — " + link.getFotografo().getNome()
-                + " (" + link.getAgendamento().getCliente().getNome() + ")";
+                + " (" + link.getAgendamento().nomeCliente() + ")";
             itens.add(new FluxoCaixaResponse.FluxoCaixaItem(
                 link.getId(), "DESPESA", descricao, "Repasse parceiros",
                 data, link.getValorRepassar(), RepasseStatus.PENDENTE.name(), "AGENDAMENTO"));

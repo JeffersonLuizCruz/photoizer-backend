@@ -27,7 +27,7 @@ public record RelatorioAgendamentoItem(
     public static RelatorioAgendamentoItem of(Agendamento a) {
         return new RelatorioAgendamentoItem(
             a.getId(),
-            a.getCliente().getNome(),
+            a.nomeCliente(),
             a.getPacote() != null ? a.getPacote().getNome() : null,
             a.getValorTotal(),
             a.getValorEntradaPago(),

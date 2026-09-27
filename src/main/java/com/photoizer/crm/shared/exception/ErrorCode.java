@@ -23,6 +23,7 @@ public enum ErrorCode {
     AGENDAMENTO_NAO_ENCONTRADO,
     AGENDAMENTO_NO_PASSADO,
     AGENDAMENTO_NAO_PERMITIDO_PARA_UPLOAD,
+    AGENDAMENTO_NAO_PERMITIDO_PARA_PUBLICACAO,
     CONFLITO_DE_AGENDA,
     ENSAIO_NAO_FINALIZADO,
     COMPROVANTE_OBRIGATORIO,
@@ -57,10 +58,10 @@ public enum ErrorCode {
     FOTO_INDISPONIVEL,
     TOKEN_EXPIRADO,
 
-    // ─── Contrato ──────────────────────────────────────────────
-    CONTRATO_NAO_ENCONTRADO,
-    CONTRATO_ESTADO_INVALIDO,
-    CONTRATO_TOKEN_EXPIRADO,
+    // ─── Proposta / Termo ──────────────────────────────────────
+    PROPOSTA_NAO_ENCONTRADA,
+    PROPOSTA_ESTADO_INVALIDO,
+    PROPOSTA_TOKEN_EXPIRADO,
 
     // ─── Documento ─────────────────────────────────────────────
     TIPO_COMPROVANTE_INVALIDO,

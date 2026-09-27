@@ -1,6 +1,5 @@
 package com.photoizer.crm.documento.service;
 
-import com.photoizer.crm.agenda.event.ContratoGeradoEvent;
 import com.photoizer.crm.agenda.exception.AgendamentoNaoEncontradoException;
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
@@ -44,17 +43,14 @@ public class DocumentoService {
 
     private final AgendamentoRepository agendamentoRepository;
     private final PdfWriter pdfWriter;
-    private final ApplicationEventPublisher eventPublisher;
 
     private final Map<TipoDocumento, PdfContentStrategy<?>> strategiesByTipo;
 
     public DocumentoService(AgendamentoRepository agendamentoRepository,
                             PdfWriter pdfWriter,
-                            ApplicationEventPublisher eventPublisher,
                             List<PdfContentStrategy<?>> strategies) {
         this.agendamentoRepository = agendamentoRepository;
         this.pdfWriter = pdfWriter;
-        this.eventPublisher = eventPublisher;
         this.strategiesByTipo = strategies.stream()
             .collect(Collectors.toMap(
                 PdfContentStrategy::getTipo,
@@ -84,17 +80,7 @@ public class DocumentoService {
         log.info("Gerando {} para agendamento {}", tipo.getValor(), agendamentoId);
 
         var linhas = ((PdfContentStrategy<Agendamento>) strategy).getLinhas(agendamento);
-        var pdf = pdfWriter.gerar(strategy.getTitulo(), linhas);
-
-        if (tipo == TipoDocumento.CONTRATO) {
-            eventPublisher.publishEvent(new ContratoGeradoEvent(agendamentoId));
-        }
-
-        return pdf;
-    }
-
-    public byte[] gerarContrato(UUID agendamentoId) {
-        return gerarDocumento(TipoDocumento.CONTRATO, agendamentoId);
+        return pdfWriter.gerar(strategy.getTitulo(), linhas);
     }
 
     public byte[] gerarRecibo(UUID agendamentoId) {

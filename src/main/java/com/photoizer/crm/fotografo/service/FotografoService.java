@@ -58,6 +58,7 @@ public class FotografoService {
         return papéis.stream()
             .map(dataFacade::findUsuariosByPapel)
             .flatMap(List::stream)
+            .filter(u -> u.isAtivo())
             .distinct()
             .map(fotografoMapper::toResponse)
             .toList();

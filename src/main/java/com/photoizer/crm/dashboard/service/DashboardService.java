@@ -214,7 +214,7 @@ public class DashboardService {
                 var agg = consolidado.comprasPorAgendamento().getOrDefault(
                     a.getId(), new EcommerceQueryService.CompraAgg(0, BigDecimal.ZERO));
                 return new TopCliente(
-                    a.getCliente().getNome(),
+                    a.nomeCliente(),
                     a.getCliente().getTelefone(),
                     agg.qtd(),
                     agg.total()

@@ -444,7 +444,7 @@ public class FinanceiroDashboardService {
                 ? valor.subtract(custo).multiply(BigDecimal.valueOf(100)).divide(valor, 2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
             resultado.add(new FinanceiroDashboardResponse.RentabilidadeTrabalho(
-                a.getId(), a.getCliente().getNome(), "ENSAIO",
+                a.getId(), a.nomeCliente(), "ENSAIO",
                 valor, custo, roi, margem));
         }
         resultado.sort((a, b) -> b.roi().compareTo(a.roi()));
@@ -461,7 +461,7 @@ public class FinanceiroDashboardService {
             var data = a.getDataHoraEnsaio() != null ? a.getDataHoraEnsaio().toLocalDate() : null;
             if (!emPeriodo(data, inicio, fim)) continue;
             var pacoteNome = a.getPacote() != null ? a.getPacote().getNome() : null;
-            var descricao = a.getCliente().getNome() + (pacoteNome != null ? " — " + pacoteNome : "");
+            var descricao = a.nomeCliente() + (pacoteNome != null ? " — " + pacoteNome : "");
             var valorEntrada = a.getValorEntradaPago() != null ? a.getValorEntradaPago() : BigDecimal.ZERO;
             var valorRestante = a.getValorRestante() != null ? a.getValorRestante() : BigDecimal.ZERO;
             var status = valorRestante.compareTo(BigDecimal.ZERO) <= 0

@@ -82,8 +82,8 @@ public class GlobalExceptionHandler {
 
     /**
      * Fallback para qualquer BusinessException que não tenha um handler específico.
-     * Captura EdicaoBusinessException, NotificacaoBusinessException e qualquer
-     * futura subclasse que não extenda uma marcadora (NotFound, Conflict, etc.).
+     * Captura NotificacaoBusinessException e qualquer futura subclasse que não
+     * extenda uma marcadora (NotFound, Conflict, Unprocessable, etc.).
      * Usa e.getHttpStatus() para derivar o status HTTP correto.
      */
     @ExceptionHandler(BusinessException.class)

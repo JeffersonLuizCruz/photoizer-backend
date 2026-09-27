@@ -10,4 +10,6 @@ import java.util.UUID;
  */
 public interface AgendamentoReadService {
     boolean isStatusPermitidoParaUpload(UUID agendamentoId);
+
+    boolean isStatusPermitidoParaPublicacao(UUID agendamentoId);
 }

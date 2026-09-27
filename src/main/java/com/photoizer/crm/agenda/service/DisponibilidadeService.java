@@ -23,6 +23,12 @@ public class DisponibilidadeService {
 
     private static final DateTimeFormatter HORA_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
 
+    /** Status que não ocupam a agenda (não geram conflito). */
+    private static final List<StatusAgendamento> STATUS_IGNORADOS = List.of(
+        StatusAgendamento.CANCELADO, StatusAgendamento.NO_SHOW,
+        StatusAgendamento.PRE_RESERVA, StatusAgendamento.AGUARDANDO_APROVACAO,
+        StatusAgendamento.PAGAMENTO_CONFIRMADO);
+
     private final AgendamentoRepository agendamentoRepository;
 
     public DisponibilidadeService(AgendamentoRepository agendamentoRepository) {
@@ -39,13 +45,13 @@ public class DisponibilidadeService {
                                                             UUID fotografoId) {
         var inicioDia = data.atStartOfDay();
         var fimDia = data.atTime(23, 59, 59);
-        var statusesIgnorados = List.of(StatusAgendamento.CANCELADO, StatusAgendamento.NO_SHOW);
+        var statusesIgnorados = STATUS_IGNORADOS;
 
         var conflitos = new ArrayList<DisponibilidadeResponse.Conflito>();
 
         if (fotografoId != null) {
             var bloqueiosExistentes = agendamentoRepository
-                .findBloqueiaDiaInteiroByFotografoAndDataBetween(fotografoId, inicioDia, fimDia, StatusAgendamento.CANCELADO);
+                .findBloqueiaDiaInteiroByFotografoAndDataBetween(fotografoId, inicioDia, fimDia, statusesIgnorados);
 
             if (excluirAgendamentoId != null) {
                 bloqueiosExistentes.removeIf(a -> a.getId().equals(excluirAgendamentoId));
@@ -56,7 +62,7 @@ public class DisponibilidadeService {
                     conflitos.add(new DisponibilidadeResponse.Conflito(
                         bloqueio.getId(),
                         bloqueio.getDataHoraEnsaio().toLocalTime().format(HORA_FORMAT),
-                        bloqueio.getCliente().getNome()
+                        bloqueio.nomeCliente()
                     ));
                 }
             }
@@ -81,7 +87,7 @@ public class DisponibilidadeService {
                 conflitos.add(new DisponibilidadeResponse.Conflito(
                     existente.getId(),
                     existente.getDataHoraEnsaio().toLocalTime().format(HORA_FORMAT),
-                    existente.getCliente().getNome()
+                    existente.nomeCliente()
                 ));
             }
         } else {
@@ -96,7 +102,7 @@ public class DisponibilidadeService {
                     conflitos.add(new DisponibilidadeResponse.Conflito(
                         existente.getId(),
                         existente.getDataHoraEnsaio().toLocalTime().format(HORA_FORMAT),
-                        existente.getCliente().getNome()
+                        existente.nomeCliente()
                     ));
                 }
             }
@@ -124,10 +130,10 @@ public class DisponibilidadeService {
             var inicioDia = dataHora.toLocalDate().atStartOfDay();
             var fimDia = dataHora.toLocalDate().atTime(23, 59, 59);
             var conflito = excluirId != null
-                ? agendamentoRepository.existsByDataHoraEnsaioBetweenAndStatusNotAndIdNot(
-                    inicioDia, fimDia, StatusAgendamento.CANCELADO, excluirId)
-                : agendamentoRepository.existsByDataHoraEnsaioBetweenAndStatusNot(
-                    inicioDia, fimDia, StatusAgendamento.CANCELADO);
+                ? agendamentoRepository.existsByDataHoraEnsaioBetweenAndStatusNotInAndIdNot(
+                    inicioDia, fimDia, STATUS_IGNORADOS, excluirId)
+                : agendamentoRepository.existsByDataHoraEnsaioBetweenAndStatusNotIn(
+                    inicioDia, fimDia, STATUS_IGNORADOS);
             if (conflito) {
                 throw new ConflitoDeAgendaException(
                     "Já existe um agendamento nesta data. O pacote selecionado bloqueia o dia inteiro.");
@@ -137,10 +143,12 @@ public class DisponibilidadeService {
 
         var inicioDia = dataHora.toLocalDate().atStartOfDay();
         var fimDia = dataHora.toLocalDate().atTime(23, 59, 59);
-        var statusesIgnorados = List.of(StatusAgendamento.CANCELADO, StatusAgendamento.NO_SHOW);
-        var agendamentosNoDia = excluirId != null
-            ? agendamentoRepository.findActiveBetweenExcludingId(inicioDia, fimDia, statusesIgnorados, excluirId)
-            : agendamentoRepository.findActiveByLocalAndDataBetween(local, inicioDia, fimDia, statusesIgnorados);
+        var agendamentosNoDia = agendamentoRepository.findActiveByLocalAndDataBetween(
+            local, inicioDia, fimDia, STATUS_IGNORADOS);
+
+        if (excluirId != null) {
+            agendamentosNoDia.removeIf(a -> a.getId().equals(excluirId));
+        }
 
         verificarSobreposicao(agendamentosNoDia, dataHora, duracao,
             "Já existe um agendamento neste horário e local: ");
@@ -154,7 +162,7 @@ public class DisponibilidadeService {
         var fimDia = dataHora.toLocalDate().atTime(23, 59, 59);
 
         var bloqueiosExistentes = agendamentoRepository
-            .findBloqueiaDiaInteiroByFotografoAndDataBetween(fotografoId, inicioDia, fimDia, StatusAgendamento.CANCELADO);
+            .findBloqueiaDiaInteiroByFotografoAndDataBetween(fotografoId, inicioDia, fimDia, STATUS_IGNORADOS);
 
         if (excluirId != null) {
             bloqueiosExistentes.removeIf(a -> a.getId().equals(excluirId));
@@ -167,10 +175,10 @@ public class DisponibilidadeService {
 
         if (pacote.getBloqueiaDiaInteiro()) {
             var conflito = excluirId != null
-                ? agendamentoRepository.existsByFotografoIdAndDataHoraEnsaioBetweenAndStatusNotAndIdNot(
-                    fotografoId, inicioDia, fimDia, StatusAgendamento.CANCELADO, excluirId)
-                : agendamentoRepository.existsByFotografoIdAndDataHoraEnsaioBetweenAndStatusNot(
-                    fotografoId, inicioDia, fimDia, StatusAgendamento.CANCELADO);
+                ? agendamentoRepository.existsByFotografoIdAndDataHoraEnsaioBetweenAndStatusNotInAndIdNot(
+                    fotografoId, inicioDia, fimDia, STATUS_IGNORADOS, excluirId)
+                : agendamentoRepository.existsByFotografoIdAndDataHoraEnsaioBetweenAndStatusNotIn(
+                    fotografoId, inicioDia, fimDia, STATUS_IGNORADOS);
             if (conflito) {
                 throw new ConflitoDeAgendaException(
                     "Já existe um agendamento nesta data para este fotógrafo. O pacote selecionado bloqueia o dia inteiro.");
@@ -178,7 +186,7 @@ public class DisponibilidadeService {
             return;
         }
 
-        var statusesIgnorados = List.of(StatusAgendamento.CANCELADO, StatusAgendamento.NO_SHOW);
+        var statusesIgnorados = STATUS_IGNORADOS;
         var agendamentosNoDia = excluirId != null
             ? agendamentoRepository.findActiveByFotografoAndDataBetweenExcludingId(
                 fotografoId, inicioDia, fimDia, statusesIgnorados, excluirId)

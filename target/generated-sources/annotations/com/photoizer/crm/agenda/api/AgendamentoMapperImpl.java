@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
 
 @Generated(
     value = "org.mapstruct.ap.MappingProcessor",
-    date = "2026-09-02T17:17:06-0300",
+    date = "2026-09-27T13:55:01-0300",
     comments = "version: 1.6.3, compiler: javac, environment: Java 26.0.1 (Homebrew)"
 )
 @Component
@@ -67,7 +67,10 @@ public class AgendamentoMapperImpl implements AgendamentoMapper {
         String urlComprovanteFinal = null;
         Boolean autorizaUsoImagem = null;
         String clausulasPersonalizadas = null;
-        Boolean contratoGerado = null;
+        String tokenProposta = null;
+        LocalDateTime dataAssinatura = null;
+        String urlPdfAssinatura = null;
+        String urlAssinaturaImagem = null;
         Boolean ensaioDestaque = null;
         String observacoes = null;
         UUID tokenGaleria = null;
@@ -126,7 +129,10 @@ public class AgendamentoMapperImpl implements AgendamentoMapper {
             urlComprovanteFinal = agendamento.getUrlComprovanteFinal();
             autorizaUsoImagem = agendamento.getAutorizaUsoImagem();
             clausulasPersonalizadas = agendamento.getClausulasPersonalizadas();
-            contratoGerado = agendamento.getContratoGerado();
+            tokenProposta = agendamento.getTokenProposta();
+            dataAssinatura = agendamento.getDataAssinatura();
+            urlPdfAssinatura = agendamento.getUrlPdfAssinatura();
+            urlAssinaturaImagem = agendamento.getUrlAssinaturaImagem();
             ensaioDestaque = agendamento.getEnsaioDestaque();
             observacoes = agendamento.getObservacoes();
             tokenGaleria = agendamento.getTokenGaleria();
@@ -148,7 +154,7 @@ public class AgendamentoMapperImpl implements AgendamentoMapper {
         LocalDateTime createdAt = null;
         LocalDateTime updatedAt = null;
 
-        AgendamentoResponse agendamentoResponse = new AgendamentoResponse( id, clienteId, clienteNome, clienteTelefone, clienteEmail, clienteCpf, clienteCidade, clienteEstado, pacoteId, pacoteNome, editorId, editorNome, fotografoId, fotografoNome, dataHoraEnsaio, duracaoMinutos, localEnsaio, enderecoCompleto, valorTotal, valorEntradaExigido, valorEntradaPago, valorRestante, valorExtras, taxaDeslocamento, custoDeslocamento, repassarDeslocamento, valorTotalFinal, percentualEntrada, valorPacote, saldoDevedor, status, dataConfirmacao, dataRealizacao, dataEnvioSelecao, dataEntregaFinal, dataFinalizacao, urlComprovanteEntrada, urlComprovanteFinal, autorizaUsoImagem, clausulasPersonalizadas, contratoGerado, ensaioDestaque, observacoes, tokenGaleria, createdAt, updatedAt, fotografos1, valorPartilhaGlobal, valorLucroCrm, valorComissao1, indicadorNome1, statusComissao1 );
+        AgendamentoResponse agendamentoResponse = new AgendamentoResponse( id, clienteId, clienteNome, clienteTelefone, clienteEmail, clienteCpf, clienteCidade, clienteEstado, pacoteId, pacoteNome, editorId, editorNome, fotografoId, fotografoNome, dataHoraEnsaio, duracaoMinutos, localEnsaio, enderecoCompleto, valorTotal, valorEntradaExigido, valorEntradaPago, valorRestante, valorExtras, taxaDeslocamento, custoDeslocamento, repassarDeslocamento, valorTotalFinal, percentualEntrada, valorPacote, saldoDevedor, status, dataConfirmacao, dataRealizacao, dataEnvioSelecao, dataEntregaFinal, dataFinalizacao, urlComprovanteEntrada, urlComprovanteFinal, autorizaUsoImagem, clausulasPersonalizadas, tokenProposta, dataAssinatura, urlPdfAssinatura, urlAssinaturaImagem, ensaioDestaque, observacoes, tokenGaleria, createdAt, updatedAt, fotografos1, valorPartilhaGlobal, valorLucroCrm, valorComissao1, indicadorNome1, statusComissao1 );
 
         return agendamentoResponse;
     }

@@ -27,6 +27,12 @@ auth/
 │   ├── LoginResponse.java      # Record: token, refreshToken, nome, email, papel, userId (UUID)
 │   ├── CriarUserRequest.java   # Record: email, password, nome, papel, telefone (com @Valid)
 │   └── UserResponse.java       # Record: id, email, nome, papel, telefone, ativo + static of(User)
+├── seed/
+│   ├── AuthUserSeeder.java                  # bootstrap: cria APENAS o ADMIN (sem parceiros)
+│   ├── LegacySeedPartnerCleanupSeeder.java  # remove/desativa parceiros semeados por versões antigas
+│   └── SeedPartnerCleanupService.java       # excluir (REQUIRES_NEW) / desativar usuário
+├── event/
+│   └── ParceiroSementeDesativadoEvent.java  # parceiro legado não removível foi desativado
 └── config/
     ├── SecurityConfig.java          # SecurityFilterChain: stateless JWT, rotas públicas + authenticated default
     ├── JwtTokenProvider.java        # Geração/validação HMAC-SHA256 (24h access, 7d refresh), claims: sub, email, papel, jti
@@ -48,7 +54,7 @@ auth/
 | fotografo | `FotografoService` delega CRUD para `UserService` |
 
 ### Eventos
-Nenhum. Módulo fundacional.
+- **Publica** `ParceiroSementeDesativadoEvent` (`auth/event/`) quando um parceiro semeado legado não pôde ser excluído (vínculo de FK) e foi apenas desativado. Consumido por `ParceiroSementeDesativadoListener` no módulo **agenda**, que cancela repasses pendentes.
 
 ## 4. Fluxos Principais
 
@@ -94,6 +100,7 @@ Nenhum. Módulo fundacional.
 4. **Blocklist**: tokens revogados armazenados em `TokenBlocklist` (JPA), verificados a cada request.
 5. **`@JsonIgnore` em `getPassword()`** — barreira adicional contra vazamento de hash BCrypt.
 6. **Secret JWT**: variável de ambiente `JWT_SECRET` com fallback para dev (`application.properties`).
+7. **Seed de usuários**: `AuthUserSeeder` cria **apenas o ADMIN de bootstrap**. Parceiros (FOTOGRAFO/EDITOR/AGENDADOR) não são semeados — devem ser cadastrados pela tela de Parceiros. `LegacySeedPartnerCleanupSeeder` remove os antigos usuários semeados (`carol@`, `joao@`, `maria@`, `agendador@`); se estiverem vinculados, são desativados e têm repasses pendentes cancelados.
 
 ## 6. Testes
 Nenhum teste específico. Apenas `CrmApplicationTests` (smoke).

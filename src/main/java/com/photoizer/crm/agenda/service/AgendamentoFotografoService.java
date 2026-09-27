@@ -1,10 +1,12 @@
 package com.photoizer.crm.agenda.service;
 
 import com.photoizer.crm.agenda.exception.AgendamentoNaoEncontradoException;
+import com.photoizer.crm.agenda.exception.EnsaioNaoFinalizadoException;
 import com.photoizer.crm.agenda.exception.FotografoNaoEncontradoException;
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.AgendamentoFotografo;
 import com.photoizer.crm.agenda.model.RepasseStatus;
+import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.shared.exception.BadRequestException;
 import com.photoizer.crm.shared.exception.ConflictException;
 import com.photoizer.crm.shared.exception.NotFoundException;
@@ -122,6 +124,7 @@ public class AgendamentoFotografoService {
         if (link.getStatus() == RepasseStatus.CANCELADO) {
             throw new ConflictException("Repasse cancelado não pode ser pago");
         }
+        validarEnsaioFinalizado(link.getAgendamento());
         link.pagar(LocalDateTime.now());
         return agendamentoFotografoRepository.save(link);
     }
@@ -143,9 +146,13 @@ public class AgendamentoFotografoService {
     public List<AgendamentoFotografo> pagarRepasseLote(List<UUID> ids) {
         var links = agendamentoFotografoRepository.findAllById(ids);
         for (var link : links) {
+            if (link.getStatus() == RepasseStatus.PAGO) continue;
             if (link.getStatus() == RepasseStatus.CANCELADO) {
                 throw new ConflictException("Repasse cancelado não pode ser pago: " + link.getId());
             }
+            validarEnsaioFinalizado(link.getAgendamento());
+        }
+        for (var link : links) {
             if (link.getStatus() == RepasseStatus.PAGO) continue;
             link.pagar(LocalDateTime.now());
         }
@@ -169,6 +176,13 @@ public class AgendamentoFotografoService {
             .findFirst()
             .orElseThrow(() -> new NotFoundException(
                 "Parceiro " + fotografoId + " não está vinculado ao agendamento " + agendamentoId));
+    }
+
+    private void validarEnsaioFinalizado(Agendamento agendamento) {
+        if (agendamento == null || agendamento.getStatus() != StatusAgendamento.FINALIZADO) {
+            throw new EnsaioNaoFinalizadoException(
+                "O repasse só pode ser realizado após a finalização do ensaio.");
+        }
     }
 
     private void validarPercentual(TipoRepasse tipo, BigDecimal percentual) {

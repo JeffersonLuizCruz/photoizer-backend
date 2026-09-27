@@ -11,13 +11,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-
 /**
  * PATTERN: Composite Seeder (CommandLineRunner + @Order)
  *
- * Seeder responsável por criar os usuários iniciais do sistema.
- * Cada módulo é dono dos seus dados semeados — responsabilidade única.
+ * Seeder responsável por criar apenas o usuário ADMIN de bootstrap,
+ * necessário para o primeiro login. Demais usuários (fotógrafos, editores,
+ * agendadores) devem ser cadastrados pela tela de Parceiros/Usuários — não
+ * são mais semeados no código.
  *
  * Idempotência: verifica userRepository.count() == 0 antes de inserir.
  * @Order(1) — deve rodar primeiro, pois outros módulos podem referenciar usuários.
@@ -40,14 +40,10 @@ public class AuthUserSeeder implements CommandLineRunner {
     @Transactional
     public void run(String... args) {
         if (userRepository.count() == 0) {
-            userRepository.saveAll(List.of(
-                new User("admin@photoizer.com", passwordEncoder.encode("dev123"), "Administrador", Papel.ADMIN),
-                new User("carol@photoizer.com", passwordEncoder.encode("dev123"), "Carol (Fotógrafa)", Papel.FOTOGRAFO),
-                new User("joao@photoizer.com", passwordEncoder.encode("dev123"), "João (Editor)", Papel.EDITOR),
-                new User("maria@photoizer.com", passwordEncoder.encode("dev123"), "Maria (Assistente)", Papel.EDITOR),
-                new User("agendador@photoizer.com", passwordEncoder.encode("dev123"), "Lucas (Agendador)", Papel.AGENDADOR)
-            ));
-            log.info("Usuários semeados: 5");
+            userRepository.save(
+                new User("admin@photoizer.com", passwordEncoder.encode("dev123"), "Administrador", Papel.ADMIN)
+            );
+            log.info("Usuário ADMIN de bootstrap semeado");
         }
     }
 }

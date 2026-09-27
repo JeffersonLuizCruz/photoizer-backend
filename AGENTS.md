@@ -3,7 +3,7 @@
 ## 1. Visão Geral e Stack Tecnológica
 - **Objetivo do Projeto:** API REST do CRM Photoizer para estúdio de fotografia. Gerencia clientes, agendamentos de ensaios, pacotes, edição de fotos, financeiro, e-commerce (galeria pública + venda de fotos extras), comissões de indicação, notificações e geração de documentos.
 - **Linguagens e Frameworks:** Java 25, Spring Boot 4.1.0, Spring Modulith 2.1.0, Spring Data JPA, Spring Security, Spring MVC.
-- **Banco de Dados:** H2 file-based (`./data/crmdb`), `ddl-auto=update`, Hibernate H2Dialect.
+- **Banco de Dados (dev):** H2 file-based (`./data/crmdb`), profile `dev` ativo por padrão, `ddl-auto=create` — schema recriado a cada subida (dados descartáveis). H2 console em `/h2-console`. **Homolog/Prod (futuro):** Flyway + Postgres com `ddl-auto=validate` (ativar via `SPRING_PROFILES_ACTIVE`).
 - **Bibliotecas Críticas:**
   - **jjwt 0.12.6** — Geração e validação de tokens JWT (HMAC-SHA256).
   - **Lombok** — `@Getter/@Setter/@SuperBuilder/@NoArgsConstructor` em entidades.

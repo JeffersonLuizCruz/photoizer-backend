@@ -3,15 +3,15 @@ package com.photoizer.crm.documento.model;
 /**
  * PATTERN: Enum Type Safety
  *
- * Substitui strings magicas ("contrato", "recibo") por tipo seguro com compile-time checking.
+ * Substitui strings magicas por tipo seguro com compile-time checking.
  * Usado como chave de resolucao de estrategias no DocumentoService.
  *
- * Motivo: Antes, a resolucao de estrategia usava String como chave, o que e propenso
- * a erros de typo em runtime. Enum garante que apenas valores validos sejam usados.
+ * Nota: o termo de prestacao de servicos assinado passou a ser gerado pelo
+ * modulo agenda (fluxo de proposta pública); o modulo documento agora gera
+ * apenas recibos e serve comprovantes.
  */
 public enum TipoDocumento {
 
-    CONTRATO("contrato"),
     RECIBO("recibo");
 
     private final String valor;
@@ -31,6 +31,6 @@ public enum TipoDocumento {
             }
         }
         throw new IllegalArgumentException(
-            "Tipo de documento invalido: '" + valor + "'. Tipos disponiveis: contrato, recibo.");
+            "Tipo de documento invalido: '" + valor + "'. Tipos disponiveis: recibo.");
     }
 }

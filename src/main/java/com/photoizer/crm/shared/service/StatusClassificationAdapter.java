@@ -20,13 +20,19 @@ import java.util.Set;
 @Component
 public class StatusClassificationAdapter implements StatusClassificationPort {
 
+    /**
+     * Status que NÃO representam um ensaio efetivo na agenda:
+     * cancelados, no-show e toda a fase de proposta/pré-reserva
+     * (que só passa a ocupar a agenda após a aprovação).
+     */
     private static final Set<StatusAgendamento> STATUS_IGNORADOS = Set.of(
-        StatusAgendamento.CANCELADO, StatusAgendamento.NO_SHOW
+        StatusAgendamento.CANCELADO, StatusAgendamento.NO_SHOW,
+        StatusAgendamento.PRE_RESERVA, StatusAgendamento.AGUARDANDO_APROVACAO,
+        StatusAgendamento.PAGAMENTO_CONFIRMADO
     );
 
     private static final Set<StatusAgendamento> STATUS_FINALIZADOS = Set.of(
         StatusAgendamento.EM_EDICAO,
-        StatusAgendamento.SELECAO_DAS_FOTOS,
         StatusAgendamento.FOTOS_ENVIADAS_PARA_SELECAO,
         StatusAgendamento.FOTOS_ENTREGUES,
         StatusAgendamento.FINALIZADO
@@ -37,7 +43,6 @@ public class StatusClassificationAdapter implements StatusClassificationPort {
         StatusAgendamento.REALIZADO,
         StatusAgendamento.AGUARDANDO_PAGAMENTO_FINAL,
         StatusAgendamento.EM_EDICAO,
-        StatusAgendamento.SELECAO_DAS_FOTOS,
         StatusAgendamento.FOTOS_ENVIADAS_PARA_SELECAO,
         StatusAgendamento.FOTOS_ENTREGUES,
         StatusAgendamento.FINALIZADO

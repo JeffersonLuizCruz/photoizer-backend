@@ -21,7 +21,7 @@ import java.util.UUID;
  *
  * Antes, este listener injetava AgendamentoRepository e AgendamentoFotografoRepository
  * do módulo agenda, violando fronteiras entre módulos e correndo risco de
- * LazyInitializationException (acesso a getCliente().getNome() fora de transação).
+ * LazyInitializationException (acesso a nomeCliente() fora de transação).
  *
  * Agora, os eventos de agenda são enriquecidos (Event Enrichment) com clienteNome
  * e fotografoIds resolvidos pelo publisher, eliminando a dependência de repositórios

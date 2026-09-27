@@ -63,8 +63,8 @@
 ### config
 - **RESOLVIDO**: `ConfigKey` enum centraliza chaves/tipos/defaults; `ConfiguracaoInvalidaException` valida valores; `@Cacheable`/`@CacheEvict` no service; DTOs (`ConfiguracaoRequest`/`ConfiguracaoResponse`); cross-module removido (endpoints de template movidos para `ContratoTemplateController` no módulo contrato); `DataSeeder` usa `ConfigKey`.
 
-### contrato
-- PDF manual (nakie lib); `ContratoFotografo` com `@ManyToOne User` (auth); estados validados por `if`; `listar` filtra em memória; **`EXPIRADO` nunca aplicado**; eventos `ContratoAssinado/Devolvido` sem consumidor.
+### contrato — CONSOLIDADO/REMOVIDO
+- **RESOLVIDO (consolidação total)**: o módulo `contrato` (entidade `Contrato`, `ContratoFotografo`, `ContratoAprovadoEvent`, `ContratoAssinado/DevolvidoEvent`, `ContratoRepository`, controllers e services) foi removido. O fluxo de proposta/pré-reserva agora vive no módulo `agenda` (`Agendamento` em `PRE_RESERVA` + `Assinatura` 1:1). A criação do agendamento deixou de ser materializada via `aprovar()` cross-module; a aprovação apenas transiciona o `Agendamento`. O PDF-contrato do módulo `documento` também foi removido (o PDF oficial é o snapshot assinado).
 
 ### dashboard
 - ~~`findAll()` em 3 pontos~~ **RESOLVIDO**: usa facades com queries agregadas SQL.
@@ -103,7 +103,8 @@
 - **RESOLVIDO**: `AvaliacaoController` injetava `AvaliacaoRepository` diretamente → `AvaliacaoService` criado.
 - **RESOLVIDO**: Testes unitários desatualizados (`EcommerceServiceTest`) → refletidos na nova estrutura.
 
-### edicao
+### edicao — MÓDULO REMOVIDO
+- **REMOVIDO**: o módulo `edicao` foi desativado e excluído (backend e frontend). A pipeline oficial de fotos/ecommerce passou a ser o upload direto do módulo `foto` (`AdminGaleriaPage`), liberado após o pagamento final (`EM_EDICAO`…`FINALIZADO`). O status `SELECAO_DAS_FOTOS` (usado apenas pelo `edicao`) e os artefatos de integração no `foto` (`FotoEdicaoPublicadaEvent`, `FotoEdicaoRemovidaEvent`, `FotoEdicaoEventListener`) também foram removidos. Itens abaixo ficam como histórico.
 - **RESOLVIDO**: God class `EdicaoService` (534→~190 linhas): extraídos `EdicaoQueryService`, `RawUploadService`, `EdicaoUploadEditadasService`, `PublicacaoService`, `EdicaoRevisaoService`, `FotoEdicaoProcessor`, `EdicaoZipService`.
 - **RESOLVIDO**: Dois fluxos de publicação duplicados: `PublicacaoService.publicar(tipo)` unifica ECOMMERCE/LOJA via Strategy Pattern.
 - **RESOLVIDO**: 3 cópias de watermark/thumbnail: `FotoEdicaoProcessor.processar()` (Template Method).

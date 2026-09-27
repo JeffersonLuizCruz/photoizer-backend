@@ -62,8 +62,7 @@ public class AgendamentoStatusLifecycle {
         if (status == StatusAgendamento.REALIZADO) {
             var fotografoIds = agendamentoFotografoRepository.findByAgendamentoId(agendamento.getId())
                 .stream().map(af -> af.getFotografo().getId()).toList();
-            var clienteNome = agendamento.getCliente() != null
-                ? agendamento.getCliente().getNome() : "";
+            var clienteNome = agendamento.nomeCliente();
             eventPublisher.publishEvent(new AgendamentoRealizadoEvent(
                 agendamento.getId(),
                 agendamento.getCliente().getId(),
@@ -131,7 +130,7 @@ public class AgendamentoStatusLifecycle {
         var fotografoIds = agendamentoFotografoRepository.findByAgendamentoId(agendamento.getId())
             .stream().map(af -> af.getFotografo().getId()).toList();
         var clienteNome = agendamento.getCliente() != null
-            ? agendamento.getCliente().getNome() : "";
+            ? agendamento.nomeCliente() : "";
         eventPublisher.publishEvent(new PagamentoFinalRegistradoEvent(
             agendamento.getId(),
             agendamento.getValorTotalFinal(),

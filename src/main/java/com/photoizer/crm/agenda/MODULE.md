@@ -1,7 +1,14 @@
 # Módulo: Agenda
 
+> **ATUALIZAÇÃO (consolidação do fluxo de agendamento)** — o módulo `contrato` foi removido e o fluxo manual (wizard) foi substituído por um **fluxo único de proposta/pré-reserva**:
+> 1. Staff cria uma proposta a partir de uma data (`POST /api/v1/agendamentos/proposta`) → `Agendamento` em `PRE_RESERVA` (cliente ainda nulo), com `tokenProposta` do link público. A criação **também valida conflito** (por responsável, se informado; senão por local) contra agendamentos que já ocupam a agenda (`CONFIRMADO`+). Sem responsável informado, o usuário logado assume como responsável.
+> 2. O cliente preenche os próprios dados, autoriza uso de imagem, anexa comprovante e assina (nome + desenho) no link público (`/api/v1/propostas/publico/{token}`) → `AGUARDANDO_APROVACAO`.
+> 3. Staff `confirmar-pagamento` → `PAGAMENTO_CONFIRMADO`; `aprovar` → `CONFIRMADO` (aqui valida conflito e ocupa a agenda).
+>
+> A assinatura fica em `agenda/model/Assinatura` (FK `agendamentoId`) com IP, user-agent, plataforma e fuso. A geração do PDF/snapshot imutável está em `PropostaPublicaService`. O template do termo é um valor de config, gerenciado em `config/api/PropostaTemplateController`.
+
 ## 1. Responsabilidade
-Gerencia o ciclo de vida completo de ensaios fotográficos (agendamentos), repasses de fotógrafos, rascunhos de agendamento e a materialização de agendamentos a partir de contratos aprovados. É o módulo central — coordena clientes, pacotes, financeiro, edição e comissões através de **Application Events**. (O submódulo `Tarefa` foi removido do código atual.)
+Gerencia o ciclo de vida completo de ensaios fotográficos (agendamentos), repasses de fotógrafos e o fluxo de proposta/pré-reserva com assinatura digital. É o módulo central — coordena clientes, pacotes, financeiro, edição e comissões através de **Application Events**. (O submódulo `Tarefa` foi removido do código atual.)
 
 ## 2. Estrutura Interna
 ```
@@ -10,7 +17,7 @@ agenda/
 │   ├── Agendamento.java              # Entidade JPA principal (~40 campos, extends BaseEntity)
 │   ├── AgendamentoFotografo.java     # Entidade JPA (extends BaseEntity, @ManyToOne Agendamento + User, unique (agendamento,fotografo))
 │   ├── RascunhoAgendamento.java      # Entidade JPA (extends BaseEntity, index usuario_id, ~25 campos String)
-│   ├── StatusAgendamento.java        # Enum: CONFIRMADO, REALIZADO, AGUARDANDO_PAGAMENTO_FINAL, EM_EDICAO, SELECAO_DAS_FOTOS, FOTOS_ENVIADAS_PARA_SELECAO, FOTOS_ENTREGUES, FINALIZADO, CANCELADO, NO_SHOW
+│   ├── StatusAgendamento.java        # Enum: PRE_RESERVA, AGUARDANDO_APROVACAO, PAGAMENTO_CONFIRMADO, CONFIRMADO, REALIZADO, AGUARDANDO_PAGAMENTO_FINAL, EM_EDICAO, FOTOS_ENVIADAS_PARA_SELECAO, FOTOS_ENTREGUES, FINALIZADO, CANCELADO, NO_SHOW
 │   └── RepasseStatus.java            # Enum: PENDENTE, PAGO, CANCELADO
 ├── repository/
 │   ├── AgendamentoRepository.java    # JpaRepository + JpaSpecificationExecutor (~9 queries customizadas)
@@ -129,7 +136,7 @@ CONFIRMADO ──realizar──▶ AGUARDANDO_PAGAMENTO_FINAL ──pagarFinal�
 1. **Controller com ~28 `@RequestParam`**: parsing manual e frágil; qualquer campo novo exige alteração em controller, command, service e entidade.
 2. **Resolução de cliente com efeito colateral**: o service cria `Cliente` quando inexistente (e silenciosamente faz `catch` de `OrigemCliente.valueOf` → `OUTROS`).
 3. **Cálculo financeiro unificado** [Fase 2]: `AgendamentoValoresCalculator` é a fonte única de `novo`/`atualização` e `valorRepasseEfetivo`; não há mais 3 cópias (ver dívida 7.3).
-4. **Conflito de agenda consolidado** [Fase 2]: `DisponibilidadeService.validarConflitoAgenda(pacote, dataHora, duracao, local[, excluirId])` único, sem cópias de lógica.
+4. **Conflito de agenda consolidado** [Fase 2]: `DisponibilidadeService.validarConflitoAgenda(pacote, dataHora, duracao, local, params)` único, sem cópias de lógica. O critério é **por fotógrafo responsável** quando informado (ignora local); **sem responsável**, por **local** (+ sobreposição de horário). É validado na **criação** (`criarProposta`), na **atualização** (`atualizar`), no **reagendar** e na **aprovação** (`aprovar`), sempre excluindo o próprio agendamento.
 5. **Status sem validação de transição**: `AgendamentoStatusLifecycle`/`transicionarPara` centralizam a mudança, mas transições inválidas ainda não são bloqueadas (encapsulado, sem bloquear — decisão mantida).
 6. **tokenGaleria**: UUID com expiração fixa de 15 dias — hardcoded (ver 7.12).
 7. **`listarAgendamentosCliente` faz 3 consultas ao módulo `foto` POR agendamento** — N+1 cross-module (ver 7.6).

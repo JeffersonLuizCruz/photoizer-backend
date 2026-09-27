@@ -1,7 +1,7 @@
 # Módulo: Foto
 
 ## 1. Responsabilidade
-Gerencia as fotos do ensaio pós-edição — upload, processamento de imagem (watermark + thumbnail), ordenação, metadados, visibilidade e status. É o repositório final das fotos exibidas na galeria do e-commerce. Consome eventos do módulo edicao para criar/remover FotoEnsaio sem escrita cross-module.
+Gerencia as fotos do ensaio — upload, processamento de imagem (watermark + thumbnail), ordenação, metadados, visibilidade e status. É o repositório final das fotos exibidas na galeria do e-commerce (pipeline Fotos, o módulo `edicao` foi removido).
 
 ## 2. Estrutura (pós-refactor)
 ```
@@ -20,17 +20,14 @@ foto/
 │   ├── FotoMapper.java             # MapStruct mapper (toResponse, toPublicResponse)
 │   └── FotoMetadataRequest.java    # Record: titulo, descricao, tags, categoria, dataSessao, destaque
 ├── acl/
-│   └── AgendamentoReadService.java # Porta ACL — desacoplamento do módulo agenda
-├── event/
-│   ├── FotoEdicaoPublicadaEvent.java   # Evento: foto editada criada como FotoEnsaio
-│   └── FotoEdicaoRemovidaEvent.java    # Evento: FotoEnsaio INEDITA removida
+│   └── AgendamentoReadService.java # Porta ACL — status permitido p/ upload e publicação
 ├── listener/
-│   ├── FotoEcommerceEventListener.java  # Escuta eventos ecommerce (seleção, compra, download)
-│   └── FotoEdicaoEventListener.java     # Escuta eventos edicao (criação/remoção de FotoEnsaio)
+│   └── FotoEcommerceEventListener.java  # Escuta eventos ecommerce (seleção, compra, download)
 └── exception/
     ├── FotoEnsaioNaoEncontradaException.java      # 404
     ├── FotoNaoPertenceAoAgendamentoException.java  # 403
     ├── AgendamentoNaoPermitidoParaUploadException.java # 422
+    ├── AgendamentoNaoPermitidoParaPublicacaoException.java # 422
     └── StatusFotoInvalidoException.java            # 409
 ```
 
@@ -39,20 +36,17 @@ foto/
 ### Módulos internos importados
 | Módulo | Uso | Tipo |
 |--------|-----|------|
-| **agenda** | `AgendamentoReadService` (porta ACL) — verificar status para upload | leitura (via porta) |
+| **agenda** | `AgendamentoReadService` (porta ACL) — verificar status para upload/publicação | leitura (via porta) |
 | **shared** | `AuditInfo` (embedded), `FileStorageService` (salvar/deletar arquivos), `ImageProcessingService` (processamento de imagem) | infraestrutura |
 
 ### Módulos que dependem deste
 | Módulo | Uso |
 |--------|-----|
-| **edicao** | `FotoEdicaoPublicadaEvent`, `FotoEdicaoRemovidaEvent`, `FotoProcessingHelper` — publica eventos para criar/remover FotoEnsaio |
 | **ecommerce** | `FotoEnsaio`, `FotoEnsaioRepository`, `FotoMapper`, `FotoEnsaioResponse` |
 
 ### Eventos consumidos
 | Evento | Módulo | Ação |
 |--------|--------|------|
-| `FotoEdicaoPublicadaEvent` | edicao | Cria FotoEnsaio com watermark + thumbnail |
-| `FotoEdicaoRemovidaEvent` | edicao | Remove FotoEnsaio INEDITA |
 | `CompraExtraFotosAssociadasEvent` | ecommerce | Vincula compraExtraId às fotos |
 | `CompraExtraCanceladaEvent` | ecommerce | Desvincula compra e restaura status PUBLICADA |
 | `CompraExtraPagaEvent` | ecommerce | Marca fotos como PAGA |
@@ -70,38 +64,34 @@ Nenhum.
 | **MapStruct Mapper** | `FotoMapper` | Elimina mapeamento manual, segue padrão do projeto |
 | **DTO Mapper** | `FotoEnsaioResponse` (record puro) | Separação entidade/contrato da API |
 | **Anti-Corruption Layer** | `AgendamentoReadService` (porta) | Inverte dependência foto→agenda, elimina importação direta de repository |
-| **Domain Events** | `FotoEdicaoPublicadaEvent`, `FotoEdicaoRemovidaEvent` | Elimina escrita cross-module do edicao em FotoEnsaio |
-| **Event Listener** | `FotoEdicaoEventListener`, `FotoEcommerceEventListener` | Consumidores de eventos Spring para desacoplamento |
-| **Template Method + DRY** | `FotoProcessingHelper` | Centraliza processamento de imagem duplicado (2 cópias eliminadas) |
+| **Event Listener** | `FotoEcommerceEventListener` | Consumidor de eventos Spring para desacoplamento |
+| **Template Method + DRY** | `FotoProcessingHelper` | Centraliza processamento de imagem (watermark + thumbnail) |
 
 ## 5. Fluxos Principais
 
-### Fluxo 1: Upload de Fotos (Admin/Edição)
+### Fluxo 1: Upload de Fotos (Admin)
 `POST /api/v1/agendamentos/{agendamentoId}/fotos` → `FotoService.uploadFotos()`:
-1. Valida status via `AgendamentoReadService.isStatusPermitidoParaUpload()` (ACL).
+1. Valida status via `AgendamentoReadService.isStatusPermitidoParaUpload()` (ACL): permitido apenas **após o pagamento final** (`EM_EDICAO`, `FOTOS_ENVIADAS_PARA_SELECAO`, `FOTOS_ENTREGUES`, `FINALIZADO`).
 2. Para cada arquivo: salva em `uploads/{agendamentoId}/orig/`, processa via `FotoProcessingHelper` (watermark 0.35 + thumbnail 300×200) com fallback.
 3. Cria `FotoEnsaio` `INEDITA`, `visivel=true`, `ordem = count + i`.
 
 ### Fluxo 2: Publicação e Ordenação
-- `PATCH /publicar` → `publicar()`: muda todas as fotos para `PUBLICADA`.
+- `PATCH /publicar` → `publicar()`: valida status pago (`isStatusPermitidoParaPublicacao`) e muda todas as fotos `INEDITA` para `PUBLICADA` (publicação **manual** via botão "Publicar Galeria").
 
 ### Fluxo 3: Gestão de Metadados/Visibilidade/Status
 - `PATCH /{fotoId}/metadata` → `atualizarMetadata()`: título, descrição, tags, categoria, dataSessao, destaque.
 - `PATCH /{fotoId}/visibilidade` → `alterarVisibilidade()`: valida pertence ao agendamento.
-- `PATCH /{fotoId}/status` → `alterarStatus()`: altera status individual.
+- `PATCH /{fotoId}/status` → `alterarStatus()`: altera status individual; transição para `PUBLICADA` exige status pago.
 - `PUT /{fotoId}/imagem` → `substituirImagem()`: deleta 3 arquivos antigos, up original, regera via `FotoProcessingHelper`.
 
-### Fluxo 4: Criação via Evento (Edicao → Foto)
-1. `EdicaoRevisaoService.revisarFoto()` publica `FotoEdicaoPublicadaEvent`.
-2. `FotoEdicaoEventListener.handleFotoEdicaoPublicada()` cria `FotoEnsaio` com watermark + thumbnail.
-3. `FotoEdicaoProcessor.processar()` delega para `FotoProcessingHelper`.
-
 ## 6. Regras Específicas
-1. **Três versões por foto** (`originalPath`, `watermarkedPath`, `thumbPath`) geradas no upload.
-2. **Fallback com log**: falha em watermark/thumbnail usa o path original e registra `log.warn`.
-3. **`FotoEnsaioResponse`** não contém métodos estáticos — mapeamento via `FotoMapper`.
-4. **StatusFoto** com transições validadas via State Pattern.
-5. **Tags `@ElementCollection`** sem `orphanRemoval` (limitação JPA).
+1. **Upload e publicação liberados após o pagamento final** (`EM_EDICAO`…`FINALIZADO`), validado via porta ACL tanto no upload quanto na publicação.
+2. **Publicação manual**: botão "Publicar Galeria" (`PATCH /publicar`); sem publicação automática.
+3. **Três versões por foto** (`originalPath`, `watermarkedPath`, `thumbPath`) geradas no upload.
+4. **Fallback com log**: falha em watermark/thumbnail usa o path original e registra `log.warn`.
+5. **`FotoEnsaioResponse`** não contém métodos estáticos — mapeamento via `FotoMapper`.
+6. **StatusFoto** com transições validadas via State Pattern.
+7. **Tags `@ElementCollection`** sem `orphanRemoval` (limitação JPA).
 
 ## 7. Dívidas Técnicas — Status (pós-refactor)
 
@@ -118,9 +108,8 @@ Nenhum.
 - `FotoEnsaioNaoEncontradaException` (404), `FotoNaoPertenceAoAgendamentoException` (403),
   `AgendamentoNaoPermitidoParaUploadException` (422), `StatusFotoInvalidoException` (409).
 
-### 7.4 Publicação por escrita direta (duplicação edicao) — **RESOLVIDO** ✅
-- `PublicacaoService` e `EdicaoRevisaoService` publicam eventos.
-- `FotoEdicaoEventListener` cria/remove `FotoEnsaio`.
+### 7.4 Integração com edicao — **REMOVIDA**
+- O módulo `edicao` foi removido; a pipeline oficial passou a ser o upload direto do `foto` (`AdminGaleriaPage`). Eventos/listener de integração (`FotoEdicaoPublicadaEvent`, `FotoEdicaoRemovidaEvent`, `FotoEdicaoEventListener`) foram removidos.
 
 ### 7.5 Herança `BaseEntity` → composição — **RESOLVIDO** ✅ (global)
 - `@Embeddable AuditInfo` + composição.

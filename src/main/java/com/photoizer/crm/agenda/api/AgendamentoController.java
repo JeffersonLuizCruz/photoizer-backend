@@ -5,10 +5,10 @@ import com.photoizer.crm.agenda.model.AgendamentoFotografo;
 import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
 import com.photoizer.crm.agenda.service.AgendamentoService;
 import com.photoizer.crm.agenda.service.AgendamentoStatusLifecycle;
-import com.photoizer.crm.agenda.service.CriarAgendamentoCommand;
+import com.photoizer.crm.agenda.service.CriarPropostaCommand;
 import com.photoizer.crm.agenda.service.DisponibilidadeService;
 import com.photoizer.crm.comissao.repository.IndicacaoRepository;
-import com.photoizer.crm.shared.exception.BadRequestException;
+import com.photoizer.crm.shared.storage.FileServeHelper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -19,7 +19,6 @@ import jakarta.annotation.security.RolesAllowed;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,13 +32,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.json.JsonMapper;
-import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -56,7 +49,7 @@ public class AgendamentoController {
     private final AgendamentoMapper agendamentoMapper;
     private final IndicacaoRepository indicacaoRepository;
     private final AgendamentoFotografoRepository agendamentoFotografoRepository;
-    private final JsonMapper objectMapper;
+    private final FileServeHelper fileServeHelper;
 
     public AgendamentoController(AgendamentoService agendamentoService,
                                   AgendamentoStatusLifecycle agendamentoStatusLifecycle,
@@ -64,94 +57,66 @@ public class AgendamentoController {
                                   AgendamentoMapper agendamentoMapper,
                                   IndicacaoRepository indicacaoRepository,
                                   AgendamentoFotografoRepository agendamentoFotografoRepository,
-                                  JsonMapper objectMapper) {
+                                  FileServeHelper fileServeHelper) {
         this.agendamentoService = agendamentoService;
         this.agendamentoStatusLifecycle = agendamentoStatusLifecycle;
         this.disponibilidadeService = disponibilidadeService;
         this.agendamentoMapper = agendamentoMapper;
         this.indicacaoRepository = indicacaoRepository;
         this.agendamentoFotografoRepository = agendamentoFotografoRepository;
-        this.objectMapper = objectMapper;
+        this.fileServeHelper = fileServeHelper;
     }
 
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Criar novo agendamento", description = "Cria um agendamento com upload do comprovante de pagamento")
+    @PostMapping("/proposta")
+    @Operation(summary = "Criar proposta/pré-reserva",
+        description = "Cria uma pré-reserva (não ocupa agenda) e gera o link público de assinatura para o cliente")
     @ApiResponses({
-        @ApiResponse(responseCode = "201", description = "Agendamento criado com sucesso"),
+        @ApiResponse(responseCode = "201", description = "Proposta criada com sucesso"),
         @ApiResponse(responseCode = "422", description = "Dados inválidos", content = @Content),
-        @ApiResponse(responseCode = "409", description = "Conflito de agenda", content = @Content),
-        @ApiResponse(responseCode = "413", description = "Arquivo excede o tamanho máximo", content = @Content)
+        @ApiResponse(responseCode = "409", description = "Conflito de agenda", content = @Content)
     })
-    public ResponseEntity<AgendamentoResponse> criar(
+    public ResponseEntity<AgendamentoResponse> criarProposta(
             @AuthenticationPrincipal String userIdStr,
-            @RequestParam(required = false) String clienteId,
-            @RequestParam(required = false) String nome,
-            @RequestParam(required = false) String telefone,
-            @RequestParam(required = false) String email,
-            @RequestParam(required = false) String cpf,
-            @RequestParam(required = false) String cidade,
-            @RequestParam(required = false) String estado,
-            @RequestParam(required = false) String origem,
-            @RequestParam String pacoteId,
-            @RequestParam(required = false) String editorId,
-            @RequestParam(required = false) String dataHoraEnsaio,
-            @RequestParam(required = false) String data,
-            @RequestParam(required = false) String hora,
-            @RequestParam(required = false, defaultValue = "60") String duracaoMinutos,
-            @RequestParam String localEnsaio,
-            @RequestParam(required = false) String enderecoCompleto,
-            @RequestParam(required = false) String taxaDeslocamento,
-            @RequestParam(required = false) String custoDeslocamento,
-            @RequestParam(required = false) String repassarDeslocamento,
-            @RequestParam(required = false) MultipartFile comprovanteEntrada,
-            @RequestParam(required = false) String autorizaUsoImagem,
-            @RequestParam(required = false) String clausulasPersonalizadas,
-            @RequestParam(required = false) String observacoes,
-            @RequestParam(required = false) String indicadorId,
-            @RequestParam(required = false) String indicadorNome,
-            @RequestParam(required = false) String indicadorTelefone,
-            @RequestParam(required = false) String fotografos
-    ) {
-        validarComprovante(comprovanteEntrada);
+            @Valid @RequestBody CriarPropostaRequest request) {
+        var fotografoId = request.fotografoId() != null
+            ? request.fotografoId()
+            : (userIdStr != null && !userIdStr.isBlank() ? UUID.fromString(userIdStr) : null);
 
-        var parsedPacoteId = UUID.fromString(pacoteId);
-        var parsedEditorId = editorId != null && !editorId.isBlank() ? UUID.fromString(editorId) : null;
-        var parsedClienteId = clienteId != null && !clienteId.isBlank() ? UUID.fromString(clienteId) : null;
-        var parsedDuracao = duracaoMinutos != null ? Integer.parseInt(duracaoMinutos) : 60;
-        var parsedTaxa = taxaDeslocamento != null && !taxaDeslocamento.isBlank() ? new BigDecimal(taxaDeslocamento) : BigDecimal.ZERO;
-        var parsedCusto = custoDeslocamento != null && !custoDeslocamento.isBlank() ? new BigDecimal(custoDeslocamento) : BigDecimal.ZERO;
-        var parsedRepassar = repassarDeslocamento == null || "true".equalsIgnoreCase(repassarDeslocamento);
-        var parsedAutoriza = autorizaUsoImagem != null && "true".equalsIgnoreCase(autorizaUsoImagem);
+        var fotografos = request.fotografos() == null ? List.<CriarPropostaCommand.FotografoRepasse>of()
+            : request.fotografos().stream()
+                .map(f -> new CriarPropostaCommand.FotografoRepasse(
+                    f.fotografoId(), f.valorRepassar(), f.tipoValor(), f.percentual()))
+                .toList();
 
-        LocalDateTime parsedDataHora = null;
-        if (dataHoraEnsaio != null && !dataHoraEnsaio.isBlank()) {
-            parsedDataHora = LocalDateTime.parse(dataHoraEnsaio, DateTimeFormatter.ISO_DATE_TIME);
-        } else if (data != null && !data.isBlank() && hora != null && !hora.isBlank()) {
-            parsedDataHora = LocalDateTime.of(
-                LocalDate.parse(data, DateTimeFormatter.ISO_DATE),
-                LocalTime.parse(hora, DateTimeFormatter.ofPattern("HH:mm"))
-            );
-        }
-
-        var parsedIndicadorId = indicadorId != null && !indicadorId.isBlank() ? UUID.fromString(indicadorId) : null;
-
-        var fotografosList = resolverRepasses(fotografos);
-
-        var parsedFotografoId = userIdStr != null && !userIdStr.isBlank()
-            ? UUID.fromString(userIdStr) : null;
-
-        var command = new CriarAgendamentoCommand(
-            parsedClienteId, nome, telefone, email, cpf, cidade, estado, origem,
-            parsedPacoteId, parsedEditorId, parsedFotografoId, parsedDataHora, null, null, parsedDuracao,
-            localEnsaio, enderecoCompleto, parsedTaxa, parsedCusto, parsedRepassar,
-            comprovanteEntrada, parsedAutoriza, clausulasPersonalizadas, observacoes,
-            parsedIndicadorId, indicadorNome, indicadorTelefone,
-            fotografosList
+        var command = new CriarPropostaCommand(
+            request.pacoteId(), request.editorId(), fotografoId, request.dataHoraEnsaio(),
+            request.duracaoMinutos(), request.localEnsaio(), request.enderecoCompleto(),
+            request.custoDeslocamento(), request.repassarDeslocamento(), request.clausulasPersonalizadas(),
+            request.observacoes(), request.indicadorId(), request.indicadorNome(),
+            request.indicadorTelefone(), fotografos
         );
 
-        var agendamento = agendamentoService.criarAgendamento(command);
+        var agendamento = agendamentoService.criarProposta(command);
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(agendamentoMapper.toResponse(agendamento, null, null, null, null));
+    }
+
+    @PatchMapping("/{id}/confirmar-pagamento")
+    @Operation(summary = "Confirmar pagamento da reserva",
+        description = "Staff confere o comprovante enviado pelo cliente; move a proposta para PAGAMENTO_CONFIRMADO")
+    public ResponseEntity<AgendamentoResponse> confirmarPagamento(
+            @PathVariable @Parameter(description = "ID do agendamento") UUID id) {
+        var agendamento = agendamentoService.confirmarPagamento(id);
+        return ResponseEntity.ok(agendamentoMapper.toResponse(agendamento, null, null, null, null));
+    }
+
+    @PatchMapping("/{id}/aprovar")
+    @Operation(summary = "Aprovar proposta",
+        description = "Valida conflito de agenda e confirma o agendamento, que passa a ocupar a agenda")
+    public ResponseEntity<AgendamentoResponse> aprovar(
+            @PathVariable @Parameter(description = "ID do agendamento") UUID id) {
+        var agendamento = agendamentoService.aprovar(id);
+        return ResponseEntity.ok(agendamentoMapper.toResponse(agendamento, null, null, null, null));
     }
 
     @GetMapping
@@ -238,7 +203,7 @@ public class AgendamentoController {
     public ResponseEntity<AgendamentoResponse> reagendar(
             @PathVariable @Parameter(description = "ID do agendamento") UUID id,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-            @Parameter(description = "Nova data") LocalDate data,
+            @Parameter(description = "Nova data") java.time.LocalDate data,
             @RequestParam(required = false) @Parameter(description = "Novo horário (HH:mm)") String hora,
             @RequestParam(required = false) @Parameter(description = "Nova duração em minutos") Integer duracaoMinutos) {
         var agendamento = agendamentoStatusLifecycle.reagendar(id, data, hora, duracaoMinutos);
@@ -273,6 +238,19 @@ public class AgendamentoController {
         return ResponseEntity.ok(agendamentoService.listarReatribuicoes(id));
     }
 
+    @GetMapping("/{id}/termo")
+    @Operation(summary = "Baixar termo assinado (PDF)",
+        description = "Serve o PDF do snapshot imutável assinado pelo cliente")
+    public ResponseEntity<org.springframework.core.io.Resource> downloadTermo(
+            @PathVariable @Parameter(description = "ID do agendamento") UUID id) {
+        var agendamento = agendamentoService.buscarPorId(id);
+        if (agendamento.getUrlPdfAssinatura() == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return fileServeHelper.servirArquivo(
+            agendamento.getUrlPdfAssinatura(), "termo_" + id + ".pdf", "inline");
+    }
+
     @PostMapping("/{id}/pagamento-final")
     @Operation(summary = "Registrar pagamento final", description = "Registra o pagamento final com comprovante obrigatório e finaliza o ensaio")
     public ResponseEntity<AgendamentoResponse> registrarPagamentoFinal(
@@ -280,35 +258,5 @@ public class AgendamentoController {
             @RequestParam @Parameter(description = "Comprovante de pagamento final (obrigatório)") MultipartFile comprovanteFinal) {
         var agendamento = agendamentoStatusLifecycle.registrarPagamentoFinal(id, comprovanteFinal);
         return ResponseEntity.ok(agendamentoMapper.toResponse(agendamento, null, null, null, null));
-    }
-
-    private void validarComprovante(MultipartFile arquivo) {
-        if (arquivo == null || arquivo.isEmpty()) {
-            throw new BadRequestException("Comprovante de pagamento é obrigatório");
-        }
-        var contentType = arquivo.getContentType();
-        if (contentType == null || !List.of("application/pdf", "image/jpeg", "image/png").contains(contentType)) {
-            throw new BadRequestException("Tipo de arquivo inválido. Permitidos: PDF, JPG, PNG");
-        }
-    }
-
-    /**
-     * Resolve a equipe de parceiros (repasses) a partir do payload JSON.
-     * O fotógrafo principal do agendamento é sempre o usuário autenticado.
-     */
-    private List<CriarAgendamentoCommand.FotografoRepasse> resolverRepasses(String fotografosJson) {
-        if (fotografosJson != null && !fotografosJson.isBlank()) {
-            return parsearFotografos(fotografosJson);
-        }
-        return null;
-    }
-
-    private List<CriarAgendamentoCommand.FotografoRepasse> parsearFotografos(String fotografosJson) {
-        try {
-            return objectMapper.readValue(fotografosJson,
-                new TypeReference<List<CriarAgendamentoCommand.FotografoRepasse>>() {});
-        } catch (Exception e) {
-            throw new BadRequestException("Formato inválido para o campo 'fotografos'. Use JSON array.");
-        }
     }
 }

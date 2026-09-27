@@ -114,6 +114,9 @@ public class FotoService {
     }
 
     public List<FotoEnsaio> publicar(UUID agendamentoId) {
+        if (!agendamentoReadService.isStatusPermitidoParaPublicacao(agendamentoId)) {
+            throw new com.photoizer.crm.foto.exception.AgendamentoNaoPermitidoParaPublicacaoException();
+        }
         var fotos = fotoEnsaioRepository.findByAgendamentoIdOrderByOrdemAsc(agendamentoId);
         var fotosParaPublicar = fotos.stream()
             .filter(f -> f.getStatus() == StatusFoto.INEDITA)
@@ -152,6 +155,9 @@ public class FotoService {
         var foto = buscarPorId(fotoId);
         if (!foto.getAgendamentoId().equals(agendamentoId)) {
             throw new FotoNaoPertenceAoAgendamentoException(fotoId, agendamentoId);
+        }
+        if (status == StatusFoto.PUBLICADA && !agendamentoReadService.isStatusPermitidoParaPublicacao(agendamentoId)) {
+            throw new com.photoizer.crm.foto.exception.AgendamentoNaoPermitidoParaPublicacaoException();
         }
         foto.setStatus(foto.getStatus().transicionarPara(status));
         return fotoEnsaioRepository.save(foto);
