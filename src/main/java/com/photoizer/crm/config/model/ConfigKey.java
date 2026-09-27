@@ -75,6 +75,7 @@ Pacote: {{pacoteNome}}
 Inclui: serviço conforme pacote contratado.
 
 # 4. Valores
+Valor do deslocamento: {{taxaDeslocamento}}
 Valor total do serviço: {{valorTotal}}
 Valor pago como reserva ({{percentualEntrada}}%): {{valorEntrada}}
 Valor restante a pagar no final do ensaio: {{valorRestante}}

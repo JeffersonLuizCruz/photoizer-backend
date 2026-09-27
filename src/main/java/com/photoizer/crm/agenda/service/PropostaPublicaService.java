@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -112,7 +113,7 @@ public class PropostaPublicaService {
             agendamento.getPercentualEntrada(),
             agendamento.getValorTotal(),
             agendamento.getValorEntradaExigido(),
-            agendamento.getValorRestante(),
+            valorRestanteContrato(agendamento),
             html,
             profissionais
         );
@@ -240,7 +241,7 @@ public class PropostaPublicaService {
             "R$ " + money(a.getValorTotal()),
             "R$ " + money(a.getValorEntradaExigido()),
             a.getPercentualEntrada().stripTrailingZeros().toPlainString(),
-            "R$ " + money(a.getValorRestante()),
+            "R$ " + money(valorRestanteContrato(a)),
             configuracaoService.getValor(ConfigKey.NOME_CONTRATADA),
             configuracaoService.getValor(ConfigKey.CNPJ_CONTRATADA),
             configuracaoService.getValor(ConfigKey.ENDERECO_CONTRATADA),
@@ -267,7 +268,7 @@ public class PropostaPublicaService {
         mapa.put("percentualEntrada", a.getPercentualEntrada().toPlainString());
         mapa.put("valorTotal", a.getValorTotal().toPlainString());
         mapa.put("valorEntradaExigido", a.getValorEntradaExigido().toPlainString());
-        mapa.put("valorRestante", a.getValorRestante().toPlainString());
+        mapa.put("valorRestante", valorRestanteContrato(a).toPlainString());
         mapa.put("clienteNome", nome);
         mapa.put("clienteTelefone", telefone);
         mapa.put("clienteEmail", email);
@@ -319,6 +320,15 @@ public class PropostaPublicaService {
             + " (IP " + segurar(ip) + ")");
         linhas.add("Hash do documento: " + hash);
         return linhas;
+    }
+
+    /**
+     * Valor a pagar ao final do ensaio conforme o contrato: total final menos a
+     * reserva exigida. Independe de a reserva já ter sido efetivamente paga,
+     * ao contrário de {@code Agendamento.getValorRestante()} (que é o "a receber").
+     */
+    private BigDecimal valorRestanteContrato(Agendamento a) {
+        return a.getValorTotalFinal().subtract(a.getValorEntradaExigido()).max(BigDecimal.ZERO);
     }
 
     private String money(java.math.BigDecimal valor) {

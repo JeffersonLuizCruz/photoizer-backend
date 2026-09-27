@@ -39,6 +39,7 @@ public class ConfigContratoSeeder implements CommandLineRunner {
         seedConfigsContrato();
         seedTemplateContrato();
         atualizarTemplateComFotografos();
+        atualizarTemplateComDeslocamento();
     }
 
     private void seedConfigsContrato() {
@@ -77,6 +78,18 @@ public class ConfigContratoSeeder implements CommandLineRunner {
                     "Endereço completo: {{enderecoEnsaio}}\nProfissionais do ensaio: {{fotografosEnsaio}}"));
                 configuracaoRepository.save(t);
                 log.info("Template de contrato atualizado com placeholder de profissionais do ensaio");
+            }
+        });
+    }
+
+    private void atualizarTemplateComDeslocamento() {
+        configuracaoRepository.findById(ConfigKey.CONTRATO_TEMPLATE.getKey()).ifPresent(t -> {
+            if (!t.getValor().contains("{{taxaDeslocamento}}")) {
+                t.setValor(t.getValor().replace(
+                    "Valor total do serviço: {{valorTotal}}",
+                    "Valor do deslocamento: {{taxaDeslocamento}}\nValor total do serviço: {{valorTotal}}"));
+                configuracaoRepository.save(t);
+                log.info("Template de contrato atualizado com placeholder de deslocamento");
             }
         });
     }
