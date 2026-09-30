@@ -6,7 +6,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * PATTERN: Facade Pattern
@@ -48,5 +50,17 @@ public class FavoritoService {
         var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
         return favoritoRepository.findBySessionIdAndAgendamentoIdOrderByAuditInfoCreatedAtAsc(sessionId, agendamento.getId())
             .stream().map(Favorito::getFotoId).toList();
+    }
+
+    /**
+     * Contagem anônima de curtidas por foto de um agendamento (sessões distintas).
+     * Usada no painel admin para mostrar quais fotos o público mais curtiu.
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, Long> contarFavoritosPorFoto(UUID agendamentoId) {
+        return favoritoRepository.contarFavoritosPorFoto(agendamentoId).stream()
+            .collect(Collectors.toMap(
+                row -> (UUID) row[0],
+                row -> ((Number) row[1]).longValue()));
     }
 }

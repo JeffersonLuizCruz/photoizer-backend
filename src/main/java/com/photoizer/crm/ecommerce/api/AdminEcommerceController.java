@@ -3,6 +3,7 @@ package com.photoizer.crm.ecommerce.api;
 import com.photoizer.crm.ecommerce.model.StatusCompraExtra;
 import com.photoizer.crm.ecommerce.service.CompraQueryService;
 import com.photoizer.crm.ecommerce.service.EcommerceService;
+import com.photoizer.crm.ecommerce.service.FavoritoService;
 import com.photoizer.crm.ecommerce.service.GaleriaQueryService;
 import com.photoizer.crm.ecommerce.service.PagamentoExtraService;
 import com.photoizer.crm.foto.api.FotoEnsaioResponse;
@@ -35,19 +36,22 @@ public class AdminEcommerceController {
     private final EcommerceMapper ecommerceMapper;
     private final FotoMapper fotoMapper;
     private final PagamentoExtraService pagamentoExtraService;
+    private final FavoritoService favoritoService;
 
     public AdminEcommerceController(EcommerceService ecommerceService,
                                     GaleriaQueryService galeriaQueryService,
                                     CompraQueryService compraQueryService,
                                     EcommerceMapper ecommerceMapper,
                                     FotoMapper fotoMapper,
-                                    PagamentoExtraService pagamentoExtraService) {
+                                    PagamentoExtraService pagamentoExtraService,
+                                    FavoritoService favoritoService) {
         this.ecommerceService = ecommerceService;
         this.galeriaQueryService = galeriaQueryService;
         this.compraQueryService = compraQueryService;
         this.ecommerceMapper = ecommerceMapper;
         this.fotoMapper = fotoMapper;
         this.pagamentoExtraService = pagamentoExtraService;
+        this.favoritoService = favoritoService;
     }
 
     @GetMapping
@@ -71,10 +75,12 @@ public class AdminEcommerceController {
 
         var fotosResponse = fotos.stream().map(fotoMapper::toResponse).toList();
         var comprasResponse = compras.stream().map(ecommerceMapper::toAdminResponse).toList();
+        var favoritosPorFoto = favoritoService.contarFavoritosPorFoto(agendamentoId);
 
         return ResponseEntity.ok(new AdminEcommerceResumoResponse(
             totalFotos, publicadas, selecionadas, pagas, aguardando,
-            fotosResponse, comprasResponse, valorTotalExtras, null,
+            fotosResponse, comprasResponse, valorTotalExtras,
+            favoritosPorFoto, favoritosPorFoto.size(), null,
             null
         ));
     }

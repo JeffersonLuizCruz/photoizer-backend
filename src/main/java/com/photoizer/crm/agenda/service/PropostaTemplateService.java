@@ -63,28 +63,45 @@ public class PropostaTemplateService {
         var texto = renderizarTexto(template, valores);
         var linhas = texto.split("\n", -1);
         var html = new StringBuilder();
+        var dentroDeLista = false;
         for (var linha : linhas) {
             var trim = linha.trim();
+
+            if (trim.startsWith("- ")) {
+                if (!dentroDeLista) {
+                    html.append("<ul>\n");
+                    dentroDeLista = true;
+                }
+                html.append("<li>").append(esc(trim.substring(2).trim())).append("</li>\n");
+                continue;
+            }
+
+            if (dentroDeLista) {
+                html.append("</ul>\n");
+                dentroDeLista = false;
+            }
+
             if (trim.startsWith("= ") && trim.endsWith(" =")) {
-                html.append("<h1 class=\"text-center text-xl font-bold my-6\">")
+                html.append("<h1>")
                     .append(esc(trim.substring(2, trim.length() - 2).trim()))
                     .append("</h1>\n");
             } else if (trim.startsWith("# ")) {
-                html.append("<h2 class=\"text-base font-semibold mt-6 mb-2\">")
+                html.append("<h2>")
                     .append(esc(trim.substring(2).trim()))
                     .append("</h2>\n");
-            } else if (trim.startsWith("- ")) {
-                html.append("<li class=\"ml-4 text-sm\">")
-                    .append(esc(trim.substring(2).trim()))
-                    .append("</li>\n");
             } else if (trim.isEmpty()) {
-                html.append("<div class=\"h-3\"></div>\n");
+                // espaçamento tratado via CSS no frontend
             } else {
-                html.append("<p class=\"text-sm mb-1\">")
+                html.append("<p>")
                     .append(esc(linha))
                     .append("</p>\n");
             }
         }
+
+        if (dentroDeLista) {
+            html.append("</ul>\n");
+        }
+
         return html.toString();
     }
 
