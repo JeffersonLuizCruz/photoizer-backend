@@ -9,6 +9,7 @@ import com.photoizer.crm.shared.exception.ConflictException;
 import com.photoizer.crm.shared.exception.NotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -17,6 +18,13 @@ import java.util.UUID;
 @Service
 @Transactional
 public class UserService {
+
+    /**
+     * Email sintético que identifica o usuário FOTOGRAFO provisionado a partir
+     * do nome configurado na tela de Configuração. Fixo e único para permitir
+     * upsert idempotente (renomear em vez de duplicar).
+     */
+    private static final String EMAIL_FOTOGRAFO_CONFIGURADO = "fotografo.configurado@photoizer.local";
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -79,6 +87,38 @@ public class UserService {
         var user = userRepository.findById(id)
             .orElseThrow(() -> new NotFoundException("Fotógrafo não encontrado: " + id));
         user.setAtivo(!user.isAtivo());
+        userRepository.save(user);
+    }
+
+    /**
+     * Cria ou atualiza o usuário FOTOGRAFO provisionado a partir do nome
+     * configurado na tela de Configuração. Idempotente: reutiliza o usuário de
+     * email sintético e apenas renomeia, garantindo papel FOTOGRAFO e ativo.
+     * A senha é aleatória (o usuário provisionado existe para ser selecionável
+     * como responsável, não para login).
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void upsertFotografoConfigurado(String nome) {
+        if (nome == null || nome.isBlank()) {
+            return;
+        }
+        var nomeLimpo = nome.trim();
+        var existente = userRepository.findByEmail(EMAIL_FOTOGRAFO_CONFIGURADO);
+        if (existente.isPresent()) {
+            var user = existente.get();
+            user.setNome(nomeLimpo);
+            user.setPapel(Papel.FOTOGRAFO);
+            user.setAtivo(true);
+            userRepository.save(user);
+            return;
+        }
+        var user = new User(
+            EMAIL_FOTOGRAFO_CONFIGURADO,
+            passwordEncoder.encode(UUID.randomUUID().toString()),
+            nomeLimpo,
+            Papel.FOTOGRAFO
+        );
+        user.setAtivo(true);
         userRepository.save(user);
     }
 

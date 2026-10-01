@@ -1,11 +1,13 @@
 package com.photoizer.crm.config.service;
 
+import com.photoizer.crm.config.event.FotografoConfiguradoEvent;
 import com.photoizer.crm.config.exception.ConfiguracaoInvalidaException;
 import com.photoizer.crm.config.model.ConfigKey;
 import com.photoizer.crm.config.model.Configuracao;
 import com.photoizer.crm.config.repository.ConfiguracaoRepository;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,9 +31,12 @@ public class ConfiguracaoService {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ConfiguracaoService.class);
 
     private final ConfiguracaoRepository configuracaoRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public ConfiguracaoService(ConfiguracaoRepository configuracaoRepository) {
+    public ConfiguracaoService(ConfiguracaoRepository configuracaoRepository,
+                               ApplicationEventPublisher eventPublisher) {
         this.configuracaoRepository = configuracaoRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -190,5 +195,9 @@ public class ConfiguracaoService {
             });
         config.setValor(valor);
         configuracaoRepository.save(config);
+
+        if (ConfigKey.NOME_FOTOGRAFO.getKey().equals(chave) && valor != null && !valor.isBlank()) {
+            eventPublisher.publishEvent(new FotografoConfiguradoEvent(valor.trim()));
+        }
     }
 }

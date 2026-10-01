@@ -18,13 +18,13 @@ public record PropostaPublicaResponse(
     LocalDateTime dataHoraEnsaio,
     Integer duracaoMinutos,
     String localEnsaio,
-    String enderecoCompleto,
     BigDecimal taxaDeslocamento,
     BigDecimal percentualEntrada,
     BigDecimal valorTotal,
     BigDecimal valorEntradaExigido,
     BigDecimal valorRestante,
     String clausulasHtml,
+    String fotografoResponsavel,
     List<ProfissionalEnsaio> fotografos
 ) {
     public record ProfissionalEnsaio(String nome, String papel) {}

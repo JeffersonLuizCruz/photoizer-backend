@@ -118,9 +118,11 @@ public class AgendamentoService {
                 .orElseThrow(() -> new EditorNaoEncontradoException(command.editorId()))
             : null;
 
-        var fotografo = (command.fotografoId() != null)
-            ? userRepository.findById(command.fotografoId()).orElse(null)
-            : null;
+        var fotografo = userRepository.findById(command.fotografoId())
+            .orElseThrow(() -> new FotografoNaoEncontradoException(command.fotografoId()));
+        if (fotografo.getPapel() != Papel.FOTOGRAFO) {
+            throw new BadRequestException("O responsável selecionado não é um fotógrafo.");
+        }
 
         var taxaDeslocamentoPadrao = configuracaoService.getValorDecimal(ConfigKey.TAXA_DESLOCAMENTO);
         var custoDeslocamento = command.custoDeslocamento() != null ? command.custoDeslocamento() : taxaDeslocamentoPadrao;
@@ -144,7 +146,6 @@ public class AgendamentoService {
             .dataHoraEnsaio(dataHoraEnsaio)
             .duracaoMinutos(duracao)
             .localEnsaio(command.localEnsaio())
-            .enderecoCompleto(command.enderecoCompleto())
             .valorTotal(valores.valorTotal())
             .valorEntradaExigido(valores.valorEntradaExigido())
             .valorEntradaPago(BigDecimal.ZERO)
@@ -389,7 +390,6 @@ public class AgendamentoService {
         agendamento.setFotografo(fotografo);
         agendamento.setDataHoraEnsaio(request.dataHoraEnsaio());
         agendamento.setLocalEnsaio(request.localEnsaio());
-        agendamento.setEnderecoCompleto(request.enderecoCompleto());
         agendamento.setTaxaDeslocamento(taxaDeslocamento);
         agendamento.setCustoDeslocamento(custoDeslocamento);
         agendamento.setRepassarDeslocamento(repassarDeslocamento);

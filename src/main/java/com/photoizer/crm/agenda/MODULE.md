@@ -1,7 +1,7 @@
 # Módulo: Agenda
 
 > **ATUALIZAÇÃO (consolidação do fluxo de agendamento)** — o módulo `contrato` foi removido e o fluxo manual (wizard) foi substituído por um **fluxo único de proposta/pré-reserva**:
-> 1. Staff cria uma proposta a partir de uma data (`POST /api/v1/agendamentos/proposta`) → `Agendamento` em `PRE_RESERVA` (cliente ainda nulo), com `tokenProposta` do link público. A criação **também valida conflito** (por responsável, se informado; senão por local) contra agendamentos que já ocupam a agenda (`CONFIRMADO`+). Sem responsável informado, o usuário logado assume como responsável.
+> 1. Staff cria uma proposta a partir de uma data (`POST /api/v1/agendamentos/proposta`) → `Agendamento` em `PRE_RESERVA` (cliente ainda nulo), com `tokenProposta` do link público. O `fotografoId` é **obrigatório** e deve ter `Papel.FOTOGRAFO` (não há mais fallback para o usuário logado). A criação **também valida conflito** por responsável contra agendamentos que já ocupam a agenda (`CONFIRMADO`+).
 > 2. O cliente preenche os próprios dados, autoriza uso de imagem, anexa comprovante e assina (nome + desenho) no link público (`/api/v1/propostas/publico/{token}`) → `AGUARDANDO_APROVACAO`.
 > 3. Staff `confirmar-pagamento` → `PAGAMENTO_CONFIRMADO`; `aprovar` → `CONFIRMADO` (aqui valida conflito e ocupa a agenda).
 >

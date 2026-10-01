@@ -76,12 +76,7 @@ public class AgendamentoController {
         @ApiResponse(responseCode = "409", description = "Conflito de agenda", content = @Content)
     })
     public ResponseEntity<AgendamentoResponse> criarProposta(
-            @AuthenticationPrincipal String userIdStr,
             @Valid @RequestBody CriarPropostaRequest request) {
-        var fotografoId = request.fotografoId() != null
-            ? request.fotografoId()
-            : (userIdStr != null && !userIdStr.isBlank() ? UUID.fromString(userIdStr) : null);
-
         var fotografos = request.fotografos() == null ? List.<CriarPropostaCommand.FotografoRepasse>of()
             : request.fotografos().stream()
                 .map(f -> new CriarPropostaCommand.FotografoRepasse(
@@ -89,8 +84,8 @@ public class AgendamentoController {
                 .toList();
 
         var command = new CriarPropostaCommand(
-            request.pacoteId(), request.editorId(), fotografoId, request.dataHoraEnsaio(),
-            request.duracaoMinutos(), request.localEnsaio(), request.enderecoCompleto(),
+            request.pacoteId(), request.editorId(), request.fotografoId(), request.dataHoraEnsaio(),
+            request.duracaoMinutos(), request.localEnsaio(),
             request.custoDeslocamento(), request.repassarDeslocamento(), request.clausulasPersonalizadas(),
             request.observacoes(), request.indicadorId(), request.indicadorNome(),
             request.indicadorTelefone(), fotografos

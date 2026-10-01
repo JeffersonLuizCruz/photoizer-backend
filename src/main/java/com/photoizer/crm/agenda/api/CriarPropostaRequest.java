@@ -16,11 +16,10 @@ import java.util.UUID;
 public record CriarPropostaRequest(
     @NotNull UUID pacoteId,
     UUID editorId,
-    UUID fotografoId,
+    @NotNull UUID fotografoId,
     @NotNull LocalDateTime dataHoraEnsaio,
     Integer duracaoMinutos,
     @NotBlank String localEnsaio,
-    String enderecoCompleto,
     BigDecimal custoDeslocamento,
     Boolean repassarDeslocamento,
     String clausulasPersonalizadas,

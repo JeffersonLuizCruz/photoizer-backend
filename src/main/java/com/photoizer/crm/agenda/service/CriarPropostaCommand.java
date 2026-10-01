@@ -18,7 +18,6 @@ public record CriarPropostaCommand(
     LocalDateTime dataHoraEnsaio,
     Integer duracaoMinutos,
     String localEnsaio,
-    String enderecoCompleto,
     BigDecimal custoDeslocamento,
     Boolean repassarDeslocamento,
     String clausulasPersonalizadas,

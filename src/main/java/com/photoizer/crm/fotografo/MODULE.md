@@ -20,6 +20,9 @@ fotografo/
 ├── exception/                              # Exceções de domínio
 │   ├── FotografoNaoEncontradoException.java
 │   └── FotografoComEnsaiosVinculadosException.java
+├── listener/
+│   ├── FotografoConfiguradoListener.java   # Consome FotografoConfiguradoEvent → upsert de User FOTOGRAFO
+│   └── FotografoConfiguradoReconciler.java # ApplicationReadyEvent → garante o User FOTOGRAFO no start
 ├── repository/                             # (vazio — usa repos de outros módulos via Facade)
 └── service/
     ├── FotografoService.java               # CRUD fino (delega ao UserService)
@@ -42,7 +45,7 @@ O módulo acessa dados de 3 módulos de negócio, encapsulados na `FotografoData
 Nenhum (módulo folha).
 
 ### Eventos
-Não publica nem consome eventos.
+Consome `FotografoConfiguradoEvent` (módulo `config`) via `FotografoConfiguradoListener` (`@EventListener`, padrão síncrono dos demais listeners do projeto) → `UserService.upsertFotografoConfigurado(nome)` (transação própria `REQUIRES_NEW`): cria/renomeia o usuário FOTOGRAFO provisionado a partir do nome configurado, tornando-o selecionável como responsável na Nova Proposta. `FotografoConfiguradoReconciler` garante o mesmo upsert no `ApplicationReadyEvent`, cobrindo valores salvos antes da correção. Não publica eventos.
 
 ## 4. Fluxos Principais
 

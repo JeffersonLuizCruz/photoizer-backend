@@ -96,10 +96,6 @@ public class Agendamento {
     @Column(nullable = false, length = 255)
     private String localEnsaio;
 
-    @Size(max = 500)
-    @Column(length = 500)
-    private String enderecoCompleto;
-
     @NotNull
     @Positive
     @Column(nullable = false, precision = 10, scale = 2)

@@ -144,9 +144,11 @@ com/photoizer/crm/agenda/exception/FotografoNaoEncontradoException.class
 com/photoizer/crm/financeiro/event/PagamentoRegistradoEvent.class
 com/photoizer/crm/agenda/api/AgendamentoResponse$FotografoNoAgendamento.class
 com/photoizer/crm/ecommerce/api/CalculoCarrinhoResponse.class
+com/photoizer/crm/config/event/FotografoConfiguradoEvent.class
 com/photoizer/crm/financeiro/api/ComparativoRelatorioResponse.class
 com/photoizer/crm/financeiro/event/ExtrasAdicionadosEvent.class
 com/photoizer/crm/agenda/listener/PagamentoFinanceiroEventListener.class
+com/photoizer/crm/fotografo/listener/FotografoConfiguradoListener.class
 com/photoizer/crm/agenda/exception/AgendamentoNoPassadoException.class
 com/photoizer/crm/config/model/ConfigKey.class
 com/photoizer/crm/financeiro/model/FotoExtra.class
@@ -212,6 +214,7 @@ com/photoizer/crm/financeiro/model/TipoExtra.class
 com/photoizer/crm/auth/repository/TokenBlocklistRepository.class
 com/photoizer/crm/pacote/api/PacoteMapperImpl.class
 com/photoizer/crm/indicador/service/IndicadorService.class
+com/photoizer/crm/fotografo/listener/FotografoConfiguradoReconciler.class
 com/photoizer/crm/foto/exception/FotoEnsaioNaoEncontradaException.class
 com/photoizer/crm/ecommerce/api/AdminEcommerceResumoResponse.class
 com/photoizer/crm/documento/service/PdfContentStrategy.class
@@ -292,6 +295,7 @@ com/photoizer/crm/financeiro/api/DespesasCategoriaRelatorioResponse.class
 com/photoizer/crm/ecommerce/model/StatusCompraExtra$1.class
 com/photoizer/crm/shared/port/DisplacementCostPort.class
 com/photoizer/crm/ecommerce/event/CompraExtraCanceladaEvent.class
+com/photoizer/crm/agenda/service/PropostaPublicaService$1.class
 com/photoizer/crm/agenda/api/RepasseResponse$ClienteResumo.class
 com/photoizer/crm/fotografo/api/FotografoDashboardResponse.class
 com/photoizer/crm/auth/config/JwtTokenProvider.class
@@ -446,7 +450,6 @@ com/photoizer/crm/despesa/api/DespesaRequest.class
 com/photoizer/crm/config/model/ConfigKey$Type.class
 com/photoizer/crm/comissao/api/IndicadorResumoResponse.class
 com/photoizer/crm/comissao/service/ComissaoCalculator.class
-com/photoizer/crm/config/api/ConfiguracaoResponse.class
 com/photoizer/crm/cliente/api/ClienteLoginRequest.class
 com/photoizer/crm/ecommerce/model/CompraExtra$CompraExtraBuilder.class
 com/photoizer/crm/financeiro/api/FinanceiroDashboardResponse$RentabilidadeTrabalho.class

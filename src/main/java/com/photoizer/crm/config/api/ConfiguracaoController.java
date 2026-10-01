@@ -35,9 +35,8 @@ public class ConfiguracaoController {
 
     @GetMapping
     @Operation(summary = "Obter configuracoes globais")
-    public ResponseEntity<ConfiguracaoResponse> getConfig() {
-        var configs = configuracaoService.getConfig();
-        return ResponseEntity.ok(ConfiguracaoResponse.of(configs));
+    public ResponseEntity<Map<String, String>> getConfig() {
+        return ResponseEntity.ok(configuracaoService.getConfig());
     }
 
     @PutMapping

@@ -38,12 +38,14 @@ public class ConfigContratoSeeder implements CommandLineRunner {
     public void run(String... args) {
         seedConfigsContrato();
         seedTemplateContrato();
-        atualizarTemplateComFotografos();
+        atualizarTemplateComProfissionais();
+        atualizarTemplateComFotografoResponsavel();
         atualizarTemplateComDeslocamento();
     }
 
     private void seedConfigsContrato() {
         List.of(
+            ConfigKey.NOME_FOTOGRAFO,
             ConfigKey.NOME_CONTRATADA,
             ConfigKey.CNPJ_CONTRATADA,
             ConfigKey.ENDERECO_CONTRATADA,
@@ -70,14 +72,38 @@ public class ConfigContratoSeeder implements CommandLineRunner {
         }
     }
 
-    private void atualizarTemplateComFotografos() {
+    /**
+     * Normaliza o bloco de profissionais do ensaio para o placeholder único
+     * {@code {{profissionaisEnsaio}}} (renderizado como lista e omitido quando vazio).
+     */
+    private void atualizarTemplateComProfissionais() {
         configuracaoRepository.findById(ConfigKey.CONTRATO_TEMPLATE.getKey()).ifPresent(t -> {
-            if (!t.getValor().contains("{{fotografosEnsaio}}")) {
-                t.setValor(t.getValor().replace(
-                    "Endereço completo: {{enderecoEnsaio}}",
-                    "Endereço completo: {{enderecoEnsaio}}\nProfissionais do ensaio: {{fotografosEnsaio}}"));
+            var valor = t.getValor();
+            if (valor.contains("{{profissionaisEnsaio}}")) {
+                return;
+            }
+            var atualizado = valor.contains("{{fotografosEnsaio}}")
+                ? valor.replace("Profissionais do ensaio: {{fotografosEnsaio}}", "{{profissionaisEnsaio}}")
+                       .replace("{{fotografosEnsaio}}", "{{profissionaisEnsaio}}")
+                : valor.replace(
+                    "Local do ensaio: {{localEnsaio}}",
+                    "Local do ensaio: {{localEnsaio}}\n{{profissionaisEnsaio}}");
+            if (!atualizado.equals(valor)) {
+                t.setValor(atualizado);
                 configuracaoRepository.save(t);
-                log.info("Template de contrato atualizado com placeholder de profissionais do ensaio");
+                log.info("Template de contrato atualizado com bloco de profissionais do ensaio");
+            }
+        });
+    }
+
+    private void atualizarTemplateComFotografoResponsavel() {
+        configuracaoRepository.findById(ConfigKey.CONTRATO_TEMPLATE.getKey()).ifPresent(t -> {
+            if (!t.getValor().contains("{{fotografoResponsavel}}")) {
+                t.setValor(t.getValor().replace(
+                    "Local do ensaio: {{localEnsaio}}",
+                    "Local do ensaio: {{localEnsaio}}\nFotógrafo responsável: {{fotografoResponsavel}}"));
+                configuracaoRepository.save(t);
+                log.info("Template de contrato atualizado com placeholder de fotógrafo responsável");
             }
         });
     }

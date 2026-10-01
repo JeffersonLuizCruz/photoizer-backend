@@ -119,8 +119,8 @@
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/comissao/service/IndicacaoService.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/config/api/ConfiguracaoController.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/config/api/ConfiguracaoRequest.java
-/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/config/api/ConfiguracaoResponse.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/config/api/PropostaTemplateController.java
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/config/event/FotografoConfiguradoEvent.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/config/exception/ConfiguracaoInvalidaException.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/config/model/ConfigKey.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/config/model/Configuracao.java
@@ -329,6 +329,8 @@
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/fotografo/api/FotografoResumoFinanceiroResponse.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/fotografo/api/ParceiroController.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/fotografo/exception/FotografoComEnsaiosVinculadosException.java
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/fotografo/listener/FotografoConfiguradoListener.java
+/Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/fotografo/listener/FotografoConfiguradoReconciler.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/fotografo/service/FotografoCsvExporter.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/fotografo/service/FotografoDataFacade.java
 /Users/hugo/Documents/Workspace/crm/photoizer-backend/src/main/java/com/photoizer/crm/fotografo/service/FotografoQueryService.java

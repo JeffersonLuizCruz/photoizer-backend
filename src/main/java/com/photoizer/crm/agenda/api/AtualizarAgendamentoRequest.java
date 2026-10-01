@@ -14,7 +14,6 @@ public record AtualizarAgendamentoRequest(
     @NotNull UUID pacoteId,
     @NotNull @Future LocalDateTime dataHoraEnsaio,
     @NotBlank String localEnsaio,
-    String enderecoCompleto,
     UUID editorId,
     UUID fotografoId,
     java.math.BigDecimal custoDeslocamento,

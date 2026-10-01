@@ -1,7 +1,7 @@
 # Módulo: Config
 
 ## 1. Responsabilidade
-Gerencia configurações globais do sistema no modelo chave-valor. Consumido por `agenda`, `comissao`, `financeiro`, `contrato` e `despesa` para obter percentuais, taxas, prazos e template de contrato.
+Gerencia configurações globais do sistema no modelo chave-valor. Consumido por `agenda`, `comissao`, `financeiro`, `contrato`, `despesa` e `fotografo` (via evento) para obter percentuais, taxas, prazos, template de contrato e o nome do fotógrafo.
 
 ## 2. Estrutura
 ```
@@ -11,12 +11,13 @@ config/
 │   └── ConfigKey.java             # Enum type-safe com chaves conhecidas + tipo + default
 ├── repository/
 │   └── ConfiguracaoRepository.java # JpaRepository<Configuracao, String>
+├── event/
+│   └── FotografoConfiguradoEvent.java # Publicado ao salvar NOME_FOTOGRAFO
 ├── service/
-│   └── ConfiguracaoService.java    # CRUD type-safe via ConfigKey + cache
+│   └── ConfiguracaoService.java    # CRUD type-safe via ConfigKey + cache + publicação de evento
 ├── api/
-│   ├── ConfiguracaoController.java # GET/PUT /api/v1/config (DTOs)
-│   ├── ConfiguracaoRequest.java    # Record DTO de entrada
-│   └── ConfiguracaoResponse.java   # Record DTO de saída
+│   ├── ConfiguracaoController.java # GET/PUT /api/v1/config (Map<String,String> plano)
+│   └── ConfiguracaoRequest.java    # Record DTO de entrada (legado, não usado pelo controller)
 └── exception/
     └── ConfiguracaoInvalidaException.java  # Exceção específica para valores inválidos
 ```
@@ -40,12 +41,12 @@ Nenhum. O módulo config é **fundacional** — não depende de módulos de dom�
 | ecommerce | `getValorDecimal(ConfigKey.VALOR_FOTO_EXTRA)` |
 
 ### Eventos
-Nenhum. Não publica nem consome eventos.
+Publica `FotografoConfiguradoEvent(nome)` ao salvar a chave `NOME_FOTOGRAFO` com valor não-branco. Consumido pelo módulo `fotografo`, que provisiona/atualiza o usuário com papel FOTOGRAFO (evita `config → auth` direto). Não consome eventos.
 
 ## 4. Fluxos Principais
 
 ### Fluxo 1: Leitura
-- `GET /api/v1/config` → `ConfiguracaoResponse` com todas as chaves (`getConfig`).
+- `GET /api/v1/config` → `Map<String, String>` **plano** com todas as chaves (`getConfig`). O frontend lê os campos diretamente (ex.: `nomeContratada`).
 - `getValor(ConfigKey)` → busca por chave, retorna valor bruto ou default do enum.
 - `getValorDecimal(ConfigKey)` / `getValorInteiro(ConfigKey)` → busca + conversão tipada.
 
@@ -61,7 +62,8 @@ Nenhum. Não publica nem consome eventos.
 | `PERCENTUAL_COMISSAO` | `percentualComissao` | DECIMAL | `10.00` |
 | `PERCENTUAL_ENTRADA` | `percentualEntrada` | DECIMAL | `30.00` |
 | `TAXA_DESLOCAMENTO` | `taxaDeslocamentoPadrao` | DECIMAL | `0.00` |
-| `NOME_CONTRATADA` | `nomeContratada` | TEXT | `Carol Oliva Fotografia` |
+| `NOME_FOTOGRAFO` | `nomeFotografo` | TEXT | `""` |
+| `NOME_CONTRATADA` | `nomeContratada` | TEXT | `""` (editável na Configuração) |
 | `CNPJ_CONTRATADA` | `cnpjContratada` | TEXT | `""` |
 | `ENDERECO_CONTRATADA` | `enderecoContratada` | TEXT | `""` |
 | `PIX_CHAVE` | `pixChave` | TEXT | `""` |

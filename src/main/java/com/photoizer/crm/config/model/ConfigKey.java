@@ -37,7 +37,8 @@ public enum ConfigKey {
     TAXA_DESLOCAMENTO("taxaDeslocamentoPadrao", Type.DECIMAL, "0.00"),
 
     // ── Dados da contratada ─────────────────────────────────────
-    NOME_CONTRATADA("nomeContratada", Type.TEXT, "Carol Oliva Fotografia"),
+    NOME_FOTOGRAFO("nomeFotografo", Type.TEXT, ""),
+    NOME_CONTRATADA("nomeContratada", Type.TEXT, ""),
     CNPJ_CONTRATADA("cnpjContratada", Type.TEXT, ""),
     ENDERECO_CONTRATADA("enderecoContratada", Type.TEXT, ""),
     PIX_CHAVE("pixChave", Type.TEXT, ""),
@@ -67,8 +68,8 @@ Contratada: {{contratadaNome}}, inscrita no CNPJ nº {{contratadaCnpj}}, com sed
 Data do ensaio: {{dataEnsaio}}
 Horário do ensaio: {{horarioEnsaio}}
 Local do ensaio: {{localEnsaio}}
-Endereço completo: {{enderecoEnsaio}}
-Profissionais do ensaio: {{fotografosEnsaio}}
+Fotógrafo responsável: {{fotografoResponsavel}}
+{{profissionaisEnsaio}}
 
 # 3. Pacote Contratado
 Pacote: {{pacoteNome}}
@@ -164,8 +165,11 @@ Assinatura da Contratada: {{contratadaNome}}
      */
     public Object convert(String valor) {
         if (valor == null || valor.isBlank()) {
-            if (defaultValue != null) {
+            if (defaultValue != null && !defaultValue.isBlank()) {
                 return convert(defaultValue);
+            }
+            if (type == Type.TEXT) {
+                return valor != null ? valor : (defaultValue != null ? defaultValue : "");
             }
             throw new com.photoizer.crm.config.exception.ConfiguracaoInvalidaException(
                 this, "valor ausente e sem default");

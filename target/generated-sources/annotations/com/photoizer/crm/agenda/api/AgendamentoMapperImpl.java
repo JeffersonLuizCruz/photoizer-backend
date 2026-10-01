@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
 
 @Generated(
     value = "org.mapstruct.ap.MappingProcessor",
-    date = "2026-09-27T22:00:10-0300",
+    date = "2026-10-01T20:31:44-0300",
     comments = "version: 1.6.3, compiler: javac, environment: Java 26.0.1 (Homebrew)"
 )
 @Component
@@ -50,7 +50,6 @@ public class AgendamentoMapperImpl implements AgendamentoMapper {
         LocalDateTime dataHoraEnsaio = null;
         Integer duracaoMinutos = null;
         String localEnsaio = null;
-        String enderecoCompleto = null;
         BigDecimal valorTotal = null;
         BigDecimal valorEntradaExigido = null;
         BigDecimal valorEntradaPago = null;
@@ -112,7 +111,6 @@ public class AgendamentoMapperImpl implements AgendamentoMapper {
             dataHoraEnsaio = agendamento.getDataHoraEnsaio();
             duracaoMinutos = agendamento.getDuracaoMinutos();
             localEnsaio = agendamento.getLocalEnsaio();
-            enderecoCompleto = agendamento.getEnderecoCompleto();
             valorTotal = agendamento.getValorTotal();
             valorEntradaExigido = agendamento.getValorEntradaExigido();
             valorEntradaPago = agendamento.getValorEntradaPago();
@@ -154,7 +152,7 @@ public class AgendamentoMapperImpl implements AgendamentoMapper {
         LocalDateTime createdAt = null;
         LocalDateTime updatedAt = null;
 
-        AgendamentoResponse agendamentoResponse = new AgendamentoResponse( id, clienteId, clienteNome, clienteTelefone, clienteEmail, clienteCpf, clienteCidade, clienteEstado, pacoteId, pacoteNome, editorId, editorNome, fotografoId, fotografoNome, dataHoraEnsaio, duracaoMinutos, localEnsaio, enderecoCompleto, valorTotal, valorEntradaExigido, valorEntradaPago, valorRestante, valorExtras, taxaDeslocamento, custoDeslocamento, repassarDeslocamento, valorTotalFinal, percentualEntrada, valorPacote, saldoDevedor, status, dataConfirmacao, dataRealizacao, dataEnvioSelecao, dataEntregaFinal, dataFinalizacao, urlComprovanteEntrada, urlComprovanteFinal, autorizaUsoImagem, clausulasPersonalizadas, tokenProposta, dataAssinatura, urlPdfAssinatura, urlAssinaturaImagem, ensaioDestaque, observacoes, tokenGaleria, createdAt, updatedAt, fotografos1, valorPartilhaGlobal, valorLucroCrm, valorComissao1, indicadorNome1, statusComissao1 );
+        AgendamentoResponse agendamentoResponse = new AgendamentoResponse( id, clienteId, clienteNome, clienteTelefone, clienteEmail, clienteCpf, clienteCidade, clienteEstado, pacoteId, pacoteNome, editorId, editorNome, fotografoId, fotografoNome, dataHoraEnsaio, duracaoMinutos, localEnsaio, valorTotal, valorEntradaExigido, valorEntradaPago, valorRestante, valorExtras, taxaDeslocamento, custoDeslocamento, repassarDeslocamento, valorTotalFinal, percentualEntrada, valorPacote, saldoDevedor, status, dataConfirmacao, dataRealizacao, dataEnvioSelecao, dataEntregaFinal, dataFinalizacao, urlComprovanteEntrada, urlComprovanteFinal, autorizaUsoImagem, clausulasPersonalizadas, tokenProposta, dataAssinatura, urlPdfAssinatura, urlAssinaturaImagem, ensaioDestaque, observacoes, tokenGaleria, createdAt, updatedAt, fotografos1, valorPartilhaGlobal, valorLucroCrm, valorComissao1, indicadorNome1, statusComissao1 );
 
         return agendamentoResponse;
     }

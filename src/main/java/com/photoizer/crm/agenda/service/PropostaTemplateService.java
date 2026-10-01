@@ -108,13 +108,14 @@ public class PropostaTemplateService {
     public Map<String, String> buildPlaceholders(
             String clienteNome, String clienteCpf, String clienteTelefone, String clienteEmail,
             String clienteCidade, String clienteEstado,
-            String dataEnsaio, String horarioEnsaio, String localEnsaio, String enderecoEnsaio,
+            String dataEnsaio, String horarioEnsaio, String localEnsaio,
             String pacoteNome, String precoFotoExtra,
             String valorTotal, String valorEntrada, String percentualEntrada, String valorRestante,
             String contratadaNome, String contratadaCnpj, String contratadaCidade,
             String pixChave, String pixTipoChave,
             String autorizaUsoImagem,
             String taxaDeslocamento,
+            String fotografoResponsavel,
             String profissionaisEnsaio) {
         return Map.ofEntries(
             Map.entry("clienteNome", nuloVazio(clienteNome)),
@@ -126,7 +127,6 @@ public class PropostaTemplateService {
             Map.entry("dataEnsaio", nuloVazio(dataEnsaio)),
             Map.entry("horarioEnsaio", nuloVazio(horarioEnsaio)),
             Map.entry("localEnsaio", nuloVazio(localEnsaio)),
-            Map.entry("enderecoEnsaio", nuloVazio(enderecoEnsaio)),
             Map.entry("pacoteNome", nuloVazio(pacoteNome)),
             Map.entry("precoFotoExtra", nuloVazio(precoFotoExtra)),
             Map.entry("valorTotal", nuloVazio(valorTotal)),
@@ -140,7 +140,8 @@ public class PropostaTemplateService {
             Map.entry("pixTipoChave", nuloVazio(pixTipoChave)),
             Map.entry("autorizaUsoImagem", nuloVazio(autorizaUsoImagem)),
             Map.entry("taxaDeslocamento", nuloVazio(taxaDeslocamento)),
-            Map.entry("fotografosEnsaio", nuloVazio(profissionaisEnsaio))
+            Map.entry("fotografoResponsavel", nuloVazio(fotografoResponsavel)),
+            Map.entry("profissionaisEnsaio", nuloVazio(profissionaisEnsaio))
         );
     }
 

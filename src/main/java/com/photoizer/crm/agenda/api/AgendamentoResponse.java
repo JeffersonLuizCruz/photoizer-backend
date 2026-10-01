@@ -27,7 +27,6 @@ public record AgendamentoResponse(
     LocalDateTime dataHoraEnsaio,
     Integer duracaoMinutos,
     String localEnsaio,
-    String enderecoCompleto,
     BigDecimal valorTotal,
     BigDecimal valorEntradaExigido,
     BigDecimal valorEntradaPago,

@@ -7,10 +7,12 @@ import com.photoizer.crm.agenda.exception.PropostaNaoEncontradaException;
 import com.photoizer.crm.agenda.exception.PropostaTokenExpiradoException;
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.Assinatura;
+import com.photoizer.crm.agenda.model.RepasseStatus;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.agenda.repository.AssinaturaRepository;
+import com.photoizer.crm.auth.model.Papel;
 import com.photoizer.crm.config.model.ConfigKey;
 import com.photoizer.crm.config.service.ConfiguracaoService;
 import com.photoizer.crm.shared.exception.BadRequestException;
@@ -88,9 +90,10 @@ public class PropostaPublicaService {
 
         var profissionais = agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(agendamento.getId())
             .stream()
+            .filter(cf -> cf.getStatus() != RepasseStatus.CANCELADO)
             .map(cf -> new PropostaPublicaResponse.ProfissionalEnsaio(
                 cf.getFotografo().getNome(),
-                cf.getPapelParceiro() != null ? cf.getPapelParceiro().name() : null))
+                cf.getPapelParceiro() != null ? rotuloPapel(cf.getPapelParceiro()) : null))
             .toList();
 
         var pacote = agendamento.getPacote();
@@ -108,13 +111,13 @@ public class PropostaPublicaService {
             agendamento.getDataHoraEnsaio(),
             agendamento.getDuracaoMinutos(),
             agendamento.getLocalEnsaio(),
-            agendamento.getEnderecoCompleto(),
             agendamento.getTaxaDeslocamento(),
             agendamento.getPercentualEntrada(),
             agendamento.getValorTotal(),
             agendamento.getValorEntradaExigido(),
             valorRestanteContrato(agendamento),
             html,
+            nomeResponsavelEfetivo(agendamento),
             profissionais
         );
     }
@@ -200,6 +203,30 @@ public class PropostaPublicaService {
         return a.getStatus() == StatusAgendamento.PRE_RESERVA;
     }
 
+    /**
+     * Nome do fotógrafo responsável do ensaio. Usa o responsável selecionado na
+     * proposta e, na ausência, o "Nome do Fotógrafo" configurado.
+     */
+    private String nomeResponsavelEfetivo(Agendamento a) {
+        var responsavel = a.getFotografo();
+        if (responsavel != null && responsavel.getNome() != null && !responsavel.getNome().isBlank()) {
+            return responsavel.getNome();
+        }
+        return configuracaoService.getValor(ConfigKey.NOME_FOTOGRAFO);
+    }
+
+    /**
+     * Rótulo legível do papel do profissional para exibição no contrato.
+     */
+    private String rotuloPapel(Papel papel) {
+        return switch (papel) {
+            case ADMIN -> "Administrador";
+            case FOTOGRAFO -> "Fotógrafo";
+            case EDITOR -> "Editor";
+            case AGENDADOR -> "Agendador";
+        };
+    }
+
     private Agendamento buscarPorToken(String token) {
         return agendamentoRepository.findByTokenPropostaHash(HashUtils.sha256(token))
             .orElseThrow(() -> new PropostaNaoEncontradaException(token));
@@ -227,15 +254,19 @@ public class PropostaPublicaService {
 
         var autorizaTexto = autoriza ? "(X) AUTORIZO\n( ) NÃO AUTORIZO" : "( ) AUTORIZO\n( ) NÃO AUTORIZO";
 
-        var nomesParceiros = agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(a.getId()).stream()
-            .map(cf -> cf.getFotografo().getNome()
-                + (cf.getPapelParceiro() != null ? " (" + cf.getPapelParceiro().name() + ")" : ""))
-            .collect(java.util.stream.Collectors.joining(", "));
+        var blocoProfissionais = agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(a.getId()).stream()
+            .filter(cf -> cf.getStatus() != RepasseStatus.CANCELADO)
+            .map(cf -> "- " + cf.getFotografo().getNome()
+                + (cf.getPapelParceiro() != null ? " (" + rotuloPapel(cf.getPapelParceiro()) + ")" : ""))
+            .collect(java.util.stream.Collectors.joining("\n"));
+        var profissionaisEnsaio = blocoProfissionais.isBlank()
+            ? ""
+            : "Profissionais do ensaio:\n" + blocoProfissionais;
 
         return templateService.buildPlaceholders(
             nome, cpf, telefone, email, cidade, estado,
             dataHora.format(FMT_DATA), dataHora.format(FMT_HORA),
-            a.getLocalEnsaio(), a.getEnderecoCompleto(),
+            a.getLocalEnsaio(),
             pacote.getNome(),
             "R$ " + money(pacote.getPrecoFotoExtra()),
             "R$ " + money(a.getValorTotal()),
@@ -249,7 +280,8 @@ public class PropostaPublicaService {
             configuracaoService.getValor(ConfigKey.PIX_TIPO_CHAVE),
             autorizaTexto,
             "R$ " + money(a.getTaxaDeslocamento()),
-            nomesParceiros
+            configuracaoService.getValor(ConfigKey.NOME_FOTOGRAFO),
+            profissionaisEnsaio
         );
     }
 
@@ -264,7 +296,6 @@ public class PropostaPublicaService {
         mapa.put("dataHoraEnsaio", a.getDataHoraEnsaio().format(FMT_DATA_HORA));
         mapa.put("duracaoMinutos", a.getDuracaoMinutos());
         mapa.put("localEnsaio", a.getLocalEnsaio());
-        mapa.put("enderecoCompleto", a.getEnderecoCompleto());
         mapa.put("percentualEntrada", a.getPercentualEntrada().toPlainString());
         mapa.put("valorTotal", a.getValorTotal().toPlainString());
         mapa.put("valorEntradaExigido", a.getValorEntradaExigido().toPlainString());
