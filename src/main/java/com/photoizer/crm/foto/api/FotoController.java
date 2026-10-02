@@ -6,6 +6,7 @@ import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.service.FotoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.security.RolesAllowed;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -29,6 +30,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/agendamentos/{agendamentoId}/fotos")
+@RolesAllowed({"ADMIN", "FOTOGRAFO", "EDITOR", "AGENDADOR"})
 @Tag(name = "Fotos", description = "Gestão de fotos do ensaio")
 public class FotoController {
 

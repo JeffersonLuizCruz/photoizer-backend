@@ -5,6 +5,12 @@
 
 **Prioridades** → P1: bloqueia qualidade/segurança/escalabilidade. P2: qualidade, refatoração. P3: cosmético/complementar.
 
+> **Correções de segurança (2026-10):** ver `../docs/security/CORRECOES_SEGURANCA_2026-10.md`.
+> Fechados: C1 (bypass de pagamento), C2 (autorização por papel — BAC), C3 (segredos/dados
+> versionados), A1 (XSS), A2, A3 (cookie HttpOnly + CSRF), A4, A5 (CORS parametrizado), M1, M2,
+> M3 (magic bytes + limites), M4. Resta apenas a operação pendente: **commitar** o
+> `git rm --cached` e, se já houve push, reescrever histórico + rotacionar `JWT_SECRET`.
+
 ---
 
 ## 1. Top 10 — Dívidas **[CRÍTICO]** (resolver primeiro)

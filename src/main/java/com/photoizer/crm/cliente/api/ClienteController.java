@@ -7,6 +7,7 @@ import com.photoizer.crm.cliente.service.ClienteService;
 import com.photoizer.crm.shared.api.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -33,6 +34,7 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/api/v1/clientes")
+@RolesAllowed({"ADMIN", "AGENDADOR"})
 @Tag(name = "Clientes", description = "Gestão de clientes")
 public class ClienteController {
 

@@ -22,11 +22,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenService refreshTokenService;
+    private final AuthCookieService authCookieService;
 
     public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider,
-                                    RefreshTokenService refreshTokenService) {
+                                    RefreshTokenService refreshTokenService,
+                                    AuthCookieService authCookieService) {
         this.jwtTokenProvider = jwtTokenProvider;
         this.refreshTokenService = refreshTokenService;
+        this.authCookieService = authCookieService;
     }
 
     @Override
@@ -35,15 +38,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     FilterChain chain) throws ServletException, IOException {
 
         var header = request.getHeader(HEADER);
+        String token = null;
 
-        if (header == null || !header.startsWith(PREFIX)) {
-            chain.doFilter(request, response);
-            return;
+        if (header != null && header.startsWith(PREFIX)) {
+            token = header.substring(PREFIX.length());
+        } else {
+            // A3: fallback para cookie HttpOnly (navegador envia automaticamente).
+            token = authCookieService.lerAccessToken(request).orElse(null);
         }
 
-        var token = header.substring(PREFIX.length());
-
-        if (!jwtTokenProvider.validateToken(token)) {
+        if (token == null || token.isBlank() || !jwtTokenProvider.validateToken(token)) {
             chain.doFilter(request, response);
             return;
         }

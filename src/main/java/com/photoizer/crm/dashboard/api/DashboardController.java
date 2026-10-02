@@ -3,6 +3,7 @@ package com.photoizer.crm.dashboard.api;
 import com.photoizer.crm.dashboard.service.DashboardService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.security.RolesAllowed;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/dashboard")
+@RolesAllowed({"ADMIN", "FOTOGRAFO", "EDITOR", "AGENDADOR"})
 @Tag(name = "Dashboard", description = "Métricas e gráficos do dashboard")
 public class DashboardController {
 

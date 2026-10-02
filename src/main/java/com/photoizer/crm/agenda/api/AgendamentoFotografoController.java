@@ -5,6 +5,7 @@ import com.photoizer.crm.shared.model.TipoRepasse;
 import com.photoizer.crm.agenda.service.AgendamentoFotografoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -23,6 +24,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/agendamentos/{agendamentoId}/fotografos")
+@RolesAllowed({"ADMIN", "FOTOGRAFO", "EDITOR", "AGENDADOR"})
 @Tag(name = "Fotógrafos do Agendamento", description = "Gerencia os fotógrafos vinculados a um ensaio")
 public class AgendamentoFotografoController {
 

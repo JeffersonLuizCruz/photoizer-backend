@@ -4,7 +4,9 @@ import com.photoizer.crm.config.model.ConfigKey;
 import com.photoizer.crm.config.service.ConfiguracaoService;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Renderização do template do termo de prestação de serviços usado na
@@ -36,7 +38,7 @@ public class PropostaTemplateService {
     }
 
     public String renderizarHtmlPublico(String template, Map<String, String> valores) {
-        return renderizarHtml(removerSecoesCliente(template), valores);
+        return sanitizarHtml(renderizarHtml(removerSecoesCliente(template), valores));
     }
 
     private String removerSecoesCliente(String template) {
@@ -150,6 +152,56 @@ public class PropostaTemplateService {
     }
 
     private String esc(String texto) {
-        return texto.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+        return texto.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&#39;");
+    }
+
+    // ==================== Sanitização (defense-in-depth / XSS) ====================
+
+    private static final Pattern TAGS_PERIGOSAS = Pattern.compile(
+        "(?is)<\\s*(script|style|iframe|object|embed|link|meta|base|form|input|button|svg|math)\\b[^>]*>.*?</\\s*\\1\\s*>"
+            + "|<\\s*(script|style|iframe|object|embed|link|meta|base|form|input|button|svg|math)\\b[^>]*/?>");
+    private static final Pattern EVENT_HANDLERS = Pattern.compile("(?i)\\s+on\\w+\\s*=\\s*(\"[^\"]*\"|'[^']*'|[^\\s>]+)");
+    private static final Pattern JS_SCHEME = Pattern.compile("(?i)(href|src)\\s*=\\s*(\"|')?\\s*(javascript|data|vbscript)\\s*:");
+    private static final List<String> TAGS_PERMITIDAS = List.of("h1", "h2", "p", "ul", "li");
+
+    /**
+     * Sanitiza o HTML do contrato antes de enviá-lo à página pública.
+     *
+     * <p>O template é editável por ADMIN e o HTML é injetado via
+     * {@code dangerouslySetInnerHTML} no frontend. Para eliminar XSS armazenado,
+     * removemos tags perigosas, atributos de evento e URLs com esquemas ativos.
+     * O conteúdo é gerado internamente como parágrafos/listas, então apenas as
+     * tags allowlist são preservadas.
+     */
+    public String sanitizarHtml(String html) {
+        if (html == null || html.isBlank()) {
+            return "";
+        }
+        var resultado = TAGS_PERIGOSAS.matcher(html).replaceAll("");
+        resultado = EVENT_HANDLERS.matcher(resultado).replaceAll("");
+        resultado = JS_SCHEME.matcher(resultado).replaceAll("$1=\"#\"");
+        // Remove qualquer tag fora da allowlist (mantém apenas h1, h2, p, ul, li).
+        resultado = removerTagsForaDaAllowlist(resultado);
+        return resultado;
+    }
+
+    private String removerTagsForaDaAllowlist(String html) {
+        var matcher = Pattern.compile("(?is)</?\\s*([a-zA-Z0-9]+)(\\s[^>]*)?>").matcher(html);
+        var sb = new StringBuilder();
+        int last = 0;
+        while (matcher.find()) {
+            sb.append(html, last, matcher.start());
+            var tag = matcher.group(1).toLowerCase();
+            if (TAGS_PERMITIDAS.contains(tag)) {
+                sb.append(matcher.group());
+            }
+            last = matcher.end();
+        }
+        sb.append(html.substring(last));
+        return sb.toString();
     }
 }

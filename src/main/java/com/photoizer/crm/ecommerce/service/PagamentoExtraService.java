@@ -46,12 +46,16 @@ public class PagamentoExtraService {
         marcarCompraPaga(compra);
     }
 
-    public CompraExtra simularPagamento(UUID token, UUID compraExtraId) {
-        var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
+    /**
+     * Simulação de pagamento usada apenas em desenvolvimento/testes manuais.
+     * NÃO deve ser exposta por endpoint público: ver {@code DevPagamentoController}
+     * (ativo somente no perfil {@code dev} e restrito a ADMIN).
+     */
+    public CompraExtra simularPagamento(UUID agendamentoId, UUID compraExtraId) {
         var compra = compraExtraRepository.findById(compraExtraId)
             .orElseThrow(() -> new CompraNaoEncontradaException(compraExtraId));
 
-        if (!compra.getAgendamentoId().equals(agendamento.getId())) {
+        if (!compra.getAgendamentoId().equals(agendamentoId)) {
             throw new CompraNaoEncontradaException(compraExtraId);
         }
 

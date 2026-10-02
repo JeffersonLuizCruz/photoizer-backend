@@ -29,12 +29,29 @@ import java.util.Set;
 @Component
 public class FileValidator {
 
+    private final FileSignatureValidator signatureValidator;
+
+    public FileValidator(FileSignatureValidator signatureValidator) {
+        this.signatureValidator = signatureValidator;
+    }
+
     private static final Map<String, Set<String>> ALLOWED_EXTENSIONS = Map.of(
         "image",   Set.of(".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"),
         "raw",     Set.of(".cr2", ".nef", ".arw", ".raf", ".dng", ".orf", ".rw2", ".pef"),
         "edited",  Set.of(".tiff", ".tif", ".psd", ".jpg", ".jpeg", ".png"),
         "receipt", Set.of(".jpg", ".jpeg", ".png", ".pdf"),
         "any",     Set.of(".jpg", ".jpeg", ".png", ".pdf", ".zip")
+    );
+
+    private static final long MB = 1024L * 1024L;
+
+    /** Limite de tamanho por contexto (defense-in-depth além do multipart global). */
+    private static final Map<String, Long> MAX_SIZE_BY_CONTEXT = Map.of(
+        "image",   25 * MB,
+        "raw",     60 * MB,
+        "edited",  60 * MB,
+        "receipt", 10 * MB,
+        "any",     25 * MB
     );
 
     /**
@@ -51,6 +68,12 @@ public class FileValidator {
             throw new IllegalArgumentException("Contexto de upload inválido: " + context);
         }
 
+        var maxSize = MAX_SIZE_BY_CONTEXT.get(context);
+        if (maxSize != null && file.getSize() > maxSize) {
+            throw new IllegalArgumentException(
+                "Arquivo excede o limite de " + (maxSize / MB) + "MB para " + context);
+        }
+
         var ext = extractExtension(file.getOriginalFilename());
         if (ext.isEmpty()) {
             throw new IllegalArgumentException("Arquivo deve ter uma extensão");
@@ -60,6 +83,10 @@ public class FileValidator {
             throw new IllegalArgumentException(
                 "Tipo de arquivo não permitido: " + ext.get() + ". Permitidos para " + context + ": " + allowed);
         }
+
+        // Defense-in-depth: confere assinatura binária real (magic bytes),
+        // impedindo conteúdo disfarçado com extensão/Content-Type forjados.
+        signatureValidator.validateContent(file, file.getOriginalFilename());
     }
 
     /**

@@ -29,6 +29,15 @@ public class JwtTokenProvider implements TokenService {
             @Value("${app.jwt.secret}") String secret,
             @Value("${app.jwt.expiration}") long expiration,
             @Value("${app.jwt.refresh-expiration}") long refreshExpiration) {
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException(
+                "app.jwt.secret (JWT_SECRET) é obrigatório e não pode ser vazio");
+        }
+        // HMAC-SHA256 exige chave de no mínimo 256 bits (32 bytes).
+        if (secret.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalStateException(
+                "app.jwt.secret (JWT_SECRET) deve ter ao menos 32 bytes para HMAC-SHA256");
+        }
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expiration = expiration;
         this.refreshExpiration = refreshExpiration;

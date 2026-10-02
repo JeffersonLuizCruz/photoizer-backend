@@ -1,11 +1,13 @@
 package com.photoizer.crm.cliente.api;
 
+import com.photoizer.crm.auth.config.AuthCookieService;
 import com.photoizer.crm.cliente.api.dto.ClienteMapper;
 import com.photoizer.crm.cliente.api.dto.ClienteResponse;
 import com.photoizer.crm.cliente.service.ClienteAuthService;
 import com.photoizer.crm.cliente.service.ClienteService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -34,12 +36,14 @@ public class ClienteAuthController {
     private final ClienteAuthService clienteAuthService;
     private final ClienteService clienteService;
     private final ClienteMapper clienteMapper;
+    private final AuthCookieService authCookieService;
 
     public ClienteAuthController(ClienteAuthService clienteAuthService, ClienteService clienteService,
-                                 ClienteMapper clienteMapper) {
+                                 ClienteMapper clienteMapper, AuthCookieService authCookieService) {
         this.clienteAuthService = clienteAuthService;
         this.clienteService = clienteService;
         this.clienteMapper = clienteMapper;
+        this.authCookieService = authCookieService;
     }
 
     /**
@@ -48,8 +52,11 @@ public class ClienteAuthController {
      */
     @PostMapping("/registro")
     @Operation(summary = "Registrar novo cliente com email e senha")
-    public ResponseEntity<ClienteAuthResponse> registrar(@Valid @RequestBody ClienteRegistroRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(clienteAuthService.registrar(request));
+    public ResponseEntity<ClienteAuthResponse> registrar(@Valid @RequestBody ClienteRegistroRequest request,
+                                                         HttpServletResponse response) {
+        var resultado = clienteAuthService.registrar(request);
+        authCookieService.emitirCookies(response, resultado.token(), null);
+        return ResponseEntity.status(HttpStatus.CREATED).body(resultado);
     }
 
     /**
@@ -57,8 +64,11 @@ public class ClienteAuthController {
      */
     @PostMapping("/login")
     @Operation(summary = "Login de cliente")
-    public ResponseEntity<ClienteAuthResponse> login(@Valid @RequestBody ClienteLoginRequest request) {
-        return ResponseEntity.ok(clienteAuthService.login(request));
+    public ResponseEntity<ClienteAuthResponse> login(@Valid @RequestBody ClienteLoginRequest request,
+                                                     HttpServletResponse response) {
+        var resultado = clienteAuthService.login(request);
+        authCookieService.emitirCookies(response, resultado.token(), null);
+        return ResponseEntity.ok(resultado);
     }
 
     /**

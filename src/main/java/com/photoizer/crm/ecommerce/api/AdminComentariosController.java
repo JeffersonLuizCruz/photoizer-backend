@@ -3,6 +3,7 @@ package com.photoizer.crm.ecommerce.api;
 import com.photoizer.crm.ecommerce.service.ComentarioService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +20,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/ecommerce/admin/comentarios")
+@RolesAllowed({"ADMIN", "FOTOGRAFO"})
 @Tag(name = "Admin Comentários", description = "Comentários dos clientes por foto da galeria")
 public class AdminComentariosController {
 

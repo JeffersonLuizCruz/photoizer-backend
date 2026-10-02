@@ -13,6 +13,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 @Aspect
@@ -65,13 +66,27 @@ public class LoggingAspect {
         }
     }
 
+    /**
+     * Pacotes cujos argumentos nunca devem ser logados (credenciais/PII).
+     * Ex.: DTOs de login carregam senha em texto plano.
+     */
+    private static final List<String> PACOTES_SEM_LOG_DE_ARGS = List.of(
+        "com.photoizer.crm.auth",
+        "com.photoizer.crm.cliente.service.ClienteAuthService"
+    );
+
     @Around("serviceLayer() && !loggingLayer()")
     public Object logService(ProceedingJoinPoint joinPoint) throws Throwable {
         var start = System.currentTimeMillis();
         var methodName = joinPoint.getSignature().toShortString();
-        var args = SensitiveDataMask.maskArgs(joinPoint.getArgs());
 
-        log.debug("[SERVICE] {} args=[{}]", methodName, args);
+        var declaracao = joinPoint.getSignature().getDeclaringTypeName();
+        if (PACOTES_SEM_LOG_DE_ARGS.stream().anyMatch(declaracao::startsWith)) {
+            log.debug("[SERVICE] {} args=[REDACTED]", methodName);
+        } else {
+            var args = SensitiveDataMask.maskArgs(joinPoint.getArgs());
+            log.debug("[SERVICE] {} args=[{}]", methodName, args);
+        }
 
         try {
             var result = joinPoint.proceed();

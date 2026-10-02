@@ -69,7 +69,14 @@ public class DownloadService {
             .toList();
     }
 
-    public Path downloadZip(UUID token) {
+    public record ZipDownload(Path zipPath, Path tempDir) implements AutoCloseable {
+        @Override
+        public void close() {
+            limpaTempDir(tempDir);
+        }
+    }
+
+    public ZipDownload downloadZip(UUID token) {
         var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
         var fotos = getDownloadableFotos(token);
 
@@ -98,14 +105,14 @@ public class DownloadService {
             eventPublisher.publishEvent(new FotoDownloadEvent(
                 agendamento.getId(), fotoIds));
 
-            return zipPath;
+            return new ZipDownload(zipPath, tempDir);
         } catch (IOException e) {
             limpaTempDir(tempDir);
             throw new GaleriaNaoEncontradaException("Erro ao gerar arquivo ZIP: " + e.getMessage());
         }
     }
 
-    private void limpaTempDir(Path tempDir) {
+    private static void limpaTempDir(Path tempDir) {
         if (tempDir != null) {
             try {
                 Files.walk(tempDir)

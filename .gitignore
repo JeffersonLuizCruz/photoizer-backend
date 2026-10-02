@@ -1,17 +1,23 @@
 # --- Backend (Java + Maven) ---
-photoizer-backend/target/
-photoizer-backend/*.class
-photoizer-backend/*.jar
-photoizer-backend/*.war
-photoizer-backend/*.log
-photoizer-backend/.sts4-cache/
-photoizer-backend/.vscode/
+# Padrões relativos à raiz DESTE repositório (photoizer-backend/). O prefixo
+# "photoizer-backend/" não casava aqui e permitia versionar build/runtime.
+target/
+*.class
+*.jar
+*.war
+*.log
+.sts4-cache/
+.vscode/
 
-# Uploads (runtime data)
-photoizer-backend/uploads/
+# Uploads / dados de runtime (podem conter PII, comprovantes e banco)
+uploads/
+data/
+logs/
+*.mv.db
+*.trace.db
 
 # Maven wrapper (the jar is large; keep the scripts but ignore the jar)
-photoizer-backend/.mvn/wrapper/maven-wrapper.jar
+.mvn/wrapper/maven-wrapper.jar
 
 # --- Frontend (Node + Vite + TypeScript) ---
 photoizer-frontend/node_modules/

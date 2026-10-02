@@ -5,6 +5,7 @@ import com.photoizer.crm.ecommerce.service.PagamentoExtraService;
 import com.photoizer.crm.shared.storage.FileServeHelper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.security.RolesAllowed;
 import org.springframework.core.io.Resource;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/admin/ecommerce/compras")
+@RolesAllowed({"ADMIN", "FOTOGRAFO"})
 @Tag(name = "Admin Compras", description = "Gestão administrativa de todas as compras de fotos extras")
 public class AdminComprasController {
 

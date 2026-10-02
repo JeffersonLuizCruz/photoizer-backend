@@ -5,7 +5,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.UUID;
 
@@ -31,27 +30,30 @@ public class FotoProcessingHelper {
     public record ProcessedImages(String watermarkedPath, String thumbPath) {}
 
     public ProcessedImages processar(Path original, Path targetDir, UUID fotoId) {
-        String watermarkedPath = processarComFallback(
-            () -> imageProcessingService.aplicarMarcaDagua(original, targetDir, TEXTO_MARCA_DAGUA, OPACIDADE_MARCA),
-            original, fotoId, "marca d'água");
-        String thumbPath = processarComFallback(
-            () -> imageProcessingService.gerarThumbnail(original, targetDir),
-            original, fotoId, "thumbnail");
+        String watermarkedPath = processarMarcaDagua(original, targetDir, fotoId);
+        String thumbPath = processarThumb(original, targetDir, fotoId, watermarkedPath);
         return new ProcessedImages(watermarkedPath, thumbPath);
     }
 
-    private String processarComFallback(IOOperation operation, Path fallback, UUID fotoId, String operacao) {
+    private String processarMarcaDagua(Path original, Path targetDir, UUID fotoId) {
         try {
-            return operation.execute().toString();
+            return imageProcessingService.aplicarMarcaDagua(original, targetDir, TEXTO_MARCA_DAGUA, OPACIDADE_MARCA)
+                .toString();
         } catch (Exception e) {
-            log.warn("Erro ao gerar {} para foto {}: {} (usando original como fallback)",
-                operacao, fotoId, e.getMessage());
-            return fallback.toString();
+            log.error("Erro ao gerar marca d'água para foto {}: {} (upload abortado para não expor original)",
+                fotoId, e.getMessage());
+            throw new IllegalStateException(
+                "Falha ao gerar marca d'água; upload abortado para não expor a imagem original", e);
         }
     }
 
-    @FunctionalInterface
-    private interface IOOperation {
-        Path execute() throws IOException;
+    private String processarThumb(Path original, Path targetDir, UUID fotoId, String fallback) {
+        try {
+            return imageProcessingService.gerarThumbnail(original, targetDir).toString();
+        } catch (Exception e) {
+            log.warn("Erro ao gerar thumbnail para foto {}: {} (usando fallback)",
+                fotoId, e.getMessage());
+            return fallback;
+        }
     }
 }

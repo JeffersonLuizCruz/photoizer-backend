@@ -5,6 +5,7 @@ import com.photoizer.crm.pacote.service.PacoteService;
 import com.photoizer.crm.shared.api.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -25,6 +26,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/pacotes")
+@RolesAllowed({"ADMIN", "FOTOGRAFO", "EDITOR", "AGENDADOR"})
 @Tag(name = "Pacotes", description = "Gestão de pacotes de ensaio")
 public class PacoteController {
 

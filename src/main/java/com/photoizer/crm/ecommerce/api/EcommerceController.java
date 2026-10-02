@@ -8,7 +8,6 @@ import com.photoizer.crm.ecommerce.service.DownloadService;
 import com.photoizer.crm.ecommerce.service.EcommerceService;
 import com.photoizer.crm.ecommerce.service.GaleriaQueryService;
 import com.photoizer.crm.ecommerce.service.FavoritoService;
-import com.photoizer.crm.ecommerce.service.PagamentoExtraService;
 import com.photoizer.crm.ecommerce.service.SessionService;
 import com.photoizer.crm.foto.api.FotoEnsaioResponse;
 import com.photoizer.crm.foto.api.FotoMapper;
@@ -27,6 +26,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -39,6 +39,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.FileInputStream;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
@@ -55,7 +56,6 @@ public class EcommerceController {
     private final CarrinhoService carrinhoService;
     private final FavoritoService favoritoService;
     private final DownloadService downloadService;
-    private final PagamentoExtraService pagamentoExtraService;
     private final FotoService fotoService;
     private final SessionService sessionService;
     private final ComentarioService comentarioService;
@@ -69,7 +69,6 @@ public class EcommerceController {
                                CarrinhoService carrinhoService,
                                FavoritoService favoritoService,
                                DownloadService downloadService,
-                               PagamentoExtraService pagamentoExtraService,
                                FotoService fotoService,
                                SessionService sessionService,
                                ComentarioService comentarioService,
@@ -82,7 +81,6 @@ public class EcommerceController {
         this.carrinhoService = carrinhoService;
         this.favoritoService = favoritoService;
         this.downloadService = downloadService;
-        this.pagamentoExtraService = pagamentoExtraService;
         this.fotoService = fotoService;
         this.sessionService = sessionService;
         this.comentarioService = comentarioService;
@@ -235,15 +233,6 @@ public class EcommerceController {
         return ResponseEntity.ok(ecommerceMapper.toPublicResponse(compra));
     }
 
-    @PostMapping("/galeria/{token}/compras/{compraExtraId}/simular-pagamento")
-    @Operation(summary = "Simular pagamento da compra de extras e liberar as fotos (substitui gateway)")
-    public ResponseEntity<CompraExtraResponse> simularPagamento(
-            @PathVariable UUID token,
-            @PathVariable UUID compraExtraId) {
-        var compra = pagamentoExtraService.simularPagamento(token, compraExtraId);
-        return ResponseEntity.ok(ecommerceMapper.toPublicResponse(compra));
-    }
-
     @PostMapping("/galeria/{token}/favoritos/{fotoId}")
     @Operation(summary = "Adicionar foto aos favoritos (wishlist)")
     public ResponseEntity<Void> adicionarFavorito(
@@ -287,13 +276,19 @@ public class EcommerceController {
 
     @GetMapping("/galeria/{token}/download-zip")
     @Operation(summary = "Baixar todas as fotos liberadas em ZIP")
-    public ResponseEntity<Resource> downloadZip(@PathVariable UUID token) {
-        var zipPath = downloadService.downloadZip(token);
-        var file = new FileSystemResource(zipPath);
+    public ResponseEntity<StreamingResponseBody> downloadZip(@PathVariable UUID token) {
+        var download = downloadService.downloadZip(token);
+        StreamingResponseBody body = outputStream -> {
+            try (download) {
+                try (var inputStream = new FileInputStream(download.zipPath().toFile())) {
+                    inputStream.transferTo(outputStream);
+                }
+            }
+        };
         return ResponseEntity.ok()
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"fotos.zip\"")
             .contentType(MediaType.APPLICATION_OCTET_STREAM)
-            .body(file);
+            .body(body);
     }
 
     @PostMapping("/galeria/{token}/fotos/{fotoId}/comentarios")

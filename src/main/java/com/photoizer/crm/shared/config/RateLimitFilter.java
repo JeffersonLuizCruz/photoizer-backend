@@ -50,14 +50,18 @@ public class RateLimitFilter extends OncePerRequestFilter {
             properties.windowMs(), properties.maximumSize(), properties.limits());
     }
 
+    /**
+     * Aplica o filtro quando o path casa com algum limite configurado.
+     *
+     * <p>Anteriormente o filtro só era aplicado a paths de galeria
+     * ({@code matchesGalery}), deixando login/registro/proposta pública sem
+     * proteção contra brute-force. Agora qualquer endpoint presente em
+     * {@code app.rate-limit.limits} é protegido.
+     */
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        boolean matchesEndpoint = properties.limits().keySet().stream()
-            .anyMatch(path::contains);
-        boolean matchesGalery = path.contains("/ecommerce/galeria/")
-            || path.contains("/ecommerce/sessao");
-        return !(matchesEndpoint && matchesGalery);
+        return properties.limits().keySet().stream().noneMatch(path::contains);
     }
 
     @Override

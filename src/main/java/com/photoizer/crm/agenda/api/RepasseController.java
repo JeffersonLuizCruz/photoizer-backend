@@ -3,6 +3,7 @@ package com.photoizer.crm.agenda.api;
 import com.photoizer.crm.agenda.service.AgendamentoFotografoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.security.RolesAllowed;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,6 +28,7 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/api/v1/repasses")
+@RolesAllowed({"ADMIN", "FOTOGRAFO"})
 @Tag(name = "Repasses", description = "Gestão de repasses pendentes para fotógrafos")
 public class RepasseController {
 

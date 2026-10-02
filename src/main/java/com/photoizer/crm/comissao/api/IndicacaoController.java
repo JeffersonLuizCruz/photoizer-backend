@@ -3,6 +3,7 @@ package com.photoizer.crm.comissao.api;
 import com.photoizer.crm.comissao.service.IndicacaoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.security.RolesAllowed;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,6 +22,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/v1/comissoes")
+@RolesAllowed({"ADMIN", "FOTOGRAFO", "EDITOR"})
 @Tag(name = "Comissões", description = "Consulta de comissões por indicação")
 public class IndicacaoController {
 

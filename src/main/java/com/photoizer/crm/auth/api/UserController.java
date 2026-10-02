@@ -19,6 +19,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/users")
+@RolesAllowed("ADMIN")
 @Tag(name = "Usuários", description = "Gestão de usuários do sistema")
 public class UserController {
 
