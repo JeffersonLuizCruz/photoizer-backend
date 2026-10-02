@@ -159,6 +159,9 @@ public class Agendamento {
     private LocalDateTime dataRealizacao;
 
     @Column
+    private LocalDateTime dataPagamentoFinal;
+
+    @Column
     private LocalDateTime dataFinalizacao;
 
     @Size(max = 500)
@@ -258,6 +261,9 @@ public class Agendamento {
         if (novoStatus == StatusAgendamento.REALIZADO) {
             this.dataRealizacao = LocalDateTime.now();
         }
+        if (novoStatus == StatusAgendamento.FINALIZADO) {
+            this.dataFinalizacao = LocalDateTime.now();
+        }
     }
 
     public String nomeCliente() {
@@ -356,6 +362,7 @@ public class Agendamento {
         this.formaPagamentoFinal = formaPagamento;
         this.valorRestante = BigDecimal.ZERO;
         this.valorEntradaPago = this.valorTotalFinal;
+        this.dataPagamentoFinal = LocalDateTime.now();
         transicionarPara(StatusAgendamento.EM_EDICAO);
     }
 

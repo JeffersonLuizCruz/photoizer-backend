@@ -43,6 +43,7 @@ public record AgendamentoResponse(
     String status,
     LocalDateTime dataConfirmacao,
     LocalDateTime dataRealizacao,
+    LocalDateTime dataPagamentoFinal,
     LocalDateTime dataFinalizacao,
     boolean temComprovanteEntrada,
     boolean temComprovanteFinal,
