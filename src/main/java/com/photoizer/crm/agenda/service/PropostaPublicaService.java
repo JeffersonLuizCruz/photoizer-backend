@@ -233,7 +233,10 @@ public class PropostaPublicaService {
     }
 
     private void validarExpiracao(Agendamento agendamento) {
-        if (agendamento.getStatus() == StatusAgendamento.PRE_RESERVA
+        var status = agendamento.getStatus();
+        var propostaEmAnalise = status == StatusAgendamento.PRE_RESERVA
+            || status == StatusAgendamento.AGUARDANDO_APROVACAO;
+        if (propostaEmAnalise
             && agendamento.getTokenPropostaExpiracao() != null
             && agendamento.getTokenPropostaExpiracao().isBefore(LocalDateTime.now())) {
             throw new PropostaTokenExpiradoException();

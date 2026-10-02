@@ -3,7 +3,8 @@
 > **ATUALIZAÇÃO (consolidação do fluxo de agendamento)** — o módulo `contrato` foi removido e o fluxo manual (wizard) foi substituído por um **fluxo único de proposta/pré-reserva**:
 > 1. Staff cria uma proposta a partir de uma data (`POST /api/v1/agendamentos/proposta`) → `Agendamento` em `PRE_RESERVA` (cliente ainda nulo), com `tokenProposta` do link público. O `fotografoId` é **obrigatório** e deve ter `Papel.FOTOGRAFO` (não há mais fallback para o usuário logado). A criação **também valida conflito** por responsável contra agendamentos que já ocupam a agenda (`CONFIRMADO`+).
 > 2. O cliente preenche os próprios dados, autoriza uso de imagem, anexa comprovante e assina (nome + desenho) no link público (`/api/v1/propostas/publico/{token}`) → `AGUARDANDO_APROVACAO`.
-> 3. Staff `confirmar-pagamento` → `PAGAMENTO_CONFIRMADO`; `aprovar` → `CONFIRMADO` (aqui valida conflito e ocupa a agenda).
+> 3. Staff `confirmar-pagamento` → `PAGAMENTO_CONFIRMADO`; `aprovar` → `CONFIRMADO` (aqui valida conflito e ocupa a agenda); `recusar` (com motivo obrigatório) → `CANCELADO`.
+> 4. **Segurança da decisão**: `confirmar-pagamento`, `aprovar` e `recusar` exigem `@RolesAllowed({"ADMIN","FOTOGRAFO"})` e o comprovante de entrada é servido pelo `documento` module (`/api/v1/documentos/comprovantes/{id}/entrada`, também ADMIN/FOTOGRAFO). A recusa grava `motivoRecusa`, `recusadoPor` (autor) e `dataRecusa`. O `AgendamentoResponse` expõe apenas flags (`temComprovanteEntrada`, `temComprovanteFinal`, `temTermoAssinado`), nunca os paths do filesystem.
 >
 > A assinatura fica em `agenda/model/Assinatura` (FK `agendamentoId`) com IP, user-agent, plataforma e fuso. A geração do PDF/snapshot imutável está em `PropostaPublicaService`. O template do termo é um valor de config, gerenciado em `config/api/PropostaTemplateController`.
 
@@ -33,7 +34,7 @@ agenda/
 │   ├── RascunhoAgendamentoService.java  # ~92 linhas: salvar/buscar/deletar rascunho por usuário
 │   └── CriarAgendamentoCommand.java      # Record com 27 campos (inclui MultipartFile)
 ├── api/
-│   ├── AgendamentoController.java     # REST: POST (multipart ~28 @RequestParam), GET, PUT, PATCH /status, PATCH /reagendar, PATCH /destaque, POST /pagamento-final, GET /verificar-disponibilidade
+│   ├── AgendamentoController.java     # REST: POST /proposta, GET, PUT, PATCH /status, PATCH /confirmar-pagamento, PATCH /aprovar, PATCH /recusar, PATCH /reagendar, PATCH /destaque, POST /pagamento-final, GET /verificar-disponibilidade
 │   ├── AgendamentoFotografoController.java # REST de repasses
 │   ├── RascunhoAgendamentoController.java  # REST de rascunhos
 │   ├── AgendamentoMapper.java         # MapStruct multi-source: agendamento + fotografos + valorComissao + indicador + statusComissao [Fase 2]

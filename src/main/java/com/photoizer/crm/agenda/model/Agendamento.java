@@ -5,6 +5,7 @@ import org.hibernate.type.SqlTypes;
 import com.photoizer.crm.auth.model.User;
 import com.photoizer.crm.cliente.model.Cliente;
 import com.photoizer.crm.pacote.model.Pacote;
+import com.photoizer.crm.shared.exception.BadRequestException;
 import com.photoizer.crm.shared.model.AuditInfo;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
@@ -18,6 +19,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -215,6 +218,17 @@ public class Agendamento {
     @Column(length = 500)
     private String urlAssinaturaImagem;
 
+    @Size(max = 500)
+    @Column(length = 500)
+    private String motivoRecusa;
+
+    @Size(max = 150)
+    @Column(length = 150)
+    private String recusadoPor;
+
+    @Column
+    private LocalDateTime dataRecusa;
+
     @Column
     private UUID indicadorId;
 
@@ -287,6 +301,35 @@ public class Agendamento {
         this.dataConfirmacao = LocalDateTime.now();
         this.valorEntradaPago = this.valorEntradaExigido;
         this.valorRestante = this.valorTotalFinal.subtract(this.valorEntradaPago).max(BigDecimal.ZERO);
+    }
+
+    /**
+     * Recusa a proposta: cancela o agendamento registrando o motivo.
+     * Permitido apenas enquanto a proposta está em análise (pré-reserva).
+     * O autor e a data são gravados pelo service (contexto de segurança).
+     */
+    public void recusar(String motivo) {
+        if (!this.status.isPreReserva()) {
+            throw new BadRequestException("Somente propostas em análise podem ser recusadas.");
+        }
+        transicionarPara(StatusAgendamento.CANCELADO);
+        this.motivoRecusa = motivo;
+        this.dataRecusa = LocalDateTime.now();
+    }
+
+    /**
+     * Normaliza os campos de recusa: um motivo só existe quando o status é
+     * CANCELADO. Cancelamentos genéricos (via transição de status) não devem
+     * carregar motivo de recusa.
+     */
+    @PrePersist
+    @PreUpdate
+    void normalizarRecusa() {
+        if (this.status != StatusAgendamento.CANCELADO) {
+            this.motivoRecusa = null;
+            this.recusadoPor = null;
+            this.dataRecusa = null;
+        }
     }
 
     public void reagendar(LocalDateTime novaDataHora, int novaDuracaoMinutos) {

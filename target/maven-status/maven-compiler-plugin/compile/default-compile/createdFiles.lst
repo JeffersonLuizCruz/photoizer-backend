@@ -202,6 +202,7 @@ com/photoizer/crm/comissao/api/ConsultaComissoesResponse.class
 com/photoizer/crm/despesa/service/DespesaService.class
 com/photoizer/crm/ecommerce/event/CompraExtraFotosAssociadasEvent.class
 com/photoizer/crm/financeiro/listener/FinanceiroEventListener.class
+com/photoizer/crm/agenda/api/RecusarPropostaRequest.class
 com/photoizer/crm/auth/api/AuthController$RefreshTokenRequest.class
 com/photoizer/crm/cliente/api/AtualizarPerfilRequest.class
 com/photoizer/crm/agenda/listener/ParceiroSementeDesativadoListener.class

@@ -2,13 +2,11 @@ package com.photoizer.crm.ecommerce.api;
 
 import com.photoizer.crm.ecommerce.service.CompraQueryService;
 import com.photoizer.crm.ecommerce.service.PagamentoExtraService;
+import com.photoizer.crm.shared.storage.FileServeHelper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,13 +28,16 @@ public class AdminComprasController {
     private final CompraQueryService compraQueryService;
     private final PagamentoExtraService pagamentoExtraService;
     private final EcommerceMapper ecommerceMapper;
+    private final FileServeHelper fileServeHelper;
 
     public AdminComprasController(CompraQueryService compraQueryService,
                                   PagamentoExtraService pagamentoExtraService,
-                                  EcommerceMapper ecommerceMapper) {
+                                  EcommerceMapper ecommerceMapper,
+                                  FileServeHelper fileServeHelper) {
         this.compraQueryService = compraQueryService;
         this.pagamentoExtraService = pagamentoExtraService;
         this.ecommerceMapper = ecommerceMapper;
+        this.fileServeHelper = fileServeHelper;
     }
 
     @GetMapping
@@ -59,11 +60,7 @@ public class AdminComprasController {
         if (comprovantePath == null) {
             return ResponseEntity.notFound().build();
         }
-        var file = new FileSystemResource(comprovantePath);
-        return ResponseEntity.ok()
-            .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"comprovante\"")
-            .contentType(MediaType.APPLICATION_OCTET_STREAM)
-            .body(file);
+        return fileServeHelper.servirArquivo(comprovantePath.toString(), "comprovante", "inline");
     }
 
     @GetMapping("/{id}")

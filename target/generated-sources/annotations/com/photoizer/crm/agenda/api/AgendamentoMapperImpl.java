@@ -18,8 +18,8 @@ import org.springframework.stereotype.Component;
 
 @Generated(
     value = "org.mapstruct.ap.MappingProcessor",
-    date = "2026-10-01T20:31:44-0300",
-    comments = "version: 1.6.3, compiler: javac, environment: Java 26.0.1 (Homebrew)"
+    date = "2026-10-01T23:21:02-0300",
+    comments = "version: 1.6.3, compiler: javac, environment: Java 25.0.4.1 (Amazon.com Inc.)"
 )
 @Component
 public class AgendamentoMapperImpl implements AgendamentoMapper {
@@ -62,15 +62,14 @@ public class AgendamentoMapperImpl implements AgendamentoMapper {
         LocalDateTime dataEnvioSelecao = null;
         LocalDateTime dataEntregaFinal = null;
         LocalDateTime dataFinalizacao = null;
-        String urlComprovanteEntrada = null;
-        String urlComprovanteFinal = null;
         Boolean autorizaUsoImagem = null;
         String clausulasPersonalizadas = null;
         String tokenProposta = null;
         LocalDateTime dataAssinatura = null;
-        String urlPdfAssinatura = null;
-        String urlAssinaturaImagem = null;
         Boolean ensaioDestaque = null;
+        String motivoRecusa = null;
+        LocalDateTime dataRecusa = null;
+        String recusadoPor = null;
         String observacoes = null;
         UUID tokenGaleria = null;
         BigDecimal valorPartilhaGlobal = null;
@@ -123,15 +122,14 @@ public class AgendamentoMapperImpl implements AgendamentoMapper {
             dataEnvioSelecao = agendamento.getDataEnvioSelecao();
             dataEntregaFinal = agendamento.getDataEntregaFinal();
             dataFinalizacao = agendamento.getDataFinalizacao();
-            urlComprovanteEntrada = agendamento.getUrlComprovanteEntrada();
-            urlComprovanteFinal = agendamento.getUrlComprovanteFinal();
             autorizaUsoImagem = agendamento.getAutorizaUsoImagem();
             clausulasPersonalizadas = agendamento.getClausulasPersonalizadas();
             tokenProposta = agendamento.getTokenProposta();
             dataAssinatura = agendamento.getDataAssinatura();
-            urlPdfAssinatura = agendamento.getUrlPdfAssinatura();
-            urlAssinaturaImagem = agendamento.getUrlAssinaturaImagem();
             ensaioDestaque = agendamento.getEnsaioDestaque();
+            motivoRecusa = agendamento.getMotivoRecusa();
+            dataRecusa = agendamento.getDataRecusa();
+            recusadoPor = agendamento.getRecusadoPor();
             observacoes = agendamento.getObservacoes();
             tokenGaleria = agendamento.getTokenGaleria();
             valorPartilhaGlobal = agendamento.getValorPartilhaGlobal();
@@ -149,10 +147,13 @@ public class AgendamentoMapperImpl implements AgendamentoMapper {
         BigDecimal valorPacote = agendamento.getValorTotal().subtract(agendamento.getTaxaDeslocamento());
         BigDecimal saldoDevedor = agendamento.getValorTotalFinal().subtract(agendamento.getValorEntradaPago());
         String status = agendamento.getStatus().name();
+        boolean temComprovanteEntrada = org.springframework.util.StringUtils.hasText(agendamento.getUrlComprovanteEntrada());
+        boolean temComprovanteFinal = org.springframework.util.StringUtils.hasText(agendamento.getUrlComprovanteFinal());
+        boolean temTermoAssinado = org.springframework.util.StringUtils.hasText(agendamento.getUrlPdfAssinatura());
         LocalDateTime createdAt = null;
         LocalDateTime updatedAt = null;
 
-        AgendamentoResponse agendamentoResponse = new AgendamentoResponse( id, clienteId, clienteNome, clienteTelefone, clienteEmail, clienteCpf, clienteCidade, clienteEstado, pacoteId, pacoteNome, editorId, editorNome, fotografoId, fotografoNome, dataHoraEnsaio, duracaoMinutos, localEnsaio, valorTotal, valorEntradaExigido, valorEntradaPago, valorRestante, valorExtras, taxaDeslocamento, custoDeslocamento, repassarDeslocamento, valorTotalFinal, percentualEntrada, valorPacote, saldoDevedor, status, dataConfirmacao, dataRealizacao, dataEnvioSelecao, dataEntregaFinal, dataFinalizacao, urlComprovanteEntrada, urlComprovanteFinal, autorizaUsoImagem, clausulasPersonalizadas, tokenProposta, dataAssinatura, urlPdfAssinatura, urlAssinaturaImagem, ensaioDestaque, observacoes, tokenGaleria, createdAt, updatedAt, fotografos1, valorPartilhaGlobal, valorLucroCrm, valorComissao1, indicadorNome1, statusComissao1 );
+        AgendamentoResponse agendamentoResponse = new AgendamentoResponse( id, clienteId, clienteNome, clienteTelefone, clienteEmail, clienteCpf, clienteCidade, clienteEstado, pacoteId, pacoteNome, editorId, editorNome, fotografoId, fotografoNome, dataHoraEnsaio, duracaoMinutos, localEnsaio, valorTotal, valorEntradaExigido, valorEntradaPago, valorRestante, valorExtras, taxaDeslocamento, custoDeslocamento, repassarDeslocamento, valorTotalFinal, percentualEntrada, valorPacote, saldoDevedor, status, dataConfirmacao, dataRealizacao, dataEnvioSelecao, dataEntregaFinal, dataFinalizacao, temComprovanteEntrada, temComprovanteFinal, autorizaUsoImagem, clausulasPersonalizadas, tokenProposta, dataAssinatura, temTermoAssinado, ensaioDestaque, motivoRecusa, dataRecusa, recusadoPor, observacoes, tokenGaleria, createdAt, updatedAt, fotografos1, valorPartilhaGlobal, valorLucroCrm, valorComissao1, indicadorNome1, statusComissao1 );
 
         return agendamentoResponse;
     }

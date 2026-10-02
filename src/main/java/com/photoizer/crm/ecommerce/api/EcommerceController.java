@@ -16,6 +16,7 @@ import com.photoizer.crm.foto.model.FotoEnsaio;
 import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.service.FotoService;
 import com.photoizer.crm.shared.exception.BadRequestException;
+import com.photoizer.crm.shared.storage.FileServeHelper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -61,6 +62,7 @@ public class EcommerceController {
     private final EcommerceMapper ecommerceMapper;
     private final CompraQueryService compraQueryService;
     private final FotoMapper fotoMapper;
+    private final FileServeHelper fileServeHelper;
 
     public EcommerceController(EcommerceService ecommerceService,
                                GaleriaQueryService galeriaQueryService,
@@ -73,7 +75,8 @@ public class EcommerceController {
                                ComentarioService comentarioService,
                                EcommerceMapper ecommerceMapper,
                                CompraQueryService compraQueryService,
-                               FotoMapper fotoMapper) {
+                               FotoMapper fotoMapper,
+                               FileServeHelper fileServeHelper) {
         this.ecommerceService = ecommerceService;
         this.galeriaQueryService = galeriaQueryService;
         this.carrinhoService = carrinhoService;
@@ -86,6 +89,7 @@ public class EcommerceController {
         this.ecommerceMapper = ecommerceMapper;
         this.compraQueryService = compraQueryService;
         this.fotoMapper = fotoMapper;
+        this.fileServeHelper = fileServeHelper;
     }
 
     @PostMapping("/sessao")
@@ -218,10 +222,7 @@ public class EcommerceController {
         if (comprovantePath == null) {
             return ResponseEntity.notFound().build();
         }
-        var file = new FileSystemResource(comprovantePath);
-        return ResponseEntity.ok()
-            .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"comprovante\"")
-            .body(file);
+        return fileServeHelper.servirArquivo(comprovantePath.toString(), "comprovante", "inline");
     }
 
     @PostMapping("/galeria/{token}/comprovante")

@@ -134,6 +134,7 @@ ecommerce/
 | 18 | **`EcommerceService.checkout()` injetado via construtor**: elimina CarrinhoService como parâmetro de método | Dependency Injection |
 | 19 | **`AdminAnalyticsController` refatorado**: usa `EcommerceQueryService` em vez de injetar repositorios | Service Layer |
 | 20 | **Testes unitários atualizados**: `EcommerceServiceTest` refleta nova estrutura de dependências | Manutenibilidade |
+| 21 | **Comprovantes servidos via `FileServeHelper`**: `EcommerceController` e `AdminComprasController` deixam de usar `new FileSystemResource(path)` cru e passam pelo helper, que confina o caminho ao diretório de uploads (defesa contra path traversal) | Segurança |
 
 ## 6. Pendências Restantes
 

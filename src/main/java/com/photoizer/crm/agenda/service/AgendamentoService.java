@@ -1,5 +1,6 @@
 package com.photoizer.crm.agenda.service;
 
+import com.photoizer.crm.agenda.event.AgendamentoCanceladoEvent;
 import com.photoizer.crm.agenda.event.AgendamentoConfirmadoEvent;
 import com.photoizer.crm.agenda.event.AgendamentoCriadoEvent;
 import com.photoizer.crm.agenda.event.AgendamentoReatribuidoEvent;
@@ -208,6 +209,27 @@ public class AgendamentoService {
             agendamento.getCliente() != null ? agendamento.getCliente().getId() : null
         ));
         return agendamento;
+    }
+
+    public Agendamento recusar(UUID id, String motivo, UUID autorId) {
+        var agendamento = agendamentoRepository.findByIdWithLock(id)
+            .orElseThrow(() -> new AgendamentoNaoEncontradoException(id));
+
+        agendamento.recusar(motivo);
+        agendamento.setRecusadoPor(resolverNomeAutor(autorId));
+        agendamento = agendamentoRepository.save(agendamento);
+
+        eventPublisher.publishEvent(new AgendamentoCanceladoEvent(agendamento.getId()));
+        return agendamento;
+    }
+
+    private String resolverNomeAutor(UUID autorId) {
+        if (autorId == null) {
+            return null;
+        }
+        return userRepository.findById(autorId)
+            .map(User::getNome)
+            .orElse(autorId.toString());
     }
 
     private void publicarAgendamentoCriado(Agendamento agendamento) {

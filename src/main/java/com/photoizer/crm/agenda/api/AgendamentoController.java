@@ -97,6 +97,7 @@ public class AgendamentoController {
     }
 
     @PatchMapping("/{id}/confirmar-pagamento")
+    @RolesAllowed({"ADMIN", "FOTOGRAFO"})
     @Operation(summary = "Confirmar pagamento da reserva",
         description = "Staff confere o comprovante enviado pelo cliente; move a proposta para PAGAMENTO_CONFIRMADO")
     public ResponseEntity<AgendamentoResponse> confirmarPagamento(
@@ -106,11 +107,25 @@ public class AgendamentoController {
     }
 
     @PatchMapping("/{id}/aprovar")
+    @RolesAllowed({"ADMIN", "FOTOGRAFO"})
     @Operation(summary = "Aprovar proposta",
         description = "Valida conflito de agenda e confirma o agendamento, que passa a ocupar a agenda")
     public ResponseEntity<AgendamentoResponse> aprovar(
             @PathVariable @Parameter(description = "ID do agendamento") UUID id) {
         var agendamento = agendamentoService.aprovar(id);
+        return ResponseEntity.ok(agendamentoMapper.toResponse(agendamento, null, null, null, null));
+    }
+
+    @PatchMapping("/{id}/recusar")
+    @RolesAllowed({"ADMIN", "FOTOGRAFO"})
+    @Operation(summary = "Recusar proposta",
+        description = "Recusa a proposta em análise, registrando o motivo e o autor; move para CANCELADO")
+    public ResponseEntity<AgendamentoResponse> recusarProposta(
+            @PathVariable @Parameter(description = "ID do agendamento") UUID id,
+            @AuthenticationPrincipal String userIdStr,
+            @Valid @RequestBody RecusarPropostaRequest request) {
+        var autorId = userIdStr != null && !userIdStr.isBlank() ? UUID.fromString(userIdStr) : null;
+        var agendamento = agendamentoService.recusar(id, request.motivo(), autorId);
         return ResponseEntity.ok(agendamentoMapper.toResponse(agendamento, null, null, null, null));
     }
 
