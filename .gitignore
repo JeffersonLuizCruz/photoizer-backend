@@ -24,6 +24,11 @@ photoizer-frontend/node_modules/
 photoizer-frontend/dist/
 photoizer-frontend/dev-dist/
 
+# --- Documentação ---
+# Arquivos Markdown não são versionados. AGENTS.md/MODULE.md já rastreados
+# permanecem no índice; novos .md passam a ser ignorados.
+*.md
+
 # --- IDE ---
 .idea/
 *.iml
