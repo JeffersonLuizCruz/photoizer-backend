@@ -41,7 +41,7 @@ public class AuthService {
         var token = jwtTokenProvider.generateToken(user.getId(), user.getEmail(), user.getPapel().name());
         var refreshToken = refreshTokenService.createRefreshToken(
             user.getId(), user.getEmail(), user.getPapel().name());
-        return new LoginResponse(token, refreshToken.getToken(),
+        return new LoginResponse(token, refreshToken,
             user.getNome(), user.getEmail(), user.getPapel(), user.getId());
     }
 }

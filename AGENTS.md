@@ -92,10 +92,15 @@ Cada módulo segue a estrutura: `model/`, `repository/`, `service/`, `api/`, DTO
   - `POST /api/v1/auth/login` → verifica BCrypt → gera JWT (claims: `sub`=userId, `email`, `papel`).
   - Emite cookies `HttpOnly` (`photoizer_access`/`photoizer_refresh`) + `XSRF-TOKEN`; mutações exigem
     header `X-XSRF-TOKEN` (double-submit). `Authorization: Bearer` continua aceito (compatibilidade).
+  - O refresh token é persistido **apenas como hash SHA-256** e rotaciona a cada `/auth/refresh`
+    (reuse detection revoga a família). Ver `RefreshTokenService`.
+  - `GET /api/v1/auth/me` devolve os dados do usuário autenticado (fonte de verdade para o frontend).
   - `JwtAuthenticationFilter` valida cookie ou header em toda requisição.
   - **`JWT_SECRET` é obrigatório fora de dev** (`application.properties` usa `${JWT_SECRET}` sem default).
     O perfil `dev` define um segredo descartável em `application-dev.properties`; prod/homolog exigem
     a variável de ambiente (o boot falha sem ela).
+  - Admin de bootstrap: `AuthUserSeeder` só roda em `dev`; fora dele, o `AdminBootstrapSeeder` cria o
+    primeiro ADMIN a partir de `ADMIN_EMAIL`/`ADMIN_PASSWORD` (falha o boot se ausentes e `users` vazio).
 - **Autenticação Cliente:**
   - `POST /api/v1/auth/cliente/registro` e `/auth/cliente/login` → `ClienteAuthService`.
 - **Fluxo de Agendamento:**

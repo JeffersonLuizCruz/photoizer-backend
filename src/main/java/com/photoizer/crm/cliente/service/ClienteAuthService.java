@@ -11,6 +11,7 @@ import com.photoizer.crm.cliente.model.Cliente;
 import com.photoizer.crm.cliente.model.OrigemCliente;
 import com.photoizer.crm.cliente.repository.ClienteRepository;
 import com.photoizer.crm.shared.auth.TokenService;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,13 @@ import java.util.UUID;
 @Service
 @Transactional
 public class ClienteAuthService {
+
+    /**
+     * Mensagem uniforme para cadastro duplicado (achado H3): não revela se o
+     * conflito foi no e-mail ou no telefone, dificultando enumeração de contas.
+     */
+    private static final String MENSAGEM_REGISTRO_GENERICA =
+        "Não foi possível concluir o cadastro com os dados informados";
 
     private final ClienteRepository clienteRepository;
     private final PasswordEncoder passwordEncoder;
@@ -49,11 +57,9 @@ public class ClienteAuthService {
      * Padrão DTO Pattern - recebe DTO de request, retorna DTO de response.
      */
     public ClienteAuthResponse registrar(ClienteRegistroRequest request) {
-        if (clienteRepository.findByEmailIgnoreCase(request.email()).isPresent()) {
-            throw new ClienteDuplicadoException("email", request.email());
-        }
-        if (clienteRepository.findByTelefone(request.telefone()).isPresent()) {
-            throw new ClienteDuplicadoException("telefone", request.telefone());
+        if (clienteRepository.findByEmailIgnoreCase(request.email()).isPresent()
+            || clienteRepository.findByTelefone(request.telefone()).isPresent()) {
+            throw new ClienteDuplicadoException(MENSAGEM_REGISTRO_GENERICA);
         }
 
         var cliente = Cliente.builder()
@@ -64,7 +70,12 @@ public class ClienteAuthService {
             .preferencias(request.preferencias())
             .origem(OrigemCliente.OUTROS)
             .build();
-        cliente = clienteRepository.save(cliente);
+        try {
+            cliente = clienteRepository.save(cliente);
+        } catch (DataIntegrityViolationException e) {
+            // Corrida entre checagem e insert violando as constraints únicas.
+            throw new ClienteDuplicadoException(MENSAGEM_REGISTRO_GENERICA);
+        }
 
         var token = tokenService.generateToken(cliente.getId(), cliente.getEmail(), "CLIENTE");
         return new ClienteAuthResponse(token, cliente.getId(), cliente.getNome(),

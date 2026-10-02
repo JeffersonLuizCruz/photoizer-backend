@@ -3,6 +3,7 @@ package com.photoizer.crm.auth.api;
 import com.photoizer.crm.auth.config.AuthCookieService;
 import com.photoizer.crm.auth.service.AuthService;
 import com.photoizer.crm.auth.service.RefreshTokenService;
+import com.photoizer.crm.auth.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -10,12 +11,15 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -25,13 +29,16 @@ public class AuthController {
     private final AuthService authService;
     private final RefreshTokenService refreshTokenService;
     private final AuthCookieService authCookieService;
+    private final UserService userService;
 
     public AuthController(AuthService authService,
                           RefreshTokenService refreshTokenService,
-                          AuthCookieService authCookieService) {
+                          AuthCookieService authCookieService,
+                          UserService userService) {
         this.authService = authService;
         this.refreshTokenService = refreshTokenService;
         this.authCookieService = authCookieService;
+        this.userService = userService;
     }
 
     @PostMapping("/login")
@@ -50,10 +57,10 @@ public class AuthController {
                                                        HttpServletRequest servletRequest,
                                                        HttpServletResponse response) {
         var refreshToken = resolverRefreshToken(request, servletRequest);
-        var newAccessToken = refreshTokenService.refreshAccessToken(refreshToken);
-        // Reemite o cookie de acesso HttpOnly com o token renovado.
-        authCookieService.emitirCookies(response, newAccessToken, refreshToken);
-        return ResponseEntity.ok(Map.of("accessToken", newAccessToken));
+        var resultado = refreshTokenService.refreshAccessToken(refreshToken);
+        // Reemite os cookies com o par rotacionado (access + refresh).
+        authCookieService.emitirCookies(response, resultado.accessToken(), resultado.refreshToken());
+        return ResponseEntity.ok(Map.of("accessToken", resultado.accessToken()));
     }
 
     @PostMapping("/logout")
@@ -74,6 +81,13 @@ public class AuthController {
         }
         authCookieService.limparCookies(response);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/me")
+    @Operation(summary = "Dados do usuário autenticado (derivados do servidor)")
+    public ResponseEntity<MeResponse> me(@AuthenticationPrincipal String userId) {
+        var user = userService.buscarPorId(UUID.fromString(userId));
+        return ResponseEntity.ok(new MeResponse(user.nome(), user.email(), user.papel(), user.id()));
     }
 
     private String resolverRefreshToken(RefreshTokenRequest request, HttpServletRequest servletRequest) {
