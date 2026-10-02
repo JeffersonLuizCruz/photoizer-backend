@@ -7,6 +7,7 @@ import com.photoizer.crm.auth.model.Papel;
 import com.photoizer.crm.auth.model.User;
 import com.photoizer.crm.cliente.model.Cliente;
 import com.photoizer.crm.pacote.model.Pacote;
+import com.photoizer.crm.shared.model.FormaPagamento;
 import com.photoizer.crm.shared.model.TipoRepasse;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -18,8 +19,8 @@ import org.springframework.stereotype.Component;
 
 @Generated(
     value = "org.mapstruct.ap.MappingProcessor",
-    date = "2026-10-01T23:21:02-0300",
-    comments = "version: 1.6.3, compiler: javac, environment: Java 25.0.4.1 (Amazon.com Inc.)"
+    date = "2026-10-01T23:42:39-0300",
+    comments = "version: 1.6.3, compiler: javac, environment: Java 26.0.1 (Homebrew)"
 )
 @Component
 public class AgendamentoMapperImpl implements AgendamentoMapper {
@@ -62,6 +63,7 @@ public class AgendamentoMapperImpl implements AgendamentoMapper {
         LocalDateTime dataEnvioSelecao = null;
         LocalDateTime dataEntregaFinal = null;
         LocalDateTime dataFinalizacao = null;
+        FormaPagamento formaPagamentoFinal = null;
         Boolean autorizaUsoImagem = null;
         String clausulasPersonalizadas = null;
         String tokenProposta = null;
@@ -122,6 +124,7 @@ public class AgendamentoMapperImpl implements AgendamentoMapper {
             dataEnvioSelecao = agendamento.getDataEnvioSelecao();
             dataEntregaFinal = agendamento.getDataEntregaFinal();
             dataFinalizacao = agendamento.getDataFinalizacao();
+            formaPagamentoFinal = agendamento.getFormaPagamentoFinal();
             autorizaUsoImagem = agendamento.getAutorizaUsoImagem();
             clausulasPersonalizadas = agendamento.getClausulasPersonalizadas();
             tokenProposta = agendamento.getTokenProposta();
@@ -153,7 +156,7 @@ public class AgendamentoMapperImpl implements AgendamentoMapper {
         LocalDateTime createdAt = null;
         LocalDateTime updatedAt = null;
 
-        AgendamentoResponse agendamentoResponse = new AgendamentoResponse( id, clienteId, clienteNome, clienteTelefone, clienteEmail, clienteCpf, clienteCidade, clienteEstado, pacoteId, pacoteNome, editorId, editorNome, fotografoId, fotografoNome, dataHoraEnsaio, duracaoMinutos, localEnsaio, valorTotal, valorEntradaExigido, valorEntradaPago, valorRestante, valorExtras, taxaDeslocamento, custoDeslocamento, repassarDeslocamento, valorTotalFinal, percentualEntrada, valorPacote, saldoDevedor, status, dataConfirmacao, dataRealizacao, dataEnvioSelecao, dataEntregaFinal, dataFinalizacao, temComprovanteEntrada, temComprovanteFinal, autorizaUsoImagem, clausulasPersonalizadas, tokenProposta, dataAssinatura, temTermoAssinado, ensaioDestaque, motivoRecusa, dataRecusa, recusadoPor, observacoes, tokenGaleria, createdAt, updatedAt, fotografos1, valorPartilhaGlobal, valorLucroCrm, valorComissao1, indicadorNome1, statusComissao1 );
+        AgendamentoResponse agendamentoResponse = new AgendamentoResponse( id, clienteId, clienteNome, clienteTelefone, clienteEmail, clienteCpf, clienteCidade, clienteEstado, pacoteId, pacoteNome, editorId, editorNome, fotografoId, fotografoNome, dataHoraEnsaio, duracaoMinutos, localEnsaio, valorTotal, valorEntradaExigido, valorEntradaPago, valorRestante, valorExtras, taxaDeslocamento, custoDeslocamento, repassarDeslocamento, valorTotalFinal, percentualEntrada, valorPacote, saldoDevedor, status, dataConfirmacao, dataRealizacao, dataEnvioSelecao, dataEntregaFinal, dataFinalizacao, temComprovanteEntrada, temComprovanteFinal, formaPagamentoFinal, autorizaUsoImagem, clausulasPersonalizadas, tokenProposta, dataAssinatura, temTermoAssinado, ensaioDestaque, motivoRecusa, dataRecusa, recusadoPor, observacoes, tokenGaleria, createdAt, updatedAt, fotografos1, valorPartilhaGlobal, valorLucroCrm, valorComissao1, indicadorNome1, statusComissao1 );
 
         return agendamentoResponse;
     }

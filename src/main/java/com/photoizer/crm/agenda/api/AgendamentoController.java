@@ -8,6 +8,8 @@ import com.photoizer.crm.agenda.service.AgendamentoStatusLifecycle;
 import com.photoizer.crm.agenda.service.CriarPropostaCommand;
 import com.photoizer.crm.agenda.service.DisponibilidadeService;
 import com.photoizer.crm.comissao.repository.IndicacaoRepository;
+import com.photoizer.crm.shared.exception.BadRequestException;
+import com.photoizer.crm.shared.model.FormaPagamento;
 import com.photoizer.crm.shared.storage.FileServeHelper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -265,8 +267,21 @@ public class AgendamentoController {
     @Operation(summary = "Registrar pagamento final", description = "Registra o pagamento final com comprovante obrigatório e finaliza o ensaio")
     public ResponseEntity<AgendamentoResponse> registrarPagamentoFinal(
             @PathVariable @Parameter(description = "ID do agendamento") UUID id,
-            @RequestParam @Parameter(description = "Comprovante de pagamento final (obrigatório)") MultipartFile comprovanteFinal) {
-        var agendamento = agendamentoStatusLifecycle.registrarPagamentoFinal(id, comprovanteFinal);
+            @RequestParam(required = false) @Parameter(description = "Comprovante de pagamento final (obrigatório, exceto em dinheiro)") MultipartFile comprovanteFinal,
+            @RequestParam(required = false) @Parameter(description = "Forma de pagamento (ex.: DINHEIRO)") String formaPagamento) {
+        var agendamento = agendamentoStatusLifecycle.registrarPagamentoFinal(
+            id, comprovanteFinal, parseFormaPagamento(formaPagamento));
         return ResponseEntity.ok(agendamentoMapper.toResponse(agendamento, null, null, null, null));
+    }
+
+    private FormaPagamento parseFormaPagamento(String valor) {
+        if (valor == null || valor.isBlank()) {
+            return null;
+        }
+        try {
+            return FormaPagamento.valueOf(valor.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestException("Forma de pagamento inválida: " + valor);
+        }
     }
 }

@@ -7,6 +7,7 @@ import com.photoizer.crm.cliente.model.Cliente;
 import com.photoizer.crm.pacote.model.Pacote;
 import com.photoizer.crm.shared.exception.BadRequestException;
 import com.photoizer.crm.shared.model.AuditInfo;
+import com.photoizer.crm.shared.model.FormaPagamento;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
@@ -173,6 +174,11 @@ public class Agendamento {
     @Size(max = 500)
     @Column(length = 500)
     private String urlComprovanteFinal;
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(length = 20)
+    private FormaPagamento formaPagamentoFinal;
 
     @NotNull
     @Column(nullable = false)
@@ -343,8 +349,9 @@ public class Agendamento {
         this.fotografo = novoResponsavel;
     }
 
-    public void aplicarPagamentoFinal(String urlComprovanteFinal) {
+    public void aplicarPagamentoFinal(String urlComprovanteFinal, FormaPagamento formaPagamento) {
         this.urlComprovanteFinal = urlComprovanteFinal;
+        this.formaPagamentoFinal = formaPagamento;
         this.valorRestante = BigDecimal.ZERO;
         this.valorEntradaPago = this.valorTotalFinal;
         transicionarPara(StatusAgendamento.EM_EDICAO);

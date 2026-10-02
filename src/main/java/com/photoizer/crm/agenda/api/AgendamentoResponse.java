@@ -1,6 +1,7 @@
 package com.photoizer.crm.agenda.api;
 
 import com.photoizer.crm.agenda.model.RepasseStatus;
+import com.photoizer.crm.shared.model.FormaPagamento;
 import com.photoizer.crm.shared.model.TipoRepasse;
 import com.photoizer.crm.auth.model.Papel;
 
@@ -47,6 +48,7 @@ public record AgendamentoResponse(
     LocalDateTime dataFinalizacao,
     boolean temComprovanteEntrada,
     boolean temComprovanteFinal,
+    FormaPagamento formaPagamentoFinal,
     Boolean autorizaUsoImagem,
     String clausulasPersonalizadas,
     String tokenProposta,

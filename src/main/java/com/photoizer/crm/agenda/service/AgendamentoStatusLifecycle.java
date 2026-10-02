@@ -10,6 +10,7 @@ import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
+import com.photoizer.crm.shared.model.FormaPagamento;
 import com.photoizer.crm.shared.storage.FileStorageService;
 import com.photoizer.crm.shared.storage.FileValidator;
 import org.springframework.context.ApplicationEventPublisher;
@@ -114,16 +115,23 @@ public class AgendamentoStatusLifecycle {
         return agendamentoRepository.save(agendamento);
     }
 
-    public Agendamento registrarPagamentoFinal(UUID id, MultipartFile comprovante) {
+    public Agendamento registrarPagamentoFinal(UUID id, MultipartFile comprovante, FormaPagamento formaPagamento) {
         var agendamento = buscarPorId(id);
 
-        if (comprovante == null || comprovante.isEmpty()) {
+        var dinheiro = formaPagamento == FormaPagamento.DINHEIRO;
+        var temComprovante = comprovante != null && !comprovante.isEmpty();
+
+        if (!dinheiro && !temComprovante) {
             throw new ComprovanteObrigatorioException();
         }
 
-        fileValidator.validate(comprovante, "any");
-        var url = fileStorageService.salvar(comprovante);
-        agendamento.aplicarPagamentoFinal(url);
+        String url = null;
+        if (temComprovante) {
+            fileValidator.validate(comprovante, "any");
+            url = fileStorageService.salvar(comprovante);
+        }
+
+        agendamento.aplicarPagamentoFinal(url, formaPagamento);
 
         agendamento = agendamentoRepository.save(agendamento);
 
