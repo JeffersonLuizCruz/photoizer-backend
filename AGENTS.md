@@ -12,7 +12,7 @@
   - **Logstash + Brave Tracing + Micrometer** — Logging estruturado e tracing distribuído.
   - **AOP (AspectJ)** — LoggingAspect para controllers, services e repositories.
 - **Estilo e Formatação:**
-  - Build: Maven Wrapper (`./mvnw`).
+  - Build: Maven do sistema (`mvn`) — **não existe `./mvnw`** (apenas `mvnw.cmd`).
   - DTOs são Java Records.
   - Valores monetários sempre `BigDecimal(10,2)`, IDs UUID.
   - Validação: `jakarta.validation` (`@NotBlank`, `@Positive`, `@Email`, etc).
@@ -29,7 +29,7 @@
     - `api/PageResponse` — record genérico para respostas paginadas.
   - `{modulo}/` — 16 módulos de negócio (ver seção 3).
 - `src/main/resources/` — `application.properties` + profiles (`dev`, `homolog`, `prod`).
-- `src/test/java/` — testes (apenas `CrmApplicationTests`).
+- `src/test/java/` — testes de segurança (autorização por controller, CSRF, cookies) e sanitização.
 - `uploads/` — diretório de upload de arquivos.
 - `data/` — banco H2 em arquivo (`crmdb.mv.db`).
 
@@ -90,8 +90,12 @@ Cada módulo segue a estrutura: `model/`, `repository/`, `service/`, `api/`, DTO
 - **Ponto de Entrada:** `CrmApplication.java` (Spring Boot + Modulith + Scheduling).
 - **Autenticação Admin:**
   - `POST /api/v1/auth/login` → verifica BCrypt → gera JWT (claims: `sub`=userId, `email`, `papel`).
-  - Header `Authorization: Bearer <token>`.
-  - `JwtAuthenticationFilter` valida em toda requisição.
+  - Emite cookies `HttpOnly` (`photoizer_access`/`photoizer_refresh`) + `XSRF-TOKEN`; mutações exigem
+    header `X-XSRF-TOKEN` (double-submit). `Authorization: Bearer` continua aceito (compatibilidade).
+  - `JwtAuthenticationFilter` valida cookie ou header em toda requisição.
+  - **`JWT_SECRET` é obrigatório fora de dev** (`application.properties` usa `${JWT_SECRET}` sem default).
+    O perfil `dev` define um segredo descartável em `application-dev.properties`; prod/homolog exigem
+    a variável de ambiente (o boot falha sem ela).
 - **Autenticação Cliente:**
   - `POST /api/v1/auth/cliente/registro` e `/auth/cliente/login` → `ClienteAuthService`.
 - **Fluxo de Agendamento:**
@@ -112,7 +116,8 @@ Cada módulo segue a estrutura: `model/`, `repository/`, `service/`, `api/`, DTO
 - **Swagger:** `/swagger-ui.html`.
 
 ## 6. Comandos Úteis
-- `./mvnw spring-boot:run` — Sobe servidor (porta 8080).
-- `./mvnw clean package` — Build + testes.
-- `./mvnw test` — Executa testes.
+- `mvn spring-boot:run` — Sobe servidor (porta 8080). Em `dev` não exige env var.
+- `mvn clean package` — Build + testes.
+- `mvn test` — Executa testes.
+- `JWT_SECRET=<segredo-com-32-bytes> SPRING_PROFILES_ACTIVE=prod mvn spring-boot:run` — Sobe em prod.
 - `java -jar target/crm-0.0.1-SNAPSHOT.jar` — Executa o JAR.
