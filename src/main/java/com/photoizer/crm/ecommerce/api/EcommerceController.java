@@ -1,5 +1,6 @@
 package com.photoizer.crm.ecommerce.api;
 
+import com.photoizer.crm.ecommerce.exception.SessaoInvalidaException;
 import com.photoizer.crm.ecommerce.model.MetodoPagamento;
 import com.photoizer.crm.ecommerce.service.CarrinhoService;
 import com.photoizer.crm.ecommerce.service.ComentarioService;
@@ -14,7 +15,6 @@ import com.photoizer.crm.foto.api.FotoMapper;
 import com.photoizer.crm.foto.model.FotoEnsaio;
 import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.service.FotoService;
-import com.photoizer.crm.shared.exception.BadRequestException;
 import com.photoizer.crm.shared.storage.FileServeHelper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -98,11 +98,11 @@ public class EcommerceController {
 
     private UUID resolverSessionId(@RequestHeader(value = HEADER_SESSION, required = false) String sessionId) {
         if (sessionId == null || sessionId.isBlank() || !sessionService.valida(sessionId)) {
-            throw new BadRequestException("Sessão inválida");
+            throw new SessaoInvalidaException();
         }
         var dotIndex = sessionId.indexOf('.');
         if (dotIndex <= 0) {
-            throw new BadRequestException("Sessão inválida");
+            throw new SessaoInvalidaException();
         }
         return UUID.fromString(sessionId.substring(0, dotIndex));
     }
