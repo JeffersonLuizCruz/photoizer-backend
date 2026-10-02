@@ -71,7 +71,7 @@ Nenhum.
 
 ### Fluxo 1: Upload de Fotos (Admin)
 `POST /api/v1/agendamentos/{agendamentoId}/fotos` → `FotoService.uploadFotos()`:
-1. Valida status via `AgendamentoReadService.isStatusPermitidoParaUpload()` (ACL): permitido apenas **após o pagamento final** (`EM_EDICAO`, `FOTOS_ENVIADAS_PARA_SELECAO`, `FOTOS_ENTREGUES`, `FINALIZADO`).
+1. Valida status via `AgendamentoReadService.isStatusPermitidoParaUpload()` (ACL): permitido apenas **após o pagamento final** (`EM_EDICAO`, `FINALIZADO`).
 2. Para cada arquivo: salva em `uploads/{agendamentoId}/orig/`, processa via `FotoProcessingHelper` (watermark 0.35 + thumbnail 300×200) com fallback.
 3. Cria `FotoEnsaio` `INEDITA`, `visivel=true`, `ordem = count + i`.
 

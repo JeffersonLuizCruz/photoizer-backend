@@ -23,8 +23,6 @@ public enum StatusAgendamento {
     REALIZADO,
     AGUARDANDO_PAGAMENTO_FINAL,
     EM_EDICAO,
-    FOTOS_ENVIADAS_PARA_SELECAO,
-    FOTOS_ENTREGUES,
     FINALIZADO,
     CANCELADO,
     NO_SHOW;
@@ -36,9 +34,7 @@ public enum StatusAgendamento {
         Map.entry(CONFIRMADO, Set.of(REALIZADO, AGUARDANDO_PAGAMENTO_FINAL, CANCELADO, NO_SHOW)),
         Map.entry(REALIZADO, Set.of(AGUARDANDO_PAGAMENTO_FINAL, EM_EDICAO, CANCELADO, NO_SHOW)),
         Map.entry(AGUARDANDO_PAGAMENTO_FINAL, Set.of(EM_EDICAO, CANCELADO)),
-        Map.entry(EM_EDICAO, Set.of(FOTOS_ENVIADAS_PARA_SELECAO, CANCELADO)),
-        Map.entry(FOTOS_ENVIADAS_PARA_SELECAO, Set.of(FOTOS_ENTREGUES, CANCELADO)),
-        Map.entry(FOTOS_ENTREGUES, Set.of(FINALIZADO, CANCELADO)),
+        Map.entry(EM_EDICAO, Set.of(FINALIZADO, CANCELADO)),
         Map.entry(FINALIZADO, Set.of()),
         Map.entry(CANCELADO, Set.of()),
         Map.entry(NO_SHOW, Set.of())

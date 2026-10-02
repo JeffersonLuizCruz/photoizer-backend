@@ -58,8 +58,6 @@ public class FinanceiroQueryService {
 
     private static final Set<StatusAgendamento> STATUS_PAGAMENTO_FINAL = Set.of(
         StatusAgendamento.EM_EDICAO,
-        StatusAgendamento.FOTOS_ENVIADAS_PARA_SELECAO,
-        StatusAgendamento.FOTOS_ENTREGUES,
         StatusAgendamento.FINALIZADO
     );
 

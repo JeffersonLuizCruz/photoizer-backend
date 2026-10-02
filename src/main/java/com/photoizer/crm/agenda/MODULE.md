@@ -18,7 +18,7 @@ agenda/
 │   ├── Agendamento.java              # Entidade JPA principal (~40 campos, extends BaseEntity)
 │   ├── AgendamentoFotografo.java     # Entidade JPA (extends BaseEntity, @ManyToOne Agendamento + User, unique (agendamento,fotografo))
 │   ├── RascunhoAgendamento.java      # Entidade JPA (extends BaseEntity, index usuario_id, ~25 campos String)
-│   ├── StatusAgendamento.java        # Enum: PRE_RESERVA, AGUARDANDO_APROVACAO, PAGAMENTO_CONFIRMADO, CONFIRMADO, REALIZADO, AGUARDANDO_PAGAMENTO_FINAL, EM_EDICAO, FOTOS_ENVIADAS_PARA_SELECAO, FOTOS_ENTREGUES, FINALIZADO, CANCELADO, NO_SHOW
+│   ├── StatusAgendamento.java        # Enum: PRE_RESERVA, AGUARDANDO_APROVACAO, PAGAMENTO_CONFIRMADO, CONFIRMADO, REALIZADO, AGUARDANDO_PAGAMENTO_FINAL, EM_EDICAO, FINALIZADO, CANCELADO, NO_SHOW
 │   └── RepasseStatus.java            # Enum: PENDENTE, PAGO, CANCELADO
 ├── repository/
 │   ├── AgendamentoRepository.java    # JpaRepository + JpaSpecificationExecutor (~9 queries customizadas)
@@ -108,17 +108,11 @@ agenda/
 ```
 CONFIRMADO ──realizar──▶ AGUARDANDO_PAGAMENTO_FINAL ──pagarFinal──▶ EM_EDICAO
     │                        │                                           │
-    ├─reagendar─┐            │                              enviarSelecao│
+    ├─reagendar─┐            │                                 finalizar│
     └─cancelar──┼─▶ CANCELADO│                                           ▼
-                │            │                               FOTOS_ENVIADAS_PARA_SELECAO
-                └──▶ NO_SHOW  │                                           │
-                          (via PATCH /status)             confirmarEntrega│
-                                                                           ▼
-                                                                 FOTOS_ENTREGUES
-                                                                           │
-                                                                   finalizar│
-                                                                           ▼
-                                                                    FINALIZADO
+                │            │                                     FINALIZADO
+                └──▶ NO_SHOW  │
+                          (via PATCH /status)
 ```
 - `atualizarStatus(id, String novoStatus)` → delegado a `AgendamentoStatusLifecycle.atualizarStatus` → `agendamento.transicionarPara(status)`: `valueOf` direto, **sem validação de transição válida** (aceita qualquer enum; ex.: `FINALIZADO → CONFIRMADO`). Eventos publicados **após o `save`** (consistência em caso de rollback/falha de persistência). Apenas dispara eventos para `REALIZADO`/`CANCELADO`/`NO_SHOW` — comportamento mantido (decisão: encapsular sem bloquear).
 - `registrarPagamentoFinal` → `AgendamentoStatusLifecycle.registrarPagamentoFinal(id, comprovante, formaPagamento)` → `agendamento.aplicarPagamentoFinal(url, formaPagamento)`: valida status ∈ {REALIZADO, AGUARDANDO_PAGAMENTO_FINAL}, zera `valorRestante`, `EM_EDICAO`, publica evento. O comprovante é **obrigatório exceto quando `formaPagamento == DINHEIRO`** (dinheiro vivo não tem comprovante); grava `formaPagamentoFinal` (`shared.model.FormaPagamento`). Endpoint `POST /api/v1/agendamentos/{id}/pagamento-final` (multipart: `comprovanteFinal?`, `formaPagamento?`).

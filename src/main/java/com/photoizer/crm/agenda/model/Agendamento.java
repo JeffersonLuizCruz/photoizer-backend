@@ -159,12 +159,6 @@ public class Agendamento {
     private LocalDateTime dataRealizacao;
 
     @Column
-    private LocalDateTime dataEnvioSelecao;
-
-    @Column
-    private LocalDateTime dataEntregaFinal;
-
-    @Column
     private LocalDateTime dataFinalizacao;
 
     @Size(max = 500)
@@ -201,6 +195,9 @@ public class Agendamento {
 
     @Column
     private LocalDateTime tokenPropostaExpiracao;
+
+    @Column
+    private LocalDateTime dataEnvioProposta;
 
     @Column
     private LocalDateTime dataAssinatura;
@@ -272,6 +269,11 @@ public class Agendamento {
         this.tokenProposta = token;
         this.tokenPropostaHash = tokenHash;
         this.tokenPropostaExpiracao = expiracao;
+    }
+
+    /** Registra o momento em que a proposta foi enviada ao cliente. */
+    public void registrarEnvioProposta() {
+        this.dataEnvioProposta = LocalDateTime.now();
     }
 
     /**
@@ -355,7 +357,6 @@ public class Agendamento {
         this.valorRestante = BigDecimal.ZERO;
         this.valorEntradaPago = this.valorTotalFinal;
         transicionarPara(StatusAgendamento.EM_EDICAO);
-        this.dataEnvioSelecao = LocalDateTime.now();
     }
 
     public void alternarDestaque() {

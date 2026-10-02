@@ -173,6 +173,7 @@ public class AgendamentoService {
         criarFotografosNoAgendamento(agendamento, command.fotografos());
         partilhaService.calcularPartilhaFotografo(agendamento);
         gerarTokenProposta(agendamento);
+        agendamento.registrarEnvioProposta();
         return agendamentoRepository.save(agendamento);
     }
 

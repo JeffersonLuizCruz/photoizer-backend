@@ -22,8 +22,6 @@ public class AgendamentoReadServiceAdapter implements AgendamentoReadService {
      */
     private static final List<StatusAgendamento> STATUS_PERMITIDOS_ECOMMERCE = List.of(
         StatusAgendamento.EM_EDICAO,
-        StatusAgendamento.FOTOS_ENVIADAS_PARA_SELECAO,
-        StatusAgendamento.FOTOS_ENTREGUES,
         StatusAgendamento.FINALIZADO
     );
 

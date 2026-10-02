@@ -33,8 +33,6 @@ public class StatusClassificationAdapter implements StatusClassificationPort {
 
     private static final Set<StatusAgendamento> STATUS_FINALIZADOS = Set.of(
         StatusAgendamento.EM_EDICAO,
-        StatusAgendamento.FOTOS_ENVIADAS_PARA_SELECAO,
-        StatusAgendamento.FOTOS_ENTREGUES,
         StatusAgendamento.FINALIZADO
     );
 
@@ -43,8 +41,6 @@ public class StatusClassificationAdapter implements StatusClassificationPort {
         StatusAgendamento.REALIZADO,
         StatusAgendamento.AGUARDANDO_PAGAMENTO_FINAL,
         StatusAgendamento.EM_EDICAO,
-        StatusAgendamento.FOTOS_ENVIADAS_PARA_SELECAO,
-        StatusAgendamento.FOTOS_ENTREGUES,
         StatusAgendamento.FINALIZADO
     );
 

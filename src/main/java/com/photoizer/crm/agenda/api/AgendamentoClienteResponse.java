@@ -36,8 +36,6 @@ public record AgendamentoClienteResponse(
             case "CONFIRMADO" -> "Confirmado";
             case "REALIZADO" -> "Ensaio Realizado";
             case "EM_EDICAO" -> "Fotos em Edição";
-            case "SELECAO_ENVIADA" -> "Seleção Enviada";
-            case "ENTREGUE" -> "Entregue";
             case "FINALIZADO" -> "Finalizado";
             case "CANCELADO" -> "Cancelado";
             case "NO_SHOW" -> "Não Compareceu";

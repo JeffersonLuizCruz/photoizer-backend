@@ -104,7 +104,7 @@ financeiro/
 `ReconciliarComprasExtraFinanceiro.run`: no boot, busca `CompraExtra PAGA` sem `Pagamento` correspondente e chama `PagamentoService.registrarPagamentoExtraEcommerce()`.
 
 ## 5. Regras Específicas
-1. **Status ignorados** em todos os cálculos: `CANCELADO`, `NO_SHOW`; "pagamento final" considerado para `EM_EDICAO`, `FOTOS_ENVIADAS_PARA_SELECAO`, `FOTOS_ENTREGUES`, `FINALIZADO`.
+1. **Status ignorados** em todos os cálculos: `CANCELADO`, `NO_SHOW`; "pagamento final" considerado para `EM_EDICAO`, `FINALIZADO`.
 2. **Comissão de extras** via evento `ComissaoSolicitadaEvent` — nunca cria `Indicacao` diretamente.
 3. **`isClienteBloqueado`**: usa query SQL `existsByClienteIdWithSaldoDevedor()` (O(1)).
 4. **`labelServico`**: centralizado no enum `TipoServico.label()` (DRY).
