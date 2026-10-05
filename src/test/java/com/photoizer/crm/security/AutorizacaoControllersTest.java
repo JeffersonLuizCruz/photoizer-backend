@@ -102,4 +102,25 @@ class AutorizacaoControllersTest {
             .as("Controllers sem autorização explícita (risco de BAC): %s", violacoes)
             .isEmpty();
     }
+
+    @Test
+    @DisplayName("Controllers com métricas financeiras internas não devem permitir AGENDADOR")
+    void controllersFinanceirosNaoDevemPermitirAgendador() throws IOException {
+        var controllersSemAgendador = List.of(
+            "dashboard/api/DashboardController.java",
+            "agenda/api/AgendamentoFotografoController.java"
+        );
+
+        for (var relativo : controllersSemAgendador) {
+            var conteudo = Files.readString(CONTROLLERS_ROOT.resolve(relativo));
+            var linhaRoles = conteudo.lines()
+                .filter(l -> l.contains("@RolesAllowed"))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Sem @RolesAllowed em " + relativo));
+
+            assertThat(linhaRoles)
+                .as("@RolesAllowed de %s não deve conter AGENDADOR", relativo)
+                .doesNotContain("AGENDADOR");
+        }
+    }
 }

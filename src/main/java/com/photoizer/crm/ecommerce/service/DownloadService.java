@@ -32,13 +32,16 @@ public class DownloadService {
     private final FotoEnsaioRepository fotoEnsaioRepository;
     private final GaleriaQueryService galeriaQueryService;
     private final ApplicationEventPublisher eventPublisher;
+    private final com.photoizer.crm.shared.storage.StoragePathResolver pathResolver;
 
     public DownloadService(FotoEnsaioRepository fotoEnsaioRepository,
                            GaleriaQueryService galeriaQueryService,
-                           ApplicationEventPublisher eventPublisher) {
+                           ApplicationEventPublisher eventPublisher,
+                           com.photoizer.crm.shared.storage.StoragePathResolver pathResolver) {
         this.fotoEnsaioRepository = fotoEnsaioRepository;
         this.galeriaQueryService = galeriaQueryService;
         this.eventPublisher = eventPublisher;
+        this.pathResolver = pathResolver;
     }
 
     public Path downloadFoto(UUID token, UUID fotoId) {
@@ -56,7 +59,7 @@ public class DownloadService {
         eventPublisher.publishEvent(new FotoDownloadEvent(
             agendamento.getId(), List.of(fotoId)));
 
-        return Path.of(foto.getOriginalPath());
+        return pathResolver.resolver(foto.getOriginalPath());
     }
 
     @Transactional(readOnly = true)
@@ -91,7 +94,7 @@ public class DownloadService {
 
             try (var zos = new ZipOutputStream(Files.newOutputStream(zipPath))) {
                 for (var foto : fotos) {
-                    var originalPath = Path.of(foto.getOriginalPath());
+                    var originalPath = pathResolver.resolver(foto.getOriginalPath());
                     if (Files.exists(originalPath)) {
                         var entryName = foto.getOrdem() + "_" + foto.getFileName();
                         zos.putNextEntry(new ZipEntry(entryName));

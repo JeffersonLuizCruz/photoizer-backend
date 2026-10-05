@@ -23,6 +23,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -95,7 +96,7 @@ public class AgendamentoController {
 
         var agendamento = agendamentoService.criarProposta(command);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(agendamentoMapper.toResponse(agendamento, null, null, null, null));
+            .body(respostaPara(agendamentoMapper.toResponse(agendamento, null, null, null, null)));
     }
 
     @PatchMapping("/{id}/confirmar-pagamento")
@@ -105,7 +106,7 @@ public class AgendamentoController {
     public ResponseEntity<AgendamentoResponse> confirmarPagamento(
             @PathVariable @Parameter(description = "ID do agendamento") UUID id) {
         var agendamento = agendamentoService.confirmarPagamento(id);
-        return ResponseEntity.ok(agendamentoMapper.toResponse(agendamento, null, null, null, null));
+        return ResponseEntity.ok(respostaPara(agendamentoMapper.toResponse(agendamento, null, null, null, null)));
     }
 
     @PatchMapping("/{id}/aprovar")
@@ -115,7 +116,7 @@ public class AgendamentoController {
     public ResponseEntity<AgendamentoResponse> aprovar(
             @PathVariable @Parameter(description = "ID do agendamento") UUID id) {
         var agendamento = agendamentoService.aprovar(id);
-        return ResponseEntity.ok(agendamentoMapper.toResponse(agendamento, null, null, null, null));
+        return ResponseEntity.ok(respostaPara(agendamentoMapper.toResponse(agendamento, null, null, null, null)));
     }
 
     @PatchMapping("/{id}/recusar")
@@ -128,7 +129,7 @@ public class AgendamentoController {
             @Valid @RequestBody RecusarPropostaRequest request) {
         var autorId = userIdStr != null && !userIdStr.isBlank() ? UUID.fromString(userIdStr) : null;
         var agendamento = agendamentoService.recusar(id, request.motivo(), autorId);
-        return ResponseEntity.ok(agendamentoMapper.toResponse(agendamento, null, null, null, null));
+        return ResponseEntity.ok(respostaPara(agendamentoMapper.toResponse(agendamento, null, null, null, null)));
     }
 
     @GetMapping
@@ -155,8 +156,8 @@ public class AgendamentoController {
                 .stream()
                 .collect(Collectors.groupingBy(af -> af.getAgendamento().getId()));
         var response = agendamentos.stream()
-            .map(a -> agendamentoMapper.toResponse(a,
-                fotografosPorAgendamento.getOrDefault(a.getId(), List.of()), null, null, null))
+            .map(a -> respostaPara(agendamentoMapper.toResponse(a,
+                fotografosPorAgendamento.getOrDefault(a.getId(), List.of()), null, null, null)))
             .toList();
         return ResponseEntity.ok(response);
     }
@@ -166,7 +167,7 @@ public class AgendamentoController {
     public ResponseEntity<AgendamentoResponse> atualizar(
             @PathVariable UUID id,
             @RequestBody @Valid AtualizarAgendamentoRequest request) {
-        return ResponseEntity.ok(agendamentoService.atualizar(id, request));
+        return ResponseEntity.ok(respostaPara(agendamentoService.atualizar(id, request)));
     }
 
     @GetMapping("/verificar-disponibilidade")
@@ -193,11 +194,11 @@ public class AgendamentoController {
         var links = agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(id);
         var indicacoes = indicacaoRepository.findAllByAgendamentoId(id);
         if (indicacoes.isEmpty()) {
-            return ResponseEntity.ok(agendamentoMapper.toResponse(agendamento, links, null, null, null));
+            return ResponseEntity.ok(respostaPara(agendamentoMapper.toResponse(agendamento, links, null, null, null)));
         }
         var primeira = indicacoes.getFirst();
-        return ResponseEntity.ok(agendamentoMapper.toResponse(
-            agendamento, links, primeira.getValorComissao(), primeira.getIndicadorNome(), primeira.getStatus().name()));
+        return ResponseEntity.ok(respostaPara(agendamentoMapper.toResponse(
+            agendamento, links, primeira.getValorComissao(), primeira.getIndicadorNome(), primeira.getStatus().name())));
     }
 
     @PatchMapping("/{id}/status")
@@ -207,7 +208,7 @@ public class AgendamentoController {
             @RequestBody Map<String, String> body) {
         var status = body.get("status");
         var agendamento = agendamentoStatusLifecycle.atualizarStatus(id, status);
-        return ResponseEntity.ok(agendamentoMapper.toResponse(agendamento, null, null, null, null));
+        return ResponseEntity.ok(respostaPara(agendamentoMapper.toResponse(agendamento, null, null, null, null)));
     }
 
     @PatchMapping("/{id}/reagendar")
@@ -219,7 +220,7 @@ public class AgendamentoController {
             @RequestParam(required = false) @Parameter(description = "Novo horário (HH:mm)") String hora,
             @RequestParam(required = false) @Parameter(description = "Nova duração em minutos") Integer duracaoMinutos) {
         var agendamento = agendamentoStatusLifecycle.reagendar(id, data, hora, duracaoMinutos);
-        return ResponseEntity.ok(agendamentoMapper.toResponse(agendamento, null, null, null, null));
+        return ResponseEntity.ok(respostaPara(agendamentoMapper.toResponse(agendamento, null, null, null, null)));
     }
 
     @PatchMapping("/{id}/destaque")
@@ -227,7 +228,7 @@ public class AgendamentoController {
     public ResponseEntity<AgendamentoResponse> toggleDestaque(
             @PathVariable @Parameter(description = "ID do agendamento") UUID id) {
         var agendamento = agendamentoStatusLifecycle.toggleDestaque(id);
-        return ResponseEntity.ok(agendamentoMapper.toResponse(agendamento, null, null, null, null));
+        return ResponseEntity.ok(respostaPara(agendamentoMapper.toResponse(agendamento, null, null, null, null)));
     }
 
     @PatchMapping("/{id}/fotografo")
@@ -271,7 +272,7 @@ public class AgendamentoController {
             @RequestParam(required = false) @Parameter(description = "Forma de pagamento (ex.: DINHEIRO)") String formaPagamento) {
         var agendamento = agendamentoStatusLifecycle.registrarPagamentoFinal(
             id, comprovanteFinal, parseFormaPagamento(formaPagamento));
-        return ResponseEntity.ok(agendamentoMapper.toResponse(agendamento, null, null, null, null));
+        return ResponseEntity.ok(respostaPara(agendamentoMapper.toResponse(agendamento, null, null, null, null)));
     }
 
     private FormaPagamento parseFormaPagamento(String valor) {
@@ -283,5 +284,24 @@ public class AgendamentoController {
         } catch (IllegalArgumentException e) {
             throw new BadRequestException("Forma de pagamento inválida: " + valor);
         }
+    }
+
+    /**
+     * Aplica a política de visibilidade financeira ao retorno. O AGENDADOR não
+     * tem acesso às métricas internas do estúdio (custos, comissões, partilha,
+     * lucro e repasses); os demais papéis recebem a resposta completa.
+     */
+    private AgendamentoResponse respostaPara(AgendamentoResponse response) {
+        return visualizadorSemMetricasInternas() ? response.ocultarDadosInternos() : response;
+    }
+
+    private boolean visualizadorSemMetricasInternas() {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            return false;
+        }
+        return authentication.getAuthorities().stream()
+            .map(org.springframework.security.core.GrantedAuthority::getAuthority)
+            .anyMatch("ROLE_AGENDADOR"::equals);
     }
 }

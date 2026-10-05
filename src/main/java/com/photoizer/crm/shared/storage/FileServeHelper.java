@@ -29,9 +29,11 @@ import java.nio.file.Path;
 public class FileServeHelper {
 
     private final Path uploadDir;
+    private final StoragePathResolver pathResolver;
 
-    public FileServeHelper(@org.springframework.beans.factory.annotation.Value("${app.storage.upload-dir:uploads}") String uploadDir) {
-        this.uploadDir = Path.of(uploadDir).toAbsolutePath().normalize();
+    public FileServeHelper(StoragePathResolver pathResolver) {
+        this.pathResolver = pathResolver;
+        this.uploadDir = pathResolver.getUploadDir();
     }
 
     /**
@@ -47,9 +49,9 @@ public class FileServeHelper {
             return ResponseEntity.notFound().build();
         }
 
-        var file = Path.of(caminho).toAbsolutePath().normalize();
+        var file = pathResolver.resolver(caminho);
 
-        if (!file.startsWith(uploadDir)) {
+        if (file == null || !file.startsWith(uploadDir)) {
             return ResponseEntity.badRequest().build();
         }
 
@@ -73,9 +75,12 @@ public class FileServeHelper {
      */
     public MediaType resolverContentType(String caminho) {
         try {
-            var probe = Files.probeContentType(Path.of(caminho));
-            if (probe != null) {
-                return MediaType.parseMediaType(probe);
+            var file = pathResolver.resolver(caminho);
+            if (file != null) {
+                var probe = Files.probeContentType(file);
+                if (probe != null) {
+                    return MediaType.parseMediaType(probe);
+                }
             }
         } catch (Exception ignored) {
         }

@@ -15,17 +15,20 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * PATTERN: Composite Seeder (CommandLineRunner + @Order)
  *
- * Seeder responsável por criar apenas o usuário ADMIN de bootstrap em
- * desenvolvimento, necessário para o primeiro login. Demais usuários
- * (fotógrafos, editores, agendadores) devem ser cadastrados pela tela de
- * Parceiros/Usuários — não são mais semeados no código.
+ * Seeder que completa o ambiente de desenvolvimento com os papéis de teste que
+ * não vêm da migração Flyway (FOTOGRAFO e EDITOR). O ADMIN e o AGENDADOR oficiais
+ * são semeados pela migração {@code V2__seed_usuarios_iniciais.sql} em todos os
+ * ambientes (dev/homolog/prod).
  *
- * <p><b>C4 (segurança):</b> restrito ao perfil {@code dev}. Credenciais
- * hardcoded ({@code admin@photoizer.com}/{@code dev123}) nunca devem existir
- * fora de desenvolvimento. Em homolog/prod o bootstrap é feito por
- * {@link AdminBootstrapSeeder} a partir de variáveis de ambiente.
+ * <p><b>C4 (segurança):</b> restrito ao perfil {@code dev}. Credenciais de teste
+ * ({@code *@photoizer.com}/{@code dev123}) nunca existem fora de desenvolvimento.
  *
- * Idempotência: verifica userRepository.count() == 0 antes de inserir.
+ * <p>Os e-mails usam o sufixo {@code .teste} de propósito para não colidirem
+ * com a lista de limpeza de parceiros legados ({@link LegacySeedPartnerCleanupSeeder}),
+ * que remove {@code carol/joao/maria/agendador@photoizer.com}.
+ *
+ * <p>Idempotência: cada usuário só é inserido se o e-mail ainda não existir —
+ * o Flyway roda antes deste seeder e já cria ADMIN/AGENDADOR.
  * @Order(1) — deve rodar primeiro, pois outros módulos podem referenciar usuários.
  */
 @Component
@@ -46,11 +49,16 @@ public class AuthUserSeeder implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        if (userRepository.count() == 0) {
-            userRepository.save(
-                new User("admin@photoizer.com", passwordEncoder.encode("dev123"), "Administrador", Papel.ADMIN)
-            );
-            log.info("Usuário ADMIN de bootstrap semeado");
+        semearSeAusente("fotografo.teste@photoizer.com", "Fotógrafo Teste", Papel.FOTOGRAFO);
+        semearSeAusente("editor.teste@photoizer.com", "Editor Teste", Papel.EDITOR);
+
+        log.info("Usuários de desenvolvimento semeados (fotógrafo, editor)");
+    }
+
+    private void semearSeAusente(String email, String nome, Papel papel) {
+        if (userRepository.existsByEmail(email)) {
+            return;
         }
+        userRepository.save(new User(email, passwordEncoder.encode("dev123"), nome, papel));
     }
 }

@@ -24,7 +24,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 
@@ -36,10 +35,13 @@ public class FotoController {
 
     private final FotoService fotoService;
     private final FotoMapper fotoMapper;
+    private final com.photoizer.crm.shared.storage.StoragePathResolver pathResolver;
 
-    public FotoController(FotoService fotoService, FotoMapper fotoMapper) {
+    public FotoController(FotoService fotoService, FotoMapper fotoMapper,
+                          com.photoizer.crm.shared.storage.StoragePathResolver pathResolver) {
         this.fotoService = fotoService;
         this.fotoMapper = fotoMapper;
+        this.pathResolver = pathResolver;
     }
 
     @PostMapping
@@ -68,7 +70,7 @@ public class FotoController {
             @PathVariable UUID agendamentoId,
             @PathVariable UUID fotoId) {
         var foto = buscarEValidarPropriedade(agendamentoId, fotoId);
-        var file = new FileSystemResource(foto.getOriginalPath());
+        var file = new FileSystemResource(pathResolver.resolver(foto.getOriginalPath()));
         return ResponseEntity.ok()
             .contentType(resolverMediaType(foto.getFileName()))
             .body(file);
@@ -80,7 +82,7 @@ public class FotoController {
             @PathVariable UUID agendamentoId,
             @PathVariable UUID fotoId) {
         var foto = buscarEValidarPropriedade(agendamentoId, fotoId);
-        var file = new FileSystemResource(Path.of(foto.getWatermarkedPath()));
+        var file = new FileSystemResource(pathResolver.resolver(foto.getWatermarkedPath()));
         return ResponseEntity.ok()
             .contentType(resolverMediaType(foto.getFileName()))
             .body(file);
@@ -92,7 +94,7 @@ public class FotoController {
             @PathVariable UUID agendamentoId,
             @PathVariable UUID fotoId) {
         var foto = buscarEValidarPropriedade(agendamentoId, fotoId);
-        var file = new FileSystemResource(Path.of(foto.getThumbPath()));
+        var file = new FileSystemResource(pathResolver.resolver(foto.getThumbPath()));
         return ResponseEntity.ok()
             .contentType(resolverMediaType(foto.getFileName()))
             .body(file);

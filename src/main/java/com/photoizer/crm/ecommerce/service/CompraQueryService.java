@@ -40,17 +40,20 @@ public class CompraQueryService {
     private final GaleriaQueryService galeriaQueryService;
     private final EcommerceMapper ecommerceMapper;
     private final FotoMapper fotoMapper;
+    private final com.photoizer.crm.shared.storage.StoragePathResolver pathResolver;
 
     public CompraQueryService(CompraExtraRepository compraExtraRepository,
                               FotoService fotoService,
                               GaleriaQueryService galeriaQueryService,
                               EcommerceMapper ecommerceMapper,
-                              FotoMapper fotoMapper) {
+                              FotoMapper fotoMapper,
+                              com.photoizer.crm.shared.storage.StoragePathResolver pathResolver) {
         this.compraExtraRepository = compraExtraRepository;
         this.fotoService = fotoService;
         this.galeriaQueryService = galeriaQueryService;
         this.ecommerceMapper = ecommerceMapper;
         this.fotoMapper = fotoMapper;
+        this.pathResolver = pathResolver;
     }
 
     // ==================== Queries por Token (galeria do cliente) ====================
@@ -77,7 +80,7 @@ public class CompraQueryService {
         if (!compra.getAgendamentoId().equals(agendamento.getId())) {
             throw new CompraNaoEncontradaException(compraId);
         }
-        return compra.getUrlComprovante() != null ? Path.of(compra.getUrlComprovante()) : null;
+        return pathResolver.resolver(compra.getUrlComprovante());
     }
 
     // ==================== Queries Admin ====================
@@ -89,7 +92,7 @@ public class CompraQueryService {
     public Path buscarComprovantePathPorId(UUID compraId) {
         var compra = compraExtraRepository.findById(compraId)
             .orElseThrow(() -> new CompraNaoEncontradaException(compraId));
-        return compra.getUrlComprovante() != null ? Path.of(compra.getUrlComprovante()) : null;
+        return pathResolver.resolver(compra.getUrlComprovante());
     }
 
     public AdminCompraDetalheResponse buscarCompraDetalhe(UUID compraId) {

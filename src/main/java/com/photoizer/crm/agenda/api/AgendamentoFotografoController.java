@@ -24,7 +24,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/agendamentos/{agendamentoId}/fotografos")
-@RolesAllowed({"ADMIN", "FOTOGRAFO", "EDITOR", "AGENDADOR"})
+@RolesAllowed({"ADMIN", "FOTOGRAFO", "EDITOR"})
 @Tag(name = "Fotógrafos do Agendamento", description = "Gerencia os fotógrafos vinculados a um ensaio")
 public class AgendamentoFotografoController {
 

@@ -27,6 +27,11 @@ import org.springframework.transaction.annotation.Transactional;
  * informadas, a subida falha ({@code IllegalStateException}) para evitar
  * ambiente sem administrador. Comportamento controlado por
  * {@code app.bootstrap.admin.required} (default {@code true}).
+ *
+ * <p>Na prática este seeder raramente atua: a migração
+ * {@code V2__seed_usuarios_iniciais.sql} já cria ADMIN e AGENDADOR em todos os
+ * ambientes, de modo que a tabela não nasce vazia. Ele permanece como rede de
+ * segurança para bancos sem usuários.
  */
 @Component
 @Profile("!dev")

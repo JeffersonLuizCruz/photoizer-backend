@@ -19,6 +19,7 @@ import com.photoizer.crm.shared.exception.BadRequestException;
 import com.photoizer.crm.shared.pdf.PdfWriter;
 import com.photoizer.crm.shared.storage.FileStorageService;
 import com.photoizer.crm.shared.storage.FileValidator;
+import com.photoizer.crm.shared.storage.StoragePathResolver;
 import com.photoizer.crm.shared.util.HashUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,6 +59,7 @@ public class PropostaPublicaService {
     private final ConfiguracaoService configuracaoService;
     private final PropostaTemplateService templateService;
     private final ObjectMapper objectMapper;
+    private final StoragePathResolver pathResolver;
 
     public PropostaPublicaService(AgendamentoRepository agendamentoRepository,
                                   AgendamentoFotografoRepository agendamentoFotografoRepository,
@@ -68,7 +70,8 @@ public class PropostaPublicaService {
                                   PdfWriter pdfWriter,
                                   ConfiguracaoService configuracaoService,
                                   PropostaTemplateService templateService,
-                                  ObjectMapper objectMapper) {
+                                  ObjectMapper objectMapper,
+                                  StoragePathResolver pathResolver) {
         this.agendamentoRepository = agendamentoRepository;
         this.agendamentoFotografoRepository = agendamentoFotografoRepository;
         this.assinaturaRepository = assinaturaRepository;
@@ -79,6 +82,7 @@ public class PropostaPublicaService {
         this.configuracaoService = configuracaoService;
         this.templateService = templateService;
         this.objectMapper = objectMapper;
+        this.pathResolver = pathResolver;
     }
 
     @Transactional(readOnly = true)
@@ -331,7 +335,7 @@ public class PropostaPublicaService {
             Files.createDirectories(dir);
             var destino = dir.resolve(agendamentoId + ".pdf");
             Files.write(destino, pdfWriter.gerar("PRESTAÇÃO DE SERVIÇOS FOTOGRÁFICOS", linhas));
-            return destino.toString();
+            return pathResolver.relativo(destino);
         } catch (IOException e) {
             throw new IllegalStateException("Erro ao gerar PDF da proposta", e);
         }

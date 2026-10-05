@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/dashboard")
-@RolesAllowed({"ADMIN", "FOTOGRAFO", "EDITOR", "AGENDADOR"})
+@RolesAllowed({"ADMIN", "FOTOGRAFO", "EDITOR"})
 @Tag(name = "Dashboard", description = "Métricas e gráficos do dashboard")
 public class DashboardController {
 

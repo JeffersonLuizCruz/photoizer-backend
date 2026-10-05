@@ -8,6 +8,7 @@ import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
 import com.photoizer.crm.shared.storage.FileStorageService;
 import com.photoizer.crm.shared.storage.FileValidator;
+import com.photoizer.crm.shared.storage.StoragePathResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -32,17 +33,20 @@ public class FotoService {
     private final FotoProcessingHelper fotoProcessingHelper;
     private final com.photoizer.crm.foto.acl.AgendamentoReadService agendamentoReadService;
     private final FileValidator fileValidator;
+    private final StoragePathResolver pathResolver;
 
     public FotoService(FotoEnsaioRepository fotoEnsaioRepository,
                        FileStorageService fileStorageService,
                        FotoProcessingHelper fotoProcessingHelper,
                        com.photoizer.crm.foto.acl.AgendamentoReadService agendamentoReadService,
-                       FileValidator fileValidator) {
+                       FileValidator fileValidator,
+                       StoragePathResolver pathResolver) {
         this.fotoEnsaioRepository = fotoEnsaioRepository;
         this.fileStorageService = fileStorageService;
         this.fotoProcessingHelper = fotoProcessingHelper;
         this.agendamentoReadService = agendamentoReadService;
         this.fileValidator = fileValidator;
+        this.pathResolver = pathResolver;
     }
 
     @Transactional(readOnly = true)
@@ -74,7 +78,7 @@ public class FotoService {
 
             fileValidator.validate(arquivo, "image");
             var originalPath = fileStorageService.salvarEmSubdiretorio(arquivo, agendamentoId, "orig");
-            var original = Path.of(originalPath);
+            var original = pathResolver.resolver(originalPath);
             var targetDir = original.getParent();
 
             var processada = fotoProcessingHelper.processar(original, targetDir, UUID.randomUUID());
@@ -88,8 +92,8 @@ public class FotoService {
                 .agendamentoId(agendamentoId)
                 .fileName(fileName)
                 .originalPath(originalPath)
-                .watermarkedPath(processada.watermarkedPath())
-                .thumbPath(processada.thumbPath())
+                .watermarkedPath(pathResolver.relativo(Path.of(processada.watermarkedPath())))
+                .thumbPath(pathResolver.relativo(Path.of(processada.thumbPath())))
                 .ordem(count + i)
                 .status(StatusFoto.INEDITA)
                 .selecionadaPacote(false)
@@ -171,7 +175,7 @@ public class FotoService {
 
         fileValidator.validate(arquivo, "image");
         var originalPath = fileStorageService.salvarEmSubdiretorio(arquivo, agendamentoId, "orig");
-        var original = Path.of(originalPath);
+        var original = pathResolver.resolver(originalPath);
         var targetDir = original.getParent();
 
         var processada = fotoProcessingHelper.processar(original, targetDir, fotoId);
@@ -181,8 +185,8 @@ public class FotoService {
         deletarArquivo(foto.getThumbPath());
 
         foto.setOriginalPath(originalPath);
-        foto.setWatermarkedPath(processada.watermarkedPath());
-        foto.setThumbPath(processada.thumbPath());
+        foto.setWatermarkedPath(pathResolver.relativo(Path.of(processada.watermarkedPath())));
+        foto.setThumbPath(pathResolver.relativo(Path.of(processada.thumbPath())));
         foto.setFileName(arquivo.getOriginalFilename());
 
         return fotoEnsaioRepository.save(foto);
@@ -190,7 +194,10 @@ public class FotoService {
 
     private void deletarArquivo(String caminho) {
         try {
-            Files.deleteIfExists(Path.of(caminho));
+            var path = pathResolver.resolver(caminho);
+            if (path != null) {
+                Files.deleteIfExists(path);
+            }
         } catch (IOException e) {
             log.warn("Falha ao deletar arquivo: {}", caminho, e);
         }

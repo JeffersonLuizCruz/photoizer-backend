@@ -79,4 +79,32 @@ public record AgendamentoResponse(
         BigDecimal percentual,
         Papel papelParceiro
     ) {}
+
+    /**
+     * Cópia da resposta sem as métricas internas do estúdio (custos, comissões,
+     * partilha, lucro e repasses). Usada para papéis sem visibilidade financeira
+     * (ex.: AGENDADOR). Os valores cobrados do cliente (total, entrada, saldo,
+     * pacote) são preservados.
+     */
+    public AgendamentoResponse ocultarDadosInternos() {
+        var fotografosSemRepasse = fotografos == null ? null : fotografos.stream()
+            .map(f -> new FotografoNoAgendamento(
+                f.fotografoId(), f.fotografoNome(), null, f.status(),
+                f.dataPagamento(), null, null, f.papelParceiro()))
+            .toList();
+
+        return new AgendamentoResponse(
+            id, clienteId, clienteNome, clienteTelefone, clienteEmail, clienteCpf,
+            clienteCidade, clienteEstado, pacoteId, pacoteNome, editorId, editorNome,
+            fotografoId, fotografoNome, dataHoraEnsaio, duracaoMinutos, localEnsaio,
+            valorTotal, valorEntradaExigido, valorEntradaPago, valorRestante,
+            valorExtras, taxaDeslocamento, null, repassarDeslocamento,
+            valorTotalFinal, percentualEntrada, valorPacote, saldoDevedor, status,
+            dataConfirmacao, dataRealizacao, dataPagamentoFinal, dataFinalizacao,
+            temComprovanteEntrada, temComprovanteFinal, formaPagamentoFinal,
+            autorizaUsoImagem, clausulasPersonalizadas, tokenProposta, dataEnvioProposta,
+            dataAssinatura, temTermoAssinado, ensaioDestaque, motivoRecusa, dataRecusa,
+            recusadoPor, observacoes, tokenGaleria, createdAt, updatedAt,
+            fotografosSemRepasse, null, null, null, null, null);
+    }
 }

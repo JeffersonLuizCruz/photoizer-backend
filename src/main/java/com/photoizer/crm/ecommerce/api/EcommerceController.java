@@ -40,7 +40,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.FileInputStream;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 
@@ -63,6 +62,7 @@ public class EcommerceController {
     private final CompraQueryService compraQueryService;
     private final FotoMapper fotoMapper;
     private final FileServeHelper fileServeHelper;
+    private final com.photoizer.crm.shared.storage.StoragePathResolver pathResolver;
 
     public EcommerceController(EcommerceService ecommerceService,
                                GaleriaQueryService galeriaQueryService,
@@ -75,7 +75,8 @@ public class EcommerceController {
                                EcommerceMapper ecommerceMapper,
                                CompraQueryService compraQueryService,
                                FotoMapper fotoMapper,
-                               FileServeHelper fileServeHelper) {
+                               FileServeHelper fileServeHelper,
+                               com.photoizer.crm.shared.storage.StoragePathResolver pathResolver) {
         this.ecommerceService = ecommerceService;
         this.galeriaQueryService = galeriaQueryService;
         this.carrinhoService = carrinhoService;
@@ -88,6 +89,7 @@ public class EcommerceController {
         this.compraQueryService = compraQueryService;
         this.fotoMapper = fotoMapper;
         this.fileServeHelper = fileServeHelper;
+        this.pathResolver = pathResolver;
     }
 
     @PostMapping("/sessao")
@@ -316,7 +318,7 @@ public class EcommerceController {
         if (!podeServirPublicamente(foto)) {
             return ResponseEntity.notFound().build();
         }
-        var file = new FileSystemResource(Path.of(foto.getWatermarkedPath()));
+        var file = new FileSystemResource(pathResolver.resolver(foto.getWatermarkedPath()));
         return ResponseEntity.ok()
             .cacheControl(CacheControl.noStore())
             .contentType(MediaType.IMAGE_JPEG)
@@ -330,7 +332,7 @@ public class EcommerceController {
         if (!podeServirPublicamente(foto)) {
             return ResponseEntity.notFound().build();
         }
-        var file = new FileSystemResource(Path.of(foto.getThumbPath()));
+        var file = new FileSystemResource(pathResolver.resolver(foto.getThumbPath()));
         return ResponseEntity.ok()
             .contentType(MediaType.IMAGE_JPEG)
             .body(file);
