@@ -1,0 +1,14 @@
+target/
+data/
+uploads/
+logs/
+.idea/
+.vscode/
+.git/
+.gitignore
+*.md
+*.log
+.mvn/
+mvnw.cmd
+HELP.md
+LICENSE

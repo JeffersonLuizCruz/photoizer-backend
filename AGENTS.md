@@ -3,7 +3,7 @@
 ## 1. Visão Geral e Stack Tecnológica
 - **Objetivo do Projeto:** API REST do CRM Photoizer para estúdio de fotografia. Gerencia clientes, agendamentos de ensaios, pacotes, edição de fotos, financeiro, e-commerce (galeria pública + venda de fotos extras), comissões de indicação, notificações e geração de documentos.
 - **Linguagens e Frameworks:** Java 25, Spring Boot 4.1.0, Spring Modulith 2.1.0, Spring Data JPA, Spring Security, Spring MVC.
-- **Banco de Dados (dev):** H2 file-based (`./data/crmdb`), profile `dev` ativo por padrão, `ddl-auto=create` — schema recriado a cada subida (dados descartáveis). H2 console em `/h2-console`. **Homolog/Prod (futuro):** Flyway + Postgres com `ddl-auto=validate` (ativar via `SPRING_PROFILES_ACTIVE`).
+- **Banco de Dados:** PostgreSQL em **todos** os ambientes (inclusive `dev`), schema versionado por **Flyway** (`src/main/resources/db/migration`, `V1__baseline.sql`), `ddl-auto=validate`. Dev local usa o Postgres do `docker-compose.dev.yml` (defaults em `application.properties`). Os **testes** usam H2 em memória (`src/test/resources/application.properties`).
 - **Bibliotecas Críticas:**
   - **jjwt 0.12.6** — Geração e validação de tokens JWT (HMAC-SHA256).
   - **Lombok** — `@Getter/@Setter/@SuperBuilder/@NoArgsConstructor` em entidades.
@@ -28,7 +28,7 @@
     - `storage/` — `FileStorageService` interface + `LocalFileStorageService` (salva em `uploads/`).
     - `api/PageResponse` — record genérico para respostas paginadas.
   - `{modulo}/` — 16 módulos de negócio (ver seção 3).
-- `src/main/resources/` — `application.properties` + profiles (`dev`, `homolog`, `prod`).
+- `src/main/resources/` — `application.properties` + profiles (`dev`, `homolog`, `prod`) + `db/migration/` (Flyway).
 - `src/test/java/` — testes de segurança (autorização por controller, CSRF, cookies) e sanitização.
 - `uploads/` — diretório de upload de arquivos.
 - `data/` — banco H2 em arquivo (`crmdb.mv.db`).
@@ -74,9 +74,9 @@ Cada módulo segue a estrutura: `model/`, `repository/`, `service/`, `api/`, DTO
   - Papéis: ADMIN, FOTOGRAFO, EDITOR, AGENDADOR (configurados via requestMatchers).
   - Senhas: BCryptPasswordEncoder.
 - **Upload de Arquivos:**
-  - Máx: 500MB/arquivo, 1GB/request.
-  - Salvos em `uploads/` via `LocalFileStorageService`.
-  - Servidos estaticamente via `file:uploads/`.
+  - Máx: 50MB/arquivo, 200MB/request.
+  - Salvos via `LocalFileStorageService` sob `app.storage.upload-dir` (env `UPLOAD_DIR`); o caminho gravado no banco é **relativo** e resolvido por `StoragePathResolver`.
+  - Servidos via `FileServeHelper` (valida path traversal).
   - Imagens passam por watermark + thumbnail via Thumbnailator.
 - **Logging:** AOP intercepta controllers (método + duração), services (args mascarados + resultado), repositories (trace). Dados sensíveis mascarados via `SensitiveDataMask`.
 - **DataSeeder:** `CommandLineRunner` que popula 5 usuários e 6 configurações se vazio.
@@ -121,8 +121,10 @@ Cada módulo segue a estrutura: `model/`, `repository/`, `service/`, `api/`, DTO
 - **Swagger:** `/swagger-ui.html`.
 
 ## 6. Comandos Úteis
-- `mvn spring-boot:run` — Sobe servidor (porta 8080). Em `dev` não exige env var.
+- `docker compose -f docker-compose.dev.yml up -d` — Sobe o PostgreSQL local (porta 5432).
+- `mvn spring-boot:run` — Sobe servidor (porta 8080) no perfil `dev`, usando o Postgres local.
 - `mvn clean package` — Build + testes.
-- `mvn test` — Executa testes.
-- `JWT_SECRET=<segredo-com-32-bytes> SPRING_PROFILES_ACTIVE=prod mvn spring-boot:run` — Sobe em prod.
+- `mvn test` — Executa testes (H2 em memória; não exige Postgres).
+- `mvn -Dtest=SchemaBaselineGenerator test` — Gera o DDL Postgres em `target/schema-postgres.sql` (ferramenta de baseline; não roda no build padrão).
+- `JWT_SECRET=<segredo> SPRING_PROFILES_ACTIVE=prod SPRING_DATASOURCE_URL=<jdbc> ... mvn spring-boot:run` — Sobe em prod.
 - `java -jar target/crm-0.0.1-SNAPSHOT.jar` — Executa o JAR.
