@@ -4,10 +4,14 @@ on:
   push:
     branches: [main]
     tags: ['v*']
+  workflow_dispatch:
 
 # Deploy de PROD (ambiente unico):
-#   push/merge na main (ou tag vX.Y.Z)
+#   push/merge na main (ou tag vX.Y.Z), ou disparo manual (workflow_dispatch)
 #     -> test (CI) -> publish (GHCR) -> deploy-prod (aprovacao manual)
+#
+# Nota: antes do Coolify/VPS existir, o job deploy-prod FALHA (COOLIFY_URL/token
+# vazios) — esperado. O que valida a esteira nesta fase sao os jobs test e publish.
 #
 # O push no GHCR usa o GITHUB_TOKEN nativo (permissions: packages: write);
 # nao ha secret de registry. Habilitar "Read and write" em
