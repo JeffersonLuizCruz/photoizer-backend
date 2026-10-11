@@ -1,0 +1,63 @@
+name: Rollback (PROD)
+
+# Rollback manual da aplicacao em PROD para uma imagem anterior retida no Coolify.
+# Executar em: Actions > Rollback (PROD) > Run workflow.
+#
+# Para listar as imagens disponiveis, rode com "list_images = true".
+# Depois use o valor do campo "tag" (ex.: sha-abc1234 ou v1.2.3) em image_tag.
+# Equivalente pela API:
+#   GET  $COOLIFY_URL/api/v1/applications/$COOLIFY_PROD_APP_UUID/rollback-images
+#   POST $COOLIFY_URL/api/v1/applications/$COOLIFY_PROD_APP_UUID/rollback  {"commit":"<tag>"}
+#
+# Secrets necessarios:
+#   COOLIFY_URL, COOLIFY_TOKEN, COOLIFY_PROD_APP_UUID
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Tag/commit da imagem anterior (ex.: sha-abc1234 ou v1.2.3)'
+        required: false
+        type: string
+      list_images:
+        description: 'Apenas listar as imagens disponiveis (ignora image_tag)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rollback-prod
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Listar imagens para rollback
+        if: ${{ inputs.list_images }}
+        run: |
+          curl -fsS "$COOLIFY_URL/api/v1/applications/$COOLIFY_PROD_APP_UUID/rollback-images" \
+            -H "Authorization: Bearer $COOLIFY_TOKEN"
+        env:
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          COOLIFY_PROD_APP_UUID: ${{ secrets.COOLIFY_PROD_APP_UUID }}
+
+      - name: Rollback para a imagem informada
+        if: ${{ !inputs.list_images }}
+        run: |
+          if [ -z "${{ inputs.image_tag }}" ]; then
+            echo "::error::Informe 'image_tag' (ou rode com list_images=true para ver as opcoes)."
+            exit 1
+          fi
+          curl -fsS -X POST "$COOLIFY_URL/api/v1/applications/$COOLIFY_PROD_APP_UUID/rollback" \
+            -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"commit\":\"${{ inputs.image_tag }}\"}"
+        env:
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          COOLIFY_PROD_APP_UUID: ${{ secrets.COOLIFY_PROD_APP_UUID }}
