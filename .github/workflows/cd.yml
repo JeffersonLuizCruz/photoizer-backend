@@ -10,17 +10,18 @@ on:
 #   push/merge na main (ou tag vX.Y.Z), ou disparo manual (workflow_dispatch)
 #     -> test (CI) -> publish (GHCR) -> deploy-prod (aprovacao manual)
 #
-# Nota: antes do Coolify/VPS existir, o job deploy-prod FALHA (COOLIFY_URL/token
+# Nota: antes do Coolify/VPS existir, o job deploy-prod FALHA (COOLIFY_WEBHOOK/token
 # vazios) — esperado. O que valida a esteira nesta fase sao os jobs test e publish.
 #
 # O push no GHCR usa o GITHUB_TOKEN nativo (permissions: packages: write);
 # nao ha secret de registry. Habilitar "Read and write" em
 # Settings > Actions > General > Workflow permissions.
 #
-# Secrets necessarios (Settings > Secrets and variables > Actions):
-#   COOLIFY_URL           -> base da API (ex.: https://coolify.photoizer.com.br)
-#   COOLIFY_TOKEN         -> API token do Coolify (escopo de deploy)
-#   COOLIFY_PROD_APP_UUID -> UUID do app de PROD no Coolify
+# Secrets necessarios (Settings > Environments 'production' ou
+# Settings > Secrets and variables > Actions):
+#   COOLIFY_WEBHOOK -> Deploy Webhook URL do app (Coolify: Configuration > Webhooks)
+#   COOLIFY_TOKEN   -> API token do Coolify (permissao Deploy)
+# Requer API Access habilitado no Coolify (Settings > Advanced).
 
 permissions:
   contents: read
@@ -92,10 +93,12 @@ jobs:
     environment: production
     steps:
       - name: Disparar deploy PROD no Coolify
-        run: |
-          curl -fsS -X POST "$COOLIFY_URL/api/v1/deploy?uuid=$COOLIFY_PROD_APP_UUID" \
-            -H "Authorization: Bearer $COOLIFY_TOKEN"
         env:
-          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK }}
           COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
-          COOLIFY_PROD_APP_UUID: ${{ secrets.COOLIFY_PROD_APP_UUID }}
+        run: |
+          test -n "$COOLIFY_WEBHOOK" || { echo "::error::COOLIFY_WEBHOOK vazio (defina em Settings > Environments > production)"; exit 1; }
+          test -n "$COOLIFY_TOKEN" || { echo "::error::COOLIFY_TOKEN vazio (defina em Settings > Environments > production)"; exit 1; }
+          curl --fail --silent --show-error \
+            --request POST "$COOLIFY_WEBHOOK" \
+            --header "Authorization: Bearer $COOLIFY_TOKEN"
