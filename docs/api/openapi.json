@@ -2166,7 +2166,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/AgendamentoFotografo"
+                  "$ref" : "#/components/schemas/RepasseResponse"
                 }
               }
             }
@@ -5612,7 +5612,7 @@
                 "schema" : {
                   "type" : "array",
                   "items" : {
-                    "$ref" : "#/components/schemas/AgendamentoFotografo"
+                    "$ref" : "#/components/schemas/RepasseResponse"
                   }
                 }
               }
@@ -5689,7 +5689,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/AgendamentoFotografo"
+                  "$ref" : "#/components/schemas/RepasseResponse"
                 }
               }
             }
@@ -7259,7 +7259,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/AgendamentoFotografo"
+                  "$ref" : "#/components/schemas/RepasseResponse"
                 }
               }
             }
@@ -7335,7 +7335,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/AgendamentoFotografo"
+                  "$ref" : "#/components/schemas/RepasseResponse"
                 }
               }
             }
@@ -12735,531 +12735,6 @@
           }
         }
       },
-      "Agendamento" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "auditInfo" : {
-            "$ref" : "#/components/schemas/AuditInfo"
-          },
-          "cliente" : {
-            "$ref" : "#/components/schemas/Cliente"
-          },
-          "pacote" : {
-            "$ref" : "#/components/schemas/Pacote"
-          },
-          "editor" : {
-            "$ref" : "#/components/schemas/User"
-          },
-          "fotografo" : {
-            "$ref" : "#/components/schemas/User"
-          },
-          "valorPartilhaGlobal" : {
-            "type" : "number",
-            "minimum" : 0
-          },
-          "valorLucroCrm" : {
-            "type" : "number",
-            "minimum" : 0
-          },
-          "dataHoraEnsaio" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "duracaoMinutos" : {
-            "type" : "integer",
-            "format" : "int32",
-            "exclusiveMinimum" : 0
-          },
-          "localEnsaio" : {
-            "type" : "string",
-            "maxLength" : 255,
-            "minLength" : 0
-          },
-          "valorTotal" : {
-            "type" : "number",
-            "exclusiveMinimum" : 0
-          },
-          "valorEntradaExigido" : {
-            "type" : "number",
-            "exclusiveMinimum" : 0
-          },
-          "valorEntradaPago" : {
-            "type" : "number",
-            "minimum" : 0
-          },
-          "valorRestante" : {
-            "type" : "number",
-            "minimum" : 0
-          },
-          "valorExtras" : {
-            "type" : "number",
-            "minimum" : 0
-          },
-          "taxaDeslocamento" : {
-            "type" : "number",
-            "minimum" : 0
-          },
-          "custoDeslocamento" : {
-            "type" : "number",
-            "minimum" : 0
-          },
-          "repassarDeslocamento" : {
-            "type" : "boolean"
-          },
-          "valorTotalFinal" : {
-            "type" : "number",
-            "minimum" : 0
-          },
-          "percentualEntrada" : {
-            "type" : "number",
-            "minimum" : 0
-          },
-          "status" : {
-            "type" : "string",
-            "enum" : [ "PRE_RESERVA", "AGUARDANDO_APROVACAO", "PAGAMENTO_CONFIRMADO", "CONFIRMADO", "REALIZADO", "AGUARDANDO_PAGAMENTO_FINAL", "EM_EDICAO", "FINALIZADO", "CANCELADO", "NO_SHOW" ]
-          },
-          "dataConfirmacao" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "dataRealizacao" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "dataPagamentoFinal" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "dataFinalizacao" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "urlComprovanteEntrada" : {
-            "type" : "string",
-            "maxLength" : 500,
-            "minLength" : 0
-          },
-          "urlComprovanteFinal" : {
-            "type" : "string",
-            "maxLength" : 500,
-            "minLength" : 0
-          },
-          "formaPagamentoFinal" : {
-            "type" : "string",
-            "enum" : [ "PIX", "CARTAO", "DINHEIRO", "TRANSFERENCIA", "OUTRO" ]
-          },
-          "autorizaUsoImagem" : {
-            "type" : "boolean"
-          },
-          "clausulasPersonalizadas" : {
-            "type" : "string"
-          },
-          "ensaioDestaque" : {
-            "type" : "boolean"
-          },
-          "tokenProposta" : {
-            "type" : "string",
-            "maxLength" : 128,
-            "minLength" : 0
-          },
-          "tokenPropostaHash" : {
-            "type" : "string",
-            "maxLength" : 64,
-            "minLength" : 0
-          },
-          "tokenPropostaExpiracao" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "dataEnvioProposta" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "dataAssinatura" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "assinanteNome" : {
-            "type" : "string",
-            "maxLength" : 64,
-            "minLength" : 0
-          },
-          "snapshotJson" : {
-            "type" : "string"
-          },
-          "snapshotHash" : {
-            "type" : "string",
-            "maxLength" : 64,
-            "minLength" : 0
-          },
-          "urlPdfAssinatura" : {
-            "type" : "string",
-            "maxLength" : 500,
-            "minLength" : 0
-          },
-          "urlAssinaturaImagem" : {
-            "type" : "string",
-            "maxLength" : 500,
-            "minLength" : 0
-          },
-          "motivoRecusa" : {
-            "type" : "string",
-            "maxLength" : 500,
-            "minLength" : 0
-          },
-          "recusadoPor" : {
-            "type" : "string",
-            "maxLength" : 150,
-            "minLength" : 0
-          },
-          "dataRecusa" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "indicadorId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "indicadorNome" : {
-            "type" : "string",
-            "maxLength" : 150,
-            "minLength" : 0
-          },
-          "indicadorTelefone" : {
-            "type" : "string",
-            "maxLength" : 30,
-            "minLength" : 0
-          },
-          "observacoes" : {
-            "type" : "string"
-          },
-          "tokenGaleria" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "tokenExpiracao" : {
-            "type" : "string",
-            "format" : "date-time"
-          }
-        },
-        "required" : [ "autorizaUsoImagem", "dataHoraEnsaio", "duracaoMinutos", "ensaioDestaque", "localEnsaio", "pacote", "status", "taxaDeslocamento", "valorEntradaExigido", "valorEntradaPago", "valorExtras", "valorRestante", "valorTotal", "valorTotalFinal" ]
-      },
-      "AgendamentoFotografo" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "auditInfo" : {
-            "$ref" : "#/components/schemas/AuditInfo"
-          },
-          "agendamento" : {
-            "$ref" : "#/components/schemas/Agendamento"
-          },
-          "fotografo" : {
-            "$ref" : "#/components/schemas/User"
-          },
-          "tipoValor" : {
-            "type" : "string",
-            "enum" : [ "FIXO", "PERCENTUAL" ]
-          },
-          "percentual" : {
-            "type" : "number",
-            "exclusiveMinimum" : 0
-          },
-          "papelParceiro" : {
-            "type" : "string",
-            "enum" : [ "ADMIN", "FOTOGRAFO", "EDITOR", "AGENDADOR" ]
-          },
-          "valorRepassar" : {
-            "type" : "number",
-            "exclusiveMinimum" : 0
-          },
-          "status" : {
-            "type" : "string",
-            "enum" : [ "PENDENTE", "PAGO", "CANCELADO" ]
-          },
-          "dataPagamento" : {
-            "type" : "string",
-            "format" : "date-time"
-          }
-        },
-        "required" : [ "agendamento", "fotografo", "status", "valorRepassar" ]
-      },
-      "AuditInfo" : {
-        "type" : "object",
-        "properties" : {
-          "createdAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "updatedAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "createdBy" : {
-            "type" : "string"
-          }
-        }
-      },
-      "Cliente" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "auditInfo" : {
-            "$ref" : "#/components/schemas/AuditInfo"
-          },
-          "nome" : {
-            "type" : "string",
-            "maxLength" : 255,
-            "minLength" : 0
-          },
-          "telefone" : {
-            "type" : "string",
-            "maxLength" : 20,
-            "minLength" : 0
-          },
-          "email" : {
-            "type" : "string",
-            "format" : "email",
-            "maxLength" : 255,
-            "minLength" : 0
-          },
-          "cpf" : {
-            "type" : "string",
-            "maxLength" : 14,
-            "minLength" : 0,
-            "pattern" : "\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}"
-          },
-          "cidade" : {
-            "type" : "string",
-            "maxLength" : 100,
-            "minLength" : 0
-          },
-          "estado" : {
-            "type" : "string",
-            "maxLength" : 2,
-            "minLength" : 0
-          },
-          "origem" : {
-            "type" : "string",
-            "enum" : [ "INDICACAO", "ANUNCIO", "OUTROS" ]
-          },
-          "observacoes" : {
-            "type" : "string"
-          },
-          "senhaHash" : {
-            "type" : "string",
-            "maxLength" : 255,
-            "minLength" : 0
-          },
-          "dataCadastro" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "preferencias" : {
-            "type" : "string"
-          }
-        },
-        "required" : [ "nome", "origem", "telefone" ]
-      },
-      "Pacote" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "auditInfo" : {
-            "$ref" : "#/components/schemas/AuditInfo"
-          },
-          "nome" : {
-            "type" : "string",
-            "maxLength" : 100,
-            "minLength" : 0
-          },
-          "descricao" : {
-            "type" : "string"
-          },
-          "quantidadeFotos" : {
-            "type" : "integer",
-            "format" : "int32",
-            "exclusiveMinimum" : 0
-          },
-          "quantidadeVideos" : {
-            "type" : "integer",
-            "format" : "int32",
-            "minimum" : 0
-          },
-          "valorBase" : {
-            "type" : "number",
-            "exclusiveMinimum" : 0
-          },
-          "precoFotoExtra" : {
-            "type" : "number",
-            "minimum" : 0
-          },
-          "imagemCapa" : {
-            "type" : "string",
-            "maxLength" : 500,
-            "minLength" : 0
-          },
-          "beneficios" : {
-            "type" : "string"
-          },
-          "duracaoEstimada" : {
-            "type" : "string",
-            "maxLength" : 50,
-            "minLength" : 0
-          },
-          "bloqueiaDiaInteiro" : {
-            "type" : "boolean"
-          },
-          "ativo" : {
-            "type" : "boolean"
-          },
-          "diasParaEntrega" : {
-            "type" : "integer",
-            "format" : "int32",
-            "minimum" : 0
-          }
-        },
-        "required" : [ "ativo", "bloqueiaDiaInteiro", "nome", "precoFotoExtra", "quantidadeFotos", "quantidadeVideos", "valorBase" ]
-      },
-      "User" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "email" : {
-            "type" : "string"
-          },
-          "nome" : {
-            "type" : "string"
-          },
-          "papel" : {
-            "type" : "string",
-            "enum" : [ "ADMIN", "FOTOGRAFO", "EDITOR", "AGENDADOR" ]
-          },
-          "telefone" : {
-            "type" : "string"
-          },
-          "ativo" : {
-            "type" : "boolean"
-          },
-          "auditInfo" : {
-            "$ref" : "#/components/schemas/AuditInfo"
-          }
-        }
-      },
-      "CriarUserRequest" : {
-        "type" : "object",
-        "description" : "Dados para criação de um usuário do sistema (staff).",
-        "properties" : {
-          "email" : {
-            "type" : "string",
-            "format" : "email",
-            "description" : "E-mail único do usuário",
-            "example" : "editor@photoizer.com.br",
-            "minLength" : 1
-          },
-          "password" : {
-            "type" : "string",
-            "description" : "Senha inicial",
-            "example" : "S3nh@Forte",
-            "minLength" : 1
-          },
-          "nome" : {
-            "type" : "string",
-            "description" : "Nome completo",
-            "example" : "Maria Editora",
-            "minLength" : 1
-          },
-          "papel" : {
-            "type" : "string",
-            "description" : "Papel do usuário",
-            "enum" : [ "ADMIN", "FOTOGRAFO", "EDITOR", "AGENDADOR" ],
-            "example" : "EDITOR"
-          },
-          "telefone" : {
-            "type" : [ "string", "null" ],
-            "description" : "Telefone de contato"
-          }
-        },
-        "required" : [ "email", "nome", "papel", "password" ]
-      },
-      "SessaoRequest" : {
-        "type" : "object",
-        "properties" : {
-          "nomeSessao" : {
-            "type" : "string",
-            "minLength" : 1
-          },
-          "dataRealizacao" : {
-            "type" : "string",
-            "format" : "date"
-          },
-          "local" : {
-            "type" : "string"
-          },
-          "descricao" : {
-            "type" : "string"
-          },
-          "status" : {
-            "type" : "string",
-            "enum" : [ "ATIVA", "FINALIZADA", "CANCELADA" ]
-          },
-          "clienteId" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        },
-        "required" : [ "nomeSessao" ]
-      },
-      "SessaoResponse" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "clienteId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "nomeSessao" : {
-            "type" : "string"
-          },
-          "dataRealizacao" : {
-            "type" : "string",
-            "format" : "date"
-          },
-          "local" : {
-            "type" : "string"
-          },
-          "descricao" : {
-            "type" : "string"
-          },
-          "status" : {
-            "type" : "string",
-            "enum" : [ "ATIVA", "FINALIZADA", "CANCELADA" ]
-          },
-          "createdAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          }
-        }
-      },
       "AuditInfoResponse" : {
         "type" : "object",
         "description" : "Datas de auditoria.",
@@ -13392,6 +12867,104 @@
             "type" : "string",
             "format" : "date-time",
             "description" : "Data de pagamento"
+          }
+        }
+      },
+      "CriarUserRequest" : {
+        "type" : "object",
+        "description" : "Dados para criação de um usuário do sistema (staff).",
+        "properties" : {
+          "email" : {
+            "type" : "string",
+            "format" : "email",
+            "description" : "E-mail único do usuário",
+            "example" : "editor@photoizer.com.br",
+            "minLength" : 1
+          },
+          "password" : {
+            "type" : "string",
+            "description" : "Senha inicial",
+            "example" : "S3nh@Forte",
+            "minLength" : 1
+          },
+          "nome" : {
+            "type" : "string",
+            "description" : "Nome completo",
+            "example" : "Maria Editora",
+            "minLength" : 1
+          },
+          "papel" : {
+            "type" : "string",
+            "description" : "Papel do usuário",
+            "enum" : [ "ADMIN", "FOTOGRAFO", "EDITOR", "AGENDADOR" ],
+            "example" : "EDITOR"
+          },
+          "telefone" : {
+            "type" : [ "string", "null" ],
+            "description" : "Telefone de contato"
+          }
+        },
+        "required" : [ "email", "nome", "papel", "password" ]
+      },
+      "SessaoRequest" : {
+        "type" : "object",
+        "properties" : {
+          "nomeSessao" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "dataRealizacao" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "local" : {
+            "type" : "string"
+          },
+          "descricao" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "ATIVA", "FINALIZADA", "CANCELADA" ]
+          },
+          "clienteId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        },
+        "required" : [ "nomeSessao" ]
+      },
+      "SessaoResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "clienteId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "nomeSessao" : {
+            "type" : "string"
+          },
+          "dataRealizacao" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "local" : {
+            "type" : "string"
+          },
+          "descricao" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "ATIVA", "FINALIZADA", "CANCELADA" ]
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
           }
         }
       },
