@@ -1,6 +1,7 @@
 package com.photoizer.crm.ecommerce.api;
 
 import com.photoizer.crm.ecommerce.service.PagamentoExtraService;
+import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.security.RolesAllowed;
@@ -32,7 +33,8 @@ import java.util.UUID;
 @RequestMapping("/api/v1/dev/pagamentos")
 @Profile("dev")
 @RolesAllowed("ADMIN")
-@Tag(name = "Dev Pagamentos", description = "Simulação de pagamento (somente perfil dev)")
+@Hidden
+@Tag(name = "Dev Pagamentos", description = "Simulação de pagamento — disponível apenas no perfil de desenvolvimento.")
 public class DevPagamentoController {
 
     private final PagamentoExtraService pagamentoExtraService;

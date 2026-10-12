@@ -1,6 +1,8 @@
 package com.photoizer.crm.agenda.api;
 
 import com.photoizer.crm.agenda.model.Agendamento;
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -11,6 +13,7 @@ import java.util.UUID;
  * 
  * Padrão DTO Pattern - isola dados do domínio do contrato da API.
  */
+@Schema(name = "AgendamentoClienteResponse", description = "Resumo do ensaio do ponto de vista do cliente.")
 public record AgendamentoClienteResponse(
     UUID id,
     String pacoteNome,

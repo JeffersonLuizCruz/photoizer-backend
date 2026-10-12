@@ -71,7 +71,7 @@ public class AgendamentoController {
     }
 
     @PostMapping("/proposta")
-    @Operation(summary = "Criar proposta/pré-reserva",
+    @Operation(operationId = "criarProposta", summary = "Criar proposta/pré-reserva",
         description = "Cria uma pré-reserva (não ocupa agenda) e gera o link público de assinatura para o cliente")
     @ApiResponses({
         @ApiResponse(responseCode = "201", description = "Proposta criada com sucesso"),
@@ -101,7 +101,7 @@ public class AgendamentoController {
 
     @PatchMapping("/{id}/confirmar-pagamento")
     @RolesAllowed({"ADMIN", "FOTOGRAFO"})
-    @Operation(summary = "Confirmar pagamento da reserva",
+    @Operation(operationId = "confirmarPagamentoReserva", summary = "Confirmar pagamento da reserva",
         description = "Staff confere o comprovante enviado pelo cliente; move a proposta para PAGAMENTO_CONFIRMADO")
     public ResponseEntity<AgendamentoResponse> confirmarPagamento(
             @PathVariable @Parameter(description = "ID do agendamento") UUID id) {
@@ -111,7 +111,7 @@ public class AgendamentoController {
 
     @PatchMapping("/{id}/aprovar")
     @RolesAllowed({"ADMIN", "FOTOGRAFO"})
-    @Operation(summary = "Aprovar proposta",
+    @Operation(operationId = "aprovarProposta", summary = "Aprovar proposta",
         description = "Valida conflito de agenda e confirma o agendamento, que passa a ocupar a agenda")
     public ResponseEntity<AgendamentoResponse> aprovar(
             @PathVariable @Parameter(description = "ID do agendamento") UUID id) {
@@ -121,7 +121,7 @@ public class AgendamentoController {
 
     @PatchMapping("/{id}/recusar")
     @RolesAllowed({"ADMIN", "FOTOGRAFO"})
-    @Operation(summary = "Recusar proposta",
+    @Operation(operationId = "recusarProposta", summary = "Recusar proposta",
         description = "Recusa a proposta em análise, registrando o motivo e o autor; move para CANCELADO")
     public ResponseEntity<AgendamentoResponse> recusarProposta(
             @PathVariable @Parameter(description = "ID do agendamento") UUID id,
@@ -133,7 +133,7 @@ public class AgendamentoController {
     }
 
     @GetMapping
-    @Operation(summary = "Listar agendamentos", description = "Retorna agendamentos com suporte a filtros")
+    @Operation(operationId = "listarAgendamentos", summary = "Listar agendamentos", description = "Retorna agendamentos com suporte a filtros")
     @ApiResponse(responseCode = "200", description = "Lista de agendamentos")
     public ResponseEntity<List<AgendamentoResponse>> listar(
             @RequestParam(required = false) @Parameter(description = "Filtrar por status") String status,
@@ -163,7 +163,7 @@ public class AgendamentoController {
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Atualizar agendamento")
+    @Operation(operationId = "atualizarAgendamento", summary = "Atualizar agendamento")
     public ResponseEntity<AgendamentoResponse> atualizar(
             @PathVariable UUID id,
             @RequestBody @Valid AtualizarAgendamentoRequest request) {
@@ -171,19 +171,19 @@ public class AgendamentoController {
     }
 
     @GetMapping("/verificar-disponibilidade")
-    @Operation(summary = "Verificar disponibilidade de horário")
+    @Operation(operationId = "verificarDisponibilidade", summary = "Verificar disponibilidade de horário")
     public ResponseEntity<DisponibilidadeResponse> verificarDisponibilidade(
-            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate data,
-            @RequestParam String hora,
-            @RequestParam(defaultValue = "60") Integer duracaoMinutos,
-            @RequestParam(required = false) UUID excluirAgendamentoId,
-            @RequestParam(defaultValue = "false") Boolean bloqueiaDiaInteiro,
-            @RequestParam(required = false) UUID fotografoId) {
+            @RequestParam @Parameter(description = "Data do ensaio (yyyy-MM-dd)") @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate data,
+            @RequestParam @Parameter(description = "Hora do ensaio (HH:mm)") String hora,
+            @RequestParam(defaultValue = "60") @Parameter(description = "Duração em minutos") Integer duracaoMinutos,
+            @RequestParam(required = false) @Parameter(description = "Agendamento a desconsiderar (edição)") UUID excluirAgendamentoId,
+            @RequestParam(defaultValue = "false") @Parameter(description = "Bloqueia o dia inteiro") Boolean bloqueiaDiaInteiro,
+            @RequestParam(required = false) @Parameter(description = "Filtrar por fotógrafo") UUID fotografoId) {
         return ResponseEntity.ok(disponibilidadeService.verificarDisponibilidade(data, hora, duracaoMinutos, excluirAgendamentoId, bloqueiaDiaInteiro, fotografoId));
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Buscar agendamento por ID", description = "Retorna os detalhes de um agendamento específico")
+    @Operation(operationId = "buscarAgendamentoPorId", summary = "Buscar agendamento por ID", description = "Retorna os detalhes de um agendamento específico")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Agendamento encontrado"),
         @ApiResponse(responseCode = "404", description = "Agendamento não encontrado", content = @Content)
@@ -202,17 +202,21 @@ public class AgendamentoController {
     }
 
     @PatchMapping("/{id}/status")
-    @Operation(summary = "Atualizar status do agendamento")
+    @Operation(operationId = "atualizarStatusAgendamento", summary = "Atualizar status do agendamento")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Status atualizado"),
+        @ApiResponse(responseCode = "404", description = "Agendamento não encontrado", content = @Content),
+        @ApiResponse(responseCode = "422", description = "Status inválido", content = @Content)
+    })
     public ResponseEntity<AgendamentoResponse> atualizarStatus(
             @PathVariable @Parameter(description = "ID do agendamento") UUID id,
-            @RequestBody Map<String, String> body) {
-        var status = body.get("status");
-        var agendamento = agendamentoStatusLifecycle.atualizarStatus(id, status);
+            @Valid @RequestBody AtualizarStatusRequest body) {
+        var agendamento = agendamentoStatusLifecycle.atualizarStatus(id, body.status());
         return ResponseEntity.ok(respostaPara(agendamentoMapper.toResponse(agendamento, null, null, null, null)));
     }
 
     @PatchMapping("/{id}/reagendar")
-    @Operation(summary = "Reagendar ensaio", description = "Atualiza data/hora e redefine status para CONFIRMADO")
+    @Operation(operationId = "reagendarEnsaio", summary = "Reagendar ensaio", description = "Atualiza data/hora e redefine status para CONFIRMADO")
     public ResponseEntity<AgendamentoResponse> reagendar(
             @PathVariable @Parameter(description = "ID do agendamento") UUID id,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
@@ -224,7 +228,7 @@ public class AgendamentoController {
     }
 
     @PatchMapping("/{id}/destaque")
-    @Operation(summary = "Alternar destaque do ensaio")
+    @Operation(operationId = "toggleDestaqueEnsaio", summary = "Alternar destaque do ensaio")
     public ResponseEntity<AgendamentoResponse> toggleDestaque(
             @PathVariable @Parameter(description = "ID do agendamento") UUID id) {
         var agendamento = agendamentoStatusLifecycle.toggleDestaque(id);
@@ -233,7 +237,7 @@ public class AgendamentoController {
 
     @PatchMapping("/{id}/fotografo")
     @RolesAllowed("ADMIN")
-    @Operation(summary = "Transferir ensaio para outro fotógrafo",
+    @Operation(operationId = "reatribuirFotografo", summary = "Transferir ensaio para outro fotógrafo",
         description = "Transfere o fotógrafo responsável do ensaio (somente ADMIN e status CONFIRMADO)")
     public ResponseEntity<AgendamentoResponse> reatribuirFotografo(
             @PathVariable @Parameter(description = "ID do agendamento") UUID id,
@@ -245,15 +249,20 @@ public class AgendamentoController {
     }
 
     @GetMapping("/{id}/reatribuicoes")
-    @Operation(summary = "Listar histórico de transferências do agendamento")
+    @Operation(operationId = "listarReatribuicoes", summary = "Listar histórico de transferências do agendamento")
     public ResponseEntity<List<ReatribuicaoResponse>> listarReatribuicoes(
             @PathVariable @Parameter(description = "ID do agendamento") UUID id) {
         return ResponseEntity.ok(agendamentoService.listarReatribuicoes(id));
     }
 
     @GetMapping("/{id}/termo")
-    @Operation(summary = "Baixar termo assinado (PDF)",
+    @Operation(operationId = "baixarTermoAssinado", summary = "Baixar termo assinado (PDF)",
         description = "Serve o PDF do snapshot imutável assinado pelo cliente")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "PDF do termo",
+            content = @Content(mediaType = "application/pdf")),
+        @ApiResponse(responseCode = "404", description = "Termo não disponível", content = @Content)
+    })
     public ResponseEntity<org.springframework.core.io.Resource> downloadTermo(
             @PathVariable @Parameter(description = "ID do agendamento") UUID id) {
         var agendamento = agendamentoService.buscarPorId(id);
@@ -265,7 +274,7 @@ public class AgendamentoController {
     }
 
     @PostMapping("/{id}/pagamento-final")
-    @Operation(summary = "Registrar pagamento final", description = "Registra o pagamento final com comprovante obrigatório e finaliza o ensaio")
+    @Operation(operationId = "registrarPagamentoFinal", summary = "Registrar pagamento final", description = "Registra o pagamento final com comprovante obrigatório e finaliza o ensaio")
     public ResponseEntity<AgendamentoResponse> registrarPagamentoFinal(
             @PathVariable @Parameter(description = "ID do agendamento") UUID id,
             @RequestParam(required = false) @Parameter(description = "Comprovante de pagamento final (obrigatório, exceto em dinheiro)") MultipartFile comprovanteFinal,

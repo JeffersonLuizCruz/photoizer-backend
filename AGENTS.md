@@ -7,7 +7,7 @@
 - **Bibliotecas Críticas:**
   - **jjwt 0.12.6** — Geração e validação de tokens JWT (HMAC-SHA256).
   - **Lombok** — `@Getter/@Setter/@SuperBuilder/@NoArgsConstructor` em entidades.
-  - **SpringDoc OpenAPI 2.8.5** — Documentação Swagger UI.
+  - **SpringDoc OpenAPI 3.1.1** — Documentação Swagger UI. **A linha v3 é obrigatória para Spring Boot 4** (o v2.x atende só Boot 3.x). Não rebaixar para 2.8.x.
   - **Thumbnailator 0.4.20** — Geração de thumbnails e watermarks.
   - **Logstash + Brave Tracing + Micrometer** — Logging estruturado e tracing distribuído.
   - **AOP (AspectJ)** — LoggingAspect para controllers, services e repositories.
@@ -23,6 +23,8 @@
   - `shared/` — Infraestrutura compartilhada:
     - `model/BaseEntity` — `@MappedSuperclass` com `id` (UUID), `createdAt`, `updatedAt`, `createdBy`.
     - `config/` — CorsConfig, DataSeeder, LoggingConfig, OpenApiConfig.
+    - `config/openapi/` — `OpenApiTags` (catálogo de tags), `GlobalOpenApiCustomizer`
+      (segurança + respostas de erro padrão) e `OpenApiTagsCustomizer` (ordem/tags).
     - `exception/` — `ErrorResponse` (record), `GlobalExceptionHandler` (`@RestControllerAdvice`).
     - `logging/` — `LoggingAspect`, `SensitiveDataMask` (mascara CPF, telefone, email em logs).
     - `storage/` — `FileStorageService` interface + `LocalFileStorageService` (salva em `uploads/`).
@@ -118,7 +120,10 @@ Cada módulo segue a estrutura: `model/`, `repository/`, `service/`, `api/`, DTO
   2. Seleciona fotos, adiciona ao carrinho.
   3. Checkout → gera `CompraExtra`.
   4. Upload comprovante → confirmação admin → fotos liberadas.
-- **Swagger:** `/swagger-ui.html`.
+- **Swagger:** `/swagger-ui.html` (UI e `/v3/api-docs` livres em dev, staff autenticado em homolog, negados em prod).
+  Padrão completo em `docs/API_DOCUMENTATION_STANDARD.md`. Spec versionada (`docs/api/openapi.json`) gerada por
+  `mvn -Dtest=OpenApiSpecExporter test`; validada no build por `OpenApiContractTest` e pela checagem
+  de spec desatualizada no CI.
 
 ## 6. Comandos Úteis
 - `docker compose -f docker-compose.dev.yml up -d` — Sobe o PostgreSQL local (porta 5432).

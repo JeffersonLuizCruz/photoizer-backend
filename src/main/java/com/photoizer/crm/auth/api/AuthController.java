@@ -4,7 +4,14 @@ import com.photoizer.crm.auth.config.AuthCookieService;
 import com.photoizer.crm.auth.service.AuthService;
 import com.photoizer.crm.auth.service.RefreshTokenService;
 import com.photoizer.crm.auth.service.UserService;
+import com.photoizer.crm.shared.config.OpenApiConfig;
+import com.photoizer.crm.shared.exception.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -23,7 +30,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/auth")
-@Tag(name = "Autenticação", description = "Login, refresh token e logout")
+@Tag(name = "Autenticação", description = "Login, refresh token, logout e dados do usuário autenticado (staff).")
 public class AuthController {
 
     private final AuthService authService;
@@ -42,7 +49,18 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    @Operation(summary = "Autenticar administrador")
+    @Operation(operationId = "login",
+        summary = "Autenticar administrador/equipe",
+        description = "Valida as credenciais e emite cookies HttpOnly (access/refresh) + cookie CSRF. "
+            + "Os tokens também retornam no corpo para integrações via Authorization: Bearer.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Autenticado com sucesso",
+            content = @Content(schema = @Schema(implementation = LoginResponse.class))),
+        @ApiResponse(responseCode = "401", description = "Credenciais inválidas",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "422", description = "Dados de entrada inválidos",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request,
                                                HttpServletResponse response) {
         var resultado = authService.login(request);
@@ -52,7 +70,16 @@ public class AuthController {
     }
 
     @PostMapping("/refresh")
-    @Operation(summary = "Renovar access token usando refresh token")
+    @Operation(operationId = "refreshToken",
+        summary = "Renovar access token usando refresh token",
+        description = "Aceita o refresh token via corpo ou cookie HttpOnly. Há rotação do refresh "
+            + "a cada chamada; reuso do token anterior revoga a família.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Token renovado",
+            content = @Content(schema = @Schema(implementation = RefreshTokenResponse.class))),
+        @ApiResponse(responseCode = "401", description = "Refresh token inválido, expirado ou reutilizado",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     public ResponseEntity<Map<String, String>> refresh(@RequestBody(required = false) RefreshTokenRequest request,
                                                        HttpServletRequest servletRequest,
                                                        HttpServletResponse response) {
@@ -64,7 +91,15 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    @Operation(summary = "Revogar tokens (access + refresh)")
+    @Operation(operationId = "logout",
+        summary = "Revogar tokens (access + refresh)",
+        security = {@SecurityRequirement(name = OpenApiConfig.SECURITY_SCHEME_BEARER),
+            @SecurityRequirement(name = OpenApiConfig.SECURITY_SCHEME_COOKIE)})
+    @ApiResponses({
+        @ApiResponse(responseCode = "204", description = "Sessão encerrada"),
+        @ApiResponse(responseCode = "401", description = "Não autenticado",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     public ResponseEntity<Void> logout(@RequestBody(required = false) RefreshTokenRequest request,
                                        Authentication authentication,
                                        HttpServletRequest servletRequest,
@@ -84,7 +119,16 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    @Operation(summary = "Dados do usuário autenticado (derivados do servidor)")
+    @Operation(operationId = "getCurrentUser",
+        summary = "Dados do usuário autenticado (derivados do servidor)",
+        security = {@SecurityRequirement(name = OpenApiConfig.SECURITY_SCHEME_BEARER),
+            @SecurityRequirement(name = OpenApiConfig.SECURITY_SCHEME_COOKIE)})
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Usuário autenticado",
+            content = @Content(schema = @Schema(implementation = MeResponse.class))),
+        @ApiResponse(responseCode = "401", description = "Não autenticado",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     public ResponseEntity<MeResponse> me(@AuthenticationPrincipal String userId) {
         var user = userService.buscarPorId(UUID.fromString(userId));
         return ResponseEntity.ok(new MeResponse(user.nome(), user.email(), user.papel(), user.id()));
@@ -97,5 +141,11 @@ public class AuthController {
         return authCookieService.lerRefreshToken(servletRequest).orElse(null);
     }
 
-    public record RefreshTokenRequest(String refreshToken) {}
+    @Schema(name = "RefreshTokenRequest", description = "Refresh token (opcional quando enviado por cookie).")
+    public record RefreshTokenRequest(
+        @Schema(description = "Refresh token previamente emitido") String refreshToken) {}
+
+    @Schema(name = "RefreshTokenResponse", description = "Novo access token.")
+    public record RefreshTokenResponse(
+        @Schema(description = "Access token (JWT)") String accessToken) {}
 }

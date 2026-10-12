@@ -39,6 +39,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, Environment environment) throws Exception {
         boolean devProfile = environment.matchesProfiles("dev", "local", "test");
+        boolean homologProfile = environment.matchesProfiles("homolog");
 
         http
             .cors(c -> c.configurationSource(corsConfig.corsConfigurationSource()))
@@ -59,14 +60,23 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.POST, "/api/v1/avaliacoes").permitAll()
                     .requestMatchers("/actuator/health").permitAll();
 
-                // H2 console e Swagger expostos apenas em perfis de desenvolvimento.
-                // Em homolog/prod ficam bloqueados (denyAll), evitando exposição do banco/API.
+                // Swagger/OpenAPI por ambiente:
+                //  - dev/local/test: UI e spec livres (permitAll).
+                //  - homolog: UI e spec exigem staff autenticado (validar contrato sem expor público).
+                //  - prod: bloqueados (denyAll); consumo via docs/api/openapi.json versionado.
+                // H2 console permanece apenas em desenvolvimento.
                 if (devProfile) {
                     auth.requestMatchers("/h2-console/**").permitAll();
-                    auth.requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll();
+                    auth.requestMatchers("/swagger-ui/**", "/swagger-ui.html",
+                        "/v3/api-docs", "/v3/api-docs/**").permitAll();
+                } else if (homologProfile) {
+                    auth.requestMatchers("/h2-console/**").denyAll();
+                    auth.requestMatchers("/swagger-ui/**", "/swagger-ui.html",
+                        "/v3/api-docs", "/v3/api-docs/**").authenticated();
                 } else {
                     auth.requestMatchers("/h2-console/**").denyAll();
-                    auth.requestMatchers("/swagger-ui/**", "/v3/api-docs/**").denyAll();
+                    auth.requestMatchers("/swagger-ui/**", "/swagger-ui.html",
+                        "/v3/api-docs", "/v3/api-docs/**").denyAll();
                 }
 
                 auth

@@ -2,6 +2,7 @@ package com.photoizer.crm.agenda.api;
 
 import com.photoizer.crm.agenda.service.AgendamentoFotografoService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.security.RolesAllowed;
 import org.springframework.http.ResponseEntity;
@@ -42,9 +43,9 @@ public class RepasseController {
     }
 
     @GetMapping("/pendentes")
-    @Operation(summary = "Listar todos os repasses pendentes (admin)")
+    @Operation(operationId = "listarRepassesPendentes", summary = "Listar todos os repasses pendentes (admin)")
     public ResponseEntity<List<RepasseResponse>> listarPendentes(
-            @RequestParam(required = false) UUID fotografoId) {
+            @Parameter(description = "Filtrar por fotógrafo") @RequestParam(required = false) UUID fotografoId) {
         List<com.photoizer.crm.agenda.model.AgendamentoFotografo> repasses;
         if (fotografoId != null) {
             repasses = agendamentoFotografoService.listarPendentesPorFotografo(fotografoId);
@@ -58,7 +59,7 @@ public class RepasseController {
     }
 
     @PostMapping("/pagar-lote")
-    @Operation(summary = "Pagar múltiplos repasses em lote")
+    @Operation(operationId = "pagarRepassesEmLote", summary = "Pagar múltiplos repasses em lote")
     public ResponseEntity<List<RepasseResponse>> pagarLote(@RequestBody List<UUID> ids) {
         var repasses = agendamentoFotografoService.pagarRepasseLote(ids);
         var responses = repasses.stream()

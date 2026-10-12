@@ -1,6 +1,7 @@
 package com.photoizer.crm.agenda.api;
 
 import com.photoizer.crm.agenda.model.RepasseStatus;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -18,23 +19,26 @@ import java.util.UUID;
  * NOTA: A estrutura é compatível com a interface AgendamentoFotografo
  * do frontend TypeScript para manter backward compatibility.
  */
+@Schema(name = "RepasseResponse", description = "Repasse pendente/pago de um fotógrafo.")
 public record RepasseResponse(
-    UUID id,
-    AuditInfoResponse auditInfo,
-    AgendamentoResumo agendamento,
-    FotografoResumo fotografo,
-    BigDecimal valorRepassar,
-    RepasseStatus status,
-    String tipoValor,
-    BigDecimal percentual,
-    String papelParceiro,
-    LocalDateTime dataPagamento
+    @Schema(description = "ID do repasse") UUID id,
+    @Schema(description = "Metadados de auditoria") AuditInfoResponse auditInfo,
+    @Schema(description = "Resumo do agendamento") AgendamentoResumo agendamento,
+    @Schema(description = "Resumo do fotógrafo") FotografoResumo fotografo,
+    @Schema(description = "Valor a repassar") BigDecimal valorRepassar,
+    @Schema(description = "Status do repasse") RepasseStatus status,
+    @Schema(description = "Tipo do valor (FIXO/PERCENTUAL)") String tipoValor,
+    @Schema(description = "Percentual") BigDecimal percentual,
+    @Schema(description = "Papel do parceiro") String papelParceiro,
+    @Schema(description = "Data de pagamento") LocalDateTime dataPagamento
 ) {
+    @Schema(name = "AuditInfoResponse", description = "Datas de auditoria.")
     public record AuditInfoResponse(
         String createdAt,
         String updatedAt
     ) {}
 
+    @Schema(name = "RepasseAgendamentoResumo", description = "Resumo do agendamento do repasse.")
     public record AgendamentoResumo(
         UUID id,
         ClienteResumo cliente,
@@ -43,16 +47,19 @@ public record RepasseResponse(
         String status
     ) {}
 
+    @Schema(name = "RepasseClienteResumo", description = "Resumo do cliente.")
     public record ClienteResumo(
         UUID id,
         String nome
     ) {}
 
+    @Schema(name = "RepassePacoteResumo", description = "Resumo do pacote.")
     public record PacoteResumo(
         UUID id,
         String nome
     ) {}
 
+    @Schema(name = "RepasseFotografoResumo", description = "Resumo do fotógrafo.")
     public record FotografoResumo(
         UUID id,
         String nome,

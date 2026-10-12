@@ -2,6 +2,11 @@ package com.photoizer.crm.agenda.api;
 
 import com.photoizer.crm.agenda.service.PropostaPublicaService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.MediaType;
@@ -16,7 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/propostas/publico")
-@Tag(name = "Propostas Públicas", description = "Página pública de assinatura da proposta por token")
+@Tag(name = "Propostas Públicas", description = "Página pública de assinatura da proposta por token.")
 public class PropostaPublicaController {
 
     private final PropostaPublicaService propostaPublicaService;
@@ -26,35 +31,47 @@ public class PropostaPublicaController {
     }
 
     @GetMapping("/{token}")
-    @Operation(summary = "Carregar proposta pública por token")
-    public ResponseEntity<PropostaPublicaResponse> carregar(@PathVariable String token) {
+    @Operation(operationId = "carregarPropostaPublica", summary = "Carregar proposta pública por token")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Proposta encontrada",
+            content = @Content(schema = @Schema(implementation = PropostaPublicaResponse.class))),
+        @ApiResponse(responseCode = "404", description = "Token inválido")
+    })
+    public ResponseEntity<PropostaPublicaResponse> carregar(
+            @PathVariable @Parameter(description = "Token público da proposta") String token) {
         return ResponseEntity.ok(propostaPublicaService.buscarPublico(token));
     }
 
     @GetMapping("/{token}/status")
-    @Operation(summary = "Consultar status da proposta pelo token")
-    public ResponseEntity<PropostaStatusPublicoResponse> status(@PathVariable String token) {
+    @Operation(operationId = "statusPropostaPublica", summary = "Consultar status da proposta pelo token")
+    public ResponseEntity<PropostaStatusPublicoResponse> status(
+            @PathVariable @Parameter(description = "Token público da proposta") String token) {
         return ResponseEntity.ok(propostaPublicaService.status(token));
     }
 
     @PostMapping(value = "/{token}/assinar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Assinar proposta",
+    @Operation(operationId = "assinarProposta", summary = "Assinar proposta",
         description = "Cliente preenche os próprios dados, escolhe uso de imagem, anexa comprovante e assina (nome + desenho)")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Proposta assinada"),
+        @ApiResponse(responseCode = "404", description = "Token inválido"),
+        @ApiResponse(responseCode = "422", description = "Dados ou arquivos inválidos")
+    })
     public ResponseEntity<PropostaStatusPublicoResponse> assinar(
-            @PathVariable String token,
-            @RequestParam String nome,
-            @RequestParam String telefone,
-            @RequestParam(required = false) String email,
-            @RequestParam String cpf,
-            @RequestParam(required = false) String cidade,
-            @RequestParam(required = false) String estado,
-            @RequestParam String autorizaUsoImagem,
-            @RequestParam("assinatura") String assinaturaNome,
-            @RequestParam MultipartFile comprovante,
-            @RequestParam MultipartFile assinaturaImagem,
-            @RequestParam(required = false) String userAgent,
-            @RequestParam(required = false) String plataforma,
-            @RequestParam(required = false) String fusoHorario,
+            @PathVariable @Parameter(description = "Token público da proposta") String token,
+            @Parameter(description = "Nome do cliente") @RequestParam String nome,
+            @Parameter(description = "Telefone do cliente") @RequestParam String telefone,
+            @Parameter(description = "E-mail do cliente") @RequestParam(required = false) String email,
+            @Parameter(description = "CPF do cliente") @RequestParam String cpf,
+            @Parameter(description = "Cidade") @RequestParam(required = false) String cidade,
+            @Parameter(description = "UF") @RequestParam(required = false) String estado,
+            @Parameter(description = "Autoriza uso de imagem (true/false)") @RequestParam String autorizaUsoImagem,
+            @Parameter(description = "Nome do assinante") @RequestParam("assinatura") String assinaturaNome,
+            @Parameter(description = "Comprovante de pagamento (imagem/PDF)") @RequestParam MultipartFile comprovante,
+            @Parameter(description = "Imagem da assinatura manuscrita") @RequestParam MultipartFile assinaturaImagem,
+            @Parameter(description = "User-Agent do navegador") @RequestParam(required = false) String userAgent,
+            @Parameter(description = "Plataforma") @RequestParam(required = false) String plataforma,
+            @Parameter(description = "Fuso horário") @RequestParam(required = false) String fusoHorario,
             HttpServletRequest request) {
         var agendamento = propostaPublicaService.assinar(
             token, nome, telefone, email, cpf, cidade, estado,

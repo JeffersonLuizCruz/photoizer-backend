@@ -23,3 +23,21 @@ jobs:
           cache: maven
       - name: Build e testes (H2 em memoria)
         run: mvn -B verify
+
+  openapi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configurar JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: Gerar a especificação OpenAPI a partir do código
+        run: mvn -B -Dtest=OpenApiSpecExporter test
+      - name: Verificar que docs/api/openapi.json está atualizado
+        run: |
+          git diff --exit-code -- docs/api/openapi.json \
+            || (echo "::error::A especificação versionada está desatualizada. Rode 'mvn -Dtest=OpenApiSpecExporter test' e commite docs/api/openapi.json." && exit 1)
+

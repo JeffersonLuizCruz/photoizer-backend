@@ -4,6 +4,8 @@ import com.photoizer.crm.agenda.model.AgendamentoFotografo;
 import com.photoizer.crm.shared.model.TipoRepasse;
 import com.photoizer.crm.agenda.service.AgendamentoFotografoService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.validation.constraints.NotNull;
@@ -25,7 +27,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/agendamentos/{agendamentoId}/fotografos")
 @RolesAllowed({"ADMIN", "FOTOGRAFO", "EDITOR"})
-@Tag(name = "Fotógrafos do Agendamento", description = "Gerencia os fotógrafos vinculados a um ensaio")
+@Tag(name = "Fotógrafos do Agendamento", description = "Fotógrafos vinculados a um ensaio (repasses por ensaio).")
 public class AgendamentoFotografoController {
 
     private final AgendamentoFotografoService service;
@@ -35,15 +37,17 @@ public class AgendamentoFotografoController {
     }
 
     @GetMapping
-    @Operation(summary = "Listar fotógrafos do agendamento")
-    public ResponseEntity<List<AgendamentoFotografo>> listar(@PathVariable UUID agendamentoId) {
+    @Operation(operationId = "listarFotografosDoAgendamento", summary = "Listar fotógrafos do agendamento")
+    public ResponseEntity<List<AgendamentoFotografo>> listar(
+            @PathVariable @Parameter(description = "ID do agendamento") UUID agendamentoId) {
         return ResponseEntity.ok(service.listarFotografos(agendamentoId));
     }
 
     @PostMapping
-    @Operation(summary = "Adicionar parceiro ao agendamento", description = "Valor pode ser FIXO (R$) ou PERCENTUAL (%)")
+    @Operation(operationId = "adicionarFotografoAoAgendamento", summary = "Adicionar parceiro ao agendamento",
+        description = "Valor pode ser FIXO (R$) ou PERCENTUAL (%)")
     public ResponseEntity<AgendamentoFotografo> adicionar(
-            @PathVariable UUID agendamentoId,
+            @PathVariable @Parameter(description = "ID do agendamento") UUID agendamentoId,
             @RequestBody AdicionarFotografoRequest request) {
         return ResponseEntity.ok(service.adicionarFotografo(
             agendamentoId, request.fotografoId(), request.valorRepassar(),
@@ -51,10 +55,10 @@ public class AgendamentoFotografoController {
     }
 
     @PutMapping("/{fotografoId}")
-    @Operation(summary = "Atualizar repasse do parceiro")
+    @Operation(operationId = "atualizarRepasseDoAgendamento", summary = "Atualizar repasse do parceiro")
     public ResponseEntity<AgendamentoFotografo> atualizarRepasse(
-            @PathVariable UUID agendamentoId,
-            @PathVariable UUID fotografoId,
+            @PathVariable @Parameter(description = "ID do agendamento") UUID agendamentoId,
+            @PathVariable @Parameter(description = "ID do profissional") UUID fotografoId,
             @RequestBody AtualizarRepasseRequest request) {
         return ResponseEntity.ok(service.atualizarRepasse(
             agendamentoId, fotografoId, request.valorRepassar(),
@@ -62,41 +66,47 @@ public class AgendamentoFotografoController {
     }
 
     @DeleteMapping("/{fotografoId}")
-    @Operation(summary = "Remover parceiro do agendamento")
-    public ResponseEntity<Void> remover(@PathVariable UUID agendamentoId, @PathVariable UUID fotografoId) {
+    @Operation(operationId = "removerFotografoDoAgendamento", summary = "Remover parceiro do agendamento")
+    public ResponseEntity<Void> remover(
+            @PathVariable @Parameter(description = "ID do agendamento") UUID agendamentoId,
+            @PathVariable @Parameter(description = "ID do profissional") UUID fotografoId) {
         service.removerFotografo(agendamentoId, fotografoId);
         return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{fotografoId}/pagar")
-    @Operation(summary = "Marcar repasse como pago")
+    @Operation(operationId = "pagarRepasseDoAgendamento", summary = "Marcar repasse como pago")
     public ResponseEntity<AgendamentoFotografo> pagarRepasse(
-            @PathVariable UUID agendamentoId, @PathVariable UUID fotografoId) {
+            @PathVariable @Parameter(description = "ID do agendamento") UUID agendamentoId,
+            @PathVariable @Parameter(description = "ID do profissional") UUID fotografoId) {
         return ResponseEntity.ok(service.pagarRepasse(agendamentoId, fotografoId));
     }
 
     @PatchMapping("/{fotografoId}/cancelar")
-    @Operation(summary = "Cancelar repasse")
+    @Operation(operationId = "cancelarRepasseDoAgendamento", summary = "Cancelar repasse")
     public ResponseEntity<AgendamentoFotografo> cancelarRepasse(
-            @PathVariable UUID agendamentoId, @PathVariable UUID fotografoId) {
+            @PathVariable @Parameter(description = "ID do agendamento") UUID agendamentoId,
+            @PathVariable @Parameter(description = "ID do profissional") UUID fotografoId) {
         return ResponseEntity.ok(service.cancelarRepasse(agendamentoId, fotografoId));
     }
 
+    @Schema(name = "AdicionarFotografoRequest", description = "Vínculo de um parceiro a um ensaio.")
     public record AdicionarFotografoRequest(
-        @NotNull UUID fotografoId,
-        BigDecimal valorRepassar,
-        TipoRepasse tipoValor,
-        BigDecimal percentual
+        @Schema(description = "ID do profissional") @NotNull UUID fotografoId,
+        @Schema(description = "Valor a repassar", nullable = true) BigDecimal valorRepassar,
+        @Schema(description = "Tipo do valor (FIXO/PERCENTUAL)", nullable = true) TipoRepasse tipoValor,
+        @Schema(description = "Percentual", nullable = true) BigDecimal percentual
     ) {
         public AdicionarFotografoRequest(UUID fotografoId, BigDecimal valorRepassar) {
             this(fotografoId, valorRepassar, TipoRepasse.FIXO, null);
         }
     }
 
+    @Schema(name = "AtualizarRepasseRequest", description = "Atualização do repasse de um parceiro.")
     public record AtualizarRepasseRequest(
-        BigDecimal valorRepassar,
-        TipoRepasse tipoValor,
-        BigDecimal percentual
+        @Schema(description = "Valor a repassar", nullable = true) BigDecimal valorRepassar,
+        @Schema(description = "Tipo do valor (FIXO/PERCENTUAL)", nullable = true) TipoRepasse tipoValor,
+        @Schema(description = "Percentual", nullable = true) BigDecimal percentual
     ) {
         public AtualizarRepasseRequest(BigDecimal valorRepassar) {
             this(valorRepassar, null, null);

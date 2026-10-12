@@ -5,7 +5,14 @@ import com.photoizer.crm.cliente.api.dto.ClienteMapper;
 import com.photoizer.crm.cliente.api.dto.ClienteResponse;
 import com.photoizer.crm.cliente.service.ClienteAuthService;
 import com.photoizer.crm.cliente.service.ClienteService;
+import com.photoizer.crm.shared.config.OpenApiConfig;
+import com.photoizer.crm.shared.exception.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -51,7 +58,15 @@ public class ClienteAuthController {
      * Padrão DTO Pattern - recebe DTO de request, retorna DTO de response.
      */
     @PostMapping("/registro")
-    @Operation(summary = "Registrar novo cliente com email e senha")
+    @Operation(operationId = "registrarCliente", summary = "Registrar novo cliente com email e senha")
+    @ApiResponses({
+        @ApiResponse(responseCode = "201", description = "Cliente registrado",
+            content = @Content(schema = @Schema(implementation = ClienteAuthResponse.class))),
+        @ApiResponse(responseCode = "409", description = "E-mail/telefone já cadastrado",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "422", description = "Dados inválidos",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     public ResponseEntity<ClienteAuthResponse> registrar(@Valid @RequestBody ClienteRegistroRequest request,
                                                          HttpServletResponse response) {
         var resultado = clienteAuthService.registrar(request);
@@ -63,7 +78,13 @@ public class ClienteAuthController {
      * Login de cliente.
      */
     @PostMapping("/login")
-    @Operation(summary = "Login de cliente")
+    @Operation(operationId = "loginCliente", summary = "Login de cliente")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Autenticado",
+            content = @Content(schema = @Schema(implementation = ClienteAuthResponse.class))),
+        @ApiResponse(responseCode = "401", description = "Credenciais inválidas",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     public ResponseEntity<ClienteAuthResponse> login(@Valid @RequestBody ClienteLoginRequest request,
                                                      HttpServletResponse response) {
         var resultado = clienteAuthService.login(request);
@@ -76,7 +97,15 @@ public class ClienteAuthController {
      * Retorna DTO de resposta (sem senhaHash).
      */
     @GetMapping("/perfil")
-    @Operation(summary = "Obter perfil do cliente autenticado")
+    @Operation(operationId = "perfilCliente", summary = "Obter perfil do cliente autenticado",
+        security = {@SecurityRequirement(name = OpenApiConfig.SECURITY_SCHEME_BEARER),
+            @SecurityRequirement(name = OpenApiConfig.SECURITY_SCHEME_COOKIE)})
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Perfil do cliente",
+            content = @Content(schema = @Schema(implementation = ClienteResponse.class))),
+        @ApiResponse(responseCode = "401", description = "Não autenticado",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     public ResponseEntity<ClienteResponse> perfil(@AuthenticationPrincipal String userId) {
         var cliente = clienteService.buscarPorId(UUID.fromString(userId));
         // Converte ClienteAdminResponse para ClienteResponse (mais leve)
@@ -101,7 +130,17 @@ public class ClienteAuthController {
      * Padrão DTO Pattern - recebe DTO de request, retorna DTO de response.
      */
     @PutMapping("/perfil")
-    @Operation(summary = "Atualizar perfil do cliente autenticado")
+    @Operation(operationId = "atualizarPerfilCliente", summary = "Atualizar perfil do cliente autenticado",
+        security = {@SecurityRequirement(name = OpenApiConfig.SECURITY_SCHEME_BEARER),
+            @SecurityRequirement(name = OpenApiConfig.SECURITY_SCHEME_COOKIE)})
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Perfil atualizado",
+            content = @Content(schema = @Schema(implementation = ClienteResponse.class))),
+        @ApiResponse(responseCode = "401", description = "Não autenticado",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "422", description = "Dados inválidos",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     public ResponseEntity<ClienteResponse> atualizarPerfil(
             @AuthenticationPrincipal String userId,
             @Valid @RequestBody AtualizarPerfilRequest request) {
