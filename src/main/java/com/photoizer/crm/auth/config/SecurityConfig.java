@@ -68,15 +68,15 @@ public class SecurityConfig {
                 if (devProfile) {
                     auth.requestMatchers("/h2-console/**").permitAll();
                     auth.requestMatchers("/swagger-ui/**", "/swagger-ui.html",
-                        "/v3/api-docs", "/v3/api-docs/**").permitAll();
+                        "/v3/api-docs*", "/v3/api-docs/**").permitAll();
                 } else if (homologProfile) {
                     auth.requestMatchers("/h2-console/**").denyAll();
                     auth.requestMatchers("/swagger-ui/**", "/swagger-ui.html",
-                        "/v3/api-docs", "/v3/api-docs/**").authenticated();
+                        "/v3/api-docs*", "/v3/api-docs/**").authenticated();
                 } else {
                     auth.requestMatchers("/h2-console/**").denyAll();
                     auth.requestMatchers("/swagger-ui/**", "/swagger-ui.html",
-                        "/v3/api-docs", "/v3/api-docs/**").denyAll();
+                        "/v3/api-docs*", "/v3/api-docs/**").denyAll();
                 }
 
                 auth
