@@ -5368,7 +5368,7 @@
       "post" : {
         "tags" : [ "Agendamentos" ],
         "summary" : "Registrar pagamento final",
-        "description" : "Registra o pagamento final com comprovante obrigatório e finaliza o ensaio",
+        "description" : "Registra o pagamento final (comprovante opcional) e finaliza o ensaio",
         "operationId" : "registrarPagamentoFinal",
         "parameters" : [ {
           "name" : "id",
@@ -5397,7 +5397,7 @@
                   "comprovanteFinal" : {
                     "type" : "string",
                     "format" : "binary",
-                    "description" : "Comprovante de pagamento final (obrigatório, exceto em dinheiro)"
+                    "description" : "Comprovante de pagamento final (opcional)"
                   }
                 }
               }

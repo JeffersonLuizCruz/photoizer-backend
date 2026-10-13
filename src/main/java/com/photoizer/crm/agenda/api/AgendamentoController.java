@@ -274,10 +274,10 @@ public class AgendamentoController {
     }
 
     @PostMapping("/{id}/pagamento-final")
-    @Operation(operationId = "registrarPagamentoFinal", summary = "Registrar pagamento final", description = "Registra o pagamento final com comprovante obrigatório e finaliza o ensaio")
+    @Operation(operationId = "registrarPagamentoFinal", summary = "Registrar pagamento final", description = "Registra o pagamento final (comprovante opcional) e finaliza o ensaio")
     public ResponseEntity<AgendamentoResponse> registrarPagamentoFinal(
             @PathVariable @Parameter(description = "ID do agendamento") UUID id,
-            @RequestParam(required = false) @Parameter(description = "Comprovante de pagamento final (obrigatório, exceto em dinheiro)") MultipartFile comprovanteFinal,
+            @RequestParam(required = false) @Parameter(description = "Comprovante de pagamento final (opcional)") MultipartFile comprovanteFinal,
             @RequestParam(required = false) @Parameter(description = "Forma de pagamento (ex.: DINHEIRO)") String formaPagamento) {
         var agendamento = agendamentoStatusLifecycle.registrarPagamentoFinal(
             id, comprovanteFinal, parseFormaPagamento(formaPagamento));

@@ -5,7 +5,6 @@ import com.photoizer.crm.agenda.event.AgendamentoConfirmadoEvent;
 import com.photoizer.crm.agenda.event.AgendamentoRealizadoEvent;
 import com.photoizer.crm.agenda.event.PagamentoFinalRegistradoEvent;
 import com.photoizer.crm.agenda.exception.AgendamentoNaoEncontradoException;
-import com.photoizer.crm.agenda.exception.ComprovanteObrigatorioException;
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
@@ -118,12 +117,8 @@ public class AgendamentoStatusLifecycle {
     public Agendamento registrarPagamentoFinal(UUID id, MultipartFile comprovante, FormaPagamento formaPagamento) {
         var agendamento = buscarPorId(id);
 
-        var dinheiro = formaPagamento == FormaPagamento.DINHEIRO;
+        // O comprovante é opcional: o registro do pagamento final não depende de anexo.
         var temComprovante = comprovante != null && !comprovante.isEmpty();
-
-        if (!dinheiro && !temComprovante) {
-            throw new ComprovanteObrigatorioException();
-        }
 
         String url = null;
         if (temComprovante) {
