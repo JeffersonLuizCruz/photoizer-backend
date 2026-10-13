@@ -2597,7 +2597,7 @@
       "post" : {
         "tags" : [ "Propostas Públicas" ],
         "summary" : "Assinar proposta",
-        "description" : "Cliente preenche os próprios dados, escolhe uso de imagem, anexa comprovante e assina (nome + desenho)",
+        "description" : "Cliente preenche os próprios dados, escolhe uso de imagem, anexa comprovante e confirma a proposta",
         "operationId" : "assinarProposta",
         "parameters" : [ {
           "name" : "token",
@@ -2664,14 +2664,6 @@
             "type" : "string"
           }
         }, {
-          "name" : "assinatura",
-          "in" : "query",
-          "description" : "Nome do assinante",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
           "name" : "userAgent",
           "in" : "query",
           "description" : "User-Agent do navegador",
@@ -2706,14 +2698,9 @@
                     "type" : "string",
                     "format" : "binary",
                     "description" : "Comprovante de pagamento (imagem/PDF)"
-                  },
-                  "assinaturaImagem" : {
-                    "type" : "string",
-                    "format" : "binary",
-                    "description" : "Imagem da assinatura manuscrita"
                   }
                 },
-                "required" : [ "assinaturaImagem", "comprovante" ]
+                "required" : [ "comprovante" ]
               }
             }
           }
@@ -12978,16 +12965,16 @@
           },
           "podeAssinar" : {
             "type" : "boolean",
-            "description" : "Indica se pode assinar"
+            "description" : "Indica se pode confirmar"
           },
           "dataAssinatura" : {
             "type" : "string",
             "format" : "date-time",
-            "description" : "Data da assinatura"
+            "description" : "Data da confirmação"
           },
           "assinanteNome" : {
             "type" : "string",
-            "description" : "Nome do assinante"
+            "description" : "Nome do contratante"
           }
         }
       },

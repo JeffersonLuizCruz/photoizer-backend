@@ -51,7 +51,7 @@ public class PropostaPublicaController {
 
     @PostMapping(value = "/{token}/assinar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(operationId = "assinarProposta", summary = "Assinar proposta",
-        description = "Cliente preenche os próprios dados, escolhe uso de imagem, anexa comprovante e assina (nome + desenho)")
+        description = "Cliente preenche os próprios dados, escolhe uso de imagem, anexa comprovante e confirma a proposta")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Proposta assinada"),
         @ApiResponse(responseCode = "404", description = "Token inválido"),
@@ -66,16 +66,14 @@ public class PropostaPublicaController {
             @Parameter(description = "Cidade") @RequestParam(required = false) String cidade,
             @Parameter(description = "UF") @RequestParam(required = false) String estado,
             @Parameter(description = "Autoriza uso de imagem (true/false)") @RequestParam String autorizaUsoImagem,
-            @Parameter(description = "Nome do assinante") @RequestParam("assinatura") String assinaturaNome,
             @Parameter(description = "Comprovante de pagamento (imagem/PDF)") @RequestParam MultipartFile comprovante,
-            @Parameter(description = "Imagem da assinatura manuscrita") @RequestParam MultipartFile assinaturaImagem,
             @Parameter(description = "User-Agent do navegador") @RequestParam(required = false) String userAgent,
             @Parameter(description = "Plataforma") @RequestParam(required = false) String plataforma,
             @Parameter(description = "Fuso horário") @RequestParam(required = false) String fusoHorario,
             HttpServletRequest request) {
         var agendamento = propostaPublicaService.assinar(
             token, nome, telefone, email, cpf, cidade, estado,
-            autorizaUsoImagem, assinaturaNome, comprovante, assinaturaImagem,
+            autorizaUsoImagem, comprovante,
             userAgent, plataforma, fusoHorario, obterIp(request));
         return ResponseEntity.ok(PropostaStatusPublicoResponse.of(agendamento));
     }

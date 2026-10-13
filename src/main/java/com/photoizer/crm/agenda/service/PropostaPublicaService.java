@@ -141,9 +141,7 @@ public class PropostaPublicaService {
                                String cidade,
                                String estado,
                                String autorizaUsoImagem,
-                               String assinaturaNome,
                                MultipartFile comprovante,
-                               MultipartFile assinaturaImagem,
                                String userAgent,
                                String plataforma,
                                String fusoHorario,
@@ -155,11 +153,8 @@ public class PropostaPublicaService {
             throw new BadRequestException("Esta proposta não está disponível para assinatura.");
         }
 
-        validarCamposCliente(nome, telefone, cpf, assinaturaNome, autorizaUsoImagem);
+        validarCamposCliente(nome, telefone, cpf, autorizaUsoImagem);
         validarComprovante(comprovante);
-        if (assinaturaImagem == null || assinaturaImagem.isEmpty()) {
-            throw new BadRequestException("A assinatura (desenho) é obrigatória");
-        }
 
         var cliente = agendamentoService.resolverCliente(nome, telefone, email, cpf, cidade, estado);
 
@@ -167,26 +162,25 @@ public class PropostaPublicaService {
         var urlComprovante = fileStorageService.salvarEmSubdiretorio(
             comprovante, agendamento.getId(), "comprovante_entrada");
 
-        fileValidator.validate(assinaturaImagem, "image");
-        var urlAssinaturaImagem = fileStorageService.salvarEmSubdiretorio(
-            assinaturaImagem, agendamento.getId(), "assinatura");
-
+        // Sem assinatura manuscrita: o nome do contratante é a prova de aceite (nome informado no passo de dados).
+        var assinanteNome = assinanteNome(nome);
+        String urlAssinaturaImagem = null; // assinatura manuscrita removida do fluxo público
         var dataAssinatura = LocalDateTime.now();
 
         var snapshotJson = montarSnapshot(agendamento, nome, telefone, email, cpf, cidade, estado,
-            autorizaUsoImagem, assinaturaNome, dataAssinatura, ip, userAgent, plataforma, fusoHorario,
+            autorizaUsoImagem, assinanteNome, dataAssinatura, ip, userAgent, plataforma, fusoHorario,
             urlComprovante, urlAssinaturaImagem);
         var hash = HashUtils.sha256(snapshotJson);
 
         var urlPdf = gravarPdf(agendamento.getId(), montarTexto(agendamento, nome, telefone, email, cpf,
-            cidade, estado, autorizaUsoImagem, assinaturaNome, dataAssinatura, ip, hash, urlAssinaturaImagem));
+            cidade, estado, autorizaUsoImagem, assinanteNome, dataAssinatura, ip, hash, urlAssinaturaImagem));
 
         assinaturaRepository.findByAgendamentoId(agendamento.getId())
             .ifPresent(assinaturaRepository::delete);
 
         var assinatura = Assinatura.builder()
             .agendamentoId(agendamento.getId())
-            .nomeAssinante(assinaturaNome)
+            .nomeAssinante(assinanteNome)
             .dataAssinatura(dataAssinatura)
             .ip(ip)
             .hash(hash)
@@ -197,10 +191,16 @@ public class PropostaPublicaService {
             .build();
         assinaturaRepository.save(assinatura);
 
-        agendamento.assinarProposta(cliente, autorizaUsoImagem, urlComprovante, assinaturaNome,
+        agendamento.assinarProposta(cliente, autorizaUsoImagem, urlComprovante, assinanteNome,
             snapshotJson, hash, urlPdf, urlAssinaturaImagem);
 
         return agendamentoRepository.save(agendamento);
+    }
+
+    /** Nome do contratante usado como assinante; truncado ao limite da coluna (64). */
+    private String assinanteNome(String nome) {
+        if (nome == null) return null;
+        return nome.length() > 64 ? nome.substring(0, 64) : nome;
     }
 
     private boolean podeAssinar(Agendamento a) {
@@ -354,7 +354,7 @@ public class PropostaPublicaService {
         var texto = templateService.renderizarTexto(template, vals);
         var linhas = new ArrayList<>(List.of(texto.split("\n", -1)));
         linhas.add("");
-        linhas.add("Assinado digitalmente em " + dataAssinatura.format(FMT_DATA_HORA)
+        linhas.add("Aceite registrado em " + dataAssinatura.format(FMT_DATA_HORA)
             + " (IP " + segurar(ip) + ")");
         linhas.add("Hash do documento: " + hash);
         return linhas;
@@ -378,12 +378,10 @@ public class PropostaPublicaService {
         return valor == null || valor.isBlank() ? "-" : valor;
     }
 
-    private void validarCamposCliente(String nome, String telefone, String cpf,
-                                      String assinaturaNome, String autorizaUsoImagem) {
+    private void validarCamposCliente(String nome, String telefone, String cpf, String autorizaUsoImagem) {
         if (isBlank(nome)) throw new BadRequestException("Nome completo do cliente é obrigatório");
         if (isBlank(telefone)) throw new BadRequestException("Telefone do cliente é obrigatório");
         if (isBlank(cpf)) throw new BadRequestException("CPF do cliente é obrigatório");
-        if (isBlank(assinaturaNome)) throw new BadRequestException("A assinatura (nome do contratante) é obrigatória");
         if (isBlank(autorizaUsoImagem)) throw new BadRequestException("Selecione uma opção de uso de imagem");
     }
 
