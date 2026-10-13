@@ -23,11 +23,14 @@ public class DisponibilidadeService {
 
     private static final DateTimeFormatter HORA_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
 
-    /** Status que não ocupam a agenda (não geram conflito). */
+    /**
+     * Status que não ocupam a agenda (não geram conflito de horário).
+     * Inclui FINALIZADO: o ensaio já foi entregue, logo o horário volta a ficar livre.
+     */
     private static final List<StatusAgendamento> STATUS_IGNORADOS = List.of(
         StatusAgendamento.CANCELADO, StatusAgendamento.NO_SHOW,
         StatusAgendamento.PRE_RESERVA, StatusAgendamento.AGUARDANDO_APROVACAO,
-        StatusAgendamento.PAGAMENTO_CONFIRMADO);
+        StatusAgendamento.PAGAMENTO_CONFIRMADO, StatusAgendamento.FINALIZADO);
 
     private final AgendamentoRepository agendamentoRepository;
 
