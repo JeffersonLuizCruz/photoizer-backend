@@ -8,6 +8,8 @@ import com.photoizer.crm.agenda.exception.AgendamentoNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.AgendamentoNoPassadoException;
 import com.photoizer.crm.agenda.exception.EditorNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.FotografoNaoEncontradoException;
+import com.photoizer.crm.agenda.exception.PropostaNaoEditavelException;
+import com.photoizer.crm.agenda.exception.PropostaNaoRemovivelException;
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.model.AgendamentoFotografo;
@@ -426,10 +428,133 @@ public class AgendamentoService {
         agendamento.setValorTotalFinal(valores.valorTotalFinal());
 
         agendamento = agendamentoRepository.save(agendamento);
-        sincronizarFotografosNoAgendamento(agendamento, request.fotografos());
+        sincronizarFotografosNoAgendamento(agendamento, mapearRepasses(request.fotografos()));
         partilhaService.calcularPartilhaFotografo(agendamento);
         var links = agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(agendamento.getId());
         return agendamentoMapper.toResponse(agendamento, links, null, null, null);
+    }
+
+    /**
+     * Altera uma proposta/pré-reserva ainda não assinada pelo cliente. Recalcula
+     * valores, revalida conflito de agenda e sincroniza os repasses dos parceiros.
+     * O token do link público é preservado (o link já enviado ao cliente continua
+     * válido). Bloqueia a edição se a proposta já foi assinada ou decidida.
+     */
+    public AgendamentoResponse atualizarProposta(UUID id, CriarPropostaCommand command) {
+        var agendamento = agendamentoRepository.findByIdWithLock(id)
+            .orElseThrow(() -> new AgendamentoNaoEncontradoException(id));
+
+        if (agendamento.getStatus() != StatusAgendamento.PRE_RESERVA) {
+            throw new PropostaNaoEditavelException(agendamento.getStatus());
+        }
+
+        var pacote = pacoteQueryService.buscarEntityPorId(command.pacoteId());
+        if (!pacote.getAtivo()) {
+            throw new PacoteInativoException(pacote.getId());
+        }
+
+        var dataHoraEnsaio = command.dataHoraEnsaio();
+        if (dataHoraEnsaio == null || dataHoraEnsaio.isBefore(LocalDateTime.now())) {
+            throw new AgendamentoNoPassadoException();
+        }
+
+        var editor = (command.editorId() != null)
+            ? userRepository.findById(command.editorId())
+                .orElseThrow(() -> new EditorNaoEncontradoException(command.editorId()))
+            : null;
+
+        var fotografo = userRepository.findById(command.fotografoId())
+            .orElseThrow(() -> new FotografoNaoEncontradoException(command.fotografoId()));
+        if (fotografo.getPapel() != Papel.FOTOGRAFO) {
+            throw new BadRequestException("O responsável selecionado não é um fotógrafo.");
+        }
+
+        var duracao = command.duracaoMinutos() != null ? command.duracaoMinutos() : agendamento.getDuracaoMinutos();
+
+        disponibilidadeService.validarConflitoAgenda(
+            pacote, dataHoraEnsaio, duracao, command.localEnsaio(),
+            ConflitoAgendaParams.paraAtualizacao(fotografo.getId(), agendamento.getId()));
+
+        var taxaDeslocamentoPadrao = configuracaoService.getValorDecimal(ConfigKey.TAXA_DESLOCAMENTO);
+        var custoDeslocamento = command.custoDeslocamento() != null ? command.custoDeslocamento() : taxaDeslocamentoPadrao;
+        var repassarDeslocamento = command.repassarDeslocamento() != null ? command.repassarDeslocamento() : true;
+        var taxaDeslocamento = repassarDeslocamento ? custoDeslocamento : BigDecimal.ZERO;
+
+        var percentualEntrada = configuracaoService.getValorDecimal(ConfigKey.PERCENTUAL_ENTRADA);
+        var valores = agendamentoValoresCalculator.calcularValoresAtualizacao(
+            pacote.getValorBase(), taxaDeslocamento, percentualEntrada,
+            agendamento.getValorEntradaPago(), agendamento.getValorExtras());
+
+        agendamento.setPacote(pacote);
+        if (command.editorId() != null) {
+            agendamento.setEditor(editor);
+        }
+        agendamento.setFotografo(fotografo);
+        agendamento.setDataHoraEnsaio(dataHoraEnsaio);
+        agendamento.setDuracaoMinutos(duracao);
+        agendamento.setLocalEnsaio(command.localEnsaio());
+        agendamento.setCustoDeslocamento(custoDeslocamento);
+        agendamento.setRepassarDeslocamento(repassarDeslocamento);
+        agendamento.setTaxaDeslocamento(taxaDeslocamento);
+        if (command.clausulasPersonalizadas() != null) {
+            agendamento.setClausulasPersonalizadas(command.clausulasPersonalizadas());
+        }
+        agendamento.setObservacoes(command.observacoes());
+        if (command.indicadorId() != null
+                || command.indicadorNome() != null
+                || command.indicadorTelefone() != null) {
+            agendamento.setIndicadorId(command.indicadorId());
+            agendamento.setIndicadorNome(command.indicadorNome());
+            agendamento.setIndicadorTelefone(command.indicadorTelefone());
+        }
+
+        agendamento.setValorTotal(valores.valorTotal());
+        agendamento.setValorEntradaExigido(valores.valorEntradaExigido());
+        agendamento.setPercentualEntrada(percentualEntrada);
+        agendamento.setValorRestante(valores.valorRestante());
+        agendamento.setValorTotalFinal(valores.valorTotalFinal());
+
+        agendamento = agendamentoRepository.save(agendamento);
+        sincronizarFotografosNoAgendamento(agendamento, command.fotografos());
+        partilhaService.calcularPartilhaFotografo(agendamento);
+
+        var links = agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(agendamento.getId());
+        return agendamentoMapper.toResponse(agendamento, links, null, null, null);
+    }
+
+    /**
+     * Remove uma proposta/pré-reserva de forma auditável (soft-cancel): move para
+     * CANCELADO registrando motivo e autor, preservando histórico, vínculos e os
+     * arquivos do termo/comprovante. Publica o evento de cancelamento para que os
+     * módulos interessados (ex.: comissão) reconciliem o estado.
+     */
+    public Agendamento removerProposta(UUID id, String motivo, UUID autorId) {
+        var agendamento = agendamentoRepository.findByIdWithLock(id)
+            .orElseThrow(() -> new AgendamentoNaoEncontradoException(id));
+
+        if (!agendamento.getStatus().isPreReserva()) {
+            throw new PropostaNaoRemovivelException(agendamento.getStatus());
+        }
+
+        var motivoFinal = (motivo == null || motivo.isBlank())
+            ? "Proposta removida pelo staff"
+            : motivo.trim();
+
+        agendamento.recusar(motivoFinal);
+        agendamento.setRecusadoPor(resolverNomeAutor(autorId));
+        agendamento = agendamentoRepository.save(agendamento);
+
+        eventPublisher.publishEvent(new AgendamentoCanceladoEvent(agendamento.getId()));
+        return agendamento;
+    }
+
+    private List<CriarPropostaCommand.FotografoRepasse> mapearRepasses(
+            List<AtualizarAgendamentoRequest.FotografoRepasse> fotografos) {
+        if (fotografos == null) return null;
+        return fotografos.stream()
+            .map(f -> new CriarPropostaCommand.FotografoRepasse(
+                f.fotografoId(), f.valorRepassar(), f.tipoValor(), f.percentual()))
+            .toList();
     }
 
     private void criarFotografosNoAgendamento(Agendamento agendamento, List<CriarPropostaCommand.FotografoRepasse> fotografos) {
@@ -462,12 +587,12 @@ public class AgendamentoService {
         }
     }
 
-    private void sincronizarFotografosNoAgendamento(Agendamento agendamento, List<com.photoizer.crm.agenda.api.AtualizarAgendamentoRequest.FotografoRepasse> fotografos) {
+    private void sincronizarFotografosNoAgendamento(Agendamento agendamento, List<CriarPropostaCommand.FotografoRepasse> fotografos) {
         if (fotografos == null) return;
         var existentes = agendamentoFotografoRepository.findByAgendamentoId(agendamento.getId());
 
         var novosIds = fotografos.stream()
-            .map(com.photoizer.crm.agenda.api.AtualizarAgendamentoRequest.FotografoRepasse::fotografoId)
+            .map(CriarPropostaCommand.FotografoRepasse::fotografoId)
             .toList();
 
         for (var existente : existentes) {

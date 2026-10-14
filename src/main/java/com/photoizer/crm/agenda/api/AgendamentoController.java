@@ -24,6 +24,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -97,6 +98,57 @@ public class AgendamentoController {
         var agendamento = agendamentoService.criarProposta(command);
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(respostaPara(agendamentoMapper.toResponse(agendamento, null, null, null, null)));
+    }
+
+    @PutMapping("/{id}/proposta")
+    @RolesAllowed({"ADMIN", "FOTOGRAFO"})
+    @Operation(operationId = "atualizarProposta", summary = "Alterar proposta/pré-reserva",
+        description = "Altera uma proposta ainda não assinada pelo cliente (status PRE_RESERVA). "
+            + "Recalcula valores, revalida conflito de agenda e sincroniza repasses. "
+            + "O link público permanece o mesmo.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Proposta alterada com sucesso"),
+        @ApiResponse(responseCode = "404", description = "Proposta não encontrada", content = @Content),
+        @ApiResponse(responseCode = "409", description = "Conflito de agenda", content = @Content),
+        @ApiResponse(responseCode = "422", description = "Proposta não editável ou dados inválidos", content = @Content)
+    })
+    public ResponseEntity<AgendamentoResponse> atualizarProposta(
+            @PathVariable @Parameter(description = "ID da proposta") UUID id,
+            @Valid @RequestBody AtualizarPropostaRequest request) {
+        var fotografos = request.fotografos() == null ? List.<CriarPropostaCommand.FotografoRepasse>of()
+            : request.fotografos().stream()
+                .map(f -> new CriarPropostaCommand.FotografoRepasse(
+                    f.fotografoId(), f.valorRepassar(), f.tipoValor(), f.percentual()))
+                .toList();
+
+        var command = new CriarPropostaCommand(
+            request.pacoteId(), request.editorId(), request.fotografoId(), request.dataHoraEnsaio(),
+            request.duracaoMinutos(), request.localEnsaio(),
+            request.custoDeslocamento(), request.repassarDeslocamento(), request.clausulasPersonalizadas(),
+            request.observacoes(), request.indicadorId(), request.indicadorNome(),
+            request.indicadorTelefone(), fotografos
+        );
+
+        return ResponseEntity.ok(respostaPara(agendamentoService.atualizarProposta(id, command)));
+    }
+
+    @DeleteMapping("/{id}/proposta")
+    @RolesAllowed({"ADMIN", "FOTOGRAFO"})
+    @Operation(operationId = "removerProposta", summary = "Remover proposta/pré-reserva",
+        description = "Remove a proposta de forma auditável (soft-cancel): move para CANCELADO registrando "
+            + "motivo e autor, preservando histórico e arquivos. Permitido apenas enquanto a proposta está em análise.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "204", description = "Proposta removida"),
+        @ApiResponse(responseCode = "404", description = "Proposta não encontrada", content = @Content),
+        @ApiResponse(responseCode = "422", description = "Proposta não removível", content = @Content)
+    })
+    public ResponseEntity<Void> removerProposta(
+            @PathVariable @Parameter(description = "ID da proposta") UUID id,
+            @AuthenticationPrincipal String userIdStr,
+            @RequestParam(required = false) @Parameter(description = "Motivo da remoção") String motivo) {
+        var autorId = userIdStr != null && !userIdStr.isBlank() ? UUID.fromString(userIdStr) : null;
+        agendamentoService.removerProposta(id, motivo, autorId);
+        return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{id}/confirmar-pagamento")

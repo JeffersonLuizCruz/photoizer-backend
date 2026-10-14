@@ -162,12 +162,27 @@ public class AgendamentoFotografoService {
     @Transactional(readOnly = true)
     public List<AgendamentoFotografo> listarPendentes() {
         return agendamentoFotografoRepository.findByStatusWithAgendamento(RepasseStatus.PENDENTE)
-            .stream().filter(l -> l.getStatus() == RepasseStatus.PENDENTE).toList();
+            .stream()
+            .filter(l -> l.getStatus() == RepasseStatus.PENDENTE)
+            .filter(this::agendamentoAtivo)
+            .toList();
     }
 
     @Transactional(readOnly = true)
     public List<AgendamentoFotografo> listarPendentesPorFotografo(UUID fotografoId) {
-        return agendamentoFotografoRepository.findByFotografoIdAndStatusWithAgendamento(fotografoId, RepasseStatus.PENDENTE);
+        return agendamentoFotografoRepository.findByFotografoIdAndStatusWithAgendamento(fotografoId, RepasseStatus.PENDENTE)
+            .stream()
+            .filter(this::agendamentoAtivo)
+            .toList();
+    }
+
+    /**
+     * Repasses pendentes de propostas canceladas (removidas/recusadas) não são
+     * obrigações reais e não devem aparecer como pendentes nem no fluxo de caixa.
+     */
+    private boolean agendamentoAtivo(AgendamentoFotografo link) {
+        var agendamento = link.getAgendamento();
+        return agendamento == null || agendamento.getStatus() != StatusAgendamento.CANCELADO;
     }
 
     private AgendamentoFotografo buscarLink(UUID agendamentoId, UUID fotografoId) {

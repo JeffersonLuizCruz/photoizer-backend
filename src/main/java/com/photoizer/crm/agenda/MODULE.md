@@ -4,6 +4,8 @@
 > 1. Staff cria uma proposta a partir de uma data (`POST /api/v1/agendamentos/proposta`) → `Agendamento` em `PRE_RESERVA` (cliente ainda nulo), com `tokenProposta` do link público. O `fotografoId` é **obrigatório** e deve ter `Papel.FOTOGRAFO` (não há mais fallback para o usuário logado). A criação **também valida conflito** por responsável contra agendamentos que já ocupam a agenda (`CONFIRMADO`+).
 > 2. O cliente preenche os próprios dados, autoriza uso de imagem, anexa comprovante e assina (nome + desenho) no link público (`/api/v1/propostas/publico/{token}`) → `AGUARDANDO_APROVACAO`.
 > 3. Staff `confirmar-pagamento` → `PAGAMENTO_CONFIRMADO`; `aprovar` → `CONFIRMADO` (aqui valida conflito e ocupa a agenda); `recusar` (com motivo obrigatório) → `CANCELADO`.
+>     - **Alterar proposta** (`PUT /api/v1/agendamentos/{id}/proposta`, ADMIN/FOTOGRAFO): permitido **apenas em `PRE_RESERVA`** (antes da assinatura), para preservar a integridade do snapshot/termo assinado. Recalcula valores, revalida conflito e sincroniza repasses; o token do link público é preservado. Bloqueia com 422 (`PropostaNaoEditavelException`) fora da pré-reserva.
+>     - **Remover proposta** (`DELETE /api/v1/agendamentos/{id}/proposta`, ADMIN/FOTOGRAFO): **soft-cancel auditável** — move para `CANCELADO` gravando `motivoRecusa`/`recusadoPor`/`dataRecusa` (preserva histórico, FKs e arquivos) e publica `AgendamentoCanceladoEvent`. Permitido para propostas em análise (`isPreReserva()`), bloqueando com 422 (`PropostaNaoRemovivelException`) fora disso.
 > 4. **Segurança da decisão**: `confirmar-pagamento`, `aprovar` e `recusar` exigem `@RolesAllowed({"ADMIN","FOTOGRAFO"})` e o comprovante de entrada é servido pelo `documento` module (`/api/v1/documentos/comprovantes/{id}/entrada`, também ADMIN/FOTOGRAFO). A recusa grava `motivoRecusa`, `recusadoPor` (autor) e `dataRecusa`. O `AgendamentoResponse` expõe apenas flags (`temComprovanteEntrada`, `temComprovanteFinal`, `temTermoAssinado`), nunca os paths do filesystem.
 >
 > A assinatura fica em `agenda/model/Assinatura` (FK `agendamentoId`) com IP, user-agent, plataforma e fuso. A geração do PDF/snapshot imutável está em `PropostaPublicaService`. O template do termo é um valor de config, gerenciado em `config/api/PropostaTemplateController`.
@@ -34,7 +36,7 @@ agenda/
 │   ├── RascunhoAgendamentoService.java  # ~92 linhas: salvar/buscar/deletar rascunho por usuário
 │   └── CriarAgendamentoCommand.java      # Record com 27 campos (inclui MultipartFile)
 ├── api/
-│   ├── AgendamentoController.java     # REST: POST /proposta, GET, PUT, PATCH /status, PATCH /confirmar-pagamento, PATCH /aprovar, PATCH /recusar, PATCH /reagendar, PATCH /destaque, POST /pagamento-final, GET /verificar-disponibilidade
+│   ├── AgendamentoController.java     # REST: POST /proposta, PUT /{id}/proposta, DELETE /{id}/proposta, GET, PUT, PATCH /status, PATCH /confirmar-pagamento, PATCH /aprovar, PATCH /recusar, PATCH /reagendar, PATCH /destaque, POST /pagamento-final, GET /verificar-disponibilidade
 │   ├── AgendamentoFotografoController.java # REST de repasses
 │   ├── RascunhoAgendamentoController.java  # REST de rascunhos
 │   ├── AgendamentoMapper.java         # MapStruct multi-source: agendamento + fotografos + valorComissao + indicador + statusComissao [Fase 2]
@@ -56,6 +58,8 @@ agenda/
     ├── ConflitoDeAgendaException.java
     ├── EditorNaoEncontradoException.java
     ├── EnsaioNaoFinalizadoException.java
+    ├── PropostaNaoEditavelException.java  # 422 ao alterar proposta fora de PRE_RESERVA
+    ├── PropostaNaoRemovivelException.java # 422 ao remover proposta fora do funil de pré-reserva
     └── FotografoNaoEncontradoException.java
 ```
 
@@ -119,6 +123,7 @@ CONFIRMADO ──realizar──▶ AGUARDANDO_PAGAMENTO_FINAL ──pagarFinal�
 
 ### Fluxo 3: Repasses de Fotógrafos (partilha)
 - `AgendamentoFotografoService`: adicionar/atualizar/remover/pagar/cancelar repasse, delegando validação de partilha e método de domínio agrupados (`atualizarRepasse`/`pagar`/`cancelar` em `AgendamentoFotografo`) a `PartilhaService.calcularPartilhaFotografo/validarPartilha` (soma custos via `DespesaService` e repasses ativos, garantindo que a soma não exceda a partilha).
+- `listarPendentes`/`listarPendentesPorFotografo` **ignoram repasses de agendamento `CANCELADO`** (proposta removida/recusada não é obrigação real); o fluxo de caixa (`FinanceiroQueryService`) também omite esses repasses pendentes. Filtro de leitura — nenhum dado é alterado.
 - `AgendamentoService` recalcula `valorPartilhaGlobal`/`valorLucroCrm` via `AgendamentoValoresCalculator` após cada mudança.
 
 ### Fluxo 4: Rascunho de Agendamento

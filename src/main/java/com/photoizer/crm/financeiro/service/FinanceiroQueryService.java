@@ -345,6 +345,10 @@ public class FinanceiroQueryService {
 
         var linksRepasse = agendamentoFotografoRepository.findByStatusWithAgendamento(RepasseStatus.PENDENTE);
         for (var link : linksRepasse) {
+            if (link.getAgendamento() != null
+                && link.getAgendamento().getStatus() == StatusAgendamento.CANCELADO) {
+                continue;
+            }
             var data = link.getAgendamento().getDataHoraEnsaio() != null
                 ? link.getAgendamento().getDataHoraEnsaio().toLocalDate()
                 : LocalDate.now();
