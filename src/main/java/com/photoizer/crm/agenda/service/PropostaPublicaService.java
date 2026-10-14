@@ -114,6 +114,7 @@ public class PropostaPublicaService {
             pacote.getPrecoFotoExtra(),
             agendamento.getDataHoraEnsaio(),
             agendamento.getDuracaoMinutos(),
+            duracaoEnsaioLabel(agendamento),
             agendamento.getLocalEnsaio(),
             agendamento.getTaxaDeslocamento(),
             agendamento.getPercentualEntrada(),
@@ -272,7 +273,7 @@ public class PropostaPublicaService {
 
         return templateService.buildPlaceholders(
             nome, cpf, telefone, email, cidade, estado,
-            dataHora.format(FMT_DATA), dataHora.format(FMT_HORA),
+            dataHora.format(FMT_DATA), dataHora.format(FMT_HORA), duracaoEnsaioLabel(a),
             a.getLocalEnsaio(),
             pacote.getNome(),
             "R$ " + money(pacote.getPrecoFotoExtra()),
@@ -358,6 +359,30 @@ public class PropostaPublicaService {
             + " (IP " + segurar(ip) + ")");
         linhas.add("Hash do documento: " + hash);
         return linhas;
+    }
+
+    /**
+     * Rótulo legível da duração do ensaio exibido na proposta e no contrato.
+     * Pacotes que bloqueiam o dia inteiro exibem "Dia inteiro"; caso contrário,
+     * formata o snapshot {@code duracaoMinutos} gravado no agendamento (ex.:
+     * "2h", "2h30", "45 min"), para que contratos já emitidos não mudem quando
+     * a duração do pacote for editada posteriormente.
+     */
+    private String duracaoEnsaioLabel(Agendamento a) {
+        var pacote = a.getPacote();
+        if (pacote != null && Boolean.TRUE.equals(pacote.getBloqueiaDiaInteiro())) {
+            return "Dia inteiro";
+        }
+        var minutos = a.getDuracaoMinutos();
+        if (minutos == null || minutos <= 0) {
+            return "—";
+        }
+        if (minutos < 60) {
+            return minutos + " min";
+        }
+        var horas = minutos / 60;
+        var resto = minutos % 60;
+        return resto == 0 ? horas + "h" : horas + "h" + resto;
     }
 
     /**

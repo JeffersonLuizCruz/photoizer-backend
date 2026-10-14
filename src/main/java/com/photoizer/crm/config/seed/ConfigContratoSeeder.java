@@ -41,6 +41,7 @@ public class ConfigContratoSeeder implements CommandLineRunner {
         atualizarTemplateComProfissionais();
         atualizarTemplateComFotografoResponsavel();
         atualizarTemplateComDeslocamento();
+        atualizarTemplateComDuracao();
     }
 
     private void seedConfigsContrato() {
@@ -116,6 +117,30 @@ public class ConfigContratoSeeder implements CommandLineRunner {
                     "Valor do deslocamento: {{taxaDeslocamento}}\nValor total do serviço: {{valorTotal}}"));
                 configuracaoRepository.save(t);
                 log.info("Template de contrato atualizado com placeholder de deslocamento");
+            }
+        });
+    }
+
+    /**
+     * Insere a linha de duração do ensaio ({@code {{duracaoEnsaio}}}) logo após o
+     * horário, nos templates já persistidos que ainda não a possuem.
+     */
+    private void atualizarTemplateComDuracao() {
+        configuracaoRepository.findById(ConfigKey.CONTRATO_TEMPLATE.getKey()).ifPresent(t -> {
+            if (t.getValor().contains("{{duracaoEnsaio}}")) {
+                return;
+            }
+            var atualizado = t.getValor().contains("Horário do ensaio: {{horarioEnsaio}}")
+                ? t.getValor().replace(
+                    "Horário do ensaio: {{horarioEnsaio}}",
+                    "Horário do ensaio: {{horarioEnsaio}}\nDuração do ensaio: {{duracaoEnsaio}}")
+                : t.getValor().replace(
+                    "Data do ensaio: {{dataEnsaio}}",
+                    "Data do ensaio: {{dataEnsaio}}\nDuração do ensaio: {{duracaoEnsaio}}");
+            if (!atualizado.equals(t.getValor())) {
+                t.setValor(atualizado);
+                configuracaoRepository.save(t);
+                log.info("Template de contrato atualizado com placeholder de duração do ensaio");
             }
         });
     }

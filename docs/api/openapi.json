@@ -13810,6 +13810,10 @@
             "format" : "int32",
             "description" : "Duração em minutos"
           },
+          "duracaoLabel" : {
+            "type" : "string",
+            "description" : "Duração do ensaio formatada (ex.: 2h, 1h30, 45 min, Dia inteiro)"
+          },
           "localEnsaio" : {
             "type" : "string",
             "description" : "Local do ensaio"

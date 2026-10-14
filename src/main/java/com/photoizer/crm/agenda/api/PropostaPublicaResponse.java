@@ -20,6 +20,7 @@ public record PropostaPublicaResponse(
     @Schema(description = "Preço da foto extra") BigDecimal precoFotoExtra,
     @Schema(description = "Data/hora do ensaio") LocalDateTime dataHoraEnsaio,
     @Schema(description = "Duração em minutos") Integer duracaoMinutos,
+    @Schema(description = "Duração do ensaio formatada (ex.: 2h, 1h30, 45 min, Dia inteiro)") String duracaoLabel,
     @Schema(description = "Local do ensaio") String localEnsaio,
     @Schema(description = "Taxa de deslocamento") BigDecimal taxaDeslocamento,
     @Schema(description = "Percentual da entrada") BigDecimal percentualEntrada,

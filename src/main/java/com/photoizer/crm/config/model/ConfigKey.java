@@ -67,6 +67,7 @@ Contratada: {{contratadaNome}}, inscrita no CNPJ nº {{contratadaCnpj}}, com sed
 # 2. Informações do Ensaio
 Data do ensaio: {{dataEnsaio}}
 Horário do ensaio: {{horarioEnsaio}}
+Duração do ensaio: {{duracaoEnsaio}}
 Local do ensaio: {{localEnsaio}}
 Fotógrafo responsável: {{fotografoResponsavel}}
 {{profissionaisEnsaio}}

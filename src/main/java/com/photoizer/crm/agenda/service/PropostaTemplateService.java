@@ -110,7 +110,7 @@ public class PropostaTemplateService {
     public Map<String, String> buildPlaceholders(
             String clienteNome, String clienteCpf, String clienteTelefone, String clienteEmail,
             String clienteCidade, String clienteEstado,
-            String dataEnsaio, String horarioEnsaio, String localEnsaio,
+            String dataEnsaio, String horarioEnsaio, String duracaoEnsaio, String localEnsaio,
             String pacoteNome, String precoFotoExtra,
             String valorTotal, String valorEntrada, String percentualEntrada, String valorRestante,
             String contratadaNome, String contratadaCnpj, String contratadaCidade,
@@ -128,6 +128,7 @@ public class PropostaTemplateService {
             Map.entry("clienteEstado", nuloVazio(clienteEstado)),
             Map.entry("dataEnsaio", nuloVazio(dataEnsaio)),
             Map.entry("horarioEnsaio", nuloVazio(horarioEnsaio)),
+            Map.entry("duracaoEnsaio", nuloVazio(duracaoEnsaio)),
             Map.entry("localEnsaio", nuloVazio(localEnsaio)),
             Map.entry("pacoteNome", nuloVazio(pacoteNome)),
             Map.entry("precoFotoExtra", nuloVazio(precoFotoExtra)),
