@@ -20,6 +20,7 @@ public interface AgendamentoMapper {
     @Mapping(target = "clienteEstado", source = "agendamento.cliente.estado")
     @Mapping(target = "pacoteId", source = "agendamento.pacote.id")
     @Mapping(target = "pacoteNome", source = "agendamento.pacote.nome")
+    @Mapping(target = "pacoteCor", source = "agendamento.pacote.cor")
     @Mapping(target = "editorId", source = "agendamento.editor.id")
     @Mapping(target = "editorNome", source = "agendamento.editor.nome")
     @Mapping(target = "fotografoId", source = "agendamento.fotografo.id")

@@ -39,6 +39,7 @@ public interface PacoteMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "auditInfo", ignore = true)
     @Mapping(target = "precoFotoExtra", defaultValue = "15")
+    @Mapping(target = "cor", defaultValue = "#64748B")
     Pacote toEntity(PacoteRequest request);
 
     @Mapping(target = "id", ignore = true)

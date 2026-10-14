@@ -17,6 +17,7 @@ public record PacoteResponse(
     String imagemCapa,
     String beneficios,
     String duracaoEstimada,
+    String cor,
     boolean bloqueiaDiaInteiro,
     boolean ativo,
     Integer diasParaEntrega,

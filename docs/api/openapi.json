@@ -2036,6 +2036,166 @@
         }
       }
     },
+    "/api/v1/agendamentos/{id}/proposta" : {
+      "put" : {
+        "tags" : [ "Agendamentos" ],
+        "summary" : "Alterar proposta/pré-reserva",
+        "description" : "Altera uma proposta ainda não assinada pelo cliente (status PRE_RESERVA). Recalcula valores, revalida conflito de agenda e sincroniza repasses. O link público permanece o mesmo.",
+        "operationId" : "atualizarProposta",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "description" : "ID da proposta",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AtualizarPropostaRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Proposta alterada com sucesso",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AgendamentoResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Proposta não encontrada"
+          },
+          "409" : {
+            "description" : "Conflito de agenda"
+          },
+          "422" : {
+            "description" : "Proposta não editável ou dados inválidos"
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      },
+      "delete" : {
+        "tags" : [ "Agendamentos" ],
+        "summary" : "Remover proposta/pré-reserva",
+        "description" : "Remove a proposta de forma auditável (soft-cancel): move para CANCELADO registrando motivo e autor, preservando histórico e arquivos. Permitido apenas enquanto a proposta está em análise.",
+        "operationId" : "removerProposta",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "description" : "ID da proposta",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "motivo",
+          "in" : "query",
+          "description" : "Motivo da remoção",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "Proposta removida"
+          },
+          "404" : {
+            "description" : "Proposta não encontrada"
+          },
+          "422" : {
+            "description" : "Proposta não removível"
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/agendamentos/{agendamentoId}/fotos/{fotoId}/imagem" : {
       "put" : {
         "tags" : [ "Fotos" ],
@@ -11573,6 +11733,10 @@
           "duracaoEstimada" : {
             "type" : "string"
           },
+          "cor" : {
+            "type" : "string",
+            "pattern" : "^#[0-9A-Fa-f]{6}$"
+          },
           "bloqueiaDiaInteiro" : {
             "type" : "boolean"
           },
@@ -11621,6 +11785,9 @@
             "type" : "string"
           },
           "duracaoEstimada" : {
+            "type" : "string"
+          },
+          "cor" : {
             "type" : "string"
           },
           "bloqueiaDiaInteiro" : {
@@ -12373,6 +12540,10 @@
             "type" : "string",
             "description" : "Nome do pacote"
           },
+          "pacoteCor" : {
+            "type" : "string",
+            "description" : "Cor identificadora do pacote (#RRGGBB)"
+          },
           "editorId" : {
             "type" : "string",
             "format" : "uuid",
@@ -12622,6 +12793,105 @@
             "type" : "string",
             "description" : "Papel do parceiro",
             "enum" : [ "ADMIN", "FOTOGRAFO", "EDITOR", "AGENDADOR" ]
+          }
+        }
+      },
+      "AtualizarPropostaRequest" : {
+        "type" : "object",
+        "description" : "Dados para alterar uma proposta/pré-reserva (somente antes da assinatura do cliente).",
+        "properties" : {
+          "pacoteId" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "ID do pacote contratado"
+          },
+          "editorId" : {
+            "type" : [ "string", "null" ],
+            "format" : "uuid",
+            "description" : "ID do editor responsável"
+          },
+          "fotografoId" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "ID do fotógrafo responsável"
+          },
+          "dataHoraEnsaio" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "Data/hora do ensaio (ISO-8601, futura)"
+          },
+          "duracaoMinutos" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Duração em minutos",
+            "example" : 60
+          },
+          "localEnsaio" : {
+            "type" : "string",
+            "description" : "Local do ensaio",
+            "example" : "Estúdio Photoizer",
+            "minLength" : 1
+          },
+          "custoDeslocamento" : {
+            "type" : [ "number", "null" ],
+            "description" : "Custo de deslocamento"
+          },
+          "repassarDeslocamento" : {
+            "type" : [ "boolean", "null" ],
+            "description" : "Repassar deslocamento ao fotógrafo"
+          },
+          "clausulasPersonalizadas" : {
+            "type" : [ "string", "null" ],
+            "description" : "Cláusulas adicionais do contrato"
+          },
+          "observacoes" : {
+            "type" : [ "string", "null" ],
+            "description" : "Observações internas"
+          },
+          "indicadorId" : {
+            "type" : [ "string", "null" ],
+            "format" : "uuid",
+            "description" : "ID de indicador existente"
+          },
+          "indicadorNome" : {
+            "type" : [ "string", "null" ],
+            "description" : "Nome do indicador (quando não cadastrado)"
+          },
+          "indicadorTelefone" : {
+            "type" : [ "string", "null" ],
+            "description" : "Telefone do indicador"
+          },
+          "fotografos" : {
+            "type" : [ "array", "null" ],
+            "description" : "Parceiros e repasses adicionais",
+            "items" : {
+              "$ref" : "#/components/schemas/FotografoRepasseProposta"
+            }
+          }
+        },
+        "required" : [ "dataHoraEnsaio", "fotografoId", "localEnsaio", "pacoteId" ]
+      },
+      "FotografoRepasseProposta" : {
+        "type" : "object",
+        "description" : "Repasse de um profissional vinculado à proposta.",
+        "properties" : {
+          "fotografoId" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "ID do profissional"
+          },
+          "valorRepassar" : {
+            "type" : [ "number", "null" ],
+            "description" : "Valor a repassar"
+          },
+          "tipoValor" : {
+            "type" : [ "string", "null" ],
+            "description" : "Tipo do valor (FIXO ou PERCENTUAL)",
+            "enum" : [ "FIXO", "PERCENTUAL" ]
+          },
+          "percentual" : {
+            "type" : [ "number", "null" ],
+            "description" : "Percentual (quando tipoValor=PERCENTUAL)"
           }
         }
       },

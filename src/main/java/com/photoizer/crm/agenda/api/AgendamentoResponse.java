@@ -25,6 +25,7 @@ public record AgendamentoResponse(
     @Schema(description = "UF do cliente") String clienteEstado,
     @Schema(description = "ID do pacote") UUID pacoteId,
     @Schema(description = "Nome do pacote") String pacoteNome,
+    @Schema(description = "Cor identificadora do pacote (#RRGGBB)") String pacoteCor,
     @Schema(description = "ID do editor") UUID editorId,
     @Schema(description = "Nome do editor") String editorNome,
     @Schema(description = "ID do fotógrafo responsável") UUID fotografoId,
@@ -100,7 +101,7 @@ public record AgendamentoResponse(
 
         return new AgendamentoResponse(
             id, clienteId, clienteNome, clienteTelefone, clienteEmail, clienteCpf,
-            clienteCidade, clienteEstado, pacoteId, pacoteNome, editorId, editorNome,
+            clienteCidade, clienteEstado, pacoteId, pacoteNome, pacoteCor, editorId, editorNome,
             fotografoId, fotografoNome, dataHoraEnsaio, duracaoMinutos, localEnsaio,
             valorTotal, valorEntradaExigido, valorEntradaPago, valorRestante,
             valorExtras, taxaDeslocamento, null, repassarDeslocamento,

@@ -74,7 +74,7 @@ class AgendamentoResponseRedacaoTest {
     private AgendamentoResponse novoResponse(List<AgendamentoResponse.FotografoNoAgendamento> fotografos) {
         return new AgendamentoResponse(
             UUID.randomUUID(), UUID.randomUUID(), "Cliente", "11999999999", "c@x.com", null,
-            "São Paulo", "SP", UUID.randomUUID(), "Pacote", null, null,
+            "São Paulo", "SP", UUID.randomUUID(), "Pacote", "#64748B", null, null,
             null, null, LocalDateTime.now(), 60, "Estúdio",
             new BigDecimal("1000.00"), new BigDecimal("300.00"), new BigDecimal("300.00"), new BigDecimal("700.00"),
             BigDecimal.ZERO, new BigDecimal("50.00"), new BigDecimal("40.00"), true,
