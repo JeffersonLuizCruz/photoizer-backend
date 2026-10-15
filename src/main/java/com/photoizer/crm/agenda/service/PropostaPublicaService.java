@@ -259,6 +259,9 @@ public class PropostaPublicaService {
                                                    String cpf, String cidade, String estado, boolean autoriza) {
         var dataHora = a.getDataHoraEnsaio();
         var pacote = a.getPacote();
+        var pacoteDescricao = (pacote.getDescricao() == null || pacote.getDescricao().isBlank())
+            ? "serviço conforme pacote contratado."
+            : neutralizarMarcacaoBloco(pacote.getDescricao());
 
         var autorizaTexto = autoriza ? "(X) AUTORIZO\n( ) NÃO AUTORIZO" : "( ) AUTORIZO\n( ) NÃO AUTORIZO";
 
@@ -276,6 +279,7 @@ public class PropostaPublicaService {
             dataHora.format(FMT_DATA), dataHora.format(FMT_HORA), duracaoEnsaioLabel(a),
             a.getLocalEnsaio(),
             pacote.getNome(),
+            pacoteDescricao,
             "R$ " + money(pacote.getPrecoFotoExtra()),
             "R$ " + money(a.getValorTotal()),
             "R$ " + money(a.getValorEntradaExigido()),
@@ -293,6 +297,31 @@ public class PropostaPublicaService {
         );
     }
 
+    /**
+     * Evita que a descrição do pacote (texto livre) seja interpretada como
+     * marcação de template pelo renderizador de HTML do contrato: linhas que
+     * iniciam por {@code "# "} ou {@code "= "} seriam convertidas em cabeçalhos.
+     * Prefixa essas linhas com NBSP, que sobrevive ao {@code trim()} e é
+     * renderizado como espaço tanto no HTML quanto no PDF. Linhas iniciadas
+     * por {@code "- "} são preservadas como itens de lista.
+     */
+    private static String neutralizarMarcacaoBloco(String texto) {
+        var linhas = texto.split("\n", -1);
+        var sb = new StringBuilder();
+        for (int i = 0; i < linhas.length; i++) {
+            var linha = linhas[i];
+            var trim = linha.stripLeading();
+            if (trim.startsWith("# ") || trim.startsWith("= ")) {
+                linha = "\u00A0" + linha;
+            }
+            sb.append(linha);
+            if (i < linhas.length - 1) {
+                sb.append('\n');
+            }
+        }
+        return sb.toString();
+    }
+
     private String montarSnapshot(Agendamento a, String nome, String telefone, String email,
                                   String cpf, String cidade, String estado, String autorizaUsoImagem,
                                   String assinante, LocalDateTime dataAssinatura, String ip,
@@ -301,6 +330,7 @@ public class PropostaPublicaService {
         var mapa = new LinkedHashMap<String, Object>();
         mapa.put("agendamentoId", a.getId());
         mapa.put("pacoteNome", a.getPacote().getNome());
+        mapa.put("pacoteDescricao", a.getPacote().getDescricao());
         mapa.put("dataHoraEnsaio", a.getDataHoraEnsaio().format(FMT_DATA_HORA));
         mapa.put("duracaoMinutos", a.getDuracaoMinutos());
         mapa.put("localEnsaio", a.getLocalEnsaio());

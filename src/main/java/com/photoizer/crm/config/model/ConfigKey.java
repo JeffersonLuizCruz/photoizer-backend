@@ -74,7 +74,8 @@ Fotógrafo responsável: {{fotografoResponsavel}}
 
 # 3. Pacote Contratado
 Pacote: {{pacoteNome}}
-Inclui: serviço conforme pacote contratado.
+Inclui:
+{{pacoteDescricao}}
 
 # 4. Valores
 Valor do deslocamento: {{taxaDeslocamento}}

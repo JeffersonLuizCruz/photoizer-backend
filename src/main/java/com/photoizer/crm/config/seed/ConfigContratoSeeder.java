@@ -42,6 +42,7 @@ public class ConfigContratoSeeder implements CommandLineRunner {
         atualizarTemplateComFotografoResponsavel();
         atualizarTemplateComDeslocamento();
         atualizarTemplateComDuracao();
+        atualizarTemplateComDescricaoPacote();
     }
 
     private void seedConfigsContrato() {
@@ -141,6 +142,27 @@ public class ConfigContratoSeeder implements CommandLineRunner {
                 t.setValor(atualizado);
                 configuracaoRepository.save(t);
                 log.info("Template de contrato atualizado com placeholder de duração do ensaio");
+            }
+        });
+    }
+
+    /**
+     * Substitui o texto fixo da seção "Pacote Contratado" pelo placeholder
+     * {@code {{pacoteDescricao}}}, para que a descrição real do pacote seja
+     * exibida nos contratos já persistidos.
+     */
+    private void atualizarTemplateComDescricaoPacote() {
+        configuracaoRepository.findById(ConfigKey.CONTRATO_TEMPLATE.getKey()).ifPresent(t -> {
+            if (t.getValor().contains("{{pacoteDescricao}}")) {
+                return;
+            }
+            var atualizado = t.getValor().replace(
+                "Inclui: serviço conforme pacote contratado.",
+                "Inclui:\n{{pacoteDescricao}}");
+            if (!atualizado.equals(t.getValor())) {
+                t.setValor(atualizado);
+                configuracaoRepository.save(t);
+                log.info("Template de contrato atualizado com placeholder de descrição do pacote");
             }
         });
     }
