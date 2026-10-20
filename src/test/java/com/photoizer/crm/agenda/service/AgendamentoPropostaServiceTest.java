@@ -105,6 +105,34 @@ class AgendamentoPropostaServiceTest {
     }
 
     @Test
+    @DisplayName("cria proposta com pacote de R$ 0,01 usando entrada mínima")
+    void criaPropostaComPacoteDeUmCentavo() {
+        var pacote = pacote(new BigDecimal("0.01"));
+        var fotografo = new User("foto@test.com", "hash", "Foto", Papel.FOTOGRAFO);
+
+        when(pacoteQueryService.buscarEntityPorId(pacote.getId())).thenReturn(pacote);
+        when(userRepository.findById(fotografo.getId())).thenReturn(Optional.of(fotografo));
+        when(configuracaoService.getValorDecimal(ConfigKey.TAXA_DESLOCAMENTO)).thenReturn(new BigDecimal("0.00"));
+        when(configuracaoService.getValorDecimal(ConfigKey.PERCENTUAL_ENTRADA)).thenReturn(new BigDecimal("30.00"));
+        when(configuracaoService.getValorInteiro(ConfigKey.CONTRATO_DIAS_VALIDADE)).thenReturn(7);
+        when(agendamentoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        var command = new CriarPropostaCommand(
+            pacote.getId(), null, fotografo.getId(), LocalDateTime.now().plusDays(5),
+            360, "Estúdio", null, true, null, null,
+            null, null, null, List.of());
+
+        var agendamento = service.criarProposta(command);
+
+        assertThat(agendamento.getStatus()).isEqualTo(StatusAgendamento.PRE_RESERVA);
+        assertThat(agendamento.getValorTotal()).isEqualByComparingTo("0.01");
+        assertThat(agendamento.getValorEntradaExigido()).isEqualByComparingTo("0.01");
+        assertThat(agendamento.getValorEntradaPago()).isEqualByComparingTo("0.00");
+        assertThat(agendamento.getValorRestante()).isEqualByComparingTo("0.01");
+        assertThat(agendamento.getTokenProposta()).isNotBlank();
+    }
+
+    @Test
     @DisplayName("bloqueia alteração de proposta já assinada")
     void bloqueiaAlteracaoAposAssinatura() {
         var agendamento = agendamento(StatusAgendamento.AGUARDANDO_APROVACAO);

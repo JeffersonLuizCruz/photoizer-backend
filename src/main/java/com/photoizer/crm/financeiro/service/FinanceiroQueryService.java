@@ -29,6 +29,7 @@ import com.photoizer.crm.pacote.service.PacoteQueryService;
 import com.photoizer.crm.shared.port.DisplacementCostPort;
 import com.photoizer.crm.shared.port.RepasseAggregationPort;
 import com.photoizer.crm.shared.port.StatusClassificationPort;
+import com.photoizer.crm.shared.util.EntradaUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -105,10 +106,8 @@ public class FinanceiroQueryService {
         var taxa = taxaDeslocamento != null ? taxaDeslocamento : BigDecimal.ZERO;
 
         var percentualEntrada = configuracaoService.getValorDecimal(ConfigKey.PERCENTUAL_ENTRADA);
-        var fatorEntrada = percentualEntrada.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
         var valorTotal = pacote.getValorBase().add(taxa);
-        var valorEntradaExigido = valorTotal.multiply(fatorEntrada)
-            .setScale(2, RoundingMode.HALF_UP);
+        var valorEntradaExigido = EntradaUtils.calcularEntradaExigida(valorTotal, percentualEntrada);
         var valorRestante = valorTotal.subtract(valorEntradaExigido);
 
         return new FinanceiroPreviewResponse(valorTotal, valorEntradaExigido, valorRestante, valorTotal, percentualEntrada);

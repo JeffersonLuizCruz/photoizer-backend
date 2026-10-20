@@ -2,6 +2,7 @@ package com.photoizer.crm.agenda.service;
 
 import com.photoizer.crm.shared.exception.BadRequestException;
 import com.photoizer.crm.shared.model.TipoRepasse;
+import com.photoizer.crm.shared.util.EntradaUtils;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -25,7 +26,7 @@ public class AgendamentoValoresCalculator {
     public ValoresAgendamento calcularValoresNovo(BigDecimal valorBasePacote, BigDecimal taxaDeslocamento,
                                                   BigDecimal percentualEntrada) {
         var valorTotal = valorBasePacote.add(taxaDeslocamento);
-        var valorEntradaExigido = calcularEntradaExigida(valorTotal, percentualEntrada);
+        var valorEntradaExigido = EntradaUtils.calcularEntradaExigida(valorTotal, percentualEntrada);
         var valorEntradaPago = valorEntradaExigido;
         var valorExtras = BigDecimal.ZERO;
         return new ValoresAgendamento(valorTotal, valorEntradaExigido, valorEntradaPago,
@@ -36,7 +37,7 @@ public class AgendamentoValoresCalculator {
                                                          BigDecimal percentualEntrada,
                                                          BigDecimal valorEntradaPago, BigDecimal valorExtras) {
         var valorTotal = valorBasePacote.add(taxaDeslocamento);
-        var valorEntradaExigido = calcularEntradaExigida(valorTotal, percentualEntrada);
+        var valorEntradaExigido = EntradaUtils.calcularEntradaExigida(valorTotal, percentualEntrada);
         var valorRestante = valorTotal.subtract(valorEntradaPago);
         return new ValoresAgendamento(valorTotal, valorEntradaExigido, valorEntradaPago,
             valorRestante, valorExtras, valorTotal.add(valorExtras), taxaDeslocamento);
@@ -61,11 +62,6 @@ public class AgendamentoValoresCalculator {
             return valorRepasseEfetivo(base, tipo, valorRepassar, percentual);
         }
         return valorRepassar != null ? valorRepassar : BigDecimal.ZERO;
-    }
-
-    private BigDecimal calcularEntradaExigida(BigDecimal valorTotal, BigDecimal percentualEntrada) {
-        var fator = percentualEntrada.divide(CEM, 4, RoundingMode.HALF_UP);
-        return valorTotal.multiply(fator).setScale(2, RoundingMode.HALF_UP);
     }
 
 }
