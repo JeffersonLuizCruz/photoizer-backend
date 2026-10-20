@@ -5,11 +5,13 @@ import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.pacote.model.Pacote;
+import com.photoizer.crm.shared.port.BloqueioAgendaPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -36,7 +38,8 @@ class DisponibilidadeServiceTest {
     private static final String HORA = "08:00";
 
     private final AgendamentoRepository repository = mock(AgendamentoRepository.class);
-    private final DisponibilidadeService service = new DisponibilidadeService(repository);
+    private final BloqueioAgendaPort bloqueioAgendaPort = mock(BloqueioAgendaPort.class);
+    private final DisponibilidadeService service = new DisponibilidadeService(repository, bloqueioAgendaPort);
 
     @Test
     @DisplayName("verificarDisponibilidade ignora ensaio FINALIZADO no mesmo horário")
@@ -78,6 +81,34 @@ class DisponibilidadeServiceTest {
         assertThatThrownBy(() -> service.validarConflitoAgenda(
             pacote(), DATA.atTime(8, 0), 60, "Estúdio", ConflitoAgendaParams.paraCriacao(FOTOGRAFO_ID)))
             .isInstanceOf(ConflitoDeAgendaException.class);
+    }
+
+    @Test
+    @DisplayName("bloqueio global torna o horário indisponível")
+    void bloqueioGlobalGeraConflito() {
+        stubAgendaDoDia();
+        when(bloqueioAgendaPort.buscarBloqueios(any(), any(), any())).thenReturn(List.of(
+            new BloqueioAgendaPort.BloqueioConflito(
+                UUID.randomUUID(), "Congresso", DATA.atTime(8, 0), DATA.atTime(12, 0), null)));
+
+        var resultado = service.verificarDisponibilidade(DATA, HORA, 60, null, false, FOTOGRAFO_ID);
+
+        assertThat(resultado.disponivel()).isFalse();
+        assertThat(resultado.bloqueios()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("validarConflitoAgenda barra período bloqueado")
+    void validacaoFalhaParaPeriodoBloqueado() {
+        stubAgendaDoDia();
+        when(bloqueioAgendaPort.buscarBloqueios(any(), any(), any())).thenReturn(List.of(
+            new BloqueioAgendaPort.BloqueioConflito(
+                UUID.randomUUID(), "Congresso", DATA.atTime(8, 0), DATA.atTime(12, 0), null)));
+
+        assertThatThrownBy(() -> service.validarConflitoAgenda(
+            pacote(), DATA.atTime(9, 0), 60, "Estúdio", ConflitoAgendaParams.paraCriacao(FOTOGRAFO_ID)))
+            .isInstanceOf(ConflitoDeAgendaException.class)
+            .hasMessageContaining("Congresso");
     }
 
     private void stubAgendaDoDia(Agendamento... agendamentos) {

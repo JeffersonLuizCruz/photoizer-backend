@@ -31,7 +31,7 @@ agenda/
 │   ├── AgendamentoStatusLifecycle.java# ~125 linhas: máquina de estados (status, reagendar, destaque, pagamento final) + eventos [Fase 2]
 │   ├── AgendamentoValoresCalculator.java # ~69 linhas: cálculo financeiro único (novo/atualização) + valorRepasseEfetivo [Fase 2]
 │   ├── PartilhaService.java          # ~79 linhas: calcular/validar partilha de fotógrafos (usa DespesaService) [Fase 2]
-│   ├── DisponibilidadeService.java   # ~139 linhas: verificarDisponibilidade + validarConflitoAgenda (com/sem excluirId) [Fase 2]
+│   ├── DisponibilidadeService.java   # verificarDisponibilidade + validarConflitoAgenda + bloqueios de agenda (porta shared) [Fase 2]
 │   ├── AgendamentoFotografoService.java # ~177 linhas: repasses (pagar, cancelar, lote) + partilha
 │   ├── RascunhoAgendamentoService.java  # ~92 linhas: salvar/buscar/deletar rascunho por usuário
 │   └── CriarAgendamentoCommand.java      # Record com 27 campos (inclui MultipartFile)
@@ -75,6 +75,7 @@ agenda/
 - **foto** → `FotoEnsaioRepository`, `StatusFoto` (contagem de fotos do cliente) — **repository de outro módulo**
 - **comissao** → `IndicacaoRepository` (usado no `AgendamentoController`) — **repository de outro módulo**
 - **contrato** → `ContratoAprovadoEvent` (consumir) + `ContratoRepository` usado no `ContratoAprovadoEventListener` — **repository de outro módulo**
+- **bloqueio** → via porta `shared/port/BloqueioAgendaPort` (implementada em `bloqueio/acl`), sem import direto do módulo. O adapter de sentido inverso (`agenda/adapter/AgendamentoOcupacaoAdapter`) implementa `AgendamentoOcupacaoPort` para o módulo bloqueio.
 
 ### Acoplamento reverso (outros módulos importam o `agenda`)
 - **financeiro** → `FinanceiroService` importa `AgendamentoMapper` (agenda) para converter `Agendamento` em `AgendamentoResponse` [Fase 2]
@@ -138,6 +139,7 @@ CONFIRMADO ──realizar──▶ AGUARDANDO_PAGAMENTO_FINAL ──pagarFinal�
 3. **Cálculo financeiro unificado** [Fase 2]: `AgendamentoValoresCalculator` é a fonte única de `novo`/`atualização` e `valorRepasseEfetivo`; não há mais 3 cópias (ver dívida 7.3).
 4. **Conflito de agenda consolidado** [Fase 2]: `DisponibilidadeService.validarConflitoAgenda(pacote, dataHora, duracao, local, params)` único, sem cópias de lógica. O critério é **por fotógrafo responsável** quando informado (ignora local); **sem responsável**, por **local** (+ sobreposição de horário). É validado na **criação** (`criarProposta`), na **atualização** (`atualizar`), no **reagendar** e na **aprovação** (`aprovar`), sempre excluindo o próprio agendamento.
 5. **Status sem validação de transição**: `AgendamentoStatusLifecycle`/`transicionarPara` centralizam a mudança, mas transições inválidas ainda não são bloqueadas (encapsulado, sem bloquear — decisão mantida).
+5.1. **Bloqueios de agenda**: `DisponibilidadeService` consulta `BloqueioAgendaPort` em `verificarDisponibilidade` (campo `bloqueios` na resposta) e em `validarConflitoAgenda` (409). Bloqueios globais sempre aplicam; bloqueios de profissional aplicam quando o `fotografoId` coincide.
 6. **tokenGaleria**: UUID com expiração fixa de 15 dias — hardcoded (ver 7.12).
 7. **`listarAgendamentosCliente` faz 3 consultas ao módulo `foto` POR agendamento** — N+1 cross-module (ver 7.6).
 8. **`AgendamentoController` usa repo de `comissao` + `AgendamentoFotografoRepository` diretamente** — controller acessando repositories de outra/infra.

@@ -82,6 +82,7 @@ public class SecurityConfig {
                 auth
                     .requestMatchers("/api/v1/dev/**").hasRole("ADMIN")
                     .requestMatchers("/api/v1/agendamentos/**").hasAnyRole("ADMIN", "FOTOGRAFO", "EDITOR", "AGENDADOR")
+                    .requestMatchers("/api/v1/bloqueios/**").hasAnyRole("ADMIN", "FOTOGRAFO", "EDITOR", "AGENDADOR")
                     .requestMatchers("/api/v1/sessoes/**").hasAnyRole("ADMIN", "FOTOGRAFO", "EDITOR", "AGENDADOR")
                     // fail-safe: qualquer rota não classificada exige autenticação; os
                     // controllers administrativos declaram @RolesAllowed explicitamente.

@@ -1826,6 +1826,238 @@
         } ]
       }
     },
+    "/api/v1/bloqueios/{id}" : {
+      "get" : {
+        "tags" : [ "Bloqueios de Agenda" ],
+        "summary" : "Buscar compromisso por ID",
+        "operationId" : "buscarBloqueioAgenda",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Compromisso encontrado",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BloqueioAgendaResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Compromisso não encontrado",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BloqueioAgendaResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      },
+      "put" : {
+        "tags" : [ "Bloqueios de Agenda" ],
+        "summary" : "Atualizar compromisso",
+        "operationId" : "atualizarBloqueioAgenda",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BloqueioAgendaRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Compromisso atualizado",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BloqueioAgendaResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Sem permissão para alterar",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BloqueioAgendaResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Compromisso não encontrado",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BloqueioAgendaResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflito com compromisso ou ensaio existente",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BloqueioAgendaResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Um ou mais campos estão inválidos",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      },
+      "delete" : {
+        "tags" : [ "Bloqueios de Agenda" ],
+        "summary" : "Cancelar compromisso",
+        "operationId" : "cancelarBloqueioAgenda",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "Compromisso cancelado"
+          },
+          "403" : {
+            "description" : "Sem permissão para cancelar"
+          },
+          "404" : {
+            "description" : "Compromisso não encontrado"
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/auth/cliente/perfil" : {
       "get" : {
         "tags" : [ "Auth Cliente" ],
@@ -5144,6 +5376,179 @@
           },
           "422" : {
             "description" : "Um ou mais campos estão inválidos",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/bloqueios" : {
+      "get" : {
+        "tags" : [ "Bloqueios de Agenda" ],
+        "summary" : "Listar compromissos no período",
+        "operationId" : "listarBloqueiosAgenda",
+        "parameters" : [ {
+          "name" : "dataInicio",
+          "in" : "query",
+          "description" : "Início do período (ISO-8601)",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "name" : "dataFim",
+          "in" : "query",
+          "description" : "Fim do período, exclusivo (ISO-8601)",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "name" : "profissionalId",
+          "in" : "query",
+          "description" : "Filtrar por profissional (inclui bloqueios globais)",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/BloqueioAgendaResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      },
+      "post" : {
+        "tags" : [ "Bloqueios de Agenda" ],
+        "summary" : "Criar compromisso na agenda",
+        "operationId" : "criarBloqueioAgenda",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BloqueioAgendaRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Compromisso criado",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BloqueioAgendaResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflito com compromisso ou ensaio existente",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BloqueioAgendaResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Período ou profissional inválido",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BloqueioAgendaResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
             "content" : {
               "application/json" : {
                 "schema" : {
@@ -12318,6 +12723,82 @@
           }
         }
       },
+      "BloqueioAgendaRequest" : {
+        "type" : "object",
+        "description" : "Dados de criação/edição de um compromisso na agenda.",
+        "properties" : {
+          "titulo" : {
+            "type" : "string",
+            "description" : "Título do compromisso",
+            "example" : "Congresso de fotografia",
+            "maxLength" : 120,
+            "minLength" : 0
+          },
+          "descricao" : {
+            "type" : [ "string", "null" ],
+            "description" : "Descrição opcional",
+            "maxLength" : 500,
+            "minLength" : 0
+          },
+          "inicio" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "Início do período (ISO-8601)",
+            "example" : "2026-11-20T08:00:00"
+          },
+          "fim" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "Fim do período, exclusivo (ISO-8601)",
+            "example" : "2026-11-20T18:00:00"
+          },
+          "profissionalId" : {
+            "type" : [ "string", "null" ],
+            "format" : "uuid",
+            "description" : "Profissional bloqueado; nulo bloqueia toda a equipe"
+          }
+        },
+        "required" : [ "fim", "inicio", "titulo" ]
+      },
+      "BloqueioAgendaResponse" : {
+        "type" : "object",
+        "description" : "Compromisso/indisponibilidade da agenda.",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "titulo" : {
+            "type" : "string"
+          },
+          "descricao" : {
+            "type" : "string"
+          },
+          "inicio" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "fim" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "profissionalId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "criadoPorId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "criadoEm" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "ativo" : {
+            "type" : "boolean"
+          }
+        }
+      },
       "AtualizarPerfilRequest" : {
         "type" : "object",
         "description" : "Dados de atualização do perfil do cliente autenticado.",
@@ -15653,6 +16134,31 @@
           }
         }
       },
+      "BloqueioAgendaConflito" : {
+        "type" : "object",
+        "description" : "Compromisso que bloqueia o horário.",
+        "properties" : {
+          "bloqueioId" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "ID do bloqueio"
+          },
+          "titulo" : {
+            "type" : "string",
+            "description" : "Título do compromisso"
+          },
+          "inicio" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "Início do bloqueio"
+          },
+          "fim" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "Fim do bloqueio"
+          }
+        }
+      },
       "ConflitoAgenda" : {
         "type" : "object",
         "description" : "Conflito de horário com outro agendamento.",
@@ -15682,9 +16188,16 @@
           },
           "conflitos" : {
             "type" : "array",
-            "description" : "Conflitos encontrados",
+            "description" : "Conflitos com agendamentos",
             "items" : {
               "$ref" : "#/components/schemas/ConflitoAgenda"
+            }
+          },
+          "bloqueios" : {
+            "type" : "array",
+            "description" : "Compromissos/bloqueios que impedem o horário",
+            "items" : {
+              "$ref" : "#/components/schemas/BloqueioAgendaConflito"
             }
           }
         }

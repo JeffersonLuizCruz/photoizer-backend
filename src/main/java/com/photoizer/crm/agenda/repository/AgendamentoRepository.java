@@ -108,4 +108,22 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID>,
            "WHERE a.fotografo.id = :fotografoId ORDER BY a.dataHoraEnsaio DESC")
     List<Agendamento> findByFotografoIdWithDetails(@Param("fotografoId") UUID fotografoId);
 
+    @Query("SELECT a FROM Agendamento a WHERE a.status NOT IN :statusesIgnorados " +
+           "AND a.dataHoraEnsaio < :fim AND a.dataHoraEnsaio >= :inicioMenosBuffer " +
+           "ORDER BY a.dataHoraEnsaio")
+    List<Agendamento> findAtivosParaConflitoNoPeriodo(
+        @Param("inicioMenosBuffer") LocalDateTime inicioMenosBuffer,
+        @Param("fim") LocalDateTime fim,
+        @Param("statusesIgnorados") List<StatusAgendamento> statusesIgnorados);
+
+    @Query("SELECT a FROM Agendamento a WHERE a.status NOT IN :statusesIgnorados " +
+           "AND a.fotografo.id = :fotografoId " +
+           "AND a.dataHoraEnsaio < :fim AND a.dataHoraEnsaio >= :inicioMenosBuffer " +
+           "ORDER BY a.dataHoraEnsaio")
+    List<Agendamento> findAtivosParaConflitoNoPeriodoByFotografo(
+        @Param("fotografoId") UUID fotografoId,
+        @Param("inicioMenosBuffer") LocalDateTime inicioMenosBuffer,
+        @Param("fim") LocalDateTime fim,
+        @Param("statusesIgnorados") List<StatusAgendamento> statusesIgnorados);
+
 }

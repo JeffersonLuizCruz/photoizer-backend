@@ -6,6 +6,7 @@ import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.pacote.model.Pacote;
+import com.photoizer.crm.shared.port.BloqueioAgendaPort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,15 +28,18 @@ public class DisponibilidadeService {
      * Status que não ocupam a agenda (não geram conflito de horário).
      * Inclui FINALIZADO: o ensaio já foi entregue, logo o horário volta a ficar livre.
      */
-    private static final List<StatusAgendamento> STATUS_IGNORADOS = List.of(
+    public static final List<StatusAgendamento> STATUS_IGNORADOS = List.of(
         StatusAgendamento.CANCELADO, StatusAgendamento.NO_SHOW,
         StatusAgendamento.PRE_RESERVA, StatusAgendamento.AGUARDANDO_APROVACAO,
         StatusAgendamento.PAGAMENTO_CONFIRMADO, StatusAgendamento.FINALIZADO);
 
     private final AgendamentoRepository agendamentoRepository;
+    private final BloqueioAgendaPort bloqueioAgendaPort;
 
-    public DisponibilidadeService(AgendamentoRepository agendamentoRepository) {
+    public DisponibilidadeService(AgendamentoRepository agendamentoRepository,
+                                  BloqueioAgendaPort bloqueioAgendaPort) {
         this.agendamentoRepository = agendamentoRepository;
+        this.bloqueioAgendaPort = bloqueioAgendaPort;
     }
 
     public DisponibilidadeResponse verificarDisponibilidade(LocalDate data, String hora, Integer duracaoMinutos,
@@ -111,7 +115,20 @@ public class DisponibilidadeService {
             }
         }
 
-        return new DisponibilidadeResponse(conflitos.isEmpty(), conflitos);
+        var bloqueioInicio = Boolean.TRUE.equals(bloqueiaDiaInteiro)
+            ? inicioDia
+            : LocalDateTime.of(data, LocalTime.parse(hora, HORA_FORMAT));
+        var bloqueioFim = Boolean.TRUE.equals(bloqueiaDiaInteiro)
+            ? fimDia.plusSeconds(1)
+            : bloqueioInicio.plusMinutes(duracaoMinutos != null ? duracaoMinutos : 60);
+
+        var bloqueios = bloqueioAgendaPort.buscarBloqueios(bloqueioInicio, bloqueioFim, fotografoId)
+            .stream()
+            .map(b -> new DisponibilidadeResponse.BloqueioConflito(
+                b.bloqueioId(), b.titulo(), b.inicio(), b.fim()))
+            .toList();
+
+        return new DisponibilidadeResponse(conflitos.isEmpty() && bloqueios.isEmpty(), conflitos, bloqueios);
     }
 
     public void validarConflitoAgenda(Pacote pacote, LocalDateTime dataHora, int duracao, String local) {
@@ -120,12 +137,25 @@ public class DisponibilidadeService {
 
     public void validarConflitoAgenda(Pacote pacote, LocalDateTime dataHora, int duracao, String local,
                                       ConflitoAgendaParams params) {
+        validarBloqueio(dataHora, duracao, params.fotografoId());
+
         if (params.fotografoId() != null) {
             validarPorFotografo(pacote, dataHora, duracao, local, params);
             return;
         }
 
         validarGeral(pacote, dataHora, duracao, local, params.excluirAgendamentoId());
+    }
+
+    private void validarBloqueio(LocalDateTime dataHora, int duracao, UUID fotografoId) {
+        var bloqueios = bloqueioAgendaPort.buscarBloqueios(
+            dataHora, dataHora.plusMinutes(duracao), fotografoId);
+        if (!bloqueios.isEmpty()) {
+            var bloqueio = bloqueios.getFirst();
+            throw new ConflitoDeAgendaException(
+                "Horário bloqueado por compromisso: " + bloqueio.titulo()
+                    + " (" + bloqueio.inicio() + " às " + bloqueio.fim() + ")");
+        }
     }
 
     private void validarGeral(Pacote pacote, LocalDateTime dataHora, int duracao, String local, UUID excluirId) {

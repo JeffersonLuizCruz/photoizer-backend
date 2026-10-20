@@ -33,6 +33,11 @@ public enum ErrorCode {
     FOTOGRAFO_NAO_ENCONTRADO,
     FOTOGRAFO_COM_ENSAIOS_VINCULADOS,
 
+    // ─── Bloqueio de agenda ───────────────────────────────────
+    BLOQUEIO_NAO_ENCONTRADO,
+    PERIODO_BLOQUEADO,
+    PERIODO_INVALIDO,
+
     // ─── Pacote ────────────────────────────────────────────────
     PACOTE_NAO_ENCONTRADO,
     PACOTE_INATIVO,
