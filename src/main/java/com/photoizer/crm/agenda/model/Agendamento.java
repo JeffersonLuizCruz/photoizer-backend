@@ -152,6 +152,22 @@ public class Agendamento {
     @Column(nullable = false, length = 40)
     private StatusAgendamento status;
 
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private OrigemAgendamento origem = OrigemAgendamento.PROPOSTA;
+
+    @NotNull
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean valoresPersonalizados = false;
+
+    @Size(max = 100)
+    @Column(length = 100)
+    private String referenciaExterna;
+
     @Column
     private LocalDateTime dataConfirmacao;
 

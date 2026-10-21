@@ -28,6 +28,7 @@ public interface AgendamentoMapper {
     @Mapping(target = "valorPacote", expression = "java(agendamento.getValorTotal().subtract(agendamento.getTaxaDeslocamento()))")
     @Mapping(target = "saldoDevedor", expression = "java(agendamento.getValorTotalFinal().subtract(agendamento.getValorEntradaPago()))")
     @Mapping(target = "status", expression = "java(agendamento.getStatus().name())")
+    @Mapping(target = "origem", expression = "java(agendamento.getOrigem() != null ? agendamento.getOrigem().name() : \"PROPOSTA\")")
     @Mapping(target = "temComprovanteEntrada", expression = "java(org.springframework.util.StringUtils.hasText(agendamento.getUrlComprovanteEntrada()))")
     @Mapping(target = "temComprovanteFinal", expression = "java(org.springframework.util.StringUtils.hasText(agendamento.getUrlComprovanteFinal()))")
     @Mapping(target = "temTermoAssinado", expression = "java(org.springframework.util.StringUtils.hasText(agendamento.getUrlPdfAssinatura()))")

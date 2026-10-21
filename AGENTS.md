@@ -3,6 +3,7 @@
 ## 1. Visão Geral e Stack Tecnológica
 - **Objetivo do Projeto:** API REST do CRM Photoizer para estúdio de fotografia. Gerencia clientes, agendamentos de ensaios, pacotes, edição de fotos, financeiro, e-commerce (galeria pública + venda de fotos extras), comissões de indicação, notificações e geração de documentos.
 - **Linguagens e Frameworks:** Java 25, Spring Boot 4.1.0, Spring Modulith 2.1.0, Spring Data JPA, Spring Security, Spring MVC.
+- **Testes:** Spock 2.5 (`2.5-groovy-5.0`) + Groovy 5 na JUnit Platform, compilado por GMavenPlus. Specs em `src/test/groovy/**/*Spec.groovy`; JUnit legado permanece em `src/test/java` até migração incremental.
 - **Banco de Dados:** PostgreSQL em **todos** os ambientes (inclusive `dev`), schema versionado por **Flyway** (`src/main/resources/db/migration`, `V1__baseline.sql`), `ddl-auto=validate`. Dev local usa o Postgres do `docker-compose.dev.yml` (defaults em `application.properties`). Os **testes** usam H2 em memória (`src/test/resources/application.properties`).
 - **Bibliotecas Críticas:**
   - **jjwt 0.12.6** — Geração e validação de tokens JWT (HMAC-SHA256).
@@ -31,7 +32,8 @@
     - `api/PageResponse` — record genérico para respostas paginadas.
   - `{modulo}/` — 16 módulos de negócio (ver seção 3).
 - `src/main/resources/` — `application.properties` + profiles (`dev`, `homolog`, `prod`) + `db/migration/` (Flyway).
-- `src/test/java/` — testes de segurança (autorização por controller, CSRF, cookies) e sanitização.
+- `src/test/java/` — testes JUnit legados (segurança, cookies/CSRF, sanitização, JWT, refresh token), fora do `agenda`.
+- `src/test/groovy/` — specs Spock/BDD. O módulo `agenda` está migrado e é a referência de padrão.
 - `uploads/` — diretório de upload de arquivos.
 - `data/` — banco H2 em arquivo (`crmdb.mv.db`).
 
@@ -88,6 +90,44 @@ Cada módulo segue a estrutura: `model/`, `repository/`, `service/`, `api/`, DTO
   - Records DTO: `{Entidade}Request`, `{Entidade}Response`.
   - Enums: PascalCase (`StatusAgendamento`, `Papel`).
 
+### 4.1 Testes (Spock + BDD) — obrigatório no `agenda` e em novos testes
+
+- **Stack:** Spock `2.5-groovy-5.0`, Groovy 5, `spock-spring`, JUnit Platform, GMavenPlus (`pom.xml`).
+- **Localização/nome:** `src/test/groovy/com/photoizer/crm/{modulo}/**`, sufixo `*Spec.groovy`, classe `extends Specification`.
+- **Regra de migração:** não criar novos `*Test.java` no `agenda`. Os 10 testes JUnit antigos do módulo foram migrados para Spock; os demais módulos permanecem em JUnit até migração incremental.
+- **Nomes:** features em português, descritivas, sem `@DisplayName`:
+  ```groovy
+  def "bloqueia alteração de proposta já assinada"() { ... }
+  ```
+- **Blocos BDD:** usar `given:` (contexto), `when:` (ação), `then:` (resultado/interações), `expect:` (asserções puras), `cleanup:` (teardown real) e `where:` (dados). Cada feature usa apenas os blocos aplicáveis; **não criar blocos vazios cerimoniais**.
+- **Não misturar** `expect:` com `when:`/`then:` na mesma feature.
+- **Data-driven:** usar `where:` com tabela/pipes nomeados e `@Unroll`:
+  ```groovy
+  @Unroll
+  def "status #status ocupa a agenda? #ocupa"() {
+      expect:
+      StatusAgendamento.valueOf(status).isPreReserva() == ocupa
+
+      where:
+      status                  | ocupa
+      "PRE_RESERVA"           | true
+      "CONFIRMADO"            | false
+  }
+  ```
+- **Exceções:** `when:` + `then: thrown(TipoException)`; valide a mensagem quando ela for parte do contrato.
+- **Mocks:** `Mock`/`Stub`/`Spy` do Spock (não usar Mockito em specs novos). Interações no `then:`.
+- **Unitário:** sem contexto Spring; dependências via `Mock`/`Stub`, fixtures em `agenda/support/AgendaFixtures.groovy`.
+- **Integração:** `spock-spring` com `@SpringBootTest`, `@DataJpaTest` (usar `@AutoConfigureTestDatabase(replace = Replace.NONE)`), `@AutoConfigureMockMvc` e `MockMvc`. Autenticação via `.with(user(...))` do `spring-security-test`.
+- **Isolamento:** `@Transactional` para rollback; nomes de banco H2 únicos por spec de integração (evita colisão entre contextos); `cleanup:` para arquivos/caches/`SecurityContext`.
+- **Fixtures compartilhadas:** `src/test/groovy/com/photoizer/crm/agenda/support/AgendaFixtures.groovy`.
+- **Comandos:**
+  ```bash
+  mvn test                                  # JUnit + Spock
+  mvn -Dtest='*Spec' test                   # somente Spock
+  mvn -Dtest=AgendamentoPropostaServiceSpec test
+  mvn clean package
+  ```
+
 ## 5. Fluxos Principais e Pontos de Entrada
 - **Ponto de Entrada:** `CrmApplication.java` (Spring Boot + Modulith + Scheduling).
 - **Autenticação Admin:**
@@ -129,7 +169,8 @@ Cada módulo segue a estrutura: `model/`, `repository/`, `service/`, `api/`, DTO
 - `docker compose -f docker-compose.dev.yml up -d` — Sobe o PostgreSQL local (porta 5432).
 - `mvn spring-boot:run` — Sobe servidor (porta 8080) no perfil `dev`, usando o Postgres local.
 - `mvn clean package` — Build + testes.
-- `mvn test` — Executa testes (H2 em memória; não exige Postgres).
+- `mvn test` — Executa JUnit legado + specs Spock (H2 em memória; não exige Postgres).
+- `mvn -Dtest='*Spec' test` — Executa somente os specs Spock (módulo `agenda` e novos testes).
 - `mvn -Dtest=SchemaBaselineGenerator test` — Gera o DDL Postgres em `target/schema-postgres.sql` (ferramenta de baseline; não roda no build padrão).
 - `JWT_SECRET=<segredo> SPRING_PROFILES_ACTIVE=prod SPRING_DATASOURCE_URL=<jdbc> ... mvn spring-boot:run` — Sobe em prod.
 - `java -jar target/crm-0.0.1-SNAPSHOT.jar` — Executa o JAR.

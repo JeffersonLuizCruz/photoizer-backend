@@ -138,7 +138,7 @@ CONFIRMADO ──realizar──▶ AGUARDANDO_PAGAMENTO_FINAL ──pagarFinal�
 2. **Resolução de cliente com efeito colateral**: o service cria `Cliente` quando inexistente (e silenciosamente faz `catch` de `OrigemCliente.valueOf` → `OUTROS`).
 3. **Cálculo financeiro unificado** [Fase 2]: `AgendamentoValoresCalculator` é a fonte única de `novo`/`atualização` e `valorRepasseEfetivo`; não há mais 3 cópias (ver dívida 7.3).
 4. **Conflito de agenda consolidado** [Fase 2]: `DisponibilidadeService.validarConflitoAgenda(pacote, dataHora, duracao, local, params)` único, sem cópias de lógica. O critério é **por fotógrafo responsável** quando informado (ignora local); **sem responsável**, por **local** (+ sobreposição de horário). É validado na **criação** (`criarProposta`), na **atualização** (`atualizar`), no **reagendar** e na **aprovação** (`aprovar`), sempre excluindo o próprio agendamento.
-5. **Status sem validação de transição**: `AgendamentoStatusLifecycle`/`transicionarPara` centralizam a mudança, mas transições inválidas ainda não são bloqueadas (encapsulado, sem bloquear — decisão mantida).
+5. **Transições de status validadas**: `StatusAgendamento` mantém o mapa de transições e `Agendamento.transicionarPara` valida via `validarTransicao`; transições inválidas lançam `StatusAgendamentoInvalidoException`.
 5.1. **Bloqueios de agenda**: `DisponibilidadeService` consulta `BloqueioAgendaPort` em `verificarDisponibilidade` (campo `bloqueios` na resposta) e em `validarConflitoAgenda` (409). Bloqueios globais sempre aplicam; bloqueios de profissional aplicam quando o `fotografoId` coincide.
 6. **tokenGaleria**: UUID com expiração fixa de 15 dias — hardcoded (ver 7.12).
 7. **`listarAgendamentosCliente` faz 3 consultas ao módulo `foto` POR agendamento** — N+1 cross-module (ver 7.6).
@@ -147,7 +147,14 @@ CONFIRMADO ──realizar──▶ AGUARDANDO_PAGAMENTO_FINAL ──pagarFinal�
 10. **Assinatura com MUITOS parâmetros**: `RascunhoAgendamentoService.salvarRascunho` (26 args), `CriarAgendamentoCommand` (27 campos, inclui `MultipartFile` — vaza dependência de web para dentro da camada de serviço).
 
 ## 6. Testes
-Nenhum teste específico no módulo `agenda`. Tests existem em outros módulos que usam o agenda: `FinanceiroServiceTest`, `DashboardServiceTest`, `FinanceiroDashboardServiceTest` (48 testes, todos verdes). Não há testes para fluxo de status, conflito, partilha ou repasses.
+O módulo `agenda` é a referência de **Spock/BDD** (`src/test/groovy/**/*Spec.groovy`). Os testes JUnit antigos do módulo foram migrados e removidos.
+
+- **Domínio/modelo:** `AgendamentoDomainSpec`, `StatusAgendamentoSpec`.
+- **Serviços:** `AgendamentoValoresCalculatorSpec`, `DisponibilidadeServiceSpec`, `PartilhaServiceSpec`, `AgendamentoStatusLifecycleSpec`, `AgendamentoPropostaServiceSpec`, `AgendamentoAvulsoServiceSpec`, `AgendamentoFotografoServiceSpec`, `PropostaPublicaServiceSpec`, `PropostaTemplateServiceSpec`.
+- **Segurança:** `PropostaEndpointsAutorizacaoSpec`, `AgendamentoAvulsoAutorizacaoSpec`, `AgendamentoResponseRedacaoSpec`.
+- **Integração:** `AgendamentoRepositoryIntegrationSpec` (`@DataJpaTest`), `AgendamentoControllerIntegrationSpec` (`@SpringBootTest` + `MockMvc`) e `AgendamentoPropostaFluxoIntegrationSpec` (fluxo proposta → assinatura → pagamento → aprovação, com eventos).
+- **Convenção:** blocos `given/when/then/expect/cleanup/where`, nomes em português, `@Unroll` em data-driven e fixtures em `agenda/support/AgendaFixtures.groovy`.
+- **Comandos:** `mvn test` (JUnit + Spock) e `mvn -Dtest='*Spec' test` (somente Spock).
 
 ## 7. Dívidas Técnicas e Melhorias Recomendadas
 
@@ -159,9 +166,9 @@ Nenhum teste específico no módulo `agenda`. Tests existem em outros módulos q
 - **Fase 2 (2º refactor)**: aplicado **Template Method** (`criarAgendamentoBase` + record `DadosNovoAgendamento`) — `criarAgendamento` e `criarAgendamentoDeContrato` (~85% duplicadas) agora compartilham um único fluxo de persistência/validação/fotógrafos/partilha/eventos; valores do contrato passam a trafegar como `ValoresAgendamento` (sem cálculo manual).
 - **Restam**: criação (multipart) ainda no service; resolução de cliente com efeito colateral.
 
-### 7.2 Status machine sem validação — **P1** · ◐ parcial
-- **Fase 2**: `Agendamento.transicionarPara(StatusAgendamento)` centraliza a mudança (seta `dataRealizacao` em REALIZADO); `AgendamentoStatusLifecycle.atualizarStatus` delega para ele, com eventos.
-- **Restam**: transições inválidas continuam aceitas (decisão do usuário: **encapsular sem bloquear** — comportamento de negócio preservado). Próximo passo opcional: `StatusInvalidoException` + validação no enum.
+### 7.2 Status machine — **P1** · ✅ resolvido
+- `Agendamento.transicionarPara(StatusAgendamento)` centraliza a mudança (seta `dataRealizacao`/`dataFinalizacao`) e valida as transições via `StatusAgendamento.validarTransicao`.
+- `AgendamentoStatusLifecycle.atualizarStatus` delega para o domínio e publica eventos após a persistência. Cobertura em `StatusAgendamentoSpec` e `AgendamentoDomainSpec`.
 
 ### 7.3 Duplicação de cálculo financeiro — **P1** · ✅ resolvido
 - **Fase 2**: `AgendamentoValoresCalculator.calcularValoresAgendamento(...)` (novo/atualização) + `calcularValorRepasse`/`valorRepasseEfetivo` como fonte única (testável isoladamente).

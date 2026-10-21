@@ -1,5 +1,6 @@
 package com.photoizer.crm.financeiro.service;
 
+import com.photoizer.crm.shared.model.TipoPagamento;
 import com.photoizer.crm.financeiro.api.PagamentoRequest;
 import com.photoizer.crm.financeiro.event.PagamentoRegistradoEvent;
 import com.photoizer.crm.financeiro.exception.AgendamentoNaoEncontradoParaFinanceiroException;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -115,6 +117,37 @@ public class PagamentoService {
             agendamentoId, saved.getId(), valor, true, compraExtraId));
 
         return saved;
+    }
+
+    /**
+     * Registra pagamentos históricos/manuais sem publicar eventos. Usado pelo
+     * Agendamento Avulso para preservar a data e a forma do recebimento original
+     * sem acionar a máquina de estados do agenda.
+     */
+    public List<Pagamento> registrarPagamentosHistoricos(UUID agendamentoId, List<PagamentoManualCommand> commands) {
+        if (commands == null || commands.isEmpty()) {
+            return List.of();
+        }
+
+        var agendamento = agendamentoRepository.findById(agendamentoId)
+            .orElseThrow(() -> new AgendamentoNaoEncontradoParaFinanceiroException(agendamentoId));
+
+        var salvos = new ArrayList<Pagamento>();
+        for (var command : commands) {
+            if (command.valor() == null || command.valor().signum() <= 0) {
+                continue;
+            }
+            var pagamento = Pagamento.builder()
+                .agendamento(agendamento)
+                .valor(command.valor())
+                .dataPagamento(command.dataPagamento() != null ? command.dataPagamento() : LocalDateTime.now())
+                .formaPagamento(command.formaPagamento())
+                .tipoPagamento(command.tipoPagamento() != null ? command.tipoPagamento() : TipoPagamento.ENTRADA)
+                .observacao(command.observacao())
+                .build();
+            salvos.add(pagamentoRepository.save(pagamento));
+        }
+        return salvos;
     }
 
     @Transactional(readOnly = true)

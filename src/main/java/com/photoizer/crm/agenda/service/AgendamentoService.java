@@ -272,7 +272,10 @@ public class AgendamentoService {
                     cb.equal(subRoot.get("agendamento").get("id"), root.get("id")),
                     cb.equal(subRoot.get("fotografo").get("id"), fotografoId)
                 ));
-                predicates.add(cb.exists(subquery));
+                predicates.add(cb.or(
+                    cb.equal(root.get("fotografo").get("id"), fotografoId),
+                    cb.exists(subquery)
+                ));
             }
             if (status != null) {
                 predicates.add(cb.equal(root.get("status"), status));
@@ -405,11 +408,6 @@ public class AgendamentoService {
         var repassarDeslocamento = request.repassarDeslocamento() != null ? request.repassarDeslocamento() : true;
         var taxaDeslocamento = repassarDeslocamento ? custoDeslocamento : BigDecimal.ZERO;
 
-        var percentualEntrada = configuracaoService.getValorDecimal("percentualEntrada", new BigDecimal("30.00"));
-        var valores = agendamentoValoresCalculator.calcularValoresAtualizacao(
-            pacote.getValorBase(), taxaDeslocamento, percentualEntrada,
-            agendamento.getValorEntradaPago(), agendamento.getValorExtras());
-
         agendamento.setPacote(pacote);
         agendamento.setEditor(editor);
         agendamento.setFotografo(fotografo);
@@ -421,11 +419,25 @@ public class AgendamentoService {
         agendamento.setAutorizaUsoImagem(request.autorizaUsoImagem() != null ? request.autorizaUsoImagem() : agendamento.getAutorizaUsoImagem());
         agendamento.setObservacoes(request.observacoes());
 
-        agendamento.setValorTotal(valores.valorTotal());
-        agendamento.setValorEntradaExigido(valores.valorEntradaExigido());
-        agendamento.setPercentualEntrada(percentualEntrada);
-        agendamento.setValorRestante(valores.valorRestante());
-        agendamento.setValorTotalFinal(valores.valorTotalFinal());
+        if (Boolean.TRUE.equals(agendamento.getValoresPersonalizados())) {
+            // Agendamento avulso com valor negociado: preserva o total/entrada
+            // informados pelo staff, recalculando apenas o saldo.
+            var valorTotalPersonalizado = agendamento.getValorTotal();
+            var valorTotalFinal = valorTotalPersonalizado.add(agendamento.getValorExtras());
+            agendamento.setValorTotalFinal(valorTotalFinal);
+            agendamento.setValorRestante(valorTotalFinal.subtract(agendamento.getValorEntradaPago()).max(BigDecimal.ZERO));
+        } else {
+            var percentualEntrada = configuracaoService.getValorDecimal("percentualEntrada", new BigDecimal("30.00"));
+            var valores = agendamentoValoresCalculator.calcularValoresAtualizacao(
+                pacote.getValorBase(), taxaDeslocamento, percentualEntrada,
+                agendamento.getValorEntradaPago(), agendamento.getValorExtras());
+
+            agendamento.setValorTotal(valores.valorTotal());
+            agendamento.setValorEntradaExigido(valores.valorEntradaExigido());
+            agendamento.setPercentualEntrada(percentualEntrada);
+            agendamento.setValorRestante(valores.valorRestante());
+            agendamento.setValorTotalFinal(valores.valorTotalFinal());
+        }
 
         agendamento = agendamentoRepository.save(agendamento);
         sincronizarFotografosNoAgendamento(agendamento, mapearRepasses(request.fotografos()));

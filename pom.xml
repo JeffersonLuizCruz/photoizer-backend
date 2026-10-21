@@ -30,6 +30,9 @@
 		<java.version>25</java.version>
 		<spring-modulith.version>2.1.0</spring-modulith.version>
 		<mapstruct.version>1.6.3</mapstruct.version>
+		<spock.version>2.5-groovy-5.0</spock.version>
+		<groovy.version>5.0.6</groovy.version>
+		<gmavenplus.version>4.2.1</gmavenplus.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -193,6 +196,39 @@
 			<artifactId>spring-modulith-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>org.spockframework</groupId>
+			<artifactId>spock-core</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.spockframework</groupId>
+			<artifactId>spock-spring</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.groovy</groupId>
+			<artifactId>groovy</artifactId>
+			<version>${groovy.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.groovy</groupId>
+			<artifactId>groovy-json</artifactId>
+			<version>${groovy.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>net.bytebuddy</groupId>
+			<artifactId>byte-buddy</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.objenesis</groupId>
+			<artifactId>objenesis</artifactId>
+			<version>3.5</version>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 	<dependencyManagement>
 		<dependencies>
@@ -200,6 +236,13 @@
 				<groupId>org.springframework.modulith</groupId>
 				<artifactId>spring-modulith-bom</artifactId>
 				<version>${spring-modulith.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.spockframework</groupId>
+				<artifactId>spock-bom</artifactId>
+				<version>${spock.version}</version>
 				<type>pom</type>
 				<scope>import</scope>
 			</dependency>
@@ -218,6 +261,31 @@
 							<artifactId>lombok</artifactId>
 						</exclude>
 					</excludes>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.codehaus.gmavenplus</groupId>
+				<artifactId>gmavenplus-plugin</artifactId>
+				<version>${gmavenplus.version}</version>
+				<configuration>
+					<targetBytecode>25</targetBytecode>
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>compileTests</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<includes>
+						<include>**/*Spec</include>
+						<include>**/*Test</include>
+						<include>**/*Tests</include>
+					</includes>
 				</configuration>
 			</plugin>
 			<plugin>

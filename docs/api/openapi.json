@@ -6345,6 +6345,94 @@
         }
       }
     },
+    "/api/v1/agendamentos/avulso" : {
+      "post" : {
+        "tags" : [ "Agendamentos" ],
+        "summary" : "Criar agendamento avulso",
+        "description" : "Cria um ensaio já confirmado pelo staff, com cliente e valores informados manualmente.",
+        "operationId" : "criarAgendamentoAvulso",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CriarAgendamentoAvulsoRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Agendamento criado",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AgendamentoResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflito de agenda",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AgendamentoResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Dados inválidos",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AgendamentoResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/admin/agendamentos/{agendamentoId}/ecommerce/regen-token" : {
       "post" : {
         "tags" : [ "Admin Ecommerce" ],
@@ -11480,6 +11568,64 @@
         }
       }
     },
+    "/api/v1/agendamentos/avulso/opcoes" : {
+      "get" : {
+        "tags" : [ "Agendamentos" ],
+        "summary" : "Opções do agendamento avulso",
+        "description" : "Lista fotógrafos, editores e valores padrão sem expor a configuração completa.",
+        "operationId" : "opcoesAgendamentoAvulso",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OpcoesAgendamentoAvulsoResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/admin/ecommerce/compras" : {
       "get" : {
         "tags" : [ "Admin Compras" ],
@@ -13110,6 +13256,11 @@
             "description" : "Status do agendamento",
             "example" : "CONFIRMADO"
           },
+          "origem" : {
+            "type" : "string",
+            "description" : "Origem do agendamento",
+            "example" : "PROPOSTA"
+          },
           "dataConfirmacao" : {
             "type" : "string",
             "format" : "date-time",
@@ -13853,6 +14004,14 @@
           "compraExtraId" : {
             "type" : "string",
             "format" : "uuid"
+          },
+          "formaPagamento" : {
+            "type" : "string",
+            "enum" : [ "PIX", "CARTAO", "DINHEIRO", "TRANSFERENCIA", "OUTRO" ]
+          },
+          "tipoPagamento" : {
+            "type" : "string",
+            "enum" : [ "ENTRADA", "FINAL", "EXTRA" ]
           }
         }
       },
@@ -14378,6 +14537,123 @@
             "description" : "Percentual (quando tipoValor=PERCENTUAL)"
           }
         }
+      },
+      "CriarAgendamentoAvulsoRequest" : {
+        "type" : "object",
+        "description" : "Cria um ensaio já confirmado, sem passar pelo fluxo público de proposta.",
+        "properties" : {
+          "clienteNome" : {
+            "type" : "string",
+            "description" : "Nome do cliente",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "clienteTelefone" : {
+            "type" : "string",
+            "description" : "Telefone do cliente",
+            "maxLength" : 20,
+            "minLength" : 0
+          },
+          "clienteEmail" : {
+            "type" : [ "string", "null" ],
+            "format" : "email",
+            "description" : "E-mail do cliente",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "clienteCpf" : {
+            "type" : [ "string", "null" ],
+            "description" : "CPF do cliente",
+            "maxLength" : 14,
+            "minLength" : 0
+          },
+          "clienteCidade" : {
+            "type" : [ "string", "null" ],
+            "description" : "Cidade",
+            "maxLength" : 100,
+            "minLength" : 0
+          },
+          "clienteEstado" : {
+            "type" : [ "string", "null" ],
+            "description" : "UF",
+            "maxLength" : 2,
+            "minLength" : 0
+          },
+          "pacoteId" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "ID do pacote"
+          },
+          "fotografoId" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "ID do fotógrafo responsável"
+          },
+          "dataHoraEnsaio" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "Data/hora do ensaio"
+          },
+          "duracaoMinutos" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32",
+            "description" : "Duração em minutos"
+          },
+          "localEnsaio" : {
+            "type" : "string",
+            "description" : "Local do ensaio",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "valorTotal" : {
+            "type" : [ "number", "null" ],
+            "description" : "Valor total combinado; se vazio usa o pacote",
+            "minimum" : 0
+          },
+          "valorEntradaExigido" : {
+            "type" : [ "number", "null" ],
+            "description" : "Valor da entrada exigida; se vazio usa o percentual configurado",
+            "minimum" : 0
+          },
+          "valorPago" : {
+            "type" : [ "number", "null" ],
+            "description" : "Valor recebido agora",
+            "minimum" : 0
+          },
+          "dataPagamento" : {
+            "type" : [ "string", "null" ],
+            "format" : "date-time",
+            "description" : "Data do recebimento"
+          },
+          "formaPagamento" : {
+            "type" : [ "string", "null" ],
+            "description" : "Forma do recebimento",
+            "enum" : [ "PIX", "CARTAO", "DINHEIRO", "TRANSFERENCIA", "OUTRO" ]
+          },
+          "tipoPagamento" : {
+            "type" : [ "string", "null" ],
+            "description" : "Tipo do recebimento",
+            "enum" : [ "ENTRADA", "FINAL", "EXTRA" ]
+          },
+          "custoDeslocamento" : {
+            "type" : [ "number", "null" ],
+            "description" : "Custo de deslocamento",
+            "minimum" : 0
+          },
+          "repassarDeslocamento" : {
+            "type" : [ "boolean", "null" ],
+            "description" : "Repassar deslocamento"
+          },
+          "autorizaUsoImagem" : {
+            "type" : [ "boolean", "null" ],
+            "description" : "Autorização de uso de imagem"
+          },
+          "observacoes" : {
+            "type" : [ "string", "null" ],
+            "description" : "Observações internas"
+          }
+        },
+        "required" : [ "clienteNome", "clienteTelefone", "dataHoraEnsaio", "fotografoId", "localEnsaio", "pacoteId" ]
       },
       "SelecionarRequest" : {
         "type" : "object",
@@ -16199,6 +16475,35 @@
             "items" : {
               "$ref" : "#/components/schemas/BloqueioAgendaConflito"
             }
+          }
+        }
+      },
+      "OpcoesAgendamentoAvulsoResponse" : {
+        "type" : "object",
+        "properties" : {
+          "fotografos" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ProfissionalOpcao"
+            }
+          },
+          "percentualEntrada" : {
+            "type" : "number"
+          },
+          "taxaDeslocamentoPadrao" : {
+            "type" : "number"
+          }
+        }
+      },
+      "ProfissionalOpcao" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "nome" : {
+            "type" : "string"
           }
         }
       },
