@@ -84,12 +84,15 @@ financeiro/
 
 ### Fluxo 2: Dashboard Financeiro
 1. `GET /financeiro/dashboard` → `FinanceiroDashboardService.calcular()`: carrega dados via Specification (receitas), queries (despesas/agendamentos/indicações), e `FinanceCalculator.carregarRepasses()`. Calcula cards, barra mensal, despesas por categoria, lucro mensal, rentabilidade por serviço/trabalho, últimos lançamentos.
+2. Agendamentos (incluindo avulsos) entram em `valorBruto`/`aReceber` via `valorEntradaPago` e `valorRestante`. Os filtros `tipoServico`, `status` e `formaPagamento` também são aplicados aos agendamentos; `clienteId` filtra ambos.
 
 ### Fluxo 3: Registro de Pagamento
 `POST /financeiro/agendamentos/{id}/pagamentos` → `PagamentoService.registrarPagamento()`:
-1. Salva `Pagamento`.
+1. Salva `Pagamento` (com `formaPagamento`/`tipoPagamento` quando informados).
 2. Publica `PagamentoRegistradoEvent`.
 3. `agenda.PagamentoFinanceiroEventListener` consome o evento: chama `agendamento.registrarPagamento(valor)` (domain method) que atualiza `valorEntradaPago`, `valorRestante` e possivelmente `status`.
+
+`POST /financeiro/agendamentos/{id}/recebimentos` (multipart, ADMIN) → `PagamentoService.registrarRecebimento()`: usado pela tela financeira do agendamento para baixar entradas/parciais/finais, com comprovante opcional. Não deduplica por valor (permite parcelas iguais) e publica o mesmo evento. O comprovante é servido por `GET /financeiro/pagamentos/{id}/comprovante`.
 
 ### Fluxo 4: Extras com Comissão
 `POST /agendamentos/{id}/fotos-extras` / `videos-extras` → `ExtraVendaService.adicionarFotoExtra/VideoExtra()`:
@@ -100,7 +103,15 @@ financeiro/
 ### Fluxo 5: Receitas Avulsas
 `ReceitaService`: CRUD de receitas manuais — deriva status de valor recebido, calcula comissão (`percentualComissao` default 10%) e `valorFinal`.
 
-### Fluxo 6: Reconciliador
+### Fluxo 6: Fluxo de Caixa
+`GET /financeiro/fluxo-caixa` → `FinanceiroQueryService.calcularFluxoCaixa()`: considera receitas manuais, despesas e repasses, além de agendamentos/avulsos. A entrada já recebida (`valorEntradaPago`) entra em `entradasRealizadas`; o saldo (`valorRestante`) entra como receita prevista na data do ensaio.
+
+### Fluxo 7: Relatórios
+- `GET /financeiro/relatorios` → `FinanceiroQueryService.calcularRelatorios()`: inclui agendamentos/avulsos com `entrada`, `entradaExigida`, `restante` e `totalFinal`.
+- `GET /financeiro/relatorios/inadimplencia` → inclui receitas manuais e agendamentos com data do ensaio vencida e `valorRestante > 0`.
+- Os demais relatórios de exportação (`resumo-mensal`, `rentabilidade-*`, `comparativo`, `fiscal`) continuam baseados em receitas manuais; a tela de Relatórios expõe o relatório **Ensaios e Avulsos** para os agendamentos.
+
+### Fluxo 8: Reconciliador
 `ReconciliarComprasExtraFinanceiro.run`: no boot, busca `CompraExtra PAGA` sem `Pagamento` correspondente e chama `PagamentoService.registrarPagamentoExtraEcommerce()`.
 
 ## 5. Regras Específicas

@@ -46,6 +46,12 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID>,
         @Param("statusesIgnorados") List<StatusAgendamento> statusesIgnorados,
         @Param("excluirId") UUID excluirId);
 
+    @Query("SELECT a FROM Agendamento a WHERE a.dataHoraEnsaio < :limite " +
+           "AND a.valorRestante > 0 AND a.status NOT IN :statusesIgnorados")
+    List<Agendamento> findInadimplentes(
+        @Param("limite") LocalDateTime limite,
+        @Param("statusesIgnorados") List<StatusAgendamento> statusesIgnorados);
+
     @Query("SELECT a FROM Agendamento a WHERE a.fotografo.id = :fotografoId " +
            "AND a.dataHoraEnsaio >= :diaInicio AND a.dataHoraEnsaio < :diaFim " +
            "AND a.status NOT IN :statusesIgnorados")

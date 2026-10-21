@@ -177,6 +177,7 @@ public class FinanceiroQueryService {
 
         var total = BigDecimal.ZERO;
         var entrada = BigDecimal.ZERO;
+        var entradaExigida = BigDecimal.ZERO;
         var restante = BigDecimal.ZERO;
         var extras = BigDecimal.ZERO;
         var totalFinal = BigDecimal.ZERO;
@@ -185,6 +186,7 @@ public class FinanceiroQueryService {
         for (var a : sorted) {
             total = total.add(a.getValorTotal());
             entrada = entrada.add(a.getValorEntradaPago());
+            entradaExigida = entradaExigida.add(a.getValorEntradaExigido());
             restante = restante.add(a.getValorRestante());
             extras = extras.add(a.getValorExtras());
             totalFinal = totalFinal.add(a.getValorTotalFinal());
@@ -195,7 +197,8 @@ public class FinanceiroQueryService {
         var comissao = ids.isEmpty() ? BigDecimal.ZERO
             : indicacaoRepository.sumValorComissaoByAgendamentoIdInAndStatusNot(ids, StatusIndicacao.CANCELADA);
 
-        var totais = new FinanceiroRelatoriosResponse.RelatoriosTotais(total, entrada, restante, extras, totalFinal, repasse, comissao);
+        var totais = new FinanceiroRelatoriosResponse.RelatoriosTotais(
+            total, entrada, entradaExigida, restante, extras, totalFinal, repasse, comissao);
         var responses = sorted.stream()
             .map(RelatorioAgendamentoItem::of)
             .toList();
@@ -301,13 +304,37 @@ public class FinanceiroQueryService {
 
         var receitas = receitaRepository.findAll();
         var despesas = despesaRepository.findAll();
+        var statusIgnorados = statusClassificationPort.statusIgnorados();
+        var agendamentos = agendamentoRepository.findByDataBetween(
+            rangeInicio.atStartOfDay(),
+            rangeFim.plusDays(1).atStartOfDay(),
+            List.copyOf(statusIgnorados));
 
         var itens = new ArrayList<FluxoCaixaResponse.FluxoCaixaItem>();
         var entradasRealizadas = BigDecimal.ZERO;
         var saidasRealizadas = BigDecimal.ZERO;
 
+        for (var a : agendamentos) {
+            var valorPago = a.getValorEntradaPago() != null ? a.getValorEntradaPago() : BigDecimal.ZERO;
+            var restante = a.getValorRestante() != null ? a.getValorRestante() : BigDecimal.ZERO;
+
+            if (valorPago.signum() > 0) {
+                entradasRealizadas = entradasRealizadas.add(valorPago);
+            }
+            if (restante.signum() > 0 && a.getDataHoraEnsaio() != null
+                && emPeriodo(a.getDataHoraEnsaio().toLocalDate(), rangeInicio, rangeFim)) {
+                var pacoteNome = a.getPacote() != null ? a.getPacote().getNome() : "Ensaio";
+                var descricao = "Recebimento — " + a.nomeCliente() + " (" + pacoteNome + ")";
+                itens.add(new FluxoCaixaResponse.FluxoCaixaItem(
+                    a.getId(), "RECEITA", descricao, "Ensaios",
+                    a.getDataHoraEnsaio().toLocalDate(), restante,
+                    valorPago.signum() > 0 ? "PAGO_PARCIAL" : "PENDENTE", "AGENDAMENTO"));
+            }
+        }
+
         for (var r : receitas) {
             if (r.getStatus() == StatusReceita.CANCELADO) continue;
+            if (r.getAgendamentoId() != null) continue;
             if (r.getStatus() == StatusReceita.PENDENTE || r.getStatus() == StatusReceita.PAGO_PARCIAL) {
                 var data = r.getDataPrevisaoRecebimento();
                 if (data != null && emPeriodo(data, rangeInicio, rangeFim)) {

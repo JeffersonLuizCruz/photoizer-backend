@@ -1,5 +1,6 @@
 package com.photoizer.crm.financeiro.service;
 
+import com.photoizer.crm.shared.model.FormaPagamento;
 import com.photoizer.crm.shared.model.TipoPagamento;
 import com.photoizer.crm.financeiro.api.PagamentoRequest;
 import com.photoizer.crm.financeiro.event.PagamentoRegistradoEvent;
@@ -10,11 +11,14 @@ import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.financeiro.api.PagamentoResponse;
 import com.photoizer.crm.financeiro.model.Pagamento;
 import com.photoizer.crm.financeiro.repository.PagamentoRepository;
+import com.photoizer.crm.shared.storage.FileStorageService;
+import com.photoizer.crm.shared.storage.FileValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -38,13 +42,19 @@ public class PagamentoService {
     private final PagamentoRepository pagamentoRepository;
     private final AgendamentoRepository agendamentoRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final FileStorageService fileStorageService;
+    private final FileValidator fileValidator;
 
     public PagamentoService(PagamentoRepository pagamentoRepository,
                             AgendamentoRepository agendamentoRepository,
-                            ApplicationEventPublisher eventPublisher) {
+                            ApplicationEventPublisher eventPublisher,
+                            FileStorageService fileStorageService,
+                            FileValidator fileValidator) {
         this.pagamentoRepository = pagamentoRepository;
         this.agendamentoRepository = agendamentoRepository;
         this.eventPublisher = eventPublisher;
+        this.fileStorageService = fileStorageService;
+        this.fileValidator = fileValidator;
     }
 
     /**
@@ -59,7 +69,35 @@ public class PagamentoService {
                 request.valor(), agendamentoId);
             return existente.get();
         }
+        return criarPagamento(agendamentoId, request);
+    }
 
+    /**
+     * Registra um recebimento com comprovante opcional (entrada/parcial/final).
+     * Usado pela tela financeira do agendamento para baixar recebimentos de
+     * agendamentos avulsos no modo percentual.
+     */
+    public Pagamento registrarRecebimento(UUID agendamentoId,
+                                          BigDecimal valor,
+                                          LocalDateTime dataPagamento,
+                                          FormaPagamento formaPagamento,
+                                          TipoPagamento tipoPagamento,
+                                          MultipartFile comprovante,
+                                          String observacao) {
+        String urlComprovante = null;
+        if (comprovante != null && !comprovante.isEmpty()) {
+            fileValidator.validate(comprovante, "receipt");
+            urlComprovante = fileStorageService.salvar(comprovante);
+        }
+        return criarPagamento(agendamentoId, new PagamentoRequest(
+            valor, dataPagamento, urlComprovante, observacao, formaPagamento, tipoPagamento));
+    }
+
+    /**
+     * Cria o pagamento sem a deduplicação por valor. Recebimentos manuais podem
+     * ter o mesmo valor em datas diferentes (ex.: duas parcelas iguais).
+     */
+    private Pagamento criarPagamento(UUID agendamentoId, PagamentoRequest request) {
         var agendamento = agendamentoRepository.findById(agendamentoId)
             .orElseThrow(() -> new AgendamentoNaoEncontradoParaFinanceiroException(agendamentoId));
 
@@ -75,6 +113,8 @@ public class PagamentoService {
             .dataPagamento(request.dataPagamento() != null ? request.dataPagamento() : LocalDateTime.now())
             .urlComprovante(request.urlComprovante())
             .observacao(request.observacao())
+            .formaPagamento(request.formaPagamento())
+            .tipoPagamento(request.tipoPagamento())
             .build();
         var saved = pagamentoRepository.save(pagamento);
 
@@ -148,6 +188,13 @@ public class PagamentoService {
             salvos.add(pagamentoRepository.save(pagamento));
         }
         return salvos;
+    }
+
+    @Transactional(readOnly = true)
+    public String caminhoComprovante(UUID pagamentoId) {
+        return pagamentoRepository.findById(pagamentoId)
+            .map(Pagamento::getUrlComprovante)
+            .orElseThrow(() -> new com.photoizer.crm.financeiro.exception.PagamentoNaoEncontradoException(pagamentoId));
     }
 
     @Transactional(readOnly = true)

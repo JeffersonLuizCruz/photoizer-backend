@@ -4122,6 +4122,126 @@
         } ]
       }
     },
+    "/api/v1/financeiro/agendamentos/{agendamentoId}/recebimentos" : {
+      "post" : {
+        "tags" : [ "Financeiro" ],
+        "summary" : "Registrar recebimento (entrada/parcial/final) com comprovante opcional",
+        "operationId" : "registrarRecebimento",
+        "parameters" : [ {
+          "name" : "agendamentoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "valor",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "number",
+            "exclusiveMinimum" : 0
+          }
+        }, {
+          "name" : "dataPagamento",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "name" : "formaPagamento",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "PIX", "CARTAO", "DINHEIRO", "TRANSFERENCIA", "OUTRO" ]
+          }
+        }, {
+          "name" : "tipoPagamento",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "ENTRADA", "FINAL", "EXTRA" ]
+          }
+        }, {
+          "name" : "observacao",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "comprovante" : {
+                    "type" : "string",
+                    "format" : "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PagamentoResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/financeiro/agendamentos/{agendamentoId}/pagamentos" : {
       "get" : {
         "tags" : [ "Financeiro" ],
@@ -9838,6 +9958,73 @@
         } ]
       }
     },
+    "/api/v1/financeiro/pagamentos/{pagamentoId}/comprovante" : {
+      "get" : {
+        "tags" : [ "Financeiro" ],
+        "summary" : "Servir comprovante de um recebimento",
+        "operationId" : "comprovantePagamento",
+        "parameters" : [ {
+          "name" : "pagamentoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "string",
+                  "format" : "binary"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/financeiro/fluxo-caixa" : {
       "get" : {
         "tags" : [ "Financeiro" ],
@@ -14239,30 +14426,6 @@
           }
         }
       },
-      "PagamentoRequest" : {
-        "type" : "object",
-        "properties" : {
-          "valor" : {
-            "type" : "number",
-            "exclusiveMinimum" : 0
-          },
-          "dataPagamento" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "urlComprovante" : {
-            "type" : "string",
-            "maxLength" : 500,
-            "minLength" : 0
-          },
-          "observacao" : {
-            "type" : "string",
-            "maxLength" : 255,
-            "minLength" : 0
-          }
-        },
-        "required" : [ "valor" ]
-      },
       "PagamentoResponse" : {
         "type" : "object",
         "properties" : {
@@ -14300,6 +14463,38 @@
             "enum" : [ "ENTRADA", "FINAL", "EXTRA" ]
           }
         }
+      },
+      "PagamentoRequest" : {
+        "type" : "object",
+        "properties" : {
+          "valor" : {
+            "type" : "number",
+            "exclusiveMinimum" : 0
+          },
+          "dataPagamento" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "urlComprovante" : {
+            "type" : "string",
+            "maxLength" : 500,
+            "minLength" : 0
+          },
+          "observacao" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "formaPagamento" : {
+            "type" : "string",
+            "enum" : [ "PIX", "CARTAO", "DINHEIRO", "TRANSFERENCIA", "OUTRO" ]
+          },
+          "tipoPagamento" : {
+            "type" : "string",
+            "enum" : [ "ENTRADA", "FINAL", "EXTRA" ]
+          }
+        },
+        "required" : [ "valor" ]
       },
       "SessaoCarrinhoResponse" : {
         "type" : "object",
@@ -15421,6 +15616,9 @@
           "valorTotal" : {
             "type" : "number"
           },
+          "valorEntradaExigido" : {
+            "type" : "number"
+          },
           "valorEntradaPago" : {
             "type" : "number"
           },
@@ -15449,6 +15647,9 @@
             "type" : "number"
           },
           "entrada" : {
+            "type" : "number"
+          },
+          "entradaExigida" : {
             "type" : "number"
           },
           "restante" : {

@@ -11,6 +11,7 @@ public record FinanceiroRelatoriosResponse(
     public record RelatoriosTotais(
         BigDecimal total,
         BigDecimal entrada,
+        BigDecimal entradaExigida,
         BigDecimal restante,
         BigDecimal extras,
         BigDecimal totalFinal,

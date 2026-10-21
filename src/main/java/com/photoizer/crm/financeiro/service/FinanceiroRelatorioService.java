@@ -1,5 +1,6 @@
 package com.photoizer.crm.financeiro.service;
 
+import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.despesa.model.Despesa;
 import com.photoizer.crm.despesa.model.StatusDespesa;
 import com.photoizer.crm.despesa.repository.DespesaRepository;
@@ -14,6 +15,7 @@ import com.photoizer.crm.financeiro.model.Receita;
 import com.photoizer.crm.financeiro.model.StatusReceita;
 import com.photoizer.crm.financeiro.model.TipoServico;
 import com.photoizer.crm.financeiro.repository.ReceitaRepository;
+import com.photoizer.crm.shared.port.StatusClassificationPort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,11 +37,17 @@ public class FinanceiroRelatorioService {
 
     private final ReceitaRepository receitaRepository;
     private final DespesaRepository despesaRepository;
+    private final AgendamentoRepository agendamentoRepository;
+    private final StatusClassificationPort statusClassificationPort;
 
     public FinanceiroRelatorioService(ReceitaRepository receitaRepository,
-                                      DespesaRepository despesaRepository) {
+                                      DespesaRepository despesaRepository,
+                                      AgendamentoRepository agendamentoRepository,
+                                      StatusClassificationPort statusClassificationPort) {
         this.receitaRepository = receitaRepository;
         this.despesaRepository = despesaRepository;
+        this.agendamentoRepository = agendamentoRepository;
+        this.statusClassificationPort = statusClassificationPort;
     }
 
     public ResumoMensalResponse resumoMensal(LocalDate inicio, LocalDate fim) {
@@ -130,6 +138,27 @@ public class FinanceiroRelatorioService {
                 r.getId(), r.getClienteNome(), r.getTipoServico(),
                 r.getDescricao(), r.getValorFinal(), r.getValorRecebido(),
                 emAberto, vencimento, diasAtraso));
+        }
+
+        var statusIgnorados = statusClassificationPort.statusIgnorados();
+        var agendamentos = agendamentoRepository.findInadimplentes(
+            hoje.atStartOfDay(), List.copyOf(statusIgnorados));
+        for (var a : agendamentos) {
+            var vencimento = a.getDataHoraEnsaio() != null ? a.getDataHoraEnsaio().toLocalDate() : null;
+            if (vencimento == null || !vencimento.isBefore(hoje)) continue;
+            if (dataInicio != null && vencimento.isBefore(dataInicio)) continue;
+            if (dataFim != null && vencimento.isAfter(dataFim)) continue;
+
+            var valorEmAberto = a.getValorRestante() != null ? a.getValorRestante() : BigDecimal.ZERO;
+            if (valorEmAberto.signum() <= 0) continue;
+
+            var diasAtraso = ChronoUnit.DAYS.between(vencimento, hoje);
+            var pacote = a.getPacote() != null ? a.getPacote().getNome() : null;
+            itens.add(new InadimplenciaRelatorioResponse.Item(
+                a.getId(), a.nomeCliente(), TipoServico.ENSAIO,
+                "Ensaio" + (pacote != null ? " — " + pacote : ""),
+                a.getValorTotalFinal(), a.getValorEntradaPago(),
+                valorEmAberto, vencimento, diasAtraso));
         }
 
         itens.sort((a, b) -> Long.compare(b.diasAtraso(), a.diasAtraso()));

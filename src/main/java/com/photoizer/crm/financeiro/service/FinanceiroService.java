@@ -68,6 +68,17 @@ public class FinanceiroService {
         return pagamentoService.registrarPagamento(agendamentoId, request);
     }
 
+    public Pagamento registrarRecebimento(UUID agendamentoId,
+                                          BigDecimal valor,
+                                          java.time.LocalDateTime dataPagamento,
+                                          com.photoizer.crm.shared.model.FormaPagamento formaPagamento,
+                                          com.photoizer.crm.shared.model.TipoPagamento tipoPagamento,
+                                          org.springframework.web.multipart.MultipartFile comprovante,
+                                          String observacao) {
+        return pagamentoService.registrarRecebimento(
+            agendamentoId, valor, dataPagamento, formaPagamento, tipoPagamento, comprovante, observacao);
+    }
+
     public void registrarPagamentoExtraEcommerce(UUID agendamentoId, BigDecimal valor, UUID compraExtraId) {
         pagamentoService.registrarPagamentoExtraEcommerce(agendamentoId, valor, compraExtraId);
     }
@@ -87,6 +98,11 @@ public class FinanceiroService {
     @Transactional(readOnly = true)
     public List<com.photoizer.crm.financeiro.api.PagamentoResponse> listarPagamentos(UUID agendamentoId) {
         return pagamentoService.listarPagamentos(agendamentoId);
+    }
+
+    @Transactional(readOnly = true)
+    public String caminhoComprovante(UUID pagamentoId) {
+        return pagamentoService.caminhoComprovante(pagamentoId);
     }
 
     @Transactional(readOnly = true)

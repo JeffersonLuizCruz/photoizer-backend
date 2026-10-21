@@ -1,6 +1,7 @@
 package com.photoizer.crm.financeiro.service;
 
 import com.photoizer.crm.agenda.model.Agendamento;
+import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.comissao.model.Indicacao;
@@ -12,7 +13,9 @@ import com.photoizer.crm.financeiro.api.FinanceiroDashboardResponse;
 import com.photoizer.crm.financeiro.model.Receita;
 import com.photoizer.crm.financeiro.model.StatusReceita;
 import com.photoizer.crm.financeiro.model.TipoServico;
+import com.photoizer.crm.financeiro.repository.PagamentoRepository;
 import com.photoizer.crm.financeiro.repository.ReceitaRepository;
+import com.photoizer.crm.shared.model.FormaPagamento;
 import com.photoizer.crm.shared.port.DisplacementCostPort;
 import com.photoizer.crm.shared.port.RepasseAggregationPort;
 import com.photoizer.crm.shared.port.StatusClassificationPort;
@@ -49,6 +52,7 @@ public class FinanceiroDashboardService {
     private final AgendamentoRepository agendamentoRepository;
     private final AgendamentoFotografoRepository agendamentoFotografoRepository;
     private final IndicacaoRepository indicacaoRepository;
+    private final PagamentoRepository pagamentoRepository;
     private final StatusClassificationPort statusClassificationPort;
     private final DisplacementCostPort displacementCostPort;
     private final RepasseAggregationPort repasseAggregationPort;
@@ -58,6 +62,7 @@ public class FinanceiroDashboardService {
                                       AgendamentoRepository agendamentoRepository,
                                       AgendamentoFotografoRepository agendamentoFotografoRepository,
                                       IndicacaoRepository indicacaoRepository,
+                                      PagamentoRepository pagamentoRepository,
                                       StatusClassificationPort statusClassificationPort,
                                       DisplacementCostPort displacementCostPort,
                                       RepasseAggregationPort repasseAggregationPort) {
@@ -66,6 +71,7 @@ public class FinanceiroDashboardService {
         this.agendamentoRepository = agendamentoRepository;
         this.agendamentoFotografoRepository = agendamentoFotografoRepository;
         this.indicacaoRepository = indicacaoRepository;
+        this.pagamentoRepository = pagamentoRepository;
         this.statusClassificationPort = statusClassificationPort;
         this.displacementCostPort = displacementCostPort;
         this.repasseAggregationPort = repasseAggregationPort;
@@ -95,6 +101,23 @@ public class FinanceiroDashboardService {
             agendamentos = agendamentos.stream()
                 .filter(a -> a.getCliente() != null && a.getCliente().getId().equals(clienteId))
                 .toList();
+        }
+        if (tipoServico != null && tipoServico != TipoServico.ENSAIO) {
+            agendamentos = List.of();
+        }
+        if (status != null) {
+            agendamentos = agendamentos.stream()
+                .filter(a -> statusReceita(a) == status)
+                .toList();
+        }
+        if (formaPagamento != null && !formaPagamento.isBlank()) {
+            var forma = formaPagamentoOuNull(formaPagamento);
+            if (forma != null) {
+                var idsComForma = pagamentoRepository.findAgendamentoIdsByFormaPagamento(forma);
+                agendamentos = agendamentos.stream()
+                    .filter(a -> idsComForma.contains(a.getId()) || a.getFormaPagamentoFinal() == forma)
+                    .toList();
+            }
         }
 
         var agendamentoIds = agendamentos.stream().map(Agendamento::getId).toList();
@@ -578,6 +601,29 @@ public class FinanceiroDashboardService {
 
     private boolean emPeriodo(LocalDate data, LocalDate inicio, LocalDate fim) {
         return FinanceiroQueryService.emPeriodo(data, inicio, fim);
+    }
+
+    private FormaPagamento formaPagamentoOuNull(String valor) {
+        try {
+            return FormaPagamento.valueOf(valor);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    /**
+     * Traduz o estado financeiro do agendamento para os status usados pelos
+     * filtros de receita (PENDENTE/PAGO_PARCIAL/PAGO_TOTAL/CANCELADO).
+     */
+    private StatusReceita statusReceita(Agendamento a) {
+        if (a.getStatus() == StatusAgendamento.CANCELADO
+            || a.getStatus() == StatusAgendamento.NO_SHOW) {
+            return StatusReceita.CANCELADO;
+        }
+        var pago = a.getValorEntradaPago() != null ? a.getValorEntradaPago() : BigDecimal.ZERO;
+        var restante = a.getValorRestante() != null ? a.getValorRestante() : BigDecimal.ZERO;
+        if (restante.signum() <= 0) return StatusReceita.PAGO_TOTAL;
+        return pago.signum() > 0 ? StatusReceita.PAGO_PARCIAL : StatusReceita.PENDENTE;
     }
 
     private record Agregados(

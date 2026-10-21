@@ -2,6 +2,9 @@ package com.photoizer.crm.financeiro.api;
 
 import com.photoizer.crm.financeiro.model.StatusReceita;
 import com.photoizer.crm.financeiro.model.TipoServico;
+import com.photoizer.crm.shared.model.FormaPagamento;
+import com.photoizer.crm.shared.model.TipoPagamento;
+import com.photoizer.crm.shared.storage.FileServeHelper;
 import com.photoizer.crm.financeiro.service.FinanceiroDashboardService;
 import com.photoizer.crm.financeiro.service.FinanceiroQueryService;
 import com.photoizer.crm.financeiro.service.FinanceiroService;
@@ -10,7 +13,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
+import org.springframework.core.io.Resource;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,9 +25,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -33,13 +41,16 @@ public class FinanceiroController {
     private final FinanceiroService financeiroService;
     private final FinanceiroDashboardService financeiroDashboardService;
     private final FinanceiroQueryService financeiroQueryService;
+    private final FileServeHelper fileServeHelper;
 
     public FinanceiroController(FinanceiroService financeiroService,
                                 FinanceiroDashboardService financeiroDashboardService,
-                                FinanceiroQueryService financeiroQueryService) {
+                                FinanceiroQueryService financeiroQueryService,
+                                FileServeHelper fileServeHelper) {
         this.financeiroService = financeiroService;
         this.financeiroDashboardService = financeiroDashboardService;
         this.financeiroQueryService = financeiroQueryService;
+        this.fileServeHelper = fileServeHelper;
     }
 
     @PostMapping("/agendamentos/{agendamentoId}/pagamentos")
@@ -50,6 +61,24 @@ public class FinanceiroController {
             @Valid @RequestBody PagamentoRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(PagamentoResponse.of(financeiroService.registrarPagamento(agendamentoId, request)));
+    }
+
+    @PostMapping(value = "/agendamentos/{agendamentoId}/recebimentos",
+        consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Registrar recebimento (entrada/parcial/final) com comprovante opcional")
+    @RolesAllowed("ADMIN")
+    public ResponseEntity<PagamentoResponse> registrarRecebimento(
+            @PathVariable UUID agendamentoId,
+            @RequestParam @Positive BigDecimal valor,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dataPagamento,
+            @RequestParam(required = false) FormaPagamento formaPagamento,
+            @RequestParam(required = false) TipoPagamento tipoPagamento,
+            @RequestParam(required = false) MultipartFile comprovante,
+            @RequestParam(required = false) String observacao) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(PagamentoResponse.of(
+            financeiroService.registrarRecebimento(agendamentoId, valor, dataPagamento,
+                formaPagamento, tipoPagamento, comprovante, observacao)));
     }
 
     @PostMapping("/agendamentos/{agendamentoId}/fotos-extras")
@@ -80,6 +109,18 @@ public class FinanceiroController {
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(ExtraServicoResponse.of(financeiroService.adicionarVideoExtra(agendamentoId, quantidade, valorUnitario,
                 indicadorNome, indicadorTelefone, indicadorId)));
+    }
+
+    @GetMapping("/pagamentos/{pagamentoId}/comprovante")
+    @Operation(summary = "Servir comprovante de um recebimento")
+    @RolesAllowed("ADMIN")
+    public ResponseEntity<Resource> comprovantePagamento(@PathVariable UUID pagamentoId) {
+        var caminho = financeiroService.caminhoComprovante(pagamentoId);
+        if (caminho == null || caminho.isBlank()) {
+            return ResponseEntity.notFound().build();
+        }
+        var filename = "comprovante_pagamento_" + pagamentoId + fileServeHelper.extrairExtensao(caminho);
+        return fileServeHelper.servirArquivo(caminho, filename, "inline");
     }
 
     @GetMapping("/agendamentos/{agendamentoId}/pagamentos")
