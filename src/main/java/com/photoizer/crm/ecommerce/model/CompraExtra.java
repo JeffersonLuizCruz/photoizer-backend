@@ -71,6 +71,9 @@ public class CompraExtra {
     @Column(length = 20)
     private MetodoPagamento metodoPagamento;
 
+    @Column(length = 1000)
+    private String linkPagamentoCartao;
+
     @Column(columnDefinition = "TEXT")
     private String observacao;
 

@@ -7,9 +7,10 @@ Gerencia a galeria pública do cliente (via token), seleção de fotos para o pa
 ```
 ecommerce/
 ├── model/
-│   ├── CompraExtra.java       # Entidade: agendamentoId, valorTotal, quantidadeFotos, metodoPagamento, status, urlComprovante, dataPagamento, observacao, motivoRecusa
+│   ├── CompraExtra.java       # Entidade: agendamentoId, valorTotal, quantidadeFotos, metodoPagamento, status, urlComprovante, linkPagamentoCartao, dataPagamento, observacao, motivoRecusa
 │   ├── StatusCompraExtra.java # Enum (State Pattern): AGUARDANDO_COMPROVANTE, AGUARDANDO_CONFIRMACAO, PAGA, CANCELADA — com métodos de transição
-│   ├── MetodoPagamento.java   # Enum: PIX, TRANSFERENCIA, DINHEIRO
+│   ├── MetodoPagamento.java   # Enum: PIX, TRANSFERENCIA, DINHEIRO, CARTAO
+│   ├── ConfiguracaoPagamentoEcommerce.java # Config global de PIX do e-commerce (linha única)
 │   ├── StatusSessao.java      # Enum: ATIVA, FINALIZADA, CANCELADA
 │   ├── ItemCarrinho.java      # Entidade: agendamentoId, fotoId, sessionId
 │   ├── Favorito.java          # Entidade: agendamentoId, fotoId, sessionId (wishlist)
@@ -19,6 +20,7 @@ ecommerce/
 │   └── Sessao.java            # Entidade legada: status agora usa enum StatusSessao
 ├── repository/
 │   ├── CompraExtraRepository.java
+│   ├── ConfiguracaoPagamentoEcommerceRepository.java
 │   ├── ItemCarrinhoRepository.java
 │   ├── FavoritoRepository.java
 │   ├── FotoComentarioRepository.java
@@ -30,7 +32,8 @@ ecommerce/
 │   ├── CarrinhoService.java          # Facade: adicionar/remover/listar/contar/calcular carrinho
 │   ├── FavoritoService.java          # Facade: adicionar/remover/listar favoritos (wishlist)
 │   ├── DownloadService.java          # Facade: download foto individual + ZIP com limpeza de temp
-│   ├── PagamentoExtraService.java    # State Pattern: confirmarPagamento, simularPagamento, cancelarCompra — transições via enum StatusCompraExtra
+│   ├── PagamentoExtraService.java    # State Pattern: confirmarPagamento, simularPagamento, cancelarCompra, atualizarLinkPagamentoCartao
+│   ├── ConfiguracaoPagamentoEcommerceService.java # PIX global do e-commerce (altera e reflete em todas as galerias)
 │   ├── SelecaoFotosService.java      # Facade: seleção/desseleção de fotos com validação de limite e bloqueio de remoção
 │   ├── CompraQueryService.java       # Query Service Facade: queries admin de compra (detalhe, paginado, relatório, comprovante)
 │   ├── ComentarioService.java        # Comentários de clientes + resposta staff + marcar lidos
@@ -40,6 +43,7 @@ ecommerce/
 │   ├── EcommerceMapper.java          # MapStruct Mapper: CompraExtra/FotoComentario/Avaliacao/Sessao → Response
 │   ├── EcommerceController.java
 │   ├── AdminComprasController.java
+│   ├── AdminPagamentoEcommerceController.java
 │   ├── AdminEcommerceController.java
 │   ├── AdminAnalyticsController.java
 │   ├── AdminComentariosController.java
@@ -109,6 +113,12 @@ ecommerce/
 | `FotosSelecionadasEvent` | `foto.FotoEcommerceEventListener` |
 | `FotoDownloadEvent` | `foto.FotoEcommerceEventListener` |
 | `TokenGaleriaRegeneradoEvent` | `agenda.AgendamentoEcommerceEventListener` |
+
+### Pagamento de fotos extras
+- `GET /api/v1/ecommerce/pagamento` (público) retorna o PIX atual do e-commerce.
+- `GET/PUT /api/v1/admin/ecommerce/pagamento` (ADMIN/FOTOGRAFO) edita o PIX global; a alteração reflete em todas as galerias.
+- `PATCH /api/v1/admin/ecommerce/compras/{id}/link-pagamento` (ADMIN/FOTOGRAFO) define/remove o link de cartão de uma compra.
+- O cliente vê o PIX e o link de cartão no checkout; o link também aparece em `Minhas Compras` com atualização periódica.
 
 ## 5. Melhorias Aplicadas (Refactor)
 

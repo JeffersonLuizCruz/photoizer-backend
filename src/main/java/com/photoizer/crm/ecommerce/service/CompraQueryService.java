@@ -145,7 +145,7 @@ public class CompraQueryService {
             compra.getQuantidadeFotos(),
             compra.getMetodoPagamento() != null ? compra.getMetodoPagamento().name() : null,
             fotos, compra.getAuditInfo().getCreatedAt(), compra.getAuditInfo().getUpdatedAt(),
-            compra.getMotivoRecusa()
+            compra.getLinkPagamentoCartao(), compra.getMotivoRecusa()
         );
     }
 }

@@ -2682,6 +2682,140 @@
         } ]
       }
     },
+    "/api/v1/admin/ecommerce/pagamento" : {
+      "get" : {
+        "tags" : [ "Admin Ecommerce" ],
+        "summary" : "Obter a configuração de PIX do e-commerce",
+        "operationId" : "obterConfiguracaoPagamentoEcommerce",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ConfiguracaoPagamentoResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      },
+      "put" : {
+        "tags" : [ "Admin Ecommerce" ],
+        "summary" : "Atualizar a configuração de PIX do e-commerce",
+        "description" : "A alteração reflete imediatamente em todas as galerias.",
+        "operationId" : "atualizarConfiguracaoPagamentoEcommerce",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AtualizarConfiguracaoPagamentoRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ConfiguracaoPagamentoResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Um ou mais campos estão inválidos",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/users" : {
       "get" : {
         "tags" : [ "Usuários" ],
@@ -8021,6 +8155,93 @@
         } ]
       }
     },
+    "/api/v1/admin/ecommerce/compras/{id}/link-pagamento" : {
+      "patch" : {
+        "tags" : [ "Admin Compras" ],
+        "summary" : "Definir/remover o link de pagamento por cartão de crédito",
+        "operationId" : "atualizarLinkPagamento",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AtualizarLinkPagamentoCartaoRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CompraExtraResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Um ou mais campos estão inválidos",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/admin/ecommerce/compras/{id}/confirmar" : {
       "patch" : {
         "tags" : [ "Admin Compras" ],
@@ -9811,6 +10032,36 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/FinanceiroTrabalhoResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ecommerce/pagamento" : {
+      "get" : {
+        "tags" : [ "Ecommerce" ],
+        "summary" : "Obter a configuração atual de PIX do e-commerce",
+        "operationId" : "pagamento",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ConfiguracaoPagamentoResponse"
                 }
               }
             }
@@ -13759,6 +14010,42 @@
           }
         }
       },
+      "AtualizarConfiguracaoPagamentoRequest" : {
+        "type" : "object",
+        "description" : "Configuracao do PIX exibido no checkout de fotos extras.",
+        "properties" : {
+          "pixChave" : {
+            "type" : [ "string", "null" ],
+            "description" : "Chave PIX (CPF, CNPJ, e-mail, telefone ou aleatoria)",
+            "example" : "12.345.678/0001-90",
+            "maxLength" : 200,
+            "minLength" : 0
+          },
+          "pixTipoChave" : {
+            "type" : [ "string", "null" ],
+            "description" : "Tipo da chave PIX",
+            "example" : "CNPJ",
+            "maxLength" : 20,
+            "minLength" : 0
+          }
+        }
+      },
+      "ConfiguracaoPagamentoResponse" : {
+        "type" : "object",
+        "description" : "Dados de PIX exibidos no checkout de fotos extras.",
+        "properties" : {
+          "pixChave" : {
+            "type" : "string",
+            "description" : "Chave PIX configurada para o e-commerce",
+            "example" : "12.345.678/0001-90"
+          },
+          "pixTipoChave" : {
+            "type" : "string",
+            "description" : "Tipo da chave PIX",
+            "example" : "CNPJ"
+          }
+        }
+      },
       "CriarUserRequest" : {
         "type" : "object",
         "description" : "Dados para criação de um usuário do sistema (staff).",
@@ -14097,6 +14384,9 @@
             "format" : "int32"
           },
           "metodoPagamento" : {
+            "type" : "string"
+          },
+          "linkPagamentoCartao" : {
             "type" : "string"
           },
           "motivoRecusa" : {
@@ -14756,6 +15046,19 @@
           },
           "destaque" : {
             "type" : "boolean"
+          }
+        }
+      },
+      "AtualizarLinkPagamentoCartaoRequest" : {
+        "type" : "object",
+        "description" : "Link de pagamento por cartao de credito de uma compra de fotos extras. Envie vazio ou nulo para remover o link.",
+        "properties" : {
+          "linkPagamentoCartao" : {
+            "type" : [ "string", "null" ],
+            "description" : "URL de pagamento (http/https)",
+            "example" : "https://pagamento.exemplo.com/abc123",
+            "maxLength" : 1000,
+            "minLength" : 0
           }
         }
       },
@@ -15917,6 +16220,9 @@
           "updatedAt" : {
             "type" : "string",
             "format" : "date-time"
+          },
+          "linkPagamentoCartao" : {
+            "type" : "string"
           },
           "motivoRecusa" : {
             "type" : "string"

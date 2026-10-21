@@ -19,5 +19,6 @@ public record AdminCompraDetalheResponse(
     List<FotoEnsaioResponse> fotos,
     LocalDateTime createdAt,
     LocalDateTime updatedAt,
+    String linkPagamentoCartao,
     String motivoRecusa
 ) {}

@@ -5,6 +5,7 @@ import com.photoizer.crm.ecommerce.model.MetodoPagamento;
 import com.photoizer.crm.ecommerce.service.CarrinhoService;
 import com.photoizer.crm.ecommerce.service.ComentarioService;
 import com.photoizer.crm.ecommerce.service.CompraQueryService;
+import com.photoizer.crm.ecommerce.service.ConfiguracaoPagamentoEcommerceService;
 import com.photoizer.crm.ecommerce.service.DownloadService;
 import com.photoizer.crm.ecommerce.service.EcommerceService;
 import com.photoizer.crm.ecommerce.service.GaleriaQueryService;
@@ -60,6 +61,7 @@ public class EcommerceController {
     private final ComentarioService comentarioService;
     private final EcommerceMapper ecommerceMapper;
     private final CompraQueryService compraQueryService;
+    private final ConfiguracaoPagamentoEcommerceService configuracaoPagamentoService;
     private final FotoMapper fotoMapper;
     private final FileServeHelper fileServeHelper;
     private final com.photoizer.crm.shared.storage.StoragePathResolver pathResolver;
@@ -74,6 +76,7 @@ public class EcommerceController {
                                ComentarioService comentarioService,
                                EcommerceMapper ecommerceMapper,
                                CompraQueryService compraQueryService,
+                               ConfiguracaoPagamentoEcommerceService configuracaoPagamentoService,
                                FotoMapper fotoMapper,
                                FileServeHelper fileServeHelper,
                                com.photoizer.crm.shared.storage.StoragePathResolver pathResolver) {
@@ -87,6 +90,7 @@ public class EcommerceController {
         this.comentarioService = comentarioService;
         this.ecommerceMapper = ecommerceMapper;
         this.compraQueryService = compraQueryService;
+        this.configuracaoPagamentoService = configuracaoPagamentoService;
         this.fotoMapper = fotoMapper;
         this.fileServeHelper = fileServeHelper;
         this.pathResolver = pathResolver;
@@ -107,6 +111,14 @@ public class EcommerceController {
             throw new SessaoInvalidaException();
         }
         return UUID.fromString(sessionId.substring(0, dotIndex));
+    }
+
+    @GetMapping("/pagamento")
+    @Operation(summary = "Obter a configuração atual de PIX do e-commerce")
+    public ResponseEntity<ConfiguracaoPagamentoResponse> pagamento() {
+        var configuracao = configuracaoPagamentoService.obter();
+        return ResponseEntity.ok(new ConfiguracaoPagamentoResponse(
+            configuracao.getPixChave(), configuracao.getPixTipoChave()));
     }
 
     @GetMapping("/galeria/{token}")

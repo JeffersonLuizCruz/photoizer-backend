@@ -78,6 +78,16 @@ public class AdminComprasController {
         return ResponseEntity.ok().build();
     }
 
+    @PatchMapping("/{id}/link-pagamento")
+    @Operation(summary = "Definir/remover o link de pagamento por cartão de crédito")
+    public ResponseEntity<CompraExtraResponse> atualizarLinkPagamento(
+            @PathVariable UUID id,
+            @Valid @RequestBody AtualizarLinkPagamentoCartaoRequest request) {
+        var compra = pagamentoExtraService.atualizarLinkPagamentoCartao(
+            id, request.linkPagamentoCartao());
+        return ResponseEntity.ok(ecommerceMapper.toAdminResponse(compra));
+    }
+
     @PatchMapping("/{id}/cancelar")
     @Operation(summary = "Cancelar compra (com motivo opcional)")
     public ResponseEntity<Void> cancelar(@PathVariable UUID id,

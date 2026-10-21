@@ -8,10 +8,13 @@ import com.photoizer.crm.ecommerce.exception.CompraNaoEncontradaException;
 import com.photoizer.crm.ecommerce.model.CompraExtra;
 import com.photoizer.crm.ecommerce.model.StatusCompraExtra;
 import com.photoizer.crm.ecommerce.repository.CompraExtraRepository;
+import com.photoizer.crm.shared.exception.BadRequestException;
+import com.photoizer.crm.shared.exception.ConflictException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -63,6 +66,39 @@ public class PagamentoExtraService {
             marcarCompraPaga(compra);
         }
         return compra;
+    }
+
+    /**
+     * Define ou remove o link de pagamento por cartao de credito da compra.
+     * O link e gerado manualmente pelo staff e apenas exibido ao cliente.
+     */
+    public CompraExtra atualizarLinkPagamentoCartao(UUID compraId, String linkPagamentoCartao) {
+        var compra = compraExtraRepository.findById(compraId)
+            .orElseThrow(() -> new CompraNaoEncontradaException(compraId));
+
+        if (compra.getStatus() == StatusCompraExtra.PAGA || compra.getStatus() == StatusCompraExtra.CANCELADA) {
+            throw new ConflictException("Compra paga ou cancelada nao pode receber link de pagamento");
+        }
+
+        compra.setLinkPagamentoCartao(validarLink(linkPagamentoCartao));
+        return compraExtraRepository.save(compra);
+    }
+
+    private String validarLink(String link) {
+        if (link == null || link.isBlank()) {
+            return null;
+        }
+        try {
+            var uri = URI.create(link.trim());
+            var scheme = uri.getScheme();
+            if (scheme == null || uri.getHost() == null
+                || (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme))) {
+                throw new BadRequestException("Link de pagamento deve ser uma URL http ou https valida");
+            }
+            return uri.toString();
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestException("Link de pagamento deve ser uma URL http ou https valida");
+        }
     }
 
     public void cancelarCompra(UUID compraId, String motivoRecusa) {
