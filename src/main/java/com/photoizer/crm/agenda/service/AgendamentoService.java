@@ -16,7 +16,6 @@ import com.photoizer.crm.agenda.model.AgendamentoFotografo;
 import com.photoizer.crm.agenda.model.ReatribuicaoAgendamento;
 import com.photoizer.crm.agenda.model.RepasseStatus;
 import com.photoizer.crm.shared.model.TipoRepasse;
-import com.photoizer.crm.shared.util.HashUtils;
 import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.agenda.repository.ReatribuicaoAgendamentoRepository;
@@ -180,10 +179,8 @@ public class AgendamentoService {
     }
 
     private void gerarTokenProposta(Agendamento agendamento) {
-        var token = UUID.randomUUID().toString();
-        var hash = HashUtils.sha256(token);
         var dias = configuracaoService.getValorInteiro(ConfigKey.CONTRATO_DIAS_VALIDADE);
-        agendamento.definirTokenProposta(token, hash, LocalDateTime.now().plusDays(dias));
+        PropostaTokenUtils.gerar(agendamento, dias);
     }
 
     public Agendamento confirmarPagamento(UUID id) {

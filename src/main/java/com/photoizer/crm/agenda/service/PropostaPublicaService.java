@@ -7,6 +7,7 @@ import com.photoizer.crm.agenda.exception.PropostaNaoEncontradaException;
 import com.photoizer.crm.agenda.exception.PropostaTokenExpiradoException;
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.Assinatura;
+import com.photoizer.crm.agenda.model.OrigemAgendamento;
 import com.photoizer.crm.agenda.model.RepasseStatus;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository;
@@ -123,7 +124,9 @@ public class PropostaPublicaService {
             valorRestanteContrato(agendamento),
             html,
             nomeResponsavelEfetivo(agendamento),
-            profissionais
+            profissionais,
+            exigeComprovante(agendamento),
+            agendamento.getValorEntradaPago()
         );
     }
 
@@ -150,18 +153,27 @@ public class PropostaPublicaService {
         var agendamento = buscarPorToken(token);
         validarExpiracao(agendamento);
 
-        if (agendamento.getStatus() != StatusAgendamento.PRE_RESERVA) {
+        var avulso = agendamento.getOrigem() == OrigemAgendamento.AVULSO;
+        var avulsoPendenteDeAssinatura = avulso
+            && agendamento.getStatus() == StatusAgendamento.CONFIRMADO
+            && agendamento.getDataAssinatura() == null;
+        if (agendamento.getStatus() != StatusAgendamento.PRE_RESERVA && !avulsoPendenteDeAssinatura) {
             throw new BadRequestException("Esta proposta não está disponível para assinatura.");
         }
 
         validarCamposCliente(nome, telefone, cpf, autorizaUsoImagem);
-        validarComprovante(comprovante);
+        if (!avulso) {
+            validarComprovante(comprovante);
+        }
 
         var cliente = agendamentoService.resolverCliente(nome, telefone, email, cpf, cidade, estado);
 
-        fileValidator.validate(comprovante, "receipt");
-        var urlComprovante = fileStorageService.salvarEmSubdiretorio(
-            comprovante, agendamento.getId(), "comprovante_entrada");
+        String urlComprovante = null;
+        if (comprovante != null && !comprovante.isEmpty()) {
+            fileValidator.validate(comprovante, "receipt");
+            urlComprovante = fileStorageService.salvarEmSubdiretorio(
+                comprovante, agendamento.getId(), "comprovante_entrada");
+        }
 
         // Sem assinatura manuscrita: o nome do contratante é a prova de aceite (nome informado no passo de dados).
         var assinanteNome = assinanteNome(nome);
@@ -192,8 +204,13 @@ public class PropostaPublicaService {
             .build();
         assinaturaRepository.save(assinatura);
 
-        agendamento.assinarProposta(cliente, autorizaUsoImagem, urlComprovante, assinanteNome,
-            snapshotJson, hash, urlPdf, urlAssinaturaImagem);
+        if (avulso) {
+            agendamento.registrarAssinaturaContrato(cliente, autorizaUsoImagem, urlComprovante,
+                assinanteNome, snapshotJson, hash, urlPdf, urlAssinaturaImagem);
+        } else {
+            agendamento.assinarProposta(cliente, autorizaUsoImagem, urlComprovante, assinanteNome,
+                snapshotJson, hash, urlPdf, urlAssinaturaImagem);
+        }
 
         return agendamentoRepository.save(agendamento);
     }
@@ -205,7 +222,34 @@ public class PropostaPublicaService {
     }
 
     private boolean podeAssinar(Agendamento a) {
-        return a.getStatus() == StatusAgendamento.PRE_RESERVA;
+        if (a.getStatus() == StatusAgendamento.PRE_RESERVA) {
+            return true;
+        }
+        return a.getOrigem() == OrigemAgendamento.AVULSO
+            && a.getStatus() == StatusAgendamento.CONFIRMADO
+            && a.getDataAssinatura() == null;
+    }
+
+    /**
+     * O avulso já nasce confirmado e a reserva pode ter sido recebida pelo staff;
+     * nesse fluxo o link público coleta apenas os dados e o aceite do cliente.
+     */
+    private boolean exigeComprovante(Agendamento a) {
+        return a.getOrigem() != OrigemAgendamento.AVULSO;
+    }
+
+    /**
+     * Status exibido no contrato para a reserva. Propostas comuns mantêm a
+     * semântica anterior ("valor pago como reserva", pois o cliente anexa o
+     * comprovante ao assinar); no avulso o status depende de a reserva já ter
+     * sido recebida pelo staff.
+     */
+    String statusReserva(Agendamento a) {
+        if (a.getOrigem() == OrigemAgendamento.AVULSO
+            && (a.getValorEntradaPago() == null || a.getValorEntradaPago().signum() == 0)) {
+            return "a receber";
+        }
+        return "recebida";
     }
 
     /**
@@ -240,7 +284,10 @@ public class PropostaPublicaService {
     private void validarExpiracao(Agendamento agendamento) {
         var status = agendamento.getStatus();
         var propostaEmAnalise = status == StatusAgendamento.PRE_RESERVA
-            || status == StatusAgendamento.AGUARDANDO_APROVACAO;
+            || status == StatusAgendamento.AGUARDANDO_APROVACAO
+            || (agendamento.getOrigem() == OrigemAgendamento.AVULSO
+                && status == StatusAgendamento.CONFIRMADO
+                && agendamento.getDataAssinatura() == null);
         if (propostaEmAnalise
             && agendamento.getTokenPropostaExpiracao() != null
             && agendamento.getTokenPropostaExpiracao().isBefore(LocalDateTime.now())) {
@@ -283,6 +330,7 @@ public class PropostaPublicaService {
             "R$ " + money(pacote.getPrecoFotoExtra()),
             "R$ " + money(a.getValorTotal()),
             "R$ " + money(a.getValorEntradaExigido()),
+            statusReserva(a),
             a.getPercentualEntrada().stripTrailingZeros().toPlainString(),
             "R$ " + money(valorRestanteContrato(a)),
             configuracaoService.getValor(ConfigKey.NOME_CONTRATADA),
@@ -337,6 +385,7 @@ public class PropostaPublicaService {
         mapa.put("percentualEntrada", a.getPercentualEntrada().toPlainString());
         mapa.put("valorTotal", a.getValorTotal().toPlainString());
         mapa.put("valorEntradaExigido", a.getValorEntradaExigido().toPlainString());
+        mapa.put("valorEntradaPago", a.getValorEntradaPago().toPlainString());
         mapa.put("valorRestante", valorRestanteContrato(a).toPlainString());
         mapa.put("clienteNome", nome);
         mapa.put("clienteTelefone", telefone);

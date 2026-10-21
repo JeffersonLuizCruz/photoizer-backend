@@ -29,7 +29,10 @@ public record PropostaPublicaResponse(
     @Schema(description = "Valor restante") BigDecimal valorRestante,
     @Schema(description = "Cláusulas em HTML") String clausulasHtml,
     @Schema(description = "Nome do fotógrafo responsável") String fotografoResponsavel,
-    @Schema(description = "Profissionais do ensaio") List<ProfissionalEnsaio> fotografos
+    @Schema(description = "Profissionais do ensaio") List<ProfissionalEnsaio> fotografos,
+    @Schema(description = "Indica se o cliente precisa anexar comprovante de pagamento da reserva")
+    boolean exigeComprovante,
+    @Schema(description = "Valor da reserva já recebido pelo staff") BigDecimal valorEntradaPago
 ) {
     @Schema(name = "ProfissionalEnsaio", description = "Profissional exibido na proposta.")
     public record ProfissionalEnsaio(

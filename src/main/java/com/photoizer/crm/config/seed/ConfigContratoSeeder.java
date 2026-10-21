@@ -43,6 +43,7 @@ public class ConfigContratoSeeder implements CommandLineRunner {
         atualizarTemplateComDeslocamento();
         atualizarTemplateComDuracao();
         atualizarTemplateComDescricaoPacote();
+        atualizarTemplateComStatusReserva();
     }
 
     private void seedConfigsContrato() {
@@ -163,6 +164,28 @@ public class ConfigContratoSeeder implements CommandLineRunner {
                 t.setValor(atualizado);
                 configuracaoRepository.save(t);
                 log.info("Template de contrato atualizado com placeholder de descrição do pacote");
+            }
+        });
+    }
+
+    /**
+     * Adiciona o status da reserva ({@code recebida}/{@code a receber}) ao
+     * template, deixando de afirmar que a reserva foi paga no modo percentual
+     * do agendamento avulso. Atualiza apenas a linha legada padrão, preservando
+     * templates customizados que não a contenham.
+     */
+    private void atualizarTemplateComStatusReserva() {
+        configuracaoRepository.findById(ConfigKey.CONTRATO_TEMPLATE.getKey()).ifPresent(t -> {
+            if (t.getValor().contains("{{statusReserva}}")) {
+                return;
+            }
+            var atualizado = t.getValor().replace(
+                "Valor pago como reserva ({{percentualEntrada}}%): {{valorEntrada}}",
+                "Valor da reserva ({{percentualEntrada}}%) - {{statusReserva}}: {{valorEntrada}}");
+            if (!atualizado.equals(t.getValor())) {
+                t.setValor(atualizado);
+                configuracaoRepository.save(t);
+                log.info("Template de contrato atualizado com placeholder de status da reserva");
             }
         });
     }

@@ -39,7 +39,8 @@ public class AgendamentoAvulsoController {
     @PostMapping
     @Operation(operationId = "criarAgendamentoAvulso",
         summary = "Criar agendamento avulso",
-        description = "Cria um ensaio já confirmado pelo staff, com cliente e valores informados manualmente.")
+        description = "Cria um ensaio já confirmado pelo staff e gera o token do link público. "
+            + "O cliente preenche os próprios dados e assina o contrato pelo link.")
     @ApiResponses({
         @ApiResponse(responseCode = "201", description = "Agendamento criado"),
         @ApiResponse(responseCode = "409", description = "Conflito de agenda"),
@@ -48,26 +49,17 @@ public class AgendamentoAvulsoController {
     public ResponseEntity<AgendamentoResponse> criar(
             @Valid @RequestBody CriarAgendamentoAvulsoRequest request) {
         var command = new CriarAgendamentoAvulsoCommand(
-            request.clienteNome(),
-            request.clienteTelefone(),
-            request.clienteEmail(),
-            request.clienteCpf(),
-            request.clienteCidade(),
-            request.clienteEstado(),
             request.pacoteId(),
             request.fotografoId(),
             request.dataHoraEnsaio(),
             request.duracaoMinutos(),
             request.localEnsaio(),
-            request.valorTotal(),
-            request.valorEntradaExigido(),
-            request.valorPago(),
-            request.dataPagamento(),
+            request.percentualEntrada(),
+            request.valorJaRecebido(),
+            request.dataRecebimento(),
             request.formaPagamento(),
-            request.tipoPagamento(),
             request.custoDeslocamento(),
             request.repassarDeslocamento(),
-            request.autorizaUsoImagem(),
             request.observacoes()
         );
 

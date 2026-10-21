@@ -65,7 +65,7 @@ public class AgendamentoStatusLifecycle {
             var clienteNome = agendamento.nomeCliente();
             eventPublisher.publishEvent(new AgendamentoRealizadoEvent(
                 agendamento.getId(),
-                agendamento.getCliente().getId(),
+                agendamento.getCliente() != null ? agendamento.getCliente().getId() : null,
                 clienteNome,
                 fotografoIds
             ));
@@ -102,7 +102,7 @@ public class AgendamentoStatusLifecycle {
 
         eventPublisher.publishEvent(new AgendamentoConfirmadoEvent(
             agendamento.getId(),
-            agendamento.getCliente().getId()
+            agendamento.getCliente() != null ? agendamento.getCliente().getId() : null
         ));
 
         return agendamento;

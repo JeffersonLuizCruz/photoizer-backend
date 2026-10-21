@@ -52,6 +52,15 @@ class PropostaTemplateServiceSpec extends Specification {
         html.contains("&quot;&gt;")
     }
 
+    def "renderiza o status da reserva no template"() {
+        given: "um template com o placeholder de status"
+        def template = 'Valor da reserva ({{percentualEntrada}}%) - {{statusReserva}}: {{valorEntrada}}'
+        def valores = [percentualEntrada: '30', statusReserva: 'a receber', valorEntrada: 'R$ 300,00']
+
+        expect: "o status é substituído junto com os demais valores"
+        service.renderizarTexto(template, valores) == 'Valor da reserva (30%) - a receber: R$ 300,00'
+    }
+
     @Unroll
     def "sanitiza entrada vazia ou nula: #entrada"() {
         expect: "o resultado é vazio"

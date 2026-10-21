@@ -7,7 +7,6 @@ import com.photoizer.crm.agenda.model.OrigemAgendamento
 import com.photoizer.crm.agenda.model.StatusAgendamento
 import com.photoizer.crm.agenda.repository.AgendamentoRepository
 import com.photoizer.crm.auth.repository.UserRepository
-import com.photoizer.crm.cliente.repository.ClienteRepository
 import com.photoizer.crm.config.model.ConfigKey
 import com.photoizer.crm.config.service.ConfiguracaoService
 import com.photoizer.crm.financeiro.service.PagamentoManualCommand
@@ -21,13 +20,11 @@ import spock.lang.Subject
 
 import java.time.LocalDateTime
 
-import static com.photoizer.crm.agenda.support.AgendaFixtures.cliente
 import static com.photoizer.crm.agenda.support.AgendaFixtures.fotografo
 import static com.photoizer.crm.agenda.support.AgendaFixtures.pacote
 
 class AgendamentoAvulsoServiceSpec extends Specification {
 
-    def clienteRepository = Mock(ClienteRepository)
     def pacoteQueryService = Mock(PacoteQueryService)
     def userRepository = Mock(UserRepository)
     def agendamentoRepository = Mock(AgendamentoRepository)
@@ -38,7 +35,6 @@ class AgendamentoAvulsoServiceSpec extends Specification {
 
     @Subject
     def service = new AgendamentoAvulsoService(
-        clienteRepository,
         pacoteQueryService,
         userRepository,
         agendamentoRepository,
@@ -49,18 +45,16 @@ class AgendamentoAvulsoServiceSpec extends Specification {
 
     def pacote
     def fotografo
-    def cliente
 
     def setup() {
         pacote = pacote(valorBase: new BigDecimal("1000.00"), ativo: true)
         fotografo = fotografo()
-        cliente = cliente()
 
         pacoteQueryService.buscarEntityPorId(pacote.id) >> pacote
         userRepository.findById(fotografo.id) >> Optional.of(fotografo)
-        clienteRepository.findByTelefone("(11) 99999-9999") >> Optional.of(cliente)
         configuracaoService.getValorDecimal(ConfigKey.TAXA_DESLOCAMENTO) >> new BigDecimal("50.00")
         configuracaoService.getValorDecimal(ConfigKey.PERCENTUAL_ENTRADA) >> new BigDecimal("30.00")
+        configuracaoService.getValorInteiro(ConfigKey.CONTRATO_DIAS_VALIDADE) >> 7
         agendamentoRepository.save(_) >> { args ->
             def agendamento = (Agendamento) args[0]
             if (agendamento.id == null) {
@@ -70,53 +64,100 @@ class AgendamentoAvulsoServiceSpec extends Specification {
         }
     }
 
-    def "cria agendamento avulso confirmado com cliente existente e pagamento inicial"() {
-        given: "um comando com valores negociados e pagamento de entrada"
-        def command = command(new BigDecimal("1200.00"), new BigDecimal("400.00"), new BigDecimal("200.00"))
+    def "cria agendamento avulso confirmado com percentual de entrada e token público"() {
+        given: "um comando com percentual de entrada sobre o pacote mais deslocamento"
+        def command = command(percentualEntrada: new BigDecimal("20.00"))
 
         when: "o agendamento avulso é criado"
         def agendamento = service.criar(command)
 
-        then: "o agendamento nasce confirmado, com origem avulsa e pagamento registrado"
+        then: "o agendamento nasce confirmado, sem cliente e com link público"
         agendamento.status == StatusAgendamento.CONFIRMADO
         agendamento.origem == OrigemAgendamento.AVULSO
-        agendamento.cliente == cliente
+        agendamento.cliente == null
         agendamento.fotografo == fotografo
-        agendamento.valorTotal == new BigDecimal("1200.00")
-        agendamento.valorEntradaExigido == new BigDecimal("400.00")
-        agendamento.valorEntradaPago == new BigDecimal("200.00")
-        agendamento.valorRestante == new BigDecimal("1000.00")
-        agendamento.valoresPersonalizados
-        agendamento.tokenProposta == null
+        agendamento.valorTotal == new BigDecimal("1050.00")
+        agendamento.valorEntradaExigido == new BigDecimal("210.00")
+        agendamento.valorEntradaPago == BigDecimal.ZERO
+        agendamento.valorRestante == new BigDecimal("1050.00")
+        agendamento.percentualEntrada == new BigDecimal("20.00")
+        agendamento.tokenProposta != null
+        agendamento.tokenPropostaHash != null
+        agendamento.tokenPropostaExpiracao != null
+        agendamento.dataEnvioProposta != null
         agendamento.tokenGaleria != null
         agendamento.dataConfirmacao != null
+        !agendamento.autorizaUsoImagem
+        0 * pagamentoService.registrarPagamentosHistoricos(_, _)
+    }
+
+    def "cria agendamento avulso com valor já recebido e registra o pagamento"() {
+        given: "um comando com o valor da reserva já recebido"
+        def command = command(valorJaRecebido: new BigDecimal("300.00"))
+
+        when: "o agendamento avulso é criado"
+        def agendamento = service.criar(command)
+
+        then: "a entrada exigida passa a ser o valor recebido"
+        agendamento.status == StatusAgendamento.CONFIRMADO
+        agendamento.valorTotal == new BigDecimal("1050.00")
+        agendamento.valorEntradaExigido == new BigDecimal("300.00")
+        agendamento.valorEntradaPago == new BigDecimal("300.00")
+        agendamento.valorRestante == new BigDecimal("750.00")
+        agendamento.percentualEntrada == new BigDecimal("28.57")
+
+        and: "o recebimento é registrado no financeiro sem alterar o status"
         1 * pagamentoService.registrarPagamentosHistoricos(_, { List<PagamentoManualCommand> pagamentos ->
             pagamentos.size() == 1
-                && pagamentos.first().valor() == new BigDecimal("200.00")
+                && pagamentos.first().valor() == new BigDecimal("300.00")
                 && pagamentos.first().tipoPagamento() == TipoPagamento.ENTRADA
                 && pagamentos.first().formaPagamento() == FormaPagamento.PIX
         })
     }
 
-    def "usa valores padrão do pacote e da configuração quando não informados"() {
-        given: "um comando sem valores negociados"
-        def command = command(null, null, null)
+    def "usa o percentual configurado quando nenhum modo é informado"() {
+        given: "um comando sem percentual e sem valor recebido"
+        def command = command()
 
         when: "o agendamento avulso é criado"
         def agendamento = service.criar(command)
 
-        then: "os valores padrão do pacote e da configuração são aplicados"
-        agendamento.valorTotal == new BigDecimal("1050.00")
+        then: "o percentual padrão da configuração é aplicado"
         agendamento.valorEntradaExigido == new BigDecimal("315.00")
         agendamento.valorEntradaPago == BigDecimal.ZERO
-        agendamento.valorRestante == new BigDecimal("1050.00")
+        agendamento.percentualEntrada == new BigDecimal("30.00")
         !agendamento.valoresPersonalizados
-        0 * pagamentoService.registrarPagamentosHistoricos(_, _)
+    }
+
+    def "rejeita comando com percentual e valor recebido ao mesmo tempo"() {
+        given: "um comando com os dois modos preenchidos"
+        def command = command(percentualEntrada: new BigDecimal("30.00"), valorJaRecebido: new BigDecimal("300.00"))
+
+        when: "o agendamento avulso é criado"
+        service.criar(command)
+
+        then: "a criação é bloqueada"
+        def exception = thrown(BadRequestException)
+        exception.message.contains("percentual")
+        0 * agendamentoRepository.save(_)
+    }
+
+    def "rejeita valor já recebido maior que o total"() {
+        given: "um comando com recebimento acima do total"
+        def command = command(valorJaRecebido: new BigDecimal("1050.01"))
+
+        when: "o agendamento avulso é criado"
+        service.criar(command)
+
+        then: "a criação é bloqueada"
+        def exception = thrown(BadRequestException)
+        exception.message.contains("valor já recebido")
+        0 * agendamentoRepository.save(_)
     }
 
     def "rejeita data passada"() {
         given: "um comando com data no passado"
-        def command = command(null, null, null, LocalDateTime.now().minusDays(1))
+        def command = command(dataHoraEnsaio: LocalDateTime.now().minusDays(1))
 
         when: "o agendamento avulso é criado"
         service.criar(command)
@@ -126,25 +167,12 @@ class AgendamentoAvulsoServiceSpec extends Specification {
         0 * agendamentoRepository.save(_)
     }
 
-    def "rejeita pagamento maior que o total"() {
-        given: "um comando com pagamento acima do valor total"
-        def command = command(new BigDecimal("1000.00"), new BigDecimal("300.00"), new BigDecimal("1000.01"))
-
-        when: "o agendamento avulso é criado"
-        service.criar(command)
-
-        then: "a criação é bloqueada"
-        def exception = thrown(BadRequestException)
-        exception.message.contains("valor pago")
-        0 * agendamentoRepository.save(_)
-    }
-
     def "rejeita responsável que não é fotógrafo"() {
         given: "um usuário com papel AGENDADOR"
         def agendador = com.photoizer.crm.agenda.support.AgendaFixtures.usuario(
             "Agendador", com.photoizer.crm.auth.model.Papel.AGENDADOR)
         userRepository.findById(agendador.id) >> Optional.of(agendador)
-        def command = command(null, null, null, LocalDateTime.now().plusDays(10), agendador.id)
+        def command = command(fotografoId: agendador.id)
 
         when: "o agendamento avulso é criado"
         service.criar(command)
@@ -154,13 +182,34 @@ class AgendamentoAvulsoServiceSpec extends Specification {
         exception.message.contains("não é um fotógrafo")
     }
 
-    private CriarAgendamentoAvulsoCommand command(BigDecimal valorTotal, BigDecimal entrada, BigDecimal pago,
-                                                   LocalDateTime dataHora = LocalDateTime.now().plusDays(10),
-                                                   UUID fotografoId = fotografo.id) {
+    private CriarAgendamentoAvulsoCommand command(Map<String, Object> overrides = [:]) {
+        def valores = [
+            pacoteId            : pacote.id,
+            fotografoId         : fotografo.id,
+            dataHoraEnsaio      : LocalDateTime.now().plusDays(10),
+            duracaoMinutos      : 60,
+            localEnsaio         : "Praia",
+            percentualEntrada   : null,
+            valorJaRecebido     : null,
+            dataRecebimento     : LocalDateTime.now(),
+            formaPagamento      : FormaPagamento.PIX,
+            custoDeslocamento   : new BigDecimal("50.00"),
+            repassarDeslocamento: true,
+            observacoes         : "Avulso",
+        ]
+        valores.putAll(overrides)
         new CriarAgendamentoAvulsoCommand(
-            "Maria Souza", "11999999999", "maria@teste.com", null,
-            "São Paulo", "SP", pacote.id, fotografoId, dataHora, 60, "Praia",
-            valorTotal, entrada, pago, LocalDateTime.now(), FormaPagamento.PIX, TipoPagamento.ENTRADA,
-            new BigDecimal("50.00"), true, false, "Avulso")
+            (UUID) valores.pacoteId,
+            (UUID) valores.fotografoId,
+            (LocalDateTime) valores.dataHoraEnsaio,
+            (Integer) valores.duracaoMinutos,
+            (String) valores.localEnsaio,
+            (BigDecimal) valores.percentualEntrada,
+            (BigDecimal) valores.valorJaRecebido,
+            (LocalDateTime) valores.dataRecebimento,
+            (FormaPagamento) valores.formaPagamento,
+            (BigDecimal) valores.custoDeslocamento,
+            (Boolean) valores.repassarDeslocamento,
+            (String) valores.observacoes)
     }
 }

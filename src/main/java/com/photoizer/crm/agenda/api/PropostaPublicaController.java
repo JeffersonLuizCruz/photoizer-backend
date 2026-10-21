@@ -66,7 +66,8 @@ public class PropostaPublicaController {
             @Parameter(description = "Cidade") @RequestParam(required = false) String cidade,
             @Parameter(description = "UF") @RequestParam(required = false) String estado,
             @Parameter(description = "Autoriza uso de imagem (true/false)") @RequestParam String autorizaUsoImagem,
-            @Parameter(description = "Comprovante de pagamento (imagem/PDF)") @RequestParam MultipartFile comprovante,
+            @Parameter(description = "Comprovante de pagamento (imagem/PDF); opcional no agendamento avulso")
+            @RequestParam(required = false) MultipartFile comprovante,
             @Parameter(description = "User-Agent do navegador") @RequestParam(required = false) String userAgent,
             @Parameter(description = "Plataforma") @RequestParam(required = false) String plataforma,
             @Parameter(description = "Fuso horário") @RequestParam(required = false) String fusoHorario,

@@ -133,6 +133,13 @@ CONFIRMADO ──realizar──▶ AGUARDANDO_PAGAMENTO_FINAL ──pagarFinal�
 ### Fluxo 5: Materialização via Contrato
 - `ContratoAprovadoEventListener` consome `ContratoAprovadoEvent` → `AgendamentoService.criarAgendamentoDeContrato` que **reutiliza o Template Method `criarAgendamentoBase`** (mesmo fluxo de persistência/fotógrafos/partilha/eventos do Fluxo 1, com valores vindos do evento via `ValoresAgendamento`) e ainda grava `agendamentoId` no `Contrato` via `ContratoRepository` (cross-module).
 
+### Fluxo 6: Agendamento avulso com contrato público
+- `POST /api/v1/agendamentos/avulso` (ADMIN/AGENDADOR) cria um `Agendamento` **CONFIRMADO** com `origem=AVULSO`, sem cliente vinculado.
+- A reserva é definida por **um dos dois modos**: `percentualEntrada` (calculado sobre pacote + deslocamento) **ou** `valorJaRecebido` (entrada exigida = valor recebido, registrado como pagamento histórico).
+- O token público (`tokenProposta`) é gerado na criação e o staff envia o link ao cliente.
+- No link público (`/propostas/publico/{token}`), o cliente preenche os próprios dados, escolhe uso de imagem e assina. O avulso **não exige comprovante** e **permanece CONFIRMADO**; o aceite é registrado sem transição de status.
+- O contrato usa o placeholder `{{statusReserva}}` (`recebida`/`a receber`) para não afirmar que a reserva foi paga no modo percentual. O `ConfigContratoSeeder` adiciona o placeholder a templates persistidos que ainda usam a linha antiga, de forma idempotente.
+
 ## 5. Regras Específicas
 1. **Controller com ~28 `@RequestParam`**: parsing manual e frágil; qualquer campo novo exige alteração em controller, command, service e entidade.
 2. **Resolução de cliente com efeito colateral**: o service cria `Cliente` quando inexistente (e silenciosamente faz `catch` de `OrigemCliente.valueOf` → `OUTROS`).

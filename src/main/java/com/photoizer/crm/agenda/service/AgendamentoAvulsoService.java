@@ -11,9 +11,6 @@ import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.auth.model.Papel;
 import com.photoizer.crm.auth.model.User;
 import com.photoizer.crm.auth.repository.UserRepository;
-import com.photoizer.crm.cliente.model.Cliente;
-import com.photoizer.crm.cliente.model.OrigemCliente;
-import com.photoizer.crm.cliente.repository.ClienteRepository;
 import com.photoizer.crm.config.model.ConfigKey;
 import com.photoizer.crm.config.service.ConfiguracaoService;
 import com.photoizer.crm.financeiro.service.PagamentoManualCommand;
@@ -38,7 +35,6 @@ public class AgendamentoAvulsoService {
 
     private static final BigDecimal CEM = BigDecimal.valueOf(100);
 
-    private final ClienteRepository clienteRepository;
     private final PacoteQueryService pacoteQueryService;
     private final UserRepository userRepository;
     private final AgendamentoRepository agendamentoRepository;
@@ -47,15 +43,13 @@ public class AgendamentoAvulsoService {
     private final PagamentoService pagamentoService;
     private final AgendamentoMapper agendamentoMapper;
 
-    public AgendamentoAvulsoService(ClienteRepository clienteRepository,
-                                    PacoteQueryService pacoteQueryService,
+    public AgendamentoAvulsoService(PacoteQueryService pacoteQueryService,
                                     UserRepository userRepository,
                                     AgendamentoRepository agendamentoRepository,
                                     DisponibilidadeService disponibilidadeService,
                                     ConfiguracaoService configuracaoService,
                                     PagamentoService pagamentoService,
                                     AgendamentoMapper agendamentoMapper) {
-        this.clienteRepository = clienteRepository;
         this.pacoteQueryService = pacoteQueryService;
         this.userRepository = userRepository;
         this.agendamentoRepository = agendamentoRepository;
@@ -82,8 +76,6 @@ public class AgendamentoAvulsoService {
             throw new BadRequestException("O responsável selecionado não é um fotógrafo.");
         }
 
-        var cliente = resolverCliente(command);
-
         var taxaDeslocamentoPadrao = configuracaoService.getValorDecimal(ConfigKey.TAXA_DESLOCAMENTO);
         var custoDeslocamento = command.custoDeslocamento() != null
             ? command.custoDeslocamento()
@@ -93,27 +85,38 @@ public class AgendamentoAvulsoService {
             : true;
         var taxaDeslocamento = repassarDeslocamento ? custoDeslocamento : BigDecimal.ZERO;
 
-        var percentualEntradaConfig = configuracaoService.getValorDecimal(ConfigKey.PERCENTUAL_ENTRADA);
-        var valorTotalPadrao = pacote.getValorBase().add(taxaDeslocamento);
-        var valorTotal = money(command.valorTotal() != null ? command.valorTotal() : valorTotalPadrao);
-        var valorEntradaPadrao = EntradaUtils.calcularEntradaExigida(valorTotal, percentualEntradaConfig);
-        var valorEntradaExigido = money(command.valorEntradaExigido() != null
-            ? command.valorEntradaExigido()
-            : valorEntradaPadrao);
-
+        var valorTotal = money(pacote.getValorBase().add(taxaDeslocamento));
         if (valorTotal.signum() <= 0) {
             throw new BadRequestException("O valor total deve ser maior que zero.");
         }
-        if (valorEntradaExigido.signum() <= 0) {
-            throw new BadRequestException("A entrada exigida deve ser maior que zero.");
-        }
-        if (valorEntradaExigido.compareTo(valorTotal) > 0) {
-            throw new BadRequestException("A entrada exigida não pode ser maior que o valor total.");
+
+        var percentualConfigurado = configuracaoService.getValorDecimal(ConfigKey.PERCENTUAL_ENTRADA);
+        var informouPercentual = command.percentualEntrada() != null;
+        var informouValorRecebido = command.valorJaRecebido() != null;
+        if (informouPercentual && informouValorRecebido) {
+            throw new BadRequestException("Informe apenas o percentual de entrada ou o valor já recebido.");
         }
 
-        var valorPago = money(command.valorPago() != null ? command.valorPago() : BigDecimal.ZERO);
-        if (valorPago.compareTo(valorTotal) > 0) {
-            throw new BadRequestException("O valor pago não pode ser maior que o valor total.");
+        BigDecimal percentualEntrada;
+        BigDecimal valorEntradaExigido;
+        BigDecimal valorPago;
+        if (informouValorRecebido) {
+            valorPago = money(command.valorJaRecebido());
+            if (valorPago.signum() <= 0) {
+                throw new BadRequestException("O valor já recebido deve ser maior que zero.");
+            }
+            if (valorPago.compareTo(valorTotal) > 0) {
+                throw new BadRequestException("O valor já recebido não pode ser maior que o valor total.");
+            }
+            valorEntradaExigido = valorPago;
+            percentualEntrada = valorPago.multiply(CEM).divide(valorTotal, 2, RoundingMode.HALF_UP);
+        } else {
+            percentualEntrada = money(informouPercentual ? command.percentualEntrada() : percentualConfigurado);
+            if (percentualEntrada.signum() <= 0 || percentualEntrada.compareTo(CEM) > 0) {
+                throw new BadRequestException("O percentual de entrada deve ser maior que zero e no máximo 100.");
+            }
+            valorEntradaExigido = EntradaUtils.calcularEntradaExigida(valorTotal, percentualEntrada);
+            valorPago = BigDecimal.ZERO;
         }
 
         var duracao = command.duracaoMinutos() != null && command.duracaoMinutos() > 0
@@ -124,20 +127,11 @@ public class AgendamentoAvulsoService {
             pacote, dataHoraEnsaio, duracao, command.localEnsaio(),
             ConflitoAgendaParams.paraCriacao(fotografo.getId()));
 
-        var percentualEntrada = valorTotal.signum() > 0
-            ? valorEntradaExigido.multiply(CEM).divide(valorTotal, 2, RoundingMode.HALF_UP)
-            : percentualEntradaConfig;
-        var valoresPersonalizados = valorTotal.compareTo(valorTotalPadrao) != 0
-            || valorEntradaExigido.compareTo(valorEntradaPadrao) != 0;
-
-        var tipoPagamento = command.tipoPagamento() != null
-            ? command.tipoPagamento()
-            : (valorPago.compareTo(valorTotal) >= 0 ? TipoPagamento.FINAL : TipoPagamento.ENTRADA);
-        var registraPagamento = valorPago.signum() > 0;
-        var dataPagamento = command.dataPagamento() != null ? command.dataPagamento() : LocalDateTime.now();
+        var agora = LocalDateTime.now();
+        var valoresPersonalizados = informouValorRecebido
+            || (informouPercentual && percentualEntrada.compareTo(percentualConfigurado) != 0);
 
         var agendamento = Agendamento.builder()
-            .cliente(cliente)
             .pacote(pacote)
             .fotografo(fotografo)
             .dataHoraEnsaio(dataHoraEnsaio)
@@ -156,26 +150,29 @@ public class AgendamentoAvulsoService {
             .status(StatusAgendamento.CONFIRMADO)
             .origem(OrigemAgendamento.AVULSO)
             .valoresPersonalizados(valoresPersonalizados)
-            .dataConfirmacao(LocalDateTime.now())
-            .dataPagamentoFinal(registraPagamento && tipoPagamento == TipoPagamento.FINAL ? dataPagamento : null)
-            .formaPagamentoFinal(registraPagamento && tipoPagamento == TipoPagamento.FINAL ? command.formaPagamento() : null)
-            .autorizaUsoImagem(Boolean.TRUE.equals(command.autorizaUsoImagem()))
+            .dataConfirmacao(agora)
+            .autorizaUsoImagem(false)
             .ensaioDestaque(false)
             .observacoes(command.observacoes())
             .tokenGaleria(UUID.randomUUID())
-            .tokenExpiracao(LocalDateTime.now().plusDays(15))
+            .tokenExpiracao(agora.plusDays(15))
             .build();
+
+        PropostaTokenUtils.gerar(agendamento,
+            configuracaoService.getValorInteiro(ConfigKey.CONTRATO_DIAS_VALIDADE));
+        agendamento.registrarEnvioProposta();
 
         agendamento = agendamentoRepository.save(agendamento);
 
-        if (registraPagamento) {
+        if (valorPago.signum() > 0) {
+            var dataRecebimento = command.dataRecebimento() != null ? command.dataRecebimento() : agora;
             pagamentoService.registrarPagamentosHistoricos(agendamento.getId(), List.of(
                 new PagamentoManualCommand(
                     valorPago,
-                    dataPagamento,
+                    dataRecebimento,
                     command.formaPagamento(),
-                    tipoPagamento,
-                    "Recebimento inicial (agendamento avulso)"
+                    TipoPagamento.ENTRADA,
+                    "Reserva recebida (agendamento avulso)"
                 )
             ));
         }
@@ -198,66 +195,6 @@ public class AgendamentoAvulsoService {
 
     public com.photoizer.crm.agenda.api.AgendamentoResponse toResponse(Agendamento agendamento) {
         return agendamentoMapper.toResponse(agendamento, null, null, null, null);
-    }
-
-    private Cliente resolverCliente(CriarAgendamentoAvulsoCommand command) {
-        var telefone = normalizarTelefone(command.clienteTelefone());
-        var digitosTelefone = command.clienteTelefone().replaceAll("\\D", "");
-        var cpf = normalizarCpf(command.clienteCpf());
-
-        var porTelefone = clienteRepository.findByTelefone(telefone)
-            .or(() -> clienteRepository.findByTelefoneContaining(digitosTelefone).stream()
-                .filter(c -> c.getTelefone() != null
-                    && c.getTelefone().replaceAll("\\D", "").equals(digitosTelefone))
-                .findFirst());
-        var porCpf = cpf != null ? clienteRepository.findByCpf(cpf) : java.util.Optional.<Cliente>empty();
-
-        if (porTelefone.isPresent() && porCpf.isPresent()
-            && !porTelefone.get().getId().equals(porCpf.get().getId())) {
-            throw new BadRequestException("Telefone e CPF informados pertencem a clientes diferentes.");
-        }
-
-        if (porTelefone.isPresent()) {
-            return porTelefone.get();
-        }
-        if (porCpf.isPresent()) {
-            return porCpf.get();
-        }
-
-        var cliente = Cliente.builder()
-            .nome(command.clienteNome().trim())
-            .telefone(telefone)
-            .email(command.clienteEmail())
-            .cpf(cpf)
-            .cidade(command.clienteCidade())
-            .estado(command.clienteEstado() != null ? command.clienteEstado().toUpperCase() : null)
-            .origem(OrigemCliente.OUTROS)
-            .build();
-        return clienteRepository.save(cliente);
-    }
-
-    private String normalizarTelefone(String telefone) {
-        var digitos = telefone != null ? telefone.replaceAll("\\D", "") : "";
-        if (digitos.length() == 11) {
-            return "(" + digitos.substring(0, 2) + ") "
-                + digitos.substring(2, 7) + "-" + digitos.substring(7);
-        }
-        if (digitos.length() == 10) {
-            return "(" + digitos.substring(0, 2) + ") "
-                + digitos.substring(2, 6) + "-" + digitos.substring(6);
-        }
-        throw new BadRequestException("Telefone inválido: informe DDD e número.");
-    }
-
-    private String normalizarCpf(String cpf) {
-        if (cpf == null || cpf.isBlank()) {
-            return null;
-        }
-        var digitos = cpf.replaceAll("\\D", "");
-        if (digitos.length() != 11) {
-            throw new BadRequestException("CPF inválido: informe 11 dígitos.");
-        }
-        return digitos.replaceAll("(\\d{3})(\\d{3})(\\d{3})(\\d{2})", "$1.$2.$3-$4");
     }
 
     private BigDecimal money(BigDecimal valor) {

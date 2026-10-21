@@ -80,7 +80,7 @@ Inclui:
 # 4. Valores
 Valor do deslocamento: {{taxaDeslocamento}}
 Valor total do serviço: {{valorTotal}}
-Valor pago como reserva ({{percentualEntrada}}%): {{valorEntrada}}
+Valor da reserva ({{percentualEntrada}}%) - {{statusReserva}}: {{valorEntrada}}
 Valor restante a pagar no final do ensaio: {{valorRestante}}
 O pagamento da reserva garante o bloqueio da data e horário na agenda da Contratada.
 O valor restante deverá ser pago ao final da realização do ensaio fotográfico.

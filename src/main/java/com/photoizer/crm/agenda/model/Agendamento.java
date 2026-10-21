@@ -320,6 +320,28 @@ public class Agendamento {
         this.status = StatusAgendamento.AGUARDANDO_APROVACAO;
     }
 
+    /**
+     * Assinatura do contrato de um agendamento avulso já confirmado. Diferente da
+     * assinatura de proposta, NÃO altera o status: o ensaio já ocupa a agenda e o
+     * cliente apenas preenche os dados e registra o aceite pelo link público.
+     */
+    public void registrarAssinaturaContrato(Cliente cliente, String autorizaUsoImagem,
+                                            String urlComprovante, String assinanteNome,
+                                            String snapshotJson, String snapshotHash,
+                                            String urlPdf, String urlAssinaturaImagem) {
+        this.cliente = cliente;
+        this.autorizaUsoImagem = "true".equalsIgnoreCase(autorizaUsoImagem);
+        if (urlComprovante != null) {
+            this.urlComprovanteEntrada = urlComprovante;
+        }
+        this.assinanteNome = assinanteNome;
+        this.snapshotJson = snapshotJson;
+        this.snapshotHash = snapshotHash;
+        this.urlPdfAssinatura = urlPdf;
+        this.urlAssinaturaImagem = urlAssinaturaImagem;
+        this.dataAssinatura = LocalDateTime.now();
+    }
+
     public void confirmarPagamento() {
         this.status.validarTransicao(StatusAgendamento.PAGAMENTO_CONFIRMADO);
         this.status = StatusAgendamento.PAGAMENTO_CONFIRMADO;

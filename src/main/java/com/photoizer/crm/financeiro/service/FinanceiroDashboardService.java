@@ -93,7 +93,7 @@ public class FinanceiroDashboardService {
         }
         if (clienteId != null) {
             agendamentos = agendamentos.stream()
-                .filter(a -> a.getCliente().getId().equals(clienteId))
+                .filter(a -> a.getCliente() != null && a.getCliente().getId().equals(clienteId))
                 .toList();
         }
 

@@ -2,6 +2,7 @@ package com.photoizer.crm.agenda.service
 
 import com.photoizer.crm.agenda.exception.PropostaNaoEncontradaException
 import com.photoizer.crm.agenda.exception.PropostaTokenExpiradoException
+import com.photoizer.crm.agenda.model.OrigemAgendamento
 import com.photoizer.crm.agenda.model.StatusAgendamento
 import com.photoizer.crm.agenda.repository.AgendamentoFotografoRepository
 import com.photoizer.crm.agenda.repository.AgendamentoRepository
@@ -162,6 +163,61 @@ class PropostaPublicaServiceSpec extends Specification {
 
         cleanup: "os arquivos temporários gerados são removidos"
         tempDir.toFile().deleteDir()
+    }
+
+    def "assina contrato de agendamento avulso sem comprovante e mantém o status confirmado"() {
+        given: "um agendamento avulso confirmado, ainda sem assinatura"
+        def token = "token-avulso"
+        def proposta = agendamento(
+            status: StatusAgendamento.CONFIRMADO,
+            origem: OrigemAgendamento.AVULSO,
+            tokenProposta: token,
+            tokenPropostaExpiracao: LocalDateTime.now().plusDays(1),
+            dataAssinatura: null,
+            valorEntradaPago: new BigDecimal("300.00"))
+        def cliente = cliente()
+
+        agendamentoRepository.findByTokenPropostaHash(HashUtils.sha256(token)) >> Optional.of(proposta)
+        agendamentoService.resolverCliente(_, _, _, _, _, _) >> cliente
+        fileStorageService.getUploadDir() >> tempDir
+        pdfWriter.gerar(_, _) >> "pdf".bytes
+        pathResolver.relativo(_) >> "propostas/${proposta.id}.pdf"
+        objectMapper.writeValueAsString(_) >> "{}"
+        assinaturaRepository.findByAgendamentoId(proposta.id) >> Optional.empty()
+        assinaturaRepository.save(_) >> { args -> args[0] }
+        agendamentoRepository.save(_) >> { args -> args[0] }
+
+        when: "o cliente assina sem anexar comprovante"
+        def resultado = service.assinar(token, "Maria", "11999999999", "m@x.com", "12345678901",
+            "São Paulo", "SP", "true", null, "agent", "web", "America/Sao_Paulo", "127.0.0.1")
+
+        then: "o cliente e o aceite são registrados, sem alterar o status"
+        resultado.status == StatusAgendamento.CONFIRMADO
+        resultado.cliente == cliente
+        resultado.autorizaUsoImagem
+        resultado.urlComprovanteEntrada == null
+        resultado.dataAssinatura != null
+        resultado.snapshotJson == "{}"
+        resultado.urlPdfAssinatura == "propostas/${proposta.id}.pdf"
+
+        and: "nenhum comprovante é validado"
+        0 * fileValidator.validate(_, _)
+
+        cleanup: "os arquivos temporários gerados são removidos"
+        tempDir.toFile().deleteDir()
+    }
+
+    @Unroll
+    def "define status da reserva #esperado para origem #origem e valor pago #valorPago"() {
+        expect:
+        service.statusReserva(agendamento(origem: origem, valorEntradaPago: valorPago)) == esperado
+
+        where:
+        origem                            | valorPago              || esperado
+        null                              | BigDecimal.ZERO        || "recebida"
+        OrigemAgendamento.PROPOSTA        | BigDecimal.ZERO        || "recebida"
+        OrigemAgendamento.AVULSO          | BigDecimal.ZERO        || "a receber"
+        OrigemAgendamento.AVULSO          | new BigDecimal("300.00") || "recebida"
     }
 
     private def propostaValida(String token) {

@@ -3223,10 +3223,9 @@
                   "comprovante" : {
                     "type" : "string",
                     "format" : "binary",
-                    "description" : "Comprovante de pagamento (imagem/PDF)"
+                    "description" : "Comprovante de pagamento (imagem/PDF); opcional no agendamento avulso"
                   }
-                },
-                "required" : [ "comprovante" ]
+                }
               }
             }
           }
@@ -6483,7 +6482,7 @@
       "post" : {
         "tags" : [ "Agendamentos" ],
         "summary" : "Criar agendamento avulso",
-        "description" : "Cria um ensaio já confirmado pelo staff, com cliente e valores informados manualmente.",
+        "description" : "Cria um ensaio já confirmado pelo staff e gera o token do link público. O cliente preenche os próprios dados e assina o contrato pelo link.",
         "operationId" : "criarAgendamentoAvulso",
         "requestBody" : {
           "content" : {
@@ -14830,45 +14829,8 @@
       },
       "CriarAgendamentoAvulsoRequest" : {
         "type" : "object",
-        "description" : "Cria um ensaio já confirmado, sem passar pelo fluxo público de proposta.",
+        "description" : "Cria um ensaio já confirmado. O cliente preenche os próprios dados e assina o contrato pelo link público gerado no token da proposta.",
         "properties" : {
-          "clienteNome" : {
-            "type" : "string",
-            "description" : "Nome do cliente",
-            "maxLength" : 255,
-            "minLength" : 0
-          },
-          "clienteTelefone" : {
-            "type" : "string",
-            "description" : "Telefone do cliente",
-            "maxLength" : 20,
-            "minLength" : 0
-          },
-          "clienteEmail" : {
-            "type" : [ "string", "null" ],
-            "format" : "email",
-            "description" : "E-mail do cliente",
-            "maxLength" : 255,
-            "minLength" : 0
-          },
-          "clienteCpf" : {
-            "type" : [ "string", "null" ],
-            "description" : "CPF do cliente",
-            "maxLength" : 14,
-            "minLength" : 0
-          },
-          "clienteCidade" : {
-            "type" : [ "string", "null" ],
-            "description" : "Cidade",
-            "maxLength" : 100,
-            "minLength" : 0
-          },
-          "clienteEstado" : {
-            "type" : [ "string", "null" ],
-            "description" : "UF",
-            "maxLength" : 2,
-            "minLength" : 0
-          },
           "pacoteId" : {
             "type" : "string",
             "format" : "uuid",
@@ -14895,35 +14857,25 @@
             "maxLength" : 255,
             "minLength" : 0
           },
-          "valorTotal" : {
+          "percentualEntrada" : {
             "type" : [ "number", "null" ],
-            "description" : "Valor total combinado; se vazio usa o pacote",
+            "description" : "Percentual de entrada sobre o total (pacote + deslocamento); use este campo OU valorJaRecebido",
+            "exclusiveMinimum" : 0
+          },
+          "valorJaRecebido" : {
+            "type" : [ "number", "null" ],
+            "description" : "Valor da reserva já recebido; use este campo OU percentualEntrada",
             "minimum" : 0
           },
-          "valorEntradaExigido" : {
-            "type" : [ "number", "null" ],
-            "description" : "Valor da entrada exigida; se vazio usa o percentual configurado",
-            "minimum" : 0
-          },
-          "valorPago" : {
-            "type" : [ "number", "null" ],
-            "description" : "Valor recebido agora",
-            "minimum" : 0
-          },
-          "dataPagamento" : {
+          "dataRecebimento" : {
             "type" : [ "string", "null" ],
             "format" : "date-time",
-            "description" : "Data do recebimento"
+            "description" : "Data do recebimento (usada quando valorJaRecebido é informado)"
           },
           "formaPagamento" : {
             "type" : [ "string", "null" ],
-            "description" : "Forma do recebimento",
+            "description" : "Forma do recebimento (usada quando valorJaRecebido é informado)",
             "enum" : [ "PIX", "CARTAO", "DINHEIRO", "TRANSFERENCIA", "OUTRO" ]
-          },
-          "tipoPagamento" : {
-            "type" : [ "string", "null" ],
-            "description" : "Tipo do recebimento",
-            "enum" : [ "ENTRADA", "FINAL", "EXTRA" ]
           },
           "custoDeslocamento" : {
             "type" : [ "number", "null" ],
@@ -14932,18 +14884,14 @@
           },
           "repassarDeslocamento" : {
             "type" : [ "boolean", "null" ],
-            "description" : "Repassar deslocamento"
-          },
-          "autorizaUsoImagem" : {
-            "type" : [ "boolean", "null" ],
-            "description" : "Autorização de uso de imagem"
+            "description" : "Repassar deslocamento ao cliente"
           },
           "observacoes" : {
             "type" : [ "string", "null" ],
             "description" : "Observações internas"
           }
         },
-        "required" : [ "clienteNome", "clienteTelefone", "dataHoraEnsaio", "fotografoId", "localEnsaio", "pacoteId" ]
+        "required" : [ "dataHoraEnsaio", "fotografoId", "localEnsaio", "pacoteId" ]
       },
       "SelecionarRequest" : {
         "type" : "object",
@@ -15182,6 +15130,14 @@
             "items" : {
               "$ref" : "#/components/schemas/ProfissionalEnsaio"
             }
+          },
+          "exigeComprovante" : {
+            "type" : "boolean",
+            "description" : "Indica se o cliente precisa anexar comprovante de pagamento da reserva"
+          },
+          "valorEntradaPago" : {
+            "type" : "number",
+            "description" : "Valor da reserva já recebido pelo staff"
           }
         }
       },

@@ -215,7 +215,7 @@ public class DashboardService {
                     a.getId(), new EcommerceQueryService.CompraAgg(0, BigDecimal.ZERO));
                 return new TopCliente(
                     a.nomeCliente(),
-                    a.getCliente().getTelefone(),
+                    a.getCliente() != null ? a.getCliente().getTelefone() : null,
                     agg.qtd(),
                     agg.total()
                 );

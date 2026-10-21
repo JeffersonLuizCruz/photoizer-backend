@@ -67,17 +67,12 @@ class AgendamentoControllerIntegrationSpec extends Specification {
         def fotografo = userRepository.save(novoFotografo())
         def corpo = """
             {
-              "clienteNome": "Maria Souza",
-              "clienteTelefone": "11999999999",
-              "clienteEmail": "maria@teste.com",
               "pacoteId": "${pacote.id}",
               "fotografoId": "${fotografo.id}",
               "dataHoraEnsaio": "${LocalDateTime.now().plusDays(15)}",
               "duracaoMinutos": 60,
               "localEnsaio": "Praia",
-              "valorTotal": 1200.00,
-              "valorEntradaExigido": 400.00,
-              "valorPago": 200.00
+              "valorJaRecebido": 200.00
             }
         """
 
@@ -87,9 +82,12 @@ class AgendamentoControllerIntegrationSpec extends Specification {
             .with(user("staff").roles("AGENDADOR"))
             .content(corpo))
 
-        then: "o agendamento nasce confirmado"
+        then: "o agendamento nasce confirmado, com reserva recebida e token público"
         resultado.andExpect(status().isCreated())
             .andExpect(jsonPath('$.status').value("CONFIRMADO"))
+            .andExpect(jsonPath('$.origem').value("AVULSO"))
+            .andExpect(jsonPath('$.valorEntradaPago').value(200.0d))
+            .andExpect(jsonPath('$.tokenProposta').isNotEmpty())
     }
 
     def "nega criação de agendamento avulso para papel FOTOGRAFO"() {
@@ -98,8 +96,6 @@ class AgendamentoControllerIntegrationSpec extends Specification {
         def fotografo = userRepository.save(novoFotografo())
         def corpo = """
             {
-              "clienteNome": "Maria Souza",
-              "clienteTelefone": "11999999999",
               "pacoteId": "${pacote.id}",
               "fotografoId": "${fotografo.id}",
               "dataHoraEnsaio": "${LocalDateTime.now().plusDays(15)}",
