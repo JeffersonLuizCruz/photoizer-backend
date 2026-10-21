@@ -207,6 +207,65 @@ class PropostaPublicaServiceSpec extends Specification {
         tempDir.toFile().deleteDir()
     }
 
+    def "expõe a entrada já paga e dispensa comprovante na proposta pública"() {
+        given: "uma proposta com a entrada integralmente recebida"
+        def token = "token-publico-entrada-paga"
+        def proposta = agendamento(
+            status: StatusAgendamento.PRE_RESERVA,
+            tokenProposta: token,
+            tokenPropostaExpiracao: LocalDateTime.now().plusDays(1),
+            valorEntradaExigido: new BigDecimal("500.00"),
+            valorEntradaPago: new BigDecimal("500.00"))
+
+        agendamentoRepository.findByTokenPropostaHash(HashUtils.sha256(token)) >> Optional.of(proposta)
+        agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(proposta.id) >> []
+        templateService.carregarTemplate() >> null
+
+        when: "o link público é consultado"
+        def response = service.buscarPublico(token)
+
+        then: "a entrada recebida é refletida e o comprovante não é exigido"
+        response.valorEntradaExigido() == new BigDecimal("500.00")
+        response.valorEntradaPago() == new BigDecimal("500.00")
+        !response.exigeComprovante()
+    }
+
+    def "assina proposta com entrada já paga sem exigir comprovante"() {
+        given: "uma proposta em pré-reserva com a entrada integralmente recebida"
+        def token = "token-entrada-paga"
+        def proposta = agendamento(
+            status: StatusAgendamento.PRE_RESERVA,
+            tokenProposta: token,
+            tokenPropostaExpiracao: LocalDateTime.now().plusDays(1),
+            valorEntradaExigido: new BigDecimal("500.00"),
+            valorEntradaPago: new BigDecimal("500.00"),
+            percentualEntrada: new BigDecimal("25.00"))
+        def cliente = cliente()
+
+        agendamentoRepository.findByTokenPropostaHash(HashUtils.sha256(token)) >> Optional.of(proposta)
+        agendamentoService.resolverCliente(_, _, _, _, _, _) >> cliente
+        fileStorageService.getUploadDir() >> tempDir
+        pdfWriter.gerar(_, _) >> "pdf".bytes
+        pathResolver.relativo(_) >> "propostas/${proposta.id}.pdf"
+        objectMapper.writeValueAsString(_) >> "{}"
+        assinaturaRepository.findByAgendamentoId(proposta.id) >> Optional.empty()
+        assinaturaRepository.save(_) >> { args -> args[0] }
+        agendamentoRepository.save(_) >> { args -> args[0] }
+
+        when: "o cliente assina sem anexar comprovante"
+        def resultado = service.assinar(token, "Maria", "11999999999", "m@x.com", "12345678901",
+            "São Paulo", "SP", "true", null, "agent", "web", "America/Sao_Paulo", "127.0.0.1")
+
+        then: "o aceite é registrado sem validar comprovante"
+        resultado.status == StatusAgendamento.AGUARDANDO_APROVACAO
+        resultado.cliente == cliente
+        resultado.urlComprovanteEntrada == null
+        0 * fileValidator.validate(_, _)
+
+        cleanup: "os arquivos temporários gerados são removidos"
+        tempDir.toFile().deleteDir()
+    }
+
     @Unroll
     def "define status da reserva #esperado para origem #origem e valor pago #valorPago"() {
         expect:

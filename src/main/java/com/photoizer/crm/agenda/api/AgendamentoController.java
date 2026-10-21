@@ -90,9 +90,9 @@ public class AgendamentoController {
         var command = new CriarPropostaCommand(
             request.pacoteId(), request.editorId(), request.fotografoId(), request.dataHoraEnsaio(),
             request.duracaoMinutos(), request.localEnsaio(),
-            request.custoDeslocamento(), request.repassarDeslocamento(), request.clausulasPersonalizadas(),
-            request.observacoes(), request.indicadorId(), request.indicadorNome(),
-            request.indicadorTelefone(), fotografos
+            request.custoDeslocamento(), request.valorEntradaPago(), request.repassarDeslocamento(),
+            request.clausulasPersonalizadas(), request.observacoes(), request.indicadorId(),
+            request.indicadorNome(), request.indicadorTelefone(), fotografos
         );
 
         var agendamento = agendamentoService.criarProposta(command);
@@ -124,9 +124,9 @@ public class AgendamentoController {
         var command = new CriarPropostaCommand(
             request.pacoteId(), request.editorId(), request.fotografoId(), request.dataHoraEnsaio(),
             request.duracaoMinutos(), request.localEnsaio(),
-            request.custoDeslocamento(), request.repassarDeslocamento(), request.clausulasPersonalizadas(),
-            request.observacoes(), request.indicadorId(), request.indicadorNome(),
-            request.indicadorTelefone(), fotografos
+            request.custoDeslocamento(), request.valorEntradaPago(), request.repassarDeslocamento(),
+            request.clausulasPersonalizadas(), request.observacoes(), request.indicadorId(),
+            request.indicadorNome(), request.indicadorTelefone(), fotografos
         );
 
         return ResponseEntity.ok(respostaPara(agendamentoService.atualizarProposta(id, command)));

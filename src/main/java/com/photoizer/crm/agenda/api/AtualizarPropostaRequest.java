@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -26,6 +27,9 @@ public record AtualizarPropostaRequest(
     @Schema(description = "Duração em minutos", example = "60") Integer duracaoMinutos,
     @Schema(description = "Local do ensaio", example = "Estúdio Photoizer") @NotBlank String localEnsaio,
     @Schema(description = "Custo de deslocamento", nullable = true) BigDecimal custoDeslocamento,
+    @Schema(description = "Valor da entrada já paga pelo cliente. Se maior que zero, substitui o percentual "
+        + "de entrada configurado e dispensa o comprovante no link público.", nullable = true)
+    @PositiveOrZero BigDecimal valorEntradaPago,
     @Schema(description = "Repassar deslocamento ao fotógrafo", nullable = true) Boolean repassarDeslocamento,
     @Schema(description = "Cláusulas adicionais do contrato", nullable = true) String clausulasPersonalizadas,
     @Schema(description = "Observações internas", nullable = true) String observacoes,

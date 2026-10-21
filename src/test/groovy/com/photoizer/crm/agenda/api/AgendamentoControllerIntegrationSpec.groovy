@@ -61,6 +61,35 @@ class AgendamentoControllerIntegrationSpec extends Specification {
             .andExpect(jsonPath('$.tokenProposta').isNotEmpty())
     }
 
+    def "cria proposta com entrada já paga via endpoint"() {
+        given: "pacote e fotógrafo cadastrados"
+        def pacote = pacoteRepository.save(pacote(id: null))
+        def fotografo = userRepository.save(novoFotografo())
+        def corpo = """
+            {
+              "pacoteId": "${pacote.id}",
+              "fotografoId": "${fotografo.id}",
+              "dataHoraEnsaio": "${LocalDateTime.now().plusDays(15)}",
+              "duracaoMinutos": 60,
+              "localEnsaio": "Estúdio",
+              "valorEntradaPago": 200.00
+            }
+        """
+
+        when: "o endpoint de criação recebe a entrada já paga"
+        def resultado = mockMvc.perform(post("/api/v1/agendamentos/proposta")
+            .contentType(MediaType.APPLICATION_JSON)
+            .with(user("staff").roles("ADMIN"))
+            .content(corpo))
+
+        then: "a entrada informada substitui o percentual configurado"
+        resultado.andExpect(status().isCreated())
+            .andExpect(jsonPath('$.valorEntradaExigido').value(200.0d))
+            .andExpect(jsonPath('$.valorEntradaPago').value(200.0d))
+            .andExpect(jsonPath('$.valorRestante').value(800.0d))
+            .andExpect(jsonPath('$.percentualEntrada').value(20.0d))
+    }
+
     def "cria agendamento avulso via endpoint com papel AGENDADOR"() {
         given: "pacote e fotógrafo cadastrados"
         def pacote = pacoteRepository.save(pacote(id: null))

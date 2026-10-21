@@ -132,8 +132,8 @@ public class AgendamentoService {
         var taxaDeslocamento = repassarDeslocamento ? custoDeslocamento : BigDecimal.ZERO;
 
         var percentualEntrada = configuracaoService.getValorDecimal(ConfigKey.PERCENTUAL_ENTRADA);
-        var valores = agendamentoValoresCalculator.calcularValoresNovo(
-            pacote.getValorBase(), taxaDeslocamento, percentualEntrada);
+        var valores = agendamentoValoresCalculator.calcularValoresProposta(
+            pacote.getValorBase(), taxaDeslocamento, percentualEntrada, command.valorEntradaPago());
 
         var duracao = command.duracaoMinutos() != null ? command.duracaoMinutos() : 60;
 
@@ -150,14 +150,14 @@ public class AgendamentoService {
             .localEnsaio(command.localEnsaio())
             .valorTotal(valores.valorTotal())
             .valorEntradaExigido(valores.valorEntradaExigido())
-            .valorEntradaPago(BigDecimal.ZERO)
-            .valorRestante(valores.valorTotal())
+            .valorEntradaPago(valores.valorEntradaPago())
+            .valorRestante(valores.valorRestante())
             .valorExtras(BigDecimal.ZERO)
             .taxaDeslocamento(valores.taxaDeslocamento())
             .custoDeslocamento(custoDeslocamento)
             .repassarDeslocamento(repassarDeslocamento)
             .valorTotalFinal(valores.valorTotalFinal())
-            .percentualEntrada(percentualEntrada)
+            .percentualEntrada(valores.percentualEntrada())
             .status(StatusAgendamento.PRE_RESERVA)
             .clausulasPersonalizadas(command.clausulasPersonalizadas())
             .autorizaUsoImagem(false)
@@ -199,6 +199,11 @@ public class AgendamentoService {
             agendamento.getPacote(), agendamento.getDataHoraEnsaio(), agendamento.getDuracaoMinutos(),
             agendamento.getLocalEnsaio(),
             ConflitoAgendaParams.paraAtualizacao(fotografoId, agendamento.getId()));
+
+        if (agendamento.getStatus() == StatusAgendamento.AGUARDANDO_APROVACAO
+            && agendamento.entradaQuitada()) {
+            agendamento.confirmarPagamento();
+        }
 
         agendamento.aprovar();
         agendamento = agendamentoRepository.save(agendamento);
@@ -490,9 +495,12 @@ public class AgendamentoService {
         var taxaDeslocamento = repassarDeslocamento ? custoDeslocamento : BigDecimal.ZERO;
 
         var percentualEntrada = configuracaoService.getValorDecimal(ConfigKey.PERCENTUAL_ENTRADA);
+        var valorEntradaPagoAtual = command.valorEntradaPago() != null
+            ? (command.valorEntradaPago().signum() > 0 ? command.valorEntradaPago() : BigDecimal.ZERO)
+            : agendamento.getValorEntradaPago();
         var valores = agendamentoValoresCalculator.calcularValoresAtualizacao(
             pacote.getValorBase(), taxaDeslocamento, percentualEntrada,
-            agendamento.getValorEntradaPago(), agendamento.getValorExtras());
+            valorEntradaPagoAtual, agendamento.getValorExtras(), command.valorEntradaPago());
 
         agendamento.setPacote(pacote);
         if (command.editorId() != null) {
@@ -519,7 +527,8 @@ public class AgendamentoService {
 
         agendamento.setValorTotal(valores.valorTotal());
         agendamento.setValorEntradaExigido(valores.valorEntradaExigido());
-        agendamento.setPercentualEntrada(percentualEntrada);
+        agendamento.setValorEntradaPago(valores.valorEntradaPago());
+        agendamento.setPercentualEntrada(valores.percentualEntrada());
         agendamento.setValorRestante(valores.valorRestante());
         agendamento.setValorTotalFinal(valores.valorTotalFinal());
 

@@ -77,7 +77,7 @@ class AgendamentoPropostaServiceSpec extends Specification {
 
         def command = new CriarPropostaCommand(
             pacote.id, null, fotografo.id, LocalDateTime.now().plusDays(5),
-            120, "Praia", null, false, "Cláusula X", "Obs Y", null, null, null, [])
+            120, "Praia", null, null, false, "Cláusula X", "Obs Y", null, null, null, [])
 
         when: "a proposta é alterada"
         service.atualizarProposta(agendamento.id, command)
@@ -108,7 +108,7 @@ class AgendamentoPropostaServiceSpec extends Specification {
 
         def command = new CriarPropostaCommand(
             pacote.id, null, fotografo.id, LocalDateTime.now().plusDays(5),
-            360, "Estúdio", null, true, null, null, null, null, null, [])
+            360, "Estúdio", null, null, true, null, null, null, null, null, [])
 
         when: "a proposta é criada"
         def criada = service.criarProposta(command)
@@ -121,6 +121,97 @@ class AgendamentoPropostaServiceSpec extends Specification {
         criada.valorRestante == new BigDecimal("0.01")
         criada.tokenProposta
         criada.tokenPropostaHash
+    }
+
+    def "cria proposta registrando entrada já paga e ignorando o percentual configurado"() {
+        given: "um pacote de R\$ 2.000,00 e entrada já paga de R\$ 500,00"
+        def pacote = pacote(valorBase: new BigDecimal("2000.00"))
+        def fotografo = fotografo()
+
+        pacoteQueryService.buscarEntityPorId(pacote.id) >> pacote
+        userRepository.findById(fotografo.id) >> Optional.of(fotografo)
+        configuracaoService.getValorDecimal(ConfigKey.TAXA_DESLOCAMENTO) >> BigDecimal.ZERO
+        configuracaoService.getValorDecimal(ConfigKey.PERCENTUAL_ENTRADA) >> new BigDecimal("30.00")
+        configuracaoService.getValorInteiro(ConfigKey.CONTRATO_DIAS_VALIDADE) >> 7
+        agendamentoRepository.save(_) >> { args -> args[0] }
+
+        def command = new CriarPropostaCommand(
+            pacote.id, null, fotografo.id, LocalDateTime.now().plusDays(5),
+            360, "Estúdio", null, new BigDecimal("500.00"), true, null, null, null, null, null, [])
+
+        when: "a proposta é criada"
+        def criada = service.criarProposta(command)
+
+        then: "a entrada paga substitui os 30%"
+        criada.valorEntradaExigido == new BigDecimal("500.00")
+        criada.valorEntradaPago == new BigDecimal("500.00")
+        criada.valorRestante == new BigDecimal("1500.00")
+        criada.percentualEntrada == new BigDecimal("25.00")
+    }
+
+    def "altera proposta preservando a entrada já paga informada"() {
+        given: "uma proposta em pré-reserva sem entrada paga"
+        def agendamento = agendamento(status: StatusAgendamento.PRE_RESERVA)
+        def pacote = pacote(valorBase: new BigDecimal("2000.00"))
+        def fotografo = fotografo()
+
+        agendamentoRepository.findByIdWithLock(agendamento.id) >> Optional.of(agendamento)
+        agendamentoRepository.save(_) >> { args -> args[0] }
+        pacoteQueryService.buscarEntityPorId(pacote.id) >> pacote
+        userRepository.findById(fotografo.id) >> Optional.of(fotografo)
+        configuracaoService.getValorDecimal(ConfigKey.TAXA_DESLOCAMENTO) >> BigDecimal.ZERO
+        configuracaoService.getValorDecimal(ConfigKey.PERCENTUAL_ENTRADA) >> new BigDecimal("30.00")
+        agendamentoFotografoRepository.findByAgendamentoId(agendamento.id) >> []
+        agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(agendamento.id) >> []
+
+        def command = new CriarPropostaCommand(
+            pacote.id, null, fotografo.id, LocalDateTime.now().plusDays(5),
+            120, "Praia", null, new BigDecimal("400.00"), false, null, null, null, null, null, [])
+
+        when: "a proposta é alterada com entrada já paga"
+        service.atualizarProposta(agendamento.id, command)
+
+        then: "a entrada paga e o saldo são recalculados"
+        agendamento.valorEntradaExigido == new BigDecimal("400.00")
+        agendamento.valorEntradaPago == new BigDecimal("400.00")
+        agendamento.valorRestante == new BigDecimal("1600.00")
+        agendamento.percentualEntrada == new BigDecimal("20.00")
+    }
+
+    def "volta ao percentual configurado quando a entrada já paga é zerada na edição"() {
+        given: "uma proposta com entrada já paga"
+        def agendamento = agendamento(
+            status: StatusAgendamento.PRE_RESERVA,
+            valorEntradaExigido: new BigDecimal("500.00"),
+            valorEntradaPago: new BigDecimal("500.00"),
+            valorRestante: new BigDecimal("1500.00"),
+            valorTotal: new BigDecimal("2000.00"),
+            valorTotalFinal: new BigDecimal("2000.00"),
+            percentualEntrada: new BigDecimal("25.00"))
+        def pacote = pacote(valorBase: new BigDecimal("2000.00"))
+        def fotografo = fotografo()
+
+        agendamentoRepository.findByIdWithLock(agendamento.id) >> Optional.of(agendamento)
+        agendamentoRepository.save(_) >> { args -> args[0] }
+        pacoteQueryService.buscarEntityPorId(pacote.id) >> pacote
+        userRepository.findById(fotografo.id) >> Optional.of(fotografo)
+        configuracaoService.getValorDecimal(ConfigKey.TAXA_DESLOCAMENTO) >> BigDecimal.ZERO
+        configuracaoService.getValorDecimal(ConfigKey.PERCENTUAL_ENTRADA) >> new BigDecimal("30.00")
+        agendamentoFotografoRepository.findByAgendamentoId(agendamento.id) >> []
+        agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(agendamento.id) >> []
+
+        def command = new CriarPropostaCommand(
+            pacote.id, null, fotografo.id, LocalDateTime.now().plusDays(5),
+            120, "Praia", null, BigDecimal.ZERO, false, null, null, null, null, null, [])
+
+        when: "a proposta é alterada com a entrada zerada"
+        service.atualizarProposta(agendamento.id, command)
+
+        then: "o percentual configurado volta a valer e nada permanece pago"
+        agendamento.valorEntradaExigido == new BigDecimal("600.00")
+        agendamento.valorEntradaPago == BigDecimal.ZERO
+        agendamento.valorRestante == new BigDecimal("2000.00")
+        agendamento.percentualEntrada == new BigDecimal("30.00")
     }
 
     def "bloqueia alteração de proposta já assinada"() {
@@ -222,6 +313,6 @@ class AgendamentoPropostaServiceSpec extends Specification {
     private CriarPropostaCommand command() {
         new CriarPropostaCommand(
             UUID.randomUUID(), null, UUID.randomUUID(), LocalDateTime.now().plusDays(5),
-            60, "Estúdio", null, true, null, null, null, null, null, [])
+            60, "Estúdio", null, null, true, null, null, null, null, null, [])
     }
 }

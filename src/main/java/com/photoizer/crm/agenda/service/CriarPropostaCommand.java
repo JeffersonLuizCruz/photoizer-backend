@@ -19,6 +19,7 @@ public record CriarPropostaCommand(
     Integer duracaoMinutos,
     String localEnsaio,
     BigDecimal custoDeslocamento,
+    BigDecimal valorEntradaPago,
     Boolean repassarDeslocamento,
     String clausulasPersonalizadas,
     String observacoes,

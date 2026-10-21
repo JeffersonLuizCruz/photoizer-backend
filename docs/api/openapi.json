@@ -13905,6 +13905,11 @@
             "type" : [ "number", "null" ],
             "description" : "Custo de deslocamento"
           },
+          "valorEntradaPago" : {
+            "type" : [ "number", "null" ],
+            "description" : "Valor da entrada já paga pelo cliente. Se maior que zero, substitui o percentual de entrada configurado e dispensa o comprovante no link público.",
+            "minimum" : 0
+          },
           "repassarDeslocamento" : {
             "type" : [ "boolean", "null" ],
             "description" : "Repassar deslocamento ao fotógrafo"
@@ -14962,6 +14967,11 @@
           "custoDeslocamento" : {
             "type" : [ "number", "null" ],
             "description" : "Custo de deslocamento"
+          },
+          "valorEntradaPago" : {
+            "type" : [ "number", "null" ],
+            "description" : "Valor da entrada já paga pelo cliente. Se maior que zero, substitui o percentual de entrada configurado e dispensa o comprovante no link público.",
+            "minimum" : 0
           },
           "repassarDeslocamento" : {
             "type" : [ "boolean", "null" ],

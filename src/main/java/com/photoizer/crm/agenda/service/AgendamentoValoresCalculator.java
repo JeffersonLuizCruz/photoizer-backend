@@ -20,7 +20,8 @@ public class AgendamentoValoresCalculator {
             BigDecimal valorRestante,
             BigDecimal valorExtras,
             BigDecimal valorTotalFinal,
-            BigDecimal taxaDeslocamento) {
+            BigDecimal taxaDeslocamento,
+            BigDecimal percentualEntrada) {
     }
 
     public ValoresAgendamento calcularValoresNovo(BigDecimal valorBasePacote, BigDecimal taxaDeslocamento,
@@ -30,17 +31,75 @@ public class AgendamentoValoresCalculator {
         var valorEntradaPago = valorEntradaExigido;
         var valorExtras = BigDecimal.ZERO;
         return new ValoresAgendamento(valorTotal, valorEntradaExigido, valorEntradaPago,
-            valorTotal.subtract(valorEntradaPago), valorExtras, valorTotal.add(valorExtras), taxaDeslocamento);
+            valorTotal.subtract(valorEntradaPago), valorExtras, valorTotal.add(valorExtras),
+            taxaDeslocamento, percentualEntrada);
+    }
+
+    /**
+     * Calcula os valores de uma proposta nova. Quando o staff informa uma entrada
+     * já paga, ela substitui o percentual configurado e passa a ser a própria
+     * entrada exigida (o cliente não precisa pagar reserva novamente).
+     */
+    public ValoresAgendamento calcularValoresProposta(BigDecimal valorBasePacote, BigDecimal taxaDeslocamento,
+                                                      BigDecimal percentualEntrada,
+                                                      BigDecimal valorEntradaPagoInformado) {
+        var valorTotal = valorBasePacote.add(taxaDeslocamento);
+        if (entradaInformada(valorEntradaPagoInformado)) {
+            return comEntradaPaga(valorTotal, BigDecimal.ZERO, taxaDeslocamento, valorEntradaPagoInformado);
+        }
+
+        var valorEntradaExigido = EntradaUtils.calcularEntradaExigida(valorTotal, percentualEntrada);
+        return new ValoresAgendamento(valorTotal, valorEntradaExigido, BigDecimal.ZERO,
+            valorTotal, BigDecimal.ZERO, valorTotal, taxaDeslocamento, percentualEntrada);
     }
 
     public ValoresAgendamento calcularValoresAtualizacao(BigDecimal valorBasePacote, BigDecimal taxaDeslocamento,
                                                          BigDecimal percentualEntrada,
                                                          BigDecimal valorEntradaPago, BigDecimal valorExtras) {
+        return calcularValoresAtualizacao(valorBasePacote, taxaDeslocamento, percentualEntrada,
+            valorEntradaPago, valorExtras, null);
+    }
+
+    public ValoresAgendamento calcularValoresAtualizacao(BigDecimal valorBasePacote, BigDecimal taxaDeslocamento,
+                                                         BigDecimal percentualEntrada,
+                                                         BigDecimal valorEntradaPago, BigDecimal valorExtras,
+                                                         BigDecimal valorEntradaPagoInformado) {
         var valorTotal = valorBasePacote.add(taxaDeslocamento);
+        if (entradaInformada(valorEntradaPagoInformado)) {
+            return comEntradaPaga(valorTotal, valorExtras, taxaDeslocamento, valorEntradaPagoInformado);
+        }
+
         var valorEntradaExigido = EntradaUtils.calcularEntradaExigida(valorTotal, percentualEntrada);
-        var valorRestante = valorTotal.subtract(valorEntradaPago);
-        return new ValoresAgendamento(valorTotal, valorEntradaExigido, valorEntradaPago,
-            valorRestante, valorExtras, valorTotal.add(valorExtras), taxaDeslocamento);
+        var valorEntradaPagoEfetivo = valorEntradaPago != null ? valorEntradaPago : BigDecimal.ZERO;
+        var valorRestante = valorTotal.subtract(valorEntradaPagoEfetivo);
+        return new ValoresAgendamento(valorTotal, valorEntradaExigido, valorEntradaPagoEfetivo,
+            valorRestante, valorExtras, valorTotal.add(valorExtras), taxaDeslocamento, percentualEntrada);
+    }
+
+    private ValoresAgendamento comEntradaPaga(BigDecimal valorTotal, BigDecimal valorExtras,
+                                              BigDecimal taxaDeslocamento, BigDecimal entradaInformada) {
+        if (valorTotal.signum() <= 0) {
+            throw new BadRequestException("O valor total do agendamento deve ser maior que zero");
+        }
+
+        var valorEntradaPago = entradaInformada.setScale(2, RoundingMode.HALF_UP);
+        if (valorEntradaPago.signum() <= 0) {
+            throw new BadRequestException("O valor de entrada já pago deve ser maior que zero");
+        }
+        if (valorEntradaPago.compareTo(valorTotal) > 0) {
+            throw new BadRequestException("O valor de entrada já pago não pode ser maior que o valor total");
+        }
+
+        var valorTotalFinal = valorTotal.add(valorExtras);
+        var percentualEntrada = valorEntradaPago.multiply(CEM)
+            .divide(valorTotal, 2, RoundingMode.HALF_UP);
+        return new ValoresAgendamento(valorTotal, valorEntradaPago, valorEntradaPago,
+            valorTotalFinal.subtract(valorEntradaPago).max(BigDecimal.ZERO), valorExtras,
+            valorTotalFinal, taxaDeslocamento, percentualEntrada);
+    }
+
+    private boolean entradaInformada(BigDecimal valorEntradaPagoInformado) {
+        return valorEntradaPagoInformado != null && valorEntradaPagoInformado.signum() != 0;
     }
 
     public BigDecimal valorRepasseEfetivo(BigDecimal base, TipoRepasse tipo, BigDecimal valorRepassar,

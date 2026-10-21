@@ -56,7 +56,7 @@ class AgendamentoPropostaFluxoIntegrationSpec extends Specification {
         def fotografo = userRepository.save(novoFotografo())
         def command = new CriarPropostaCommand(
             pacote.id, null, fotografo.id, LocalDateTime.now().plusDays(20),
-            90, "Estúdio", null, true, null, null, null, null, null, [])
+            90, "Estúdio", null, null, true, null, null, null, null, null, [])
 
         when: "o staff cria a proposta"
         def proposta = agendamentoService.criarProposta(command)
@@ -101,16 +101,54 @@ class AgendamentoPropostaFluxoIntegrationSpec extends Specification {
         new File("target/test-uploads").deleteDir()
     }
 
+    def "aprova proposta com entrada já paga sem exigir comprovante nem confirmação manual"() {
+        given: "um pacote e um fotógrafo cadastrados"
+        def pacote = pacoteRepository.save(pacote(id: null))
+        def fotografo = userRepository.save(novoFotografo())
+        def command = new CriarPropostaCommand(
+            pacote.id, null, fotografo.id, LocalDateTime.now().plusDays(20),
+            90, "Estúdio", null, new BigDecimal("300.00"), true, null, null, null, null, null, [])
+
+        when: "o staff cria a proposta com a entrada já paga"
+        def proposta = agendamentoService.criarProposta(command)
+
+        then: "a entrada paga substitui o percentual configurado"
+        proposta.valorEntradaExigido == new BigDecimal("300.00")
+        proposta.valorEntradaPago == new BigDecimal("300.00")
+        proposta.valorRestante == new BigDecimal("700.00")
+
+        when: "o cliente assina sem anexar comprovante"
+        def assinada = propostaPublicaService.assinar(
+            proposta.tokenProposta, "Maria Souza", "11999999999", "maria@teste.com",
+            "12345678901", "São Paulo", "SP", "true", null,
+            "agent", "web", "America/Sao_Paulo", "127.0.0.1")
+
+        then: "a proposta aguarda aprovação sem comprovante"
+        assinada.status == StatusAgendamento.AGUARDANDO_APROVACAO
+        assinada.urlComprovanteEntrada == null
+
+        when: "o staff aprova diretamente"
+        def aprovada = agendamentoService.aprovar(assinada.id)
+
+        then: "o agendamento é confirmado mantendo a entrada já paga"
+        aprovada.status == StatusAgendamento.CONFIRMADO
+        aprovada.valorEntradaPago == new BigDecimal("300.00")
+        aprovada.valorRestante == new BigDecimal("700.00")
+
+        cleanup: "os arquivos gerados no teste são removidos"
+        new File("target/test-uploads").deleteDir()
+    }
+
     def "não permite aprovar proposta com conflito de agenda"() {
         given: "duas propostas para o mesmo fotógrafo no mesmo horário"
         def pacote = pacoteRepository.save(pacote(id: null))
         def fotografo = userRepository.save(novoFotografo())
         def dataHora = LocalDateTime.now().plusDays(30)
         def primeira = agendamentoService.criarProposta(new CriarPropostaCommand(
-            pacote.id, null, fotografo.id, dataHora, 60, "Estúdio", null, true,
+            pacote.id, null, fotografo.id, dataHora, 60, "Estúdio", null, null, true,
             null, null, null, null, null, []))
         def segunda = agendamentoService.criarProposta(new CriarPropostaCommand(
-            pacote.id, null, fotografo.id, dataHora, 60, "Estúdio", null, true,
+            pacote.id, null, fotografo.id, dataHora, 60, "Estúdio", null, null, true,
             null, null, null, null, null, []))
 
         and: "a primeira proposta é assinada, paga e confirmada"

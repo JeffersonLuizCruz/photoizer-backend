@@ -286,6 +286,14 @@ public class Agendamento {
         return cliente != null && cliente.getNome() != null ? cliente.getNome() : "Pré-reserva";
     }
 
+    /** Indica que a entrada exigida já foi integralmente recebida. */
+    public boolean entradaQuitada() {
+        return valorEntradaPago != null
+            && valorEntradaExigido != null
+            && valorEntradaPago.signum() > 0
+            && valorEntradaPago.compareTo(valorEntradaExigido) >= 0;
+    }
+
     /** Gera/regera o token público do link de assinatura da proposta. */
     public void definirTokenProposta(String token, String tokenHash, LocalDateTime expiracao) {
         this.tokenProposta = token;

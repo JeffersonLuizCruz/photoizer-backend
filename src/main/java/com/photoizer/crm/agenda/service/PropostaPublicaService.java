@@ -162,7 +162,7 @@ public class PropostaPublicaService {
         }
 
         validarCamposCliente(nome, telefone, cpf, autorizaUsoImagem);
-        if (!avulso) {
+        if (exigeComprovante(agendamento)) {
             validarComprovante(comprovante);
         }
 
@@ -233,9 +233,14 @@ public class PropostaPublicaService {
     /**
      * O avulso já nasce confirmado e a reserva pode ter sido recebida pelo staff;
      * nesse fluxo o link público coleta apenas os dados e o aceite do cliente.
+     * Propostas comuns também dispensam o comprovante quando a entrada já foi
+     * integralmente recebida pelo staff.
      */
     private boolean exigeComprovante(Agendamento a) {
-        return a.getOrigem() != OrigemAgendamento.AVULSO;
+        if (a.getOrigem() == OrigemAgendamento.AVULSO) {
+            return false;
+        }
+        return !a.entradaQuitada();
     }
 
     /**

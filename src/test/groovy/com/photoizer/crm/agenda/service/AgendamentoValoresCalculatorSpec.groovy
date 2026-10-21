@@ -68,6 +68,49 @@ class AgendamentoValoresCalculatorSpec extends Specification {
         valores.valorEntradaExigido() == new BigDecimal("0.01")
     }
 
+    def "usa a entrada já paga no lugar do percentual configurado"() {
+        given: "um pacote de R\$ 2.000,00 e entrada já paga de R\$ 500,00"
+        def valores = calculator.calcularValoresProposta(
+            new BigDecimal("2000.00"), BigDecimal.ZERO, new BigDecimal("30.00"), new BigDecimal("500.00"))
+
+        expect: "a entrada paga substitui os 30% e define o saldo"
+        valores.valorEntradaExigido() == new BigDecimal("500.00")
+        valores.valorEntradaPago() == new BigDecimal("500.00")
+        valores.valorRestante() == new BigDecimal("1500.00")
+        valores.percentualEntrada() == new BigDecimal("25.00")
+    }
+
+    def "mantém o percentual configurado quando a entrada paga não é informada"() {
+        when: "a proposta é calculada com entrada informada zero"
+        def valores = calculator.calcularValoresProposta(
+            new BigDecimal("2000.00"), BigDecimal.ZERO, new BigDecimal("30.00"), BigDecimal.ZERO)
+
+        then: "os 30% continuam valendo e nada é registrado como pago"
+        valores.valorEntradaExigido() == new BigDecimal("600.00")
+        valores.valorEntradaPago() == BigDecimal.ZERO
+        valores.valorRestante() == new BigDecimal("2000.00")
+        valores.percentualEntrada() == new BigDecimal("30.00")
+    }
+
+    def "rejeita entrada já paga maior que o valor total"() {
+        when: "o cálculo recebe uma entrada acima do total"
+        calculator.calcularValoresProposta(
+            new BigDecimal("2000.00"), BigDecimal.ZERO, new BigDecimal("30.00"), new BigDecimal("2000.01"))
+
+        then: "uma exceção de regra de negócio é lançada"
+        def exception = thrown(BadRequestException)
+        exception.message.contains("maior que o valor total")
+    }
+
+    def "rejeita entrada já paga negativa"() {
+        when: "o cálculo recebe uma entrada negativa"
+        calculator.calcularValoresProposta(
+            new BigDecimal("2000.00"), BigDecimal.ZERO, new BigDecimal("30.00"), new BigDecimal("-1.00"))
+
+        then: "uma exceção de regra de negócio é lançada"
+        thrown(BadRequestException)
+    }
+
     def "rejeita valor total não positivo"() {
         when: "o cálculo recebe valor base zero"
         calculator.calcularValoresNovo(BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("30.00"))
