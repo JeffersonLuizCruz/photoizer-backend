@@ -1,10 +1,15 @@
 package com.photoizer.crm.auth.config;
 
+import com.photoizer.crm.shared.exception.SecurityErrorHandler;
+import com.photoizer.crm.shared.logging.SensitiveDataMask;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -30,6 +35,8 @@ import java.util.Set;
 @Order(10)
 public class CsrfCookieFilter extends OncePerRequestFilter {
 
+    private static final Logger log = LoggerFactory.getLogger(CsrfCookieFilter.class);
+
     private static final Set<String> METODOS_SEGUROS = Set.of("GET", "HEAD", "OPTIONS", "TRACE");
     private static final Set<String> PATHS_ISENTOS = Set.of(
         "/api/v1/auth/login",
@@ -39,6 +46,12 @@ public class CsrfCookieFilter extends OncePerRequestFilter {
         "/api/v1/auth/cliente/registro",
         "/api/v1/ecommerce/sessao"
     );
+
+    private final SecurityErrorHandler securityErrorHandler;
+
+    public CsrfCookieFilter(SecurityErrorHandler securityErrorHandler) {
+        this.securityErrorHandler = securityErrorHandler;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -72,10 +85,10 @@ public class CsrfCookieFilter extends OncePerRequestFilter {
 
         var csrfHeader = request.getHeader(AuthCookieService.CSRF_HEADER);
         if (csrfCookie == null || csrfHeader == null || !constantTimeEquals(csrfCookie, csrfHeader)) {
-            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-            response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write(
-                "{\"status\":403,\"error\":\"Forbidden\",\"message\":\"CSRF token inválido ou ausente\"}");
+            log.warn("[403] CSRF token inválido ou ausente: {} {}",
+                request.getMethod(), SensitiveDataMask.mask(path));
+            securityErrorHandler.escrever(response, HttpStatus.FORBIDDEN,
+                "CSRF token inválido ou ausente");
             return;
         }
 

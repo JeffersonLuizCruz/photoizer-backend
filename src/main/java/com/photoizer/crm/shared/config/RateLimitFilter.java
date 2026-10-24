@@ -4,6 +4,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import tools.jackson.databind.ObjectMapper;
 import com.photoizer.crm.shared.exception.ErrorResponse;
+import com.photoizer.crm.shared.logging.SensitiveDataMask;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -88,6 +89,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
         int count = counter.incrementAndGet();
 
         if (count > limit) {
+            log.warn("[429] Rate limit excedido: {} {} (limite={} por {}ms)",
+                request.getMethod(), SensitiveDataMask.mask(path), limit, properties.windowMs());
             response.setStatus(429);
             var errorResponse = new ErrorResponse(429, "Too Many Requests", "Muitas requisições. Tente novamente em instantes.");
             response.setContentType("application/json;charset=UTF-8");

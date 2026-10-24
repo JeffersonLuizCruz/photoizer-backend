@@ -2,11 +2,13 @@ package com.photoizer.crm.security;
 
 import com.photoizer.crm.auth.config.AuthCookieService;
 import com.photoizer.crm.auth.config.CsrfCookieFilter;
+import com.photoizer.crm.shared.exception.SecurityErrorHandler;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import tools.jackson.databind.json.JsonMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -15,7 +17,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class CsrfCookieFilterTest {
 
-    private final CsrfCookieFilter filter = new CsrfCookieFilter();
+    private final CsrfCookieFilter filter = new CsrfCookieFilter(
+        new SecurityErrorHandler(JsonMapper.builder().build()));
 
     @Test
     void postAutenticadoPorCookieSemHeaderEhBloqueado() throws Exception {

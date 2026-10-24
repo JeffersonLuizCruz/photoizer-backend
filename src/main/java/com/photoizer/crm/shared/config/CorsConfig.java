@@ -40,10 +40,11 @@ public class CorsConfig {
         config.setAllowedOrigins(properties.allowedOrigins());
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of(
-            "Authorization", "Content-Type", "X-Session-Id", "X-XSRF-TOKEN", "Accept", "Origin"));
+            "Authorization", "Content-Type", "X-Session-Id", "X-XSRF-TOKEN",
+            "X-Correlation-ID", "Accept", "Origin"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
-        config.setExposedHeaders(List.of("Authorization"));
+        config.setExposedHeaders(List.of("Authorization", "X-Correlation-ID"));
         return config;
     }
 }

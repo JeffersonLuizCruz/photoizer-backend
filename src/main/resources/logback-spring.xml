@@ -1,108 +1,159 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <springProperty scope="context" name="applicationName" source="spring.application.name" defaultValue="crm"/>
+    <springProperty scope="context" name="appName" source="spring.application.name" defaultValue="crm"/>
+    <springProperty scope="context" name="env" source="spring.profiles.active" defaultValue="dev"/>
+    <springProperty scope="context" name="version" source="APP_VERSION" defaultValue="dev"/>
+    <springProperty scope="context" name="logPath" source="logging.file.path" defaultValue="logs"/>
 
-    <property name="CONSOLE_TEXT_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %highlight(%-5level) %logger{36} [%X{traceId}] - %msg%n"/>
+    <!-- correlationId e userId vêm do MDC (CorrelationIdFilter/UserMdcFilter). -->
+    <property name="CONSOLE_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %highlight(%-5level) %cyan(%logger{36}) [%X{correlationId:-}] [user=%X{userId:-}] [trace=%X{traceId:-}] - %msg%n%ex"/>
 
-    <!-- Perfil de Usuário (default) + Desenvolvimento: console texto, DEBUG -->
-    <!-- Ativo somente quando NENHUM dos perfis homolog/prod estiver ativo.
-         Expressão com AND: a vírgula (OR) tornava a condição sempre verdadeira,
-         duplicando o log (texto + JSON) em produção. -->
+    <!-- ══════════════ DEV / TEST: console colorido e legível ══════════════ -->
     <springProfile name="!homolog &amp; !prod">
         <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
             <encoder>
-                <pattern>${CONSOLE_TEXT_PATTERN}</pattern>
+                <pattern>${CONSOLE_PATTERN}</pattern>
+                <charset>UTF-8</charset>
             </encoder>
         </appender>
+
+        <logger name="com.photoizer.crm" level="DEBUG"/>
+        <logger name="com.photoizer.crm.shared.logging.LoggingAspect" level="DEBUG"/>
+        <logger name="com.photoizer.crm.shared.logging.RequestLoggingFilter" level="INFO"/>
+        <logger name="org.springframework.security" level="INFO"/>
+        <logger name="org.hibernate.SQL" level="INFO"/>
 
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>
         </root>
-
-        <logger name="com.photoizer.crm" level="DEBUG"/>
-        <logger name="com.photoizer.crm.shared.logging" level="WARN"/>
     </springProfile>
 
-    <!-- Perfil de Homologação: JSON console, INFO -->
+    <!-- ══════════════ HOMOLOG: JSON no console ══════════════ -->
     <springProfile name="homolog">
         <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
             <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <timeZone>UTC</timeZone>
                 <includeMdc>true</includeMdc>
+                <includeKeyValuePairs>true</includeKeyValuePairs>
+                <includeContext>false</includeContext>
+                <includeCallerData>false</includeCallerData>
+                <customFields>{"service":"${appName}","env":"${env}","version":"${version}"}</customFields>
                 <fieldNames>
                     <timestamp>@timestamp</timestamp>
                     <version>[ignore]</version>
-                    <levelValue>[ignore]</levelValue>
                     <logger>logger</logger>
                     <thread>thread</thread>
-                    <mdc>mdc</mdc>
+                    <level>level</level>
+                    <levelValue>[ignore]</levelValue>
                     <message>message</message>
-                    <stackTrace>stackTrace</stackTrace>
+                    <stackTrace>error.stack_trace</stackTrace>
                 </fieldNames>
+                <decorator class="net.logstash.logback.mask.MaskingJsonGeneratorDecorator">
+                    <defaultMask>***</defaultMask>
+                    <path>cpf</path>
+                    <path>cnpj</path>
+                    <path>email</path>
+                    <path>telefone</path>
+                    <path>phone</path>
+                    <path>senha</path>
+                    <path>password</path>
+                    <path>token</path>
+                    <path>authorization</path>
+                </decorator>
             </encoder>
         </appender>
+
+        <logger name="com.photoizer.crm" level="INFO"/>
+        <logger name="com.photoizer.crm.shared.logging.LoggingAspect" level="WARN"/>
+        <logger name="com.photoizer.crm.shared.logging.RequestLoggingFilter" level="INFO"/>
+        <logger name="org.springframework.security" level="INFO"/>
 
         <root level="INFO">
             <appender-ref ref="JSON_CONSOLE"/>
         </root>
-
-        <logger name="com.photoizer.crm" level="INFO"/>
-        <logger name="com.photoizer.crm.shared.logging" level="WARN"/>
     </springProfile>
 
-    <!-- Perfil de Produção: JSON console + JSON file com AsyncAppender, INFO -->
+    <!-- ══════════════ PROD: JSON no console + arquivo assíncrono ══════════════ -->
     <springProfile name="prod">
         <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
             <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <timeZone>UTC</timeZone>
                 <includeMdc>true</includeMdc>
+                <includeKeyValuePairs>true</includeKeyValuePairs>
+                <includeContext>false</includeContext>
+                <includeCallerData>false</includeCallerData>
+                <customFields>{"service":"${appName}","env":"${env}","version":"${version}"}</customFields>
                 <fieldNames>
                     <timestamp>@timestamp</timestamp>
                     <version>[ignore]</version>
-                    <levelValue>[ignore]</levelValue>
                     <logger>logger</logger>
                     <thread>thread</thread>
-                    <mdc>mdc</mdc>
+                    <level>level</level>
+                    <levelValue>[ignore]</levelValue>
                     <message>message</message>
-                    <stackTrace>stackTrace</stackTrace>
+                    <stackTrace>error.stack_trace</stackTrace>
                 </fieldNames>
+                <decorator class="net.logstash.logback.mask.MaskingJsonGeneratorDecorator">
+                    <defaultMask>***</defaultMask>
+                    <path>cpf</path>
+                    <path>cnpj</path>
+                    <path>email</path>
+                    <path>telefone</path>
+                    <path>phone</path>
+                    <path>senha</path>
+                    <path>password</path>
+                    <path>token</path>
+                    <path>authorization</path>
+                </decorator>
             </encoder>
         </appender>
 
         <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-            <file>${LOG_PATH:-logs}/${applicationName}.json</file>
+            <file>${logPath}/${appName}.json</file>
             <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-                <fileNamePattern>${LOG_PATH:-logs}/${applicationName}-%d{yyyy-MM-dd}.%i.json</fileNamePattern>
+                <fileNamePattern>${logPath}/${appName}-%d{yyyy-MM-dd}.%i.json</fileNamePattern>
                 <maxFileSize>100MB</maxFileSize>
                 <maxHistory>30</maxHistory>
                 <totalSizeCap>3GB</totalSizeCap>
+                <cleanHistoryOnStart>true</cleanHistoryOnStart>
             </rollingPolicy>
             <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <timeZone>UTC</timeZone>
                 <includeMdc>true</includeMdc>
+                <includeKeyValuePairs>true</includeKeyValuePairs>
+                <includeContext>false</includeContext>
+                <includeCallerData>false</includeCallerData>
+                <customFields>{"service":"${appName}","env":"${env}","version":"${version}"}</customFields>
                 <fieldNames>
                     <timestamp>@timestamp</timestamp>
                     <version>[ignore]</version>
-                    <levelValue>[ignore]</levelValue>
                     <logger>logger</logger>
                     <thread>thread</thread>
-                    <mdc>mdc</mdc>
+                    <level>level</level>
+                    <levelValue>[ignore]</levelValue>
                     <message>message</message>
-                    <stackTrace>stackTrace</stackTrace>
+                    <stackTrace>error.stack_trace</stackTrace>
                 </fieldNames>
             </encoder>
         </appender>
 
         <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
-            <queueSize>1024</queueSize>
-            <neverBlock>true</neverBlock>
+            <queueSize>2048</queueSize>
             <discardingThreshold>0</discardingThreshold>
+            <neverBlock>true</neverBlock>
+            <includeCallerData>false</includeCallerData>
             <appender-ref ref="FILE"/>
         </appender>
+
+        <logger name="com.photoizer.crm" level="INFO"/>
+        <logger name="com.photoizer.crm.shared.logging.LoggingAspect" level="WARN"/>
+        <logger name="com.photoizer.crm.shared.logging.RequestLoggingFilter" level="INFO"/>
+        <logger name="org.springframework.security" level="INFO"/>
 
         <root level="INFO">
             <appender-ref ref="JSON_CONSOLE"/>
             <appender-ref ref="ASYNC_FILE"/>
         </root>
-
-        <logger name="com.photoizer.crm" level="INFO"/>
-        <logger name="com.photoizer.crm.shared.logging" level="WARN"/>
     </springProfile>
 </configuration>

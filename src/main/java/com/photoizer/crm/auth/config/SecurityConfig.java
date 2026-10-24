@@ -2,7 +2,8 @@ package com.photoizer.crm.auth.config;
 
 import com.photoizer.crm.shared.config.CorsConfig;
 import com.photoizer.crm.shared.config.RateLimitFilter;
-import jakarta.servlet.http.HttpServletResponse;
+import com.photoizer.crm.shared.exception.SecurityErrorHandler;
+import com.photoizer.crm.shared.logging.UserMdcFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -25,15 +26,21 @@ public class SecurityConfig {
     private final CsrfCookieFilter csrfCookieFilter;
     private final CorsConfig corsConfig;
     private final RateLimitFilter rateLimitFilter;
+    private final UserMdcFilter userMdcFilter;
+    private final SecurityErrorHandler securityErrorHandler;
 
     public SecurityConfig(JwtAuthenticationFilter jwtFilter,
                           CsrfCookieFilter csrfCookieFilter,
                           CorsConfig corsConfig,
-                          RateLimitFilter rateLimitFilter) {
+                          RateLimitFilter rateLimitFilter,
+                          UserMdcFilter userMdcFilter,
+                          SecurityErrorHandler securityErrorHandler) {
         this.jwtFilter = jwtFilter;
         this.csrfCookieFilter = csrfCookieFilter;
         this.corsConfig = corsConfig;
         this.rateLimitFilter = rateLimitFilter;
+        this.userMdcFilter = userMdcFilter;
+        this.securityErrorHandler = securityErrorHandler;
     }
 
     @Bean
@@ -100,11 +107,11 @@ public class SecurityConfig {
                 .contentSecurityPolicy(csp -> csp.policyDirectives(
                     "default-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'")))
             .exceptionHandling(e -> e
-                .authenticationEntryPoint((request, response, authException) ->
-                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized"))
-                .accessDeniedHandler((request, response, accessDeniedException) ->
-                    response.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden")))
+                .authenticationEntryPoint(securityErrorHandler)
+                .accessDeniedHandler(securityErrorHandler))
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+            // Depois do JWT: o SecurityContext já tem o UUID do usuário autenticado.
+            .addFilterAfter(userMdcFilter, JwtAuthenticationFilter.class)
             .addFilterBefore(csrfCookieFilter, JwtAuthenticationFilter.class)
             .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class);
 

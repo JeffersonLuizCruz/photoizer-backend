@@ -7,8 +7,10 @@ import com.photoizer.crm.auth.repository.RefreshTokenRepository;
 import com.photoizer.crm.auth.repository.TokenBlocklistRepository;
 import com.photoizer.crm.auth.repository.UserRepository;
 import com.photoizer.crm.shared.util.HashUtils;
+import com.photoizer.crm.shared.logging.LoggingKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
@@ -153,12 +155,18 @@ public class RefreshTokenService {
     @Scheduled(cron = "0 30 3 * * *")
     @Transactional
     public void expurgarExpirados() {
-        var agora = Instant.now();
-        var refreshRemovidos = refreshTokenRepository.deleteByExpiresAtBefore(agora);
-        var blocklistRemovidos = tokenBlocklistRepository.deleteByExpiresAtBefore(agora);
-        if (refreshRemovidos > 0 || blocklistRemovidos > 0) {
-            log.info("Expurgo de tokens: {} refresh e {} entradas de blocklist removidos",
-                refreshRemovidos, blocklistRemovidos);
+        // Jobs não têm requisição HTTP: gera um correlationId próprio para rastrear o expurgo.
+        MDC.put(LoggingKeys.CORRELATION_ID, "job-refresh-token-" + UUID.randomUUID());
+        try {
+            var agora = Instant.now();
+            var refreshRemovidos = refreshTokenRepository.deleteByExpiresAtBefore(agora);
+            var blocklistRemovidos = tokenBlocklistRepository.deleteByExpiresAtBefore(agora);
+            if (refreshRemovidos > 0 || blocklistRemovidos > 0) {
+                log.info("Expurgo de tokens: {} refresh e {} entradas de blocklist removidos",
+                    refreshRemovidos, blocklistRemovidos);
+            }
+        } finally {
+            MDC.remove(LoggingKeys.CORRELATION_ID);
         }
     }
 

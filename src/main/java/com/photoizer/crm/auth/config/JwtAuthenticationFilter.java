@@ -1,10 +1,12 @@
 package com.photoizer.crm.auth.config;
 
 import com.photoizer.crm.auth.service.RefreshTokenService;
+import com.photoizer.crm.shared.exception.SecurityErrorHandler;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -23,13 +25,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenService refreshTokenService;
     private final AuthCookieService authCookieService;
+    private final SecurityErrorHandler securityErrorHandler;
 
     public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider,
                                     RefreshTokenService refreshTokenService,
-                                    AuthCookieService authCookieService) {
+                                    AuthCookieService authCookieService,
+                                    SecurityErrorHandler securityErrorHandler) {
         this.jwtTokenProvider = jwtTokenProvider;
         this.refreshTokenService = refreshTokenService;
         this.authCookieService = authCookieService;
+        this.securityErrorHandler = securityErrorHandler;
     }
 
     @Override
@@ -59,7 +64,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         if (refreshTokenService.isTokenBlocked(token)) {
             SecurityContextHolder.clearContext();
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token revogado");
+            securityErrorHandler.escrever(response, HttpStatus.UNAUTHORIZED, "Token revogado");
             return;
         }
 
