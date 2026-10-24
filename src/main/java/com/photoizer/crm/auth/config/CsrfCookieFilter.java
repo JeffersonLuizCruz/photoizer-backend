@@ -85,8 +85,11 @@ public class CsrfCookieFilter extends OncePerRequestFilter {
 
         var csrfHeader = request.getHeader(AuthCookieService.CSRF_HEADER);
         if (csrfCookie == null || csrfHeader == null || !constantTimeEquals(csrfCookie, csrfHeader)) {
-            log.warn("[403] CSRF token inválido ou ausente: {} {}",
-                request.getMethod(), SensitiveDataMask.mask(path));
+            log.atWarn()
+                .addKeyValue("event_action", "security.csrf_invalido")
+                .addKeyValue("http_method", request.getMethod())
+                .addKeyValue("http_path", SensitiveDataMask.mask(path))
+                .log("CSRF token inválido ou ausente");
             securityErrorHandler.escrever(response, HttpStatus.FORBIDDEN,
                 "CSRF token inválido ou ausente");
             return;

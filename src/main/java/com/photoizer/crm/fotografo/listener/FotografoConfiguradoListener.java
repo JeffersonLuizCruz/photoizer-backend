@@ -34,9 +34,15 @@ public class FotografoConfiguradoListener {
     public void handleFotografoConfigurado(FotografoConfiguradoEvent event) {
         try {
             userService.upsertFotografoConfigurado(event.nome());
-            log.info("Usuário FOTOGRAFO provisionado/atualizado a partir da configuração: {}", event.nome());
+            log.atInfo()
+                .addKeyValue("event_action", "fotografo.provisionado")
+                .log("Usuário FOTOGRAFO provisionado/atualizado a partir da configuração");
         } catch (RuntimeException e) {
-            log.warn("Falha ao provisionar usuário FOTOGRAFO a partir da configuração '{}'", event.nome(), e);
+            // Não logar event.nome(): nome de pessoa é PII.
+            log.atWarn()
+                .addKeyValue("event_action", "fotografo.provisionamento_falhou")
+                .setCause(e)
+                .log("Falha ao provisionar usuário FOTOGRAFO a partir da configuração");
         }
     }
 }

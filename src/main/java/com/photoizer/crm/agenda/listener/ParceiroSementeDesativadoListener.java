@@ -35,15 +35,26 @@ public class ParceiroSementeDesativadoListener {
                 try {
                     agendamentoFotografoService.cancelarRepasse(
                         link.getAgendamento().getId(), event.userId());
-                    log.info("Repasse pendente cancelado do parceiro desativado {} (agendamento {})",
-                        event.userId(), link.getAgendamento().getId());
+                    log.atInfo()
+                        .addKeyValue("event_action", "agenda.repasse_cancelado")
+                        .addKeyValue("user_id", event.userId())
+                        .addKeyValue("agendamento_id", link.getAgendamento().getId())
+                        .log("Repasse pendente do parceiro desativado cancelado");
                 } catch (RuntimeException e) {
-                    log.warn("Não foi possível cancelar repasse do parceiro desativado {} (agendamento {}): {}",
-                        event.userId(), link.getAgendamento().getId(), e.getMessage());
+                    log.atWarn()
+                        .addKeyValue("event_action", "agenda.repasse_cancelamento_falhou")
+                        .addKeyValue("user_id", event.userId())
+                        .addKeyValue("agendamento_id", link.getAgendamento().getId())
+                        .setCause(e)
+                        .log("Não foi possível cancelar repasse do parceiro desativado");
                 }
             }
         } catch (RuntimeException e) {
-            log.warn("Falha ao cancelar repasses do parceiro desativado {}: {}", event.userId(), e.getMessage());
+            log.atWarn()
+                .addKeyValue("event_action", "agenda.repasses_cancelamento_falhou")
+                .addKeyValue("user_id", event.userId())
+                .setCause(e)
+                .log("Falha ao cancelar repasses do parceiro desativado");
         }
     }
 }

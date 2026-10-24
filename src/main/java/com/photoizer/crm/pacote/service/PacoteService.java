@@ -9,6 +9,8 @@ import com.photoizer.crm.pacote.exception.PacoteInativoException;
 import com.photoizer.crm.pacote.exception.PacoteNaoEncontradoException;
 import com.photoizer.crm.pacote.exception.PacoteVinculadoAgendamentoException;
 import com.photoizer.crm.pacote.repository.PacoteRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +23,8 @@ import java.util.UUID;
 @Service
 @Transactional
 public class PacoteService {
+
+    private static final Logger log = LoggerFactory.getLogger(PacoteService.class);
 
     private final PacoteRepository pacoteRepository;
     private final PacoteMapper pacoteMapper;
@@ -35,14 +39,24 @@ public class PacoteService {
 
     public PacoteResponse criar(PacoteRequest request) {
         var pacote = pacoteMapper.toEntity(request);
-        return pacoteMapper.toResponse(pacoteRepository.save(pacote));
+        pacote = pacoteRepository.save(pacote);
+        log.atInfo()
+            .addKeyValue("event_action", "pacote.criado")
+            .addKeyValue("pacote_id", pacote.getId())
+            .log("Pacote criado");
+        return pacoteMapper.toResponse(pacote);
     }
 
     public PacoteResponse atualizar(UUID id, PacoteRequest request) {
         var pacote = pacoteRepository.findById(id)
             .orElseThrow(() -> new PacoteNaoEncontradoException(id));
         pacoteMapper.updateEntity(request, pacote);
-        return pacoteMapper.toResponse(pacoteRepository.save(pacote));
+        pacote = pacoteRepository.save(pacote);
+        log.atInfo()
+            .addKeyValue("event_action", "pacote.atualizado")
+            .addKeyValue("pacote_id", pacote.getId())
+            .log("Pacote atualizado");
+        return pacoteMapper.toResponse(pacote);
     }
 
     public void deletar(UUID id) {
@@ -63,5 +77,9 @@ public class PacoteService {
 
         pacote.setAtivo(false);
         pacoteRepository.save(pacote);
+        log.atInfo()
+            .addKeyValue("event_action", "pacote.desativado")
+            .addKeyValue("pacote_id", id)
+            .log("Pacote desativado");
     }
 }

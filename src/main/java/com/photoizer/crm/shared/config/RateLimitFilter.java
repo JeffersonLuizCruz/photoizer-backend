@@ -89,8 +89,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
         int count = counter.incrementAndGet();
 
         if (count > limit) {
-            log.warn("[429] Rate limit excedido: {} {} (limite={} por {}ms)",
-                request.getMethod(), SensitiveDataMask.mask(path), limit, properties.windowMs());
+            log.atWarn()
+                .addKeyValue("event_action", "security.rate_limit_excedido")
+                .addKeyValue("http_method", request.getMethod())
+                .addKeyValue("http_path", SensitiveDataMask.mask(path))
+                .addKeyValue("limite", limit)
+                .addKeyValue("janela_ms", properties.windowMs())
+                .log("Rate limit excedido");
             response.setStatus(429);
             var errorResponse = new ErrorResponse(429, "Too Many Requests", "Muitas requisições. Tente novamente em instantes.");
             response.setContentType("application/json;charset=UTF-8");

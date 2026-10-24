@@ -8,6 +8,8 @@ import com.photoizer.crm.cliente.exception.ClienteNaoEncontradoException;
 import com.photoizer.crm.cliente.model.Cliente;
 import com.photoizer.crm.cliente.repository.ClienteRepository;
 import com.photoizer.crm.cliente.repository.ClienteSpecification;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -22,6 +24,8 @@ import java.util.UUID;
 @Service
 @Transactional
 public class ClienteService {
+
+    private static final Logger log = LoggerFactory.getLogger(ClienteService.class);
 
     private final ClienteRepository clienteRepository;
     private final ClienteMapper clienteMapper;
@@ -38,6 +42,10 @@ public class ClienteService {
     public ClienteAdminResponse criar(CriarClienteRequest request) {
         var cliente = clienteMapper.toEntity(request);
         var salvo = clienteRepository.save(cliente);
+        log.atInfo()
+            .addKeyValue("event_action", "cliente.criado")
+            .addKeyValue("cliente_id", salvo.getId())
+            .log("Cliente criado");
         return clienteMapper.toAdminResponse(salvo);
     }
 
@@ -78,6 +86,10 @@ public class ClienteService {
             .orElseThrow(() -> new ClienteNaoEncontradoException(id));
         clienteMapper.updateEntity(cliente, request);
         var atualizado = clienteRepository.save(cliente);
+        log.atInfo()
+            .addKeyValue("event_action", "cliente.atualizado")
+            .addKeyValue("cliente_id", atualizado.getId())
+            .log("Cliente atualizado");
         return clienteMapper.toAdminResponse(atualizado);
     }
 
@@ -89,6 +101,10 @@ public class ClienteService {
             throw new ClienteNaoEncontradoException(id);
         }
         clienteRepository.deleteById(id);
+        log.atInfo()
+            .addKeyValue("event_action", "cliente.deletado")
+            .addKeyValue("cliente_id", id)
+            .log("Cliente deletado");
     }
 
     /**

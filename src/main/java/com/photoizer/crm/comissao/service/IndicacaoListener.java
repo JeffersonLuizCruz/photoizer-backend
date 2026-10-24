@@ -50,8 +50,13 @@ public class IndicacaoListener {
             ? OrigemIndicacao.INDICADOR
             : OrigemIndicacao.PACOTE;
 
-        log.info("Criando indicação ({}) para agendamento {}: indicador={}, percentual={}%",
-            origem, event.agendamentoId(), event.indicadorNome(), percentual);
+        log.atInfo()
+            .addKeyValue("event_action", "comissao.indicacao_criada")
+            .addKeyValue("agendamento_id", event.agendamentoId())
+            .addKeyValue("indicador_id", indicador.getId())
+            .addKeyValue("origem", origem)
+            .addKeyValue("percentual", percentual)
+            .log("Indicação criada para o agendamento");
 
         indicacaoService.criar(
             event.agendamentoId(),
@@ -96,8 +101,13 @@ public class IndicacaoListener {
             ? indicador.getPercentualComissao()
             : configuracaoService.getValorDecimal("percentualComissao", BigDecimal.TEN);
 
-        log.info("Criando indicação ({}) para agendamento {}: indicador={}, percentual={}%",
-            event.origem(), event.agendamentoId(), nome, percentual);
+        log.atInfo()
+            .addKeyValue("event_action", "comissao.indicacao_criada")
+            .addKeyValue("agendamento_id", event.agendamentoId())
+            .addKeyValue("indicador_id", indicadorId)
+            .addKeyValue("origem", event.origem())
+            .addKeyValue("percentual", percentual)
+            .log("Indicação criada para o agendamento");
 
         indicacaoService.criar(
             event.agendamentoId(),
@@ -113,14 +123,20 @@ public class IndicacaoListener {
     @EventListener
     @Transactional
     public void handlePagamentoRegistrado(PagamentoFinalRegistradoEvent event) {
-        log.info("Marcando todas as comissões como pagas para agendamento {}", event.agendamentoId());
+        log.atInfo()
+            .addKeyValue("event_action", "comissao.pagas")
+            .addKeyValue("agendamento_id", event.agendamentoId())
+            .log("Comissões marcadas como pagas");
         indicacaoService.marcarTodasComoPaga(event.agendamentoId());
     }
 
     @EventListener
     @Transactional
     public void handleAgendamentoCancelado(AgendamentoCanceladoEvent event) {
-        log.info("Cancelando todas as comissões para agendamento {}", event.agendamentoId());
+        log.atInfo()
+            .addKeyValue("event_action", "comissao.canceladas")
+            .addKeyValue("agendamento_id", event.agendamentoId())
+            .log("Comissões canceladas");
         indicacaoService.marcarTodasComoCancelada(event.agendamentoId());
     }
 }

@@ -32,6 +32,8 @@ import com.photoizer.crm.cliente.repository.ClienteRepository;
 import com.photoizer.crm.config.model.ConfigKey;
 import com.photoizer.crm.config.service.ConfiguracaoService;
 import com.photoizer.crm.shared.exception.BadRequestException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,6 +58,8 @@ import org.springframework.data.jpa.domain.Specification;
 @Service
 @Transactional
 public class AgendamentoService {
+
+    private static final Logger log = LoggerFactory.getLogger(AgendamentoService.class);
 
     private final ClienteRepository clienteRepository;
     private final PacoteQueryService pacoteQueryService;
@@ -175,7 +179,16 @@ public class AgendamentoService {
         partilhaService.calcularPartilhaFotografo(agendamento);
         gerarTokenProposta(agendamento);
         agendamento.registrarEnvioProposta();
-        return agendamentoRepository.save(agendamento);
+        agendamento = agendamentoRepository.save(agendamento);
+
+        log.atInfo()
+            .addKeyValue("event_action", "agendamento.proposta_criada")
+            .addKeyValue("agendamento_id", agendamento.getId())
+            .addKeyValue("pacote_id", pacote.getId())
+            .addKeyValue("fotografo_id", fotografo.getId())
+            .addKeyValue("valor_total", agendamento.getValorTotal())
+            .log("Proposta de agendamento criada");
+        return agendamento;
     }
 
     private void gerarTokenProposta(Agendamento agendamento) {
@@ -187,7 +200,12 @@ public class AgendamentoService {
         var agendamento = agendamentoRepository.findByIdWithLock(id)
             .orElseThrow(() -> new AgendamentoNaoEncontradoException(id));
         agendamento.confirmarPagamento();
-        return agendamentoRepository.save(agendamento);
+        agendamento = agendamentoRepository.save(agendamento);
+        log.atInfo()
+            .addKeyValue("event_action", "agendamento.pagamento_entrada_confirmado")
+            .addKeyValue("agendamento_id", agendamento.getId())
+            .log("Pagamento da entrada confirmado");
+        return agendamento;
     }
 
     public Agendamento aprovar(UUID id) {
@@ -213,6 +231,11 @@ public class AgendamentoService {
             agendamento.getId(),
             agendamento.getCliente() != null ? agendamento.getCliente().getId() : null
         ));
+        log.atInfo()
+            .addKeyValue("event_action", "agendamento.aprovado")
+            .addKeyValue("agendamento_id", agendamento.getId())
+            .addKeyValue("status", agendamento.getStatus())
+            .log("Agendamento aprovado");
         return agendamento;
     }
 
@@ -225,6 +248,10 @@ public class AgendamentoService {
         agendamento = agendamentoRepository.save(agendamento);
 
         eventPublisher.publishEvent(new AgendamentoCanceladoEvent(agendamento.getId()));
+        log.atInfo()
+            .addKeyValue("event_action", "agendamento.recusado")
+            .addKeyValue("agendamento_id", agendamento.getId())
+            .log("Proposta recusada");
         return agendamento;
     }
 
@@ -563,6 +590,10 @@ public class AgendamentoService {
         agendamento = agendamentoRepository.save(agendamento);
 
         eventPublisher.publishEvent(new AgendamentoCanceladoEvent(agendamento.getId()));
+        log.atInfo()
+            .addKeyValue("event_action", "agendamento.proposta_removida")
+            .addKeyValue("agendamento_id", agendamento.getId())
+            .log("Proposta de agendamento removida");
         return agendamento;
     }
 

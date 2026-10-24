@@ -105,7 +105,10 @@ public class ConfiguracaoService {
             key.convert(valor);
             saveOrCreate(key.getKey(), valor);
         }
-        log.info("Configuracoes atualizadas: {} chaves", valores.size());
+        log.atInfo()
+            .addKeyValue("event_action", "config.atualizadas")
+            .addKeyValue("quantidade", valores.size())
+            .log("Configurações atualizadas");
     }
 
     /**
@@ -115,8 +118,12 @@ public class ConfiguracaoService {
     public void atualizar(ConfigKey key, String valor) {
         key.convert(valor);
         saveOrCreate(key.getKey(), valor);
-        log.info("Configuracao atualizada: {} = {}", key.name(),
-            valor.length() > 100 ? valor.substring(0, 100) + "..." : valor);
+        // Nunca logar o valor: PIX_CHAVE/CNPJ/endereço são dados sensíveis.
+        log.atInfo()
+            .addKeyValue("event_action", "config.atualizada")
+            .addKeyValue("config_key", key.name())
+            .addKeyValue("chars", valor == null ? 0 : valor.length())
+            .log("Configuração atualizada");
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -134,7 +141,10 @@ public class ConfiguracaoService {
                 try {
                     return new BigDecimal(c.getValor());
                 } catch (NumberFormatException e) {
-                    log.warn("Valor invalido para chave '{}': '{}' — retornando padrao", chave, c.getValor());
+                    log.atWarn()
+                        .addKeyValue("event_action", "config.valor_invalido")
+                        .addKeyValue("config_key", chave)
+                        .log("Valor inválido para configuração; retornando padrão");
                     return valorPadrao;
                 }
             })
@@ -152,7 +162,10 @@ public class ConfiguracaoService {
                 try {
                     return Integer.parseInt(c.getValor());
                 } catch (NumberFormatException e) {
-                    log.warn("Valor invalido para chave '{}': '{}' — retornando padrao", chave, c.getValor());
+                    log.atWarn()
+                        .addKeyValue("event_action", "config.valor_invalido")
+                        .addKeyValue("config_key", chave)
+                        .log("Valor inválido para configuração; retornando padrão");
                     return valorPadrao;
                 }
             })
@@ -178,8 +191,11 @@ public class ConfiguracaoService {
     @CacheEvict("config")
     public void atualizarValorTexto(String chave, String valor) {
         saveOrCreate(chave, valor);
-        log.info("Configuracao atualizada: {} = {} ({} chars)", chave,
-            valor.length() > 100 ? valor.substring(0, 100) + "..." : valor, valor.length());
+        log.atInfo()
+            .addKeyValue("event_action", "config.atualizada")
+            .addKeyValue("config_key", chave)
+            .addKeyValue("chars", valor == null ? 0 : valor.length())
+            .log("Configuração atualizada");
     }
 
     // ════════════════════════════════════════════════════════════════

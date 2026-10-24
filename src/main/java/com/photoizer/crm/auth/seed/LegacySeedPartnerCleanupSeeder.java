@@ -56,20 +56,30 @@ public class LegacySeedPartnerCleanupSeeder implements CommandLineRunner {
         for (var email : LEGACY_SEED_EMAILS) {
             userRepository.findByEmail(email)
                 .filter(User::isAtivo)
-                .ifPresent(user -> cleanup(user.getId(), email));
+                .ifPresent(user -> cleanup(user.getId()));
         }
     }
 
-    private void cleanup(UUID userId, String email) {
+    private void cleanup(UUID userId) {
         try {
             cleanupService.excluir(userId);
-            log.info("Parceiro semeado legado removido: {}", email);
+            log.atInfo()
+                .addKeyValue("event_action", "auth.parceiro_legado_removido")
+                .addKeyValue("user_id", userId)
+                .log("Parceiro semeado legado removido");
         } catch (DataIntegrityViolationException e) {
             cleanupService.desativar(userId);
             eventPublisher.publishEvent(new ParceiroSementeDesativadoEvent(userId));
-            log.warn("Parceiro semeado legado possui vínculos e foi desativado: {}", email);
+            log.atWarn()
+                .addKeyValue("event_action", "auth.parceiro_legado_desativado")
+                .addKeyValue("user_id", userId)
+                .log("Parceiro semeado legado possui vínculos e foi desativado");
         } catch (RuntimeException e) {
-            log.error("Falha ao limpar parceiro semeado legado {}: {}", email, e.getMessage());
+            log.atError()
+                .addKeyValue("event_action", "auth.parceiro_legado_limpeza_falhou")
+                .addKeyValue("user_id", userId)
+                .setCause(e)
+                .log("Falha ao limpar parceiro semeado legado");
         }
     }
 }

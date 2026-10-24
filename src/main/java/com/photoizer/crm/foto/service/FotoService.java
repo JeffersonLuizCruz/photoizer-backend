@@ -120,6 +120,12 @@ public class FotoService {
                 fotos.add(fotoEnsaioRepository.save(foto));
             }
 
+            log.atInfo()
+                .addKeyValue("event_action", "foto.upload_concluido")
+                .addKeyValue("agendamento_id", agendamentoId)
+                .addKeyValue("quantidade", fotos.size())
+                .log("Upload de fotos concluído");
+
             return fotos;
         } catch (RuntimeException e) {
             // A transação sofrerá rollback: remove os arquivos gravados nesta
@@ -154,7 +160,11 @@ public class FotoService {
             try {
                 Files.deleteIfExists(caminho);
             } catch (IOException e) {
-                log.warn("Falha ao remover arquivo de upload abortado: {}", caminho, e);
+                log.atWarn()
+                    .addKeyValue("event_action", "foto.limpeza_arquivo_falhou")
+                    .addKeyValue("caminho", caminho.toString())
+                    .setCause(e)
+                    .log("Falha ao remover arquivo de upload abortado");
             }
         }
     }
@@ -168,6 +178,11 @@ public class FotoService {
         deletarArquivo(foto.getWatermarkedPath());
         deletarArquivo(foto.getThumbPath());
         fotoEnsaioRepository.deleteById(id);
+        log.atInfo()
+            .addKeyValue("event_action", "foto.deletada")
+            .addKeyValue("foto_id", id)
+            .addKeyValue("agendamento_id", agendamentoId)
+            .log("Foto deletada");
     }
 
     public List<FotoEnsaio> publicar(UUID agendamentoId) {
@@ -181,7 +196,13 @@ public class FotoService {
         for (var foto : fotosParaPublicar) {
             foto.setStatus(StatusFoto.PUBLICADA);
         }
-        return fotoEnsaioRepository.saveAll(fotosParaPublicar);
+        var publicadas = fotoEnsaioRepository.saveAll(fotosParaPublicar);
+        log.atInfo()
+            .addKeyValue("event_action", "foto.publicadas")
+            .addKeyValue("agendamento_id", agendamentoId)
+            .addKeyValue("quantidade", publicadas.size())
+            .log("Fotos publicadas");
+        return publicadas;
     }
 
     /**
@@ -252,7 +273,11 @@ public class FotoService {
                 Files.deleteIfExists(path);
             }
         } catch (IOException e) {
-            log.warn("Falha ao deletar arquivo: {}", caminho, e);
+            log.atWarn()
+                .addKeyValue("event_action", "foto.delecao_arquivo_falhou")
+                .addKeyValue("caminho", caminho)
+                .setCause(e)
+                .log("Falha ao deletar arquivo");
         }
     }
 }

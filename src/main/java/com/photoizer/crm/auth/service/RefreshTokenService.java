@@ -88,8 +88,10 @@ public class RefreshTokenService {
         // Reuse detection: token já consumido ou revogado → derruba a família.
         if (storedToken.isUsado() || storedToken.isRevogado()) {
             refreshTokenRepository.deleteByFamilyId(storedToken.getFamilyId());
-            log.warn("Reuso de refresh token detectado (userId={}). Família revogada.",
-                storedToken.getUserId());
+            log.atWarn()
+                .addKeyValue("event_action", "auth.refresh_token_reuso")
+                .addKeyValue("user_id", storedToken.getUserId())
+                .log("Reuso de refresh token detectado; família revogada");
             throw new BadCredentialsException("Refresh token reutilizado; sessão revogada");
         }
 
@@ -162,8 +164,11 @@ public class RefreshTokenService {
             var refreshRemovidos = refreshTokenRepository.deleteByExpiresAtBefore(agora);
             var blocklistRemovidos = tokenBlocklistRepository.deleteByExpiresAtBefore(agora);
             if (refreshRemovidos > 0 || blocklistRemovidos > 0) {
-                log.info("Expurgo de tokens: {} refresh e {} entradas de blocklist removidos",
-                    refreshRemovidos, blocklistRemovidos);
+                log.atInfo()
+                    .addKeyValue("event_action", "auth.tokens_expirados_purgados")
+                    .addKeyValue("refresh_removidos", refreshRemovidos)
+                    .addKeyValue("blocklist_removidos", blocklistRemovidos)
+                    .log("Expurgo de tokens concluído");
             }
         } finally {
             MDC.remove(LoggingKeys.CORRELATION_ID);

@@ -65,8 +65,11 @@ public class PagamentoService {
         var existente = pagamentoRepository.findByAgendamentoIdAndValorAndCompraExtraIdIsNull(
             agendamentoId, request.valor());
         if (existente.isPresent()) {
-            log.warn("Pagamento de R$ {} para agendamento {} já registrado. Ignorando duplicata.",
-                request.valor(), agendamentoId);
+            log.atWarn()
+                .addKeyValue("event_action", "financeiro.pagamento_duplicado")
+                .addKeyValue("agendamento_id", agendamentoId)
+                .addKeyValue("valor", request.valor())
+                .log("Pagamento já registrado; duplicata ignorada");
             return existente.get();
         }
         return criarPagamento(agendamentoId, request);
@@ -121,6 +124,15 @@ public class PagamentoService {
         eventPublisher.publishEvent(new PagamentoRegistradoEvent(
             agendamentoId, saved.getId(), saved.getValor(), false, null));
 
+        log.atInfo()
+            .addKeyValue("event_action", "financeiro.pagamento_registrado")
+            .addKeyValue("agendamento_id", agendamentoId)
+            .addKeyValue("pagamento_id", saved.getId())
+            .addKeyValue("valor", saved.getValor())
+            .addKeyValue("tipo_pagamento", saved.getTipoPagamento())
+            .addKeyValue("forma_pagamento", saved.getFormaPagamento())
+            .log("Pagamento registrado");
+
         return saved;
     }
 
@@ -131,7 +143,10 @@ public class PagamentoService {
     public Pagamento registrarPagamentoExtraEcommerce(UUID agendamentoId, BigDecimal valor, UUID compraExtraId) {
         var existente = pagamentoRepository.findByCompraExtraId(compraExtraId);
         if (existente.isPresent()) {
-            log.warn("Pagamento para compra extra {} já registrado. Ignorando duplicata.", compraExtraId);
+            log.atWarn()
+                .addKeyValue("event_action", "financeiro.pagamento_extra_duplicado")
+                .addKeyValue("compra_extra_id", compraExtraId)
+                .log("Pagamento da compra extra já registrado; duplicata ignorada");
             return existente.get();
         }
 
@@ -155,6 +170,14 @@ public class PagamentoService {
 
         eventPublisher.publishEvent(new PagamentoRegistradoEvent(
             agendamentoId, saved.getId(), valor, true, compraExtraId));
+
+        log.atInfo()
+            .addKeyValue("event_action", "financeiro.pagamento_extra_registrado")
+            .addKeyValue("agendamento_id", agendamentoId)
+            .addKeyValue("compra_extra_id", compraExtraId)
+            .addKeyValue("pagamento_id", saved.getId())
+            .addKeyValue("valor", valor)
+            .log("Pagamento de compra extra registrado no financeiro");
 
         return saved;
     }

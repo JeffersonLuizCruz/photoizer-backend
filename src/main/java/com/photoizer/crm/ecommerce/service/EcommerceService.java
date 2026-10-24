@@ -14,6 +14,8 @@ import com.photoizer.crm.foto.model.FotoEnsaio;
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
 import com.photoizer.crm.shared.storage.FileStorageService;
 import com.photoizer.crm.shared.storage.FileValidator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +41,8 @@ import java.util.UUID;
 @Service
 @Transactional
 public class EcommerceService {
+
+    private static final Logger log = LoggerFactory.getLogger(EcommerceService.class);
 
     private final FotoEnsaioRepository fotoEnsaioRepository;
     private final CompraExtraRepository compraExtraRepository;
@@ -93,7 +97,13 @@ public class EcommerceService {
     // ==================== Selecao de Fotos (delegado para SelecaoFotosService) ====================
 
     public List<FotoEnsaio> selecionarFotos(UUID token, List<UUID> fotoIds, boolean selecionada) {
-        return selecaoFotosService.selecionarFotos(token, fotoIds, selecionada);
+        var fotos = selecaoFotosService.selecionarFotos(token, fotoIds, selecionada);
+        log.atInfo()
+            .addKeyValue("event_action", "ecommerce.fotos_selecionadas")
+            .addKeyValue("quantidade", fotoIds.size())
+            .addKeyValue("selecionada", selecionada)
+            .log("Seleção de fotos atualizada");
+        return fotos;
     }
 
     // ==================== Checkout ====================
@@ -142,6 +152,14 @@ public class EcommerceService {
         eventPublisher.publishEvent(new CompraExtraCriadaEvent(
             agendamento.getId(), compra.getId(), valorTotal, fotos.size()));
 
+        log.atInfo()
+            .addKeyValue("event_action", "ecommerce.checkout_criado")
+            .addKeyValue("compra_id", compra.getId())
+            .addKeyValue("agendamento_id", agendamento.getId())
+            .addKeyValue("valor_total", valorTotal)
+            .addKeyValue("quantidade_fotos", fotos.size())
+            .log("Checkout de fotos extras criado");
+
         return compra;
     }
 
@@ -161,7 +179,13 @@ public class EcommerceService {
         compra.setUrlComprovante(caminho);
         compra.setStatus(StatusCompraExtra.AGUARDANDO_CONFIRMACAO);
 
-        return compraExtraRepository.save(compra);
+        compra = compraExtraRepository.save(compra);
+        log.atInfo()
+            .addKeyValue("event_action", "ecommerce.comprovante_enviado")
+            .addKeyValue("compra_id", compra.getId())
+            .addKeyValue("agendamento_id", agendamento.getId())
+            .log("Comprovante da compra extra enviado");
+        return compra;
     }
 
     public FotoEnsaio overrideSelecao(UUID agendamentoId, UUID fotoId, boolean selecionada) {
@@ -175,6 +199,13 @@ public class EcommerceService {
 
         eventPublisher.publishEvent(new TokenGaleriaRegeneradoEvent(
             agendamentoId, novoToken, expiracao));
+
+        // Nunca logar o token: é credencial de acesso à galeria.
+        log.atInfo()
+            .addKeyValue("event_action", "ecommerce.token_galeria_regerado")
+            .addKeyValue("agendamento_id", agendamentoId)
+            .addKeyValue("token_expiracao", expiracao.toString())
+            .log("Token da galeria regenerado");
 
         return novoToken;
     }

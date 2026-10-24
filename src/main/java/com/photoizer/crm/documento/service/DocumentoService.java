@@ -77,10 +77,23 @@ public class DocumentoService {
         var agendamento = agendamentoRepository.findById(agendamentoId)
             .orElseThrow(() -> new AgendamentoNaoEncontradoException(agendamentoId));
 
-        log.info("Gerando {} para agendamento {}", tipo.getValor(), agendamentoId);
+        log.atInfo()
+            .addKeyValue("event_action", "documento.geracao_iniciada")
+            .addKeyValue("tipo", tipo.getValor())
+            .addKeyValue("agendamento_id", agendamentoId)
+            .log("Gerando documento");
 
         var linhas = ((PdfContentStrategy<Agendamento>) strategy).getLinhas(agendamento);
-        return pdfWriter.gerar(strategy.getTitulo(), linhas);
+        var bytes = pdfWriter.gerar(strategy.getTitulo(), linhas);
+
+        log.atInfo()
+            .addKeyValue("event_action", "documento.gerado")
+            .addKeyValue("tipo", tipo.getValor())
+            .addKeyValue("agendamento_id", agendamentoId)
+            .addKeyValue("bytes", bytes.length)
+            .log("Documento gerado");
+
+        return bytes;
     }
 
     public byte[] gerarRecibo(UUID agendamentoId) {

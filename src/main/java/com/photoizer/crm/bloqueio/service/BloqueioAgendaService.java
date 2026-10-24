@@ -11,6 +11,8 @@ import com.photoizer.crm.shared.exception.ForbiddenException;
 import com.photoizer.crm.shared.exception.UnprocessableException;
 import com.photoizer.crm.shared.port.AgendamentoOcupacaoPort;
 import com.photoizer.crm.shared.port.UsuarioStaffPort;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +24,8 @@ import java.util.UUID;
 @Service
 @Transactional
 public class BloqueioAgendaService {
+
+    private static final Logger log = LoggerFactory.getLogger(BloqueioAgendaService.class);
 
     private static final int MAX_DIAS = 90;
 
@@ -68,7 +72,15 @@ public class BloqueioAgendaService {
             .ativo(true)
             .build();
 
-        return bloqueioRepository.save(bloqueio);
+        bloqueio = bloqueioRepository.save(bloqueio);
+        log.atInfo()
+            .addKeyValue("event_action", "bloqueio.criado")
+            .addKeyValue("bloqueio_id", bloqueio.getId())
+            .addKeyValue("profissional_id", command.profissionalId())
+            .addKeyValue("inicio", command.inicio().toString())
+            .addKeyValue("fim", command.fim().toString())
+            .log("Bloqueio de agenda criado");
+        return bloqueio;
     }
 
     public BloqueioAgenda atualizar(UUID id, BloqueioAgendaCommand command,
@@ -85,7 +97,12 @@ public class BloqueioAgendaService {
         bloqueio.setInicio(command.inicio());
         bloqueio.setFim(command.fim());
         bloqueio.setProfissionalId(command.profissionalId());
-        return bloqueioRepository.save(bloqueio);
+        bloqueio = bloqueioRepository.save(bloqueio);
+        log.atInfo()
+            .addKeyValue("event_action", "bloqueio.atualizado")
+            .addKeyValue("bloqueio_id", bloqueio.getId())
+            .log("Bloqueio de agenda atualizado");
+        return bloqueio;
     }
 
     public void cancelar(UUID id, UUID solicitanteId, boolean admin) {
@@ -93,6 +110,10 @@ public class BloqueioAgendaService {
         validarPermissao(bloqueio, solicitanteId, admin);
         bloqueio.cancelar(solicitanteId);
         bloqueioRepository.save(bloqueio);
+        log.atInfo()
+            .addKeyValue("event_action", "bloqueio.cancelado")
+            .addKeyValue("bloqueio_id", bloqueio.getId())
+            .log("Bloqueio de agenda cancelado");
     }
 
     private void validarPeriodoConsulta(LocalDateTime inicio, LocalDateTime fim) {

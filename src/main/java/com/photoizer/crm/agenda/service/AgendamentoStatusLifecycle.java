@@ -12,6 +12,8 @@ import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.shared.model.FormaPagamento;
 import com.photoizer.crm.shared.storage.FileStorageService;
 import com.photoizer.crm.shared.storage.FileValidator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +29,8 @@ import java.util.UUID;
 @Service
 @Transactional
 public class AgendamentoStatusLifecycle {
+
+    private static final Logger log = LoggerFactory.getLogger(AgendamentoStatusLifecycle.class);
 
     private final AgendamentoRepository agendamentoRepository;
     private final AgendamentoFotografoRepository agendamentoFotografoRepository;
@@ -51,6 +55,7 @@ public class AgendamentoStatusLifecycle {
 
     public Agendamento atualizarStatus(UUID id, String novoStatus) {
         var agendamento = buscarPorId(id);
+        var statusAnterior = agendamento.getStatus();
         var status = StatusAgendamento.valueOf(novoStatus);
         agendamento.transicionarPara(status);
 
@@ -74,6 +79,13 @@ public class AgendamentoStatusLifecycle {
         if (status == StatusAgendamento.CANCELADO || status == StatusAgendamento.NO_SHOW) {
             eventPublisher.publishEvent(new AgendamentoCanceladoEvent(agendamento.getId()));
         }
+
+        log.atInfo()
+            .addKeyValue("event_action", "agendamento.status_alterado")
+            .addKeyValue("agendamento_id", agendamento.getId())
+            .addKeyValue("status_anterior", statusAnterior)
+            .addKeyValue("status_novo", status)
+            .log("Status do agendamento alterado");
 
         return agendamento;
     }
@@ -104,6 +116,13 @@ public class AgendamentoStatusLifecycle {
             agendamento.getId(),
             agendamento.getCliente() != null ? agendamento.getCliente().getId() : null
         ));
+
+        log.atInfo()
+            .addKeyValue("event_action", "agendamento.reagendado")
+            .addKeyValue("agendamento_id", agendamento.getId())
+            .addKeyValue("data_hora_ensaio", agendamento.getDataHoraEnsaio().toString())
+            .addKeyValue("duracao_minutos", duracao)
+            .log("Agendamento reagendado");
 
         return agendamento;
     }
@@ -140,6 +159,14 @@ public class AgendamentoStatusLifecycle {
             clienteNome,
             fotografoIds
         ));
+
+        log.atInfo()
+            .addKeyValue("event_action", "agendamento.pagamento_final_registrado")
+            .addKeyValue("agendamento_id", agendamento.getId())
+            .addKeyValue("valor_total_final", agendamento.getValorTotalFinal())
+            .addKeyValue("forma_pagamento", formaPagamento)
+            .addKeyValue("tem_comprovante", temComprovante)
+            .log("Pagamento final registrado");
 
         return agendamento;
     }

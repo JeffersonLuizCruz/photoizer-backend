@@ -28,8 +28,13 @@ public class AgendamentoEcommerceEventListener {
     @EventListener
     @Transactional
     public void handleTokenGaleriaRegenerado(TokenGaleriaRegeneradoEvent event) {
-        log.info("Recebido TokenGaleriaRegeneradoEvent: agendamento={}, novoToken={}",
-            event.agendamentoId(), event.novoToken());
+        // NUNCA logar event.novoToken(): é credencial de acesso à galeria do cliente.
+        log.atInfo()
+            .addKeyValue("event_action", "agendamento.token_galeria_regenerado")
+            .addKeyValue("agendamento_id", event.agendamentoId())
+            .addKeyValue("token_expiracao", event.expiracao().toString())
+            .log("Token da galeria regenerado");
+
         var agendamento = agendamentoRepository.findById(event.agendamentoId());
         agendamento.ifPresent(agg -> {
             agg.setTokenGaleria(event.novoToken());

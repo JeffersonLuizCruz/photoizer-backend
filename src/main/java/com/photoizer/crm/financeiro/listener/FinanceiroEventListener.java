@@ -20,8 +20,12 @@ public class FinanceiroEventListener {
 
     @EventListener
     public void handleCompraExtraConfirmada(CompraExtraConfirmadaEvent event) {
-        log.info("Compra extras {} confirmada para agendamento {}. Contabilizando no financeiro.",
-            event.compraExtraId(), event.agendamentoId());
+        log.atInfo()
+            .addKeyValue("event_action", "financeiro.compra_extra_confirmada")
+            .addKeyValue("compra_extra_id", event.compraExtraId())
+            .addKeyValue("agendamento_id", event.agendamentoId())
+            .addKeyValue("valor_total", event.valorTotal())
+            .log("Compra extra confirmada; contabilizando no financeiro");
         pagamentoService.registrarPagamentoExtraEcommerce(
             event.agendamentoId(), event.valorTotal(), event.compraExtraId());
     }

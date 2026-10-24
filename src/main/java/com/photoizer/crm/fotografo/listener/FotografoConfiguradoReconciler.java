@@ -38,9 +38,15 @@ public class FotografoConfiguradoReconciler {
         }
         try {
             userService.upsertFotografoConfigurado(nome);
-            log.info("Reconciliação: usuário FOTOGRAFO garantido a partir da configuração: {}", nome.trim());
+            log.atInfo()
+                .addKeyValue("event_action", "fotografo.reconciliado")
+                .log("Reconciliação: usuário FOTOGRAFO garantido a partir da configuração");
         } catch (RuntimeException e) {
-            log.warn("Reconciliação: falha ao garantir usuário FOTOGRAFO a partir da configuração '{}'", nome, e);
+            // Não logar nome: PII.
+            log.atWarn()
+                .addKeyValue("event_action", "fotografo.reconciliacao_falhou")
+                .setCause(e)
+                .log("Reconciliação: falha ao garantir usuário FOTOGRAFO a partir da configuração");
         }
     }
 }

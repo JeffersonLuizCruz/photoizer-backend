@@ -46,6 +46,10 @@ import com.photoizer.crm.despesa.repository.DespesaRepository;
 import com.photoizer.crm.despesa.repository.DespesaSpecification;
 import com.photoizer.crm.shared.storage.FileStorageService;
 import com.photoizer.crm.shared.storage.FileValidator;
+import com.photoizer.crm.shared.logging.LoggingKeys;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -61,6 +65,8 @@ import java.util.UUID;
 
 @Service
 public class DespesaService {
+
+    private static final Logger log = LoggerFactory.getLogger(DespesaService.class);
 
     private final DespesaRepository despesaRepository;
     private final DespesaCategoriaRepository categoriaRepository;
@@ -247,27 +253,38 @@ public class DespesaService {
     @Scheduled(cron = "0 5 6 * * *")
     @Transactional
     public void gerarDespesasRecorrentes() {
-        var pendentes = buscarRecorrentesVencidas(LocalDate.now());
+        // Job não tem requisição HTTP: gera um correlationId próprio para rastrear a execução.
+        MDC.put(LoggingKeys.CORRELATION_ID, "job-despesas-recorrentes-" + UUID.randomUUID());
+        try {
+            var pendentes = buscarRecorrentesVencidas(LocalDate.now());
 
-        for (var origem : pendentes) {
-            var gerada = Despesa.builder()
-                .descricao(origem.getDescricao())
-                .valor(origem.getValor())
-                .categoria(origem.getCategoria())
-                .categoriaRef(origem.getCategoriaRef())
-                .data(origem.getDataProximaGeracao())
-                .formaPagamento(origem.getFormaPagamento())
-                .status(StatusDespesa.PENDENTE)
-                .recorrencia(RecorrenciaDespesa.UNICA)
-                .geradaDeId(origem.getId())
-                .agendamentoId(origem.getAgendamentoId())
-                .fotografoId(origem.getFotografoId())
-                .observacao(origem.getObservacao())
-                .build();
-            despesaRepository.save(gerada);
+            for (var origem : pendentes) {
+                var gerada = Despesa.builder()
+                    .descricao(origem.getDescricao())
+                    .valor(origem.getValor())
+                    .categoria(origem.getCategoria())
+                    .categoriaRef(origem.getCategoriaRef())
+                    .data(origem.getDataProximaGeracao())
+                    .formaPagamento(origem.getFormaPagamento())
+                    .status(StatusDespesa.PENDENTE)
+                    .recorrencia(RecorrenciaDespesa.UNICA)
+                    .geradaDeId(origem.getId())
+                    .agendamentoId(origem.getAgendamentoId())
+                    .fotografoId(origem.getFotografoId())
+                    .observacao(origem.getObservacao())
+                    .build();
+                despesaRepository.save(gerada);
 
-            origem.setDataProximaGeracao(proximaGeracao(origem.getDataProximaGeracao(), origem.getRecorrencia()));
-            despesaRepository.save(origem);
+                origem.setDataProximaGeracao(proximaGeracao(origem.getDataProximaGeracao(), origem.getRecorrencia()));
+                despesaRepository.save(origem);
+            }
+
+            log.atInfo()
+                .addKeyValue("event_action", "despesa.recorrentes_geradas")
+                .addKeyValue("quantidade", pendentes.size())
+                .log("Despesas recorrentes geradas");
+        } finally {
+            MDC.remove(LoggingKeys.CORRELATION_ID);
         }
     }
 

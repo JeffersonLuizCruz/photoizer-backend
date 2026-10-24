@@ -108,6 +108,11 @@ public class NotificacaoEventListener {
                 TipoNotificacao.ENSAIO_REATRIBUIDO
             );
         }
+
+        log.atInfo()
+            .addKeyValue("event_action", "notificacao.reatribuicao")
+            .addKeyValue("agendamento_id", event.agendamentoId())
+            .log("Notificações de reatribuição criadas");
     }
 
     /**
@@ -120,5 +125,10 @@ public class NotificacaoEventListener {
         for (UUID fotografoId : fotografoIds) {
             notificacaoService.criar(fotografoId, titulo, mensagem, link, tipo);
         }
+        log.atInfo()
+            .addKeyValue("event_action", "notificacao.criada")
+            .addKeyValue("tipo", tipo)
+            .addKeyValue("destinatarios", fotografoIds.size())
+            .log("Notificações criadas");
     }
 }

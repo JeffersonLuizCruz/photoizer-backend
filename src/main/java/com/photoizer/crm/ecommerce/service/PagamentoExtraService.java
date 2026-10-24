@@ -10,6 +10,8 @@ import com.photoizer.crm.ecommerce.model.StatusCompraExtra;
 import com.photoizer.crm.ecommerce.repository.CompraExtraRepository;
 import com.photoizer.crm.shared.exception.BadRequestException;
 import com.photoizer.crm.shared.exception.ConflictException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +32,8 @@ import java.util.UUID;
 @Service
 @Transactional
 public class PagamentoExtraService {
+
+    private static final Logger log = LoggerFactory.getLogger(PagamentoExtraService.class);
 
     private final CompraExtraRepository compraExtraRepository;
     private final GaleriaQueryService galeriaQueryService;
@@ -81,7 +85,12 @@ public class PagamentoExtraService {
         }
 
         compra.setLinkPagamentoCartao(validarLink(linkPagamentoCartao));
-        return compraExtraRepository.save(compra);
+        compra = compraExtraRepository.save(compra);
+        log.atInfo()
+            .addKeyValue("event_action", "ecommerce.link_pagamento_atualizado")
+            .addKeyValue("compra_id", compra.getId())
+            .log("Link de pagamento da compra extra atualizado");
+        return compra;
     }
 
     private String validarLink(String link) {
@@ -117,6 +126,12 @@ public class PagamentoExtraService {
 
         eventPublisher.publishEvent(new CompraExtraCanceladaEvent(
             compra.getId(), compra.getAgendamentoId()));
+
+        log.atInfo()
+            .addKeyValue("event_action", "ecommerce.compra_cancelada")
+            .addKeyValue("compra_id", compra.getId())
+            .addKeyValue("agendamento_id", compra.getAgendamentoId())
+            .log("Compra extra cancelada");
     }
 
     private void marcarCompraPaga(CompraExtra compra) {
@@ -129,5 +144,12 @@ public class PagamentoExtraService {
 
         eventPublisher.publishEvent(new CompraExtraConfirmadaEvent(
             compra.getAgendamentoId(), compra.getId(), compra.getValorTotal()));
+
+        log.atInfo()
+            .addKeyValue("event_action", "ecommerce.pagamento_confirmado")
+            .addKeyValue("compra_id", compra.getId())
+            .addKeyValue("agendamento_id", compra.getAgendamentoId())
+            .addKeyValue("valor_total", compra.getValorTotal())
+            .log("Pagamento da compra extra confirmado");
     }
 }

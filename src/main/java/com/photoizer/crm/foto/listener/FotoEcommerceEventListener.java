@@ -35,8 +35,12 @@ public class FotoEcommerceEventListener {
     @EventListener
     @Transactional
     public void handleFotosSelecionadas(FotosSelecionadasEvent event) {
-        log.info("Recebido FotosSelecionadasEvent: agendamento={}, fotos={}, selecionada={}",
-            event.agendamentoId(), event.fotoIds().size(), event.selecionada());
+        log.atInfo()
+            .addKeyValue("event_action", "foto.selecao_atualizada")
+            .addKeyValue("agendamento_id", event.agendamentoId())
+            .addKeyValue("quantidade", event.fotoIds().size())
+            .addKeyValue("selecionada", event.selecionada())
+            .log("Seleção de fotos recebida");
         var fotos = fotoEnsaioRepository.findAllById(event.fotoIds());
         for (var foto : fotos) {
             if (foto.getAgendamentoId().equals(event.agendamentoId())) {
@@ -49,8 +53,12 @@ public class FotoEcommerceEventListener {
     @EventListener
     @Transactional
     public void handleCompraExtraFotosAssociadas(CompraExtraFotosAssociadasEvent event) {
-        log.info("Recebido CompraExtraFotosAssociadasEvent: compra={}, fotos={}",
-            event.compraExtraId(), event.fotoIds().size());
+        log.atInfo()
+            .addKeyValue("event_action", "foto.compra_associada")
+            .addKeyValue("compra_id", event.compraExtraId())
+            .addKeyValue("agendamento_id", event.agendamentoId())
+            .addKeyValue("quantidade", event.fotoIds().size())
+            .log("Fotos associadas à compra extra");
         var fotos = fotoEnsaioRepository.findAllById(event.fotoIds());
         for (var foto : fotos) {
             if (foto.getAgendamentoId().equals(event.agendamentoId())) {
@@ -63,7 +71,10 @@ public class FotoEcommerceEventListener {
     @EventListener
     @Transactional
     public void handleCompraExtraCancelada(CompraExtraCanceladaEvent event) {
-        log.info("Recebido CompraExtraCanceladaEvent: compra={}", event.compraExtraId());
+        log.atInfo()
+            .addKeyValue("event_action", "foto.compra_cancelada")
+            .addKeyValue("compra_id", event.compraExtraId())
+            .log("Fotos liberadas por cancelamento da compra extra");
         var fotos = fotoEnsaioRepository.findByCompraExtraId(event.compraExtraId());
         for (var foto : fotos) {
             foto.setCompraExtraId(null);
@@ -76,7 +87,10 @@ public class FotoEcommerceEventListener {
     @EventListener
     @Transactional
     public void handleCompraExtraPaga(CompraExtraPagaEvent event) {
-        log.info("Recebido CompraExtraPagaEvent: compra={}", event.compraExtraId());
+        log.atInfo()
+            .addKeyValue("event_action", "foto.compra_paga")
+            .addKeyValue("compra_id", event.compraExtraId())
+            .log("Fotos liberadas por pagamento da compra extra");
         var fotos = fotoEnsaioRepository.findByCompraExtraId(event.compraExtraId());
         for (var foto : fotos) {
             foto.setStatus(StatusFoto.PAGA);
@@ -87,7 +101,10 @@ public class FotoEcommerceEventListener {
     @EventListener
     @Transactional
     public void handleFotoDownload(FotoDownloadEvent event) {
-        log.info("Recebido FotoDownloadEvent: fotos={}", event.fotoIds().size());
+        log.atInfo()
+            .addKeyValue("event_action", "foto.download_registrado")
+            .addKeyValue("quantidade", event.fotoIds().size())
+            .log("Download de fotos registrado");
         var fotos = fotoEnsaioRepository.findAllById(event.fotoIds());
         var now = LocalDateTime.now();
         for (var foto : fotos) {

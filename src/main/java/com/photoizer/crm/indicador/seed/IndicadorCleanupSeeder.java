@@ -65,8 +65,11 @@ public class IndicadorCleanupSeeder implements CommandLineRunner {
             for (var remover : indicadores) {
                 indicadorRepository.delete(remover);
             }
-            log.warn("Indicadores duplicados '{}' ({}): mantido ID {}, removidos {} registro(s)",
-                nome, telefone, manter.getId(), indicadores.size());
+            log.atWarn()
+                .addKeyValue("event_action", "indicador.duplicados_removidos")
+                .addKeyValue("indicador_mantido_id", manter.getId())
+                .addKeyValue("removidos", indicadores.size())
+                .log("Indicadores duplicados consolidados");
             totalRemovidos += indicadores.size();
         }
         log.info("Limpeza de indicadores duplicados concluída: {} registros removidos", totalRemovidos);

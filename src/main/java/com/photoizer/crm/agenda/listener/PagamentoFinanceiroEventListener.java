@@ -35,15 +35,23 @@ public class PagamentoFinanceiroEventListener {
     @EventListener
     @Transactional
     public void handlePagamentoRegistrado(PagamentoRegistradoEvent event) {
-        log.info("Pagamento registrado no financeiro: agendamento={}, valor={}, extraEcommerce={}",
-            event.agendamentoId(), event.valor(), event.isExtraEcommerce());
+        log.atInfo()
+            .addKeyValue("event_action", "agenda.pagamento_registrado")
+            .addKeyValue("agendamento_id", event.agendamentoId())
+            .addKeyValue("valor", event.valor())
+            .addKeyValue("extra_ecommerce", event.isExtraEcommerce())
+            .log("Pagamento registrado no financeiro");
 
         var agendamento = agendamentoRepository.findByIdWithLock(event.agendamentoId())
             .orElseThrow(() -> new AgendamentoNaoEncontradoException(event.agendamentoId()));
 
         if (agendamento.getStatus() == StatusAgendamento.CANCELADO
             || agendamento.getStatus() == StatusAgendamento.NO_SHOW) {
-            log.warn("Pagamento ignorado: agendamento {} esta {}", agendamento.getId(), agendamento.getStatus());
+            log.atWarn()
+                .addKeyValue("event_action", "agenda.pagamento_ignorado")
+                .addKeyValue("agendamento_id", agendamento.getId())
+                .addKeyValue("status", agendamento.getStatus())
+                .log("Pagamento ignorado para agendamento cancelado/no-show");
             return;
         }
 
@@ -54,30 +62,46 @@ public class PagamentoFinanceiroEventListener {
         }
         agendamentoRepository.save(agendamento);
 
-        log.info("Agendamento {} atualizado: valorEntradaPago={}, valorRestante={}, status={}",
-            agendamento.getId(), agendamento.getValorEntradaPago(),
-            agendamento.getValorRestante(), agendamento.getStatus());
+        log.atInfo()
+            .addKeyValue("event_action", "agenda.valores_atualizados")
+            .addKeyValue("agendamento_id", agendamento.getId())
+            .addKeyValue("valor_entrada_pago", agendamento.getValorEntradaPago())
+            .addKeyValue("valor_restante", agendamento.getValorRestante())
+            .addKeyValue("status", agendamento.getStatus())
+            .log("Valores do agendamento atualizados");
     }
 
     @EventListener
     @Transactional
     public void handleExtrasAdicionados(ExtrasAdicionadosEvent event) {
-        log.info("Extras adicionados no financeiro: agendamento={}, tipo={}, valorTotal={}",
-            event.agendamentoId(), event.tipo(), event.valorTotal());
+        log.atInfo()
+            .addKeyValue("event_action", "agenda.extras_adicionados")
+            .addKeyValue("agendamento_id", event.agendamentoId())
+            .addKeyValue("tipo", event.tipo())
+            .addKeyValue("valor_total", event.valorTotal())
+            .log("Extras adicionados no financeiro");
 
         var agendamento = agendamentoRepository.findByIdWithLock(event.agendamentoId())
             .orElseThrow(() -> new AgendamentoNaoEncontradoException(event.agendamentoId()));
 
         if (agendamento.getStatus() == StatusAgendamento.CANCELADO
             || agendamento.getStatus() == StatusAgendamento.NO_SHOW) {
-            log.warn("Ignorando extras para agendamento {} com status {}", agendamento.getId(), agendamento.getStatus());
+            log.atWarn()
+                .addKeyValue("event_action", "agenda.extras_ignorados")
+                .addKeyValue("agendamento_id", agendamento.getId())
+                .addKeyValue("status", agendamento.getStatus())
+                .log("Extras ignorados para agendamento cancelado/no-show");
             return;
         }
 
         agendamento.adicionarExtras(event.valorTotal());
         agendamentoRepository.save(agendamento);
 
-        log.info("Agendamento {} atualizado: valorExtras={}, valorTotalFinal={}",
-            agendamento.getId(), agendamento.getValorExtras(), agendamento.getValorTotalFinal());
+        log.atInfo()
+            .addKeyValue("event_action", "agenda.extras_contabilizados")
+            .addKeyValue("agendamento_id", agendamento.getId())
+            .addKeyValue("valor_extras", agendamento.getValorExtras())
+            .addKeyValue("valor_total_final", agendamento.getValorTotalFinal())
+            .log("Extras contabilizados no agendamento");
     }
 }

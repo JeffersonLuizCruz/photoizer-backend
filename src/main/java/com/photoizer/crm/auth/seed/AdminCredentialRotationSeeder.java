@@ -101,11 +101,11 @@ public class AdminCredentialRotationSeeder implements CommandLineRunner {
 
             if (senhaValida(adminPassword)) {
                 rotacionar(user, adminPassword);
-                log.info("Senha do ADMIN '{}' rotacionada a partir de ADMIN_PASSWORD", email);
+                log.info("Senha do ADMIN padrão rotacionada a partir de ADMIN_PASSWORD");
             } else if (required) {
-                throw new IllegalStateException(mensagemAdminPadrao(email));
+                throw new IllegalStateException(mensagemAdminPadrao());
             } else {
-                log.error("{} Boot prossegue (app.bootstrap.admin.required=false).", mensagemAdminPadrao(email));
+                log.error("{} Boot prossegue (app.bootstrap.admin.required=false).", mensagemAdminPadrao());
             }
         }
     }
@@ -122,13 +122,12 @@ public class AdminCredentialRotationSeeder implements CommandLineRunner {
 
         if (senhaValida(agendadorPassword)) {
             rotacionar(user, agendadorPassword);
-            log.info("Senha do AGENDADOR '{}' rotacionada a partir de AGENDADOR_PASSWORD",
-                DEFAULT_AGENDADOR_EMAIL);
+            log.info("Senha do AGENDADOR padrão rotacionada a partir de AGENDADOR_PASSWORD");
         } else {
             user.setAtivo(false);
             userRepository.save(user);
-            log.warn("AGENDADOR '{}' ainda usava a senha padrão de desenvolvimento e "
-                + "AGENDADOR_PASSWORD não foi definido; conta DESATIVADA.", DEFAULT_AGENDADOR_EMAIL);
+            log.warn("AGENDADOR ainda usava a senha padrão de desenvolvimento e "
+                + "AGENDADOR_PASSWORD não foi definido; conta DESATIVADA.");
         }
     }
 
@@ -141,8 +140,8 @@ public class AdminCredentialRotationSeeder implements CommandLineRunner {
         return senha != null && senha.length() >= MIN_PASSWORD_LENGTH;
     }
 
-    private String mensagemAdminPadrao(String email) {
-        return "O usuário ADMIN '" + email + "' ainda usa a senha padrão de desenvolvimento "
+    private String mensagemAdminPadrao() {
+        return "O usuário ADMIN padrão ainda usa a senha de desenvolvimento "
             + "e ADMIN_PASSWORD não foi definido (mínimo " + MIN_PASSWORD_LENGTH
             + " caracteres). Defina ADMIN_PASSWORD para rotacionar antes de subir em homolog/prod.";
     }

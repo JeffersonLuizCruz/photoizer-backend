@@ -11,6 +11,8 @@ import com.photoizer.crm.cliente.model.Cliente;
 import com.photoizer.crm.cliente.model.OrigemCliente;
 import com.photoizer.crm.cliente.repository.ClienteRepository;
 import com.photoizer.crm.shared.auth.TokenService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -29,6 +31,8 @@ import java.util.UUID;
 @Service
 @Transactional
 public class ClienteAuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(ClienteAuthService.class);
 
     /**
      * Mensagem uniforme para cadastro duplicado (achado H3): não revela se o
@@ -78,6 +82,10 @@ public class ClienteAuthService {
         }
 
         var token = tokenService.generateToken(cliente.getId(), cliente.getEmail(), "CLIENTE");
+        log.atInfo()
+            .addKeyValue("event_action", "cliente.registrado")
+            .addKeyValue("cliente_id", cliente.getId())
+            .log("Cliente registrado");
         return new ClienteAuthResponse(token, cliente.getId(), cliente.getNome(),
             cliente.getEmail(), cliente.getTelefone());
     }
@@ -95,6 +103,10 @@ public class ClienteAuthService {
         }
 
         var token = tokenService.generateToken(cliente.getId(), cliente.getEmail(), "CLIENTE");
+        log.atInfo()
+            .addKeyValue("event_action", "cliente.login")
+            .addKeyValue("cliente_id", cliente.getId())
+            .log("Login de cliente realizado");
         return new ClienteAuthResponse(token, cliente.getId(), cliente.getNome(),
             cliente.getEmail(), cliente.getTelefone());
     }
@@ -108,6 +120,11 @@ public class ClienteAuthService {
             .orElseThrow(() -> new ClienteNaoEncontradoException(clienteId));
 
         clienteMapper.updatePerfil(cliente, request);
-        return clienteRepository.save(cliente);
+        cliente = clienteRepository.save(cliente);
+        log.atInfo()
+            .addKeyValue("event_action", "cliente.perfil_atualizado")
+            .addKeyValue("cliente_id", cliente.getId())
+            .log("Perfil do cliente atualizado");
+        return cliente;
     }
 }

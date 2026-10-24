@@ -41,11 +41,18 @@ public class FotoProcessingHelper {
                 .toString();
         } catch (IllegalArgumentException e) {
             // Arquivo não decodificável: o chamador converte em 422 com o nome da foto.
-            log.error("Imagem inválida para a foto {}: {}", fotoId, e.getMessage());
+            log.atWarn()
+                .addKeyValue("event_action", "foto.imagem_invalida")
+                .addKeyValue("foto_id", fotoId)
+                .setCause(e)
+                .log("Imagem inválida recebida no upload");
             throw e;
         } catch (Exception e) {
-            log.error("Erro ao gerar marca d'água para foto {}: {} (upload abortado para não expor original)",
-                fotoId, e.getMessage());
+            log.atError()
+                .addKeyValue("event_action", "foto.marca_dagua_falhou")
+                .addKeyValue("foto_id", fotoId)
+                .setCause(e)
+                .log("Erro ao gerar marca d'água; upload abortado para não expor original");
             throw new IllegalStateException(
                 "Falha ao gerar marca d'água; upload abortado para não expor a imagem original", e);
         }
@@ -55,8 +62,11 @@ public class FotoProcessingHelper {
         try {
             return imageProcessingService.gerarThumbnail(original, targetDir).toString();
         } catch (Exception e) {
-            log.warn("Erro ao gerar thumbnail para foto {}: {} (usando fallback)",
-                fotoId, e.getMessage());
+            log.atWarn()
+                .addKeyValue("event_action", "foto.thumbnail_falhou")
+                .addKeyValue("foto_id", fotoId)
+                .setCause(e)
+                .log("Erro ao gerar thumbnail; usando fallback");
             return fallback;
         }
     }
