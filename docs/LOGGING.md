@@ -1,7 +1,10 @@
 # Logging e Observabilidade — CRM Photoizer (backend)
 
-> Documento operacional e de convenção. Este arquivo é ignorado pelo `.gitignore`
-> (`*.md`), mas deve existir no ambiente local/servidor para consulta da equipe.
+> Documento operacional e de convenção. Foi versionado com `git add -f` apesar
+> da regra `*.md` do `.gitignore`.
+>
+> Runbook de diagnóstico: [`DEBUGGING.md`](./DEBUGGING.md) — como usar
+> `correlationId`, `userId` e `traceId` para resolver bugs.
 
 ## 1. Visão geral
 
