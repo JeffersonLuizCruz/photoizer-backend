@@ -16,8 +16,11 @@ import java.util.UUID;
  * Publica o usuário autenticado no MDC.
  *
  * <p>Precisa rodar <strong>depois</strong> do JwtAuthenticationFilter (ver
- * {@code SecurityConfig}), pois é ele quem popula o SecurityContext. Só publica
- * o UUID interno — nunca e-mail, CPF ou username, que são PII.
+ * {@code SecurityConfig}), pois é ele quem popula o SecurityContext. O principal
+ * do JWT é o UUID em formato String (o {@code JwtAuthenticationFilter} mantém
+ * String para compatibilidade com os controllers que usam
+ * {@code @AuthenticationPrincipal String}). Só publicamos UUID válido — nunca
+ * e-mail, CPF ou username.
  *
  * <p>Não limpa o MDC: o {@link CorrelationIdFilter} limpa ao final da requisição,
  * pois o access log ({@link RequestLoggingFilter}) ainda precisa do userId.
@@ -31,8 +34,11 @@ public class UserMdcFilter extends OncePerRequestFilter {
                                     FilterChain chain) throws ServletException, IOException {
 
         var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.isAuthenticated() && auth.getPrincipal() instanceof UUID userId) {
-            MDC.put(LoggingKeys.USER_ID, userId.toString());
+        if (auth != null && auth.isAuthenticated()) {
+            var userId = uuidOuNull(auth.getPrincipal());
+            if (userId != null) {
+                MDC.put(LoggingKeys.USER_ID, userId);
+            }
 
             var roles = auth.getAuthorities().stream()
                 .map(a -> a.getAuthority())
@@ -46,5 +52,24 @@ public class UserMdcFilter extends OncePerRequestFilter {
 
         chain.doFilter(request, response);
         // NÃO remover aqui — ver Javadoc.
+    }
+
+    /**
+     * Aceita tanto {@link UUID} (testes/futuro) quanto a String com o subject do
+     * JWT (formato real). Qualquer outro principal (username, e-mail) é ignorado
+     * para não vazar PII no MDC.
+     */
+    private static String uuidOuNull(Object principal) {
+        if (principal instanceof UUID uuid) {
+            return uuid.toString();
+        }
+        if (principal instanceof String value) {
+            try {
+                return UUID.fromString(value).toString();
+            } catch (IllegalArgumentException ignored) {
+                return null;
+            }
+        }
+        return null;
     }
 }

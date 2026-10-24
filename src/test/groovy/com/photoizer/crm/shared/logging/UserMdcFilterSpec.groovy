@@ -18,12 +18,12 @@ class UserMdcFilterSpec extends Specification {
         MDC.clear()
     }
 
-    def "publica userId e userRole quando o principal é o UUID do JWT"() {
+    def "publica userId quando o principal é o UUID em String do JWT"() {
         given:
         def userId = UUID.randomUUID()
         SecurityContextHolder.getContext().setAuthentication(
             new UsernamePasswordAuthenticationToken(
-                userId, null, [new SimpleGrantedAuthority("ROLE_ADMIN")]))
+                userId.toString(), null, [new SimpleGrantedAuthority("ROLE_ADMIN")]))
         def request = new MockHttpServletRequest("GET", "/api/v1/agenda")
 
         when:
@@ -32,6 +32,20 @@ class UserMdcFilterSpec extends Specification {
         then:
         MDC.get(LoggingKeys.USER_ID) == userId.toString()
         MDC.get(LoggingKeys.USER_ROLE) == "ROLE_ADMIN"
+    }
+
+    def "aceita principal UUID (testes/futuro)"() {
+        given:
+        def userId = UUID.randomUUID()
+        SecurityContextHolder.getContext().setAuthentication(
+            new UsernamePasswordAuthenticationToken(userId, null, []))
+
+        when:
+        filter.doFilter(new MockHttpServletRequest("GET", "/api/v1/agenda"),
+            new MockHttpServletResponse(), new MockFilterChain())
+
+        then:
+        MDC.get(LoggingKeys.USER_ID) == userId.toString()
     }
 
     def "não publica username/e-mail de principal legado"() {

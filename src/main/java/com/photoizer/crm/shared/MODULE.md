@@ -101,10 +101,11 @@ Todos: `AuditInfo` (25 entidades), `FileStorageService` (agenda, edicao, ecommer
 
 ### Observabilidade (MDC)
 - `CorrelationIdFilter` gera/reutiliza `X-Correlation-ID` (sanitizado, até 64 chars) e limpa o MDC ao final.
-- `UserMdcFilter` publica `userId`/`userRole` (apenas UUID interno; nunca e-mail/CPF).
+- `UserMdcFilter` publica `userId`/`userRole` (apenas UUID interno; o subject String do JWT é convertido para UUID; nunca e-mail/CPF).
 - `RequestLoggingFilter` emite uma linha por request com `http_method`, `http_path`, `http_status`, `duration_ms`.
 - JSON em homolog/prod (`LogstashEncoder`) com `service`, `env`, `version`, MDC e KV pairs.
 - PII: `SensitiveDataMask` no código + `MaskingJsonGeneratorDecorator` no Logback.
+- Tracing (Spring Boot 4): exige `spring-boot-micrometer-tracing-brave`; o bridge `micrometer-tracing-bridge-brave` sozinho não cria `Tracer` nem `traceId`/`spanId` no MDC.
 
 ### PdfWriter
 - Facade: geração de PDF via OpenPDF.
