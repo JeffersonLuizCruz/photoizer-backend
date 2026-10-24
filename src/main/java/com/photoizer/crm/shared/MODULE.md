@@ -26,11 +26,16 @@ shared/
 │   ├── GoneException.java            # 410
 │   ├── UnauthorizedException.java    # 401
 │   ├── ForbiddenException.java       # 403
-│   ├── ErrorResponse.java            # Record: status, error, message, code, timestamp(UTC), fieldErrors
-│   └── GlobalExceptionHandler.java   # @RestControllerAdvice: 7 handlers de hierarquia + genéricos Spring
+│   ├── ErrorResponse.java            # Record: status, error, message, code, timestamp(UTC), correlationId, fieldErrors
+│   ├── GlobalExceptionHandler.java   # @RestControllerAdvice: hierarquia BusinessException + Spring; 4xx WARN / 5xx ERROR
+│   └── SecurityErrorHandler.java     # 401/403 (Security/CSRF) no contrato ErrorResponse, com correlationId
 ├── logging/
-│   ├── LoggingAspect.java            # @Around em controllers (INFO), services (DEBUG), repositories (TRACE)
-│   └── SensitiveDataMask.java        # Mascara CPF, telefone, email em logs
+│   ├── CorrelationIdFilter.java      # X-Correlation-ID -> MDC + response header (HIGHEST_PRECEDENCE)
+│   ├── UserMdcFilter.java            # userId/userRole no MDC após o JwtAuthenticationFilter
+│   ├── RequestLoggingFilter.java     # Access log HTTP: método, path, status e latência (1 linha/request)
+│   ├── LoggingKeys.java              # Constantes canônicas do MDC
+│   ├── LoggingAspect.java            # @Around em services (DEBUG, args mascarados) e repositories (TRACE)
+│   └── SensitiveDataMask.java        # Mascara CPF/CNPJ, telefone, e-mail, cartão, JWT e chaves sensíveis
 ├── model/
 │   ├── AuditInfo.java                # @Embeddable: createdAt, updatedAt, createdBy (composição > herança)
 │   ├── AuditInfoListener.java        # JPA EntityListener: @PrePersist/@PreUpdate + createdBy via SecurityContext
@@ -90,7 +95,16 @@ Todos: `AuditInfo` (25 entidades), `FileStorageService` (agenda, edicao, ecommer
 - Sanitização de filename e validação de path traversal.
 
 ### LoggingAspect
-- AOP: controllers (INFO), services (DEBUG), repositories (TRACE).
+- AOP: services (DEBUG, args mascarados + duração) e repositories (TRACE).
+- O log HTTP não usa AOP: `RequestLoggingFilter` enxerga o status final (inclusive 401/403/429).
+- Não loga ERROR: stack trace é responsabilidade do `GlobalExceptionHandler` (evita duplicidade).
+
+### Observabilidade (MDC)
+- `CorrelationIdFilter` gera/reutiliza `X-Correlation-ID` (sanitizado, até 64 chars) e limpa o MDC ao final.
+- `UserMdcFilter` publica `userId`/`userRole` (apenas UUID interno; nunca e-mail/CPF).
+- `RequestLoggingFilter` emite uma linha por request com `http_method`, `http_path`, `http_status`, `duration_ms`.
+- JSON em homolog/prod (`LogstashEncoder`) com `service`, `env`, `version`, MDC e KV pairs.
+- PII: `SensitiveDataMask` no código + `MaskingJsonGeneratorDecorator` no Logback.
 
 ### PdfWriter
 - Facade: geração de PDF via OpenPDF.
@@ -109,8 +123,9 @@ Todos: `AuditInfo` (25 entidades), `FileStorageService` (agenda, edicao, ecommer
 ### 7.1 `CorsConfig` duplicação de beans — **P3**
 - Dois beans com a mesma configuração. Origens hardcoded.
 
-### 7.2 `SensitiveDataMask` — mascaramento pós-truncamento — **P3**
-- Strings > 500 chars truncadas antes de mascarar.
+### 7.2 `SensitiveDataMask` — **resolvido**
+- Mascara antes de truncar, cobre records/DTOs, JWT/Bearer, chaves JSON e cartão.
+- Limitação conhecida: nomes/endereços completos não são detectáveis por regex.
 
 ## 8. Exemplos de arquivos afetados nesta refatoração
 - `GlobalExceptionHandler.java` — 509→~130 linhas, zero imports de domínio

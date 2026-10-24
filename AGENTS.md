@@ -26,8 +26,8 @@
     - `config/` — CorsConfig, DataSeeder, LoggingConfig, OpenApiConfig.
     - `config/openapi/` — `OpenApiTags` (catálogo de tags), `GlobalOpenApiCustomizer`
       (segurança + respostas de erro padrão) e `OpenApiTagsCustomizer` (ordem/tags).
-    - `exception/` — `ErrorResponse` (record), `GlobalExceptionHandler` (`@RestControllerAdvice`).
-    - `logging/` — `LoggingAspect`, `SensitiveDataMask` (mascara CPF, telefone, email em logs).
+    - `exception/` — `ErrorResponse` (record, inclui `correlationId`), `GlobalExceptionHandler` (`@RestControllerAdvice`), `SecurityErrorHandler` (401/403 no mesmo contrato).
+    - `logging/` — `CorrelationIdFilter` (MDC + `X-Correlation-ID`), `UserMdcFilter` (`userId`/`userRole`), `RequestLoggingFilter` (access log HTTP), `LoggingKeys`, `LoggingAspect` (services em DEBUG, repositories em TRACE) e `SensitiveDataMask` (CPF/CNPJ, telefone, e-mail, cartão, JWT e chaves sensíveis). Documentação: `docs/LOGGING.md` (ignorado pelo `.gitignore`, mantido localmente).
     - `storage/` — `FileStorageService` interface + `LocalFileStorageService` (salva em `uploads/`).
     - `api/PageResponse` — record genérico para respostas paginadas.
   - `{modulo}/` — 16 módulos de negócio (ver seção 3).
@@ -82,7 +82,7 @@ Cada módulo segue a estrutura: `model/`, `repository/`, `service/`, `api/`, DTO
   - Salvos via `LocalFileStorageService` sob `app.storage.upload-dir` (env `UPLOAD_DIR`); o caminho gravado no banco é **relativo** e resolvido por `StoragePathResolver`.
   - Servidos via `FileServeHelper` (valida path traversal).
   - Imagens passam por watermark + thumbnail via Thumbnailator.
-- **Logging:** AOP intercepta controllers (método + duração), services (args mascarados + resultado), repositories (trace). Dados sensíveis mascarados via `SensitiveDataMask`.
+- **Logging/Observabilidade:** `CorrelationIdFilter` gera/reutiliza `X-Correlation-ID` (sanitizado) e o publica no MDC; `UserMdcFilter` adiciona `userId`/`userRole` (UUID interno, nunca PII) após o JWT; `RequestLoggingFilter` emite **uma linha por request** com método, path, status e latência (cobre 401/403/429). O `LoggingAspect` loga services em DEBUG (args mascarados) e repositories em TRACE — 4xx são WARN sem stack e 5xx são ERROR com stack **somente** no `GlobalExceptionHandler`. Em homolog/prod o log é JSON (`LogstashEncoder`) com `service`/`env`/`version`; em dev é console colorido. PII é mascarada por `SensitiveDataMask` + `MaskingJsonGeneratorDecorator`. O header `X-Correlation-ID` volta em toda resposta (e no body de erro, campo `correlationId`).
 - **DataSeeder:** `CommandLineRunner` que popula 5 usuários e 6 configurações se vazio.
 - **Nomenclatura:**
   - Classes: PascalCase (`AgendamentoService`).
