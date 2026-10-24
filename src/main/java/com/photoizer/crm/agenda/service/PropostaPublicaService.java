@@ -31,7 +31,6 @@ import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,6 +56,7 @@ public class PropostaPublicaService {
     private final FileStorageService fileStorageService;
     private final FileValidator fileValidator;
     private final PdfWriter pdfWriter;
+    private final TermoPdfComposer termoPdfComposer;
     private final ConfiguracaoService configuracaoService;
     private final PropostaTemplateService templateService;
     private final ObjectMapper objectMapper;
@@ -69,6 +69,7 @@ public class PropostaPublicaService {
                                   FileStorageService fileStorageService,
                                   FileValidator fileValidator,
                                   PdfWriter pdfWriter,
+                                  TermoPdfComposer termoPdfComposer,
                                   ConfiguracaoService configuracaoService,
                                   PropostaTemplateService templateService,
                                   ObjectMapper objectMapper,
@@ -80,6 +81,7 @@ public class PropostaPublicaService {
         this.fileStorageService = fileStorageService;
         this.fileValidator = fileValidator;
         this.pdfWriter = pdfWriter;
+        this.termoPdfComposer = termoPdfComposer;
         this.configuracaoService = configuracaoService;
         this.templateService = templateService;
         this.objectMapper = objectMapper;
@@ -185,8 +187,16 @@ public class PropostaPublicaService {
             urlComprovante, urlAssinaturaImagem);
         var hash = HashUtils.sha256(snapshotJson);
 
-        var urlPdf = gravarPdf(agendamento.getId(), montarTexto(agendamento, nome, telefone, email, cpf,
-            cidade, estado, autorizaUsoImagem, assinanteNome, dataAssinatura, ip, hash, urlAssinaturaImagem));
+        var placeholders = montarPlaceholders(agendamento, nome, telefone, email, cpf,
+            cidade, estado, "true".equalsIgnoreCase(autorizaUsoImagem));
+        var template = templateService.carregarTemplate();
+        var texto = (template == null || template.isBlank())
+            ? "Termo sem template definido."
+            : templateService.renderizarTexto(template, placeholders);
+        var documento = termoPdfComposer.compor(agendamento, placeholders, texto,
+            new TermoPdfComposer.DadosAssinatura(assinanteNome, dataAssinatura, ip, hash));
+
+        var urlPdf = gravarPdf(agendamento.getId(), documento);
 
         assinaturaRepository.findByAgendamentoId(agendamento.getId())
             .ifPresent(assinaturaRepository::delete);
@@ -315,7 +325,7 @@ public class PropostaPublicaService {
             ? "serviço conforme pacote contratado."
             : neutralizarMarcacaoBloco(pacote.getDescricao());
 
-        var autorizaTexto = autoriza ? "(X) AUTORIZO\n( ) NÃO AUTORIZO" : "( ) AUTORIZO\n( ) NÃO AUTORIZO";
+        var autorizaTexto = autoriza ? "(X) AUTORIZO\n( ) NÃO AUTORIZO" : "( ) AUTORIZO\n(X) NÃO AUTORIZO";
 
         var blocoProfissionais = agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(a.getId()).stream()
             .filter(cf -> cf.getStatus() != RepasseStatus.CANCELADO)
@@ -414,35 +424,16 @@ public class PropostaPublicaService {
         }
     }
 
-    private String gravarPdf(UUID agendamentoId, List<String> linhas) {
+    private String gravarPdf(UUID agendamentoId, com.photoizer.crm.shared.pdf.PdfDocument documento) {
         try {
             var dir = fileStorageService.getUploadDir().resolve("propostas");
             Files.createDirectories(dir);
             var destino = dir.resolve(agendamentoId + ".pdf");
-            Files.write(destino, pdfWriter.gerar("PRESTAÇÃO DE SERVIÇOS FOTOGRÁFICOS", linhas));
+            Files.write(destino, pdfWriter.gerar(documento));
             return pathResolver.relativo(destino);
         } catch (IOException e) {
             throw new IllegalStateException("Erro ao gerar PDF da proposta", e);
         }
-    }
-
-    private List<String> montarTexto(Agendamento a, String nome, String telefone, String email,
-                                     String cpf, String cidade, String estado, String autoriza,
-                                     String assinante, LocalDateTime dataAssinatura, String ip,
-                                     String hash, String urlAssinaturaImagem) {
-        var template = templateService.carregarTemplate();
-        if (template == null || template.isBlank()) {
-            return List.of("Termo sem template definido.");
-        }
-        var vals = montarPlaceholders(a, nome, telefone, email, cpf, cidade, estado,
-            "true".equalsIgnoreCase(autoriza));
-        var texto = templateService.renderizarTexto(template, vals);
-        var linhas = new ArrayList<>(List.of(texto.split("\n", -1)));
-        linhas.add("");
-        linhas.add("Aceite registrado em " + dataAssinatura.format(FMT_DATA_HORA)
-            + " (IP " + segurar(ip) + ")");
-        linhas.add("Hash do documento: " + hash);
-        return linhas;
     }
 
     /**
@@ -481,10 +472,6 @@ public class PropostaPublicaService {
     private String money(java.math.BigDecimal valor) {
         return valor == null ? "0,00" : valor.setScale(2, java.math.RoundingMode.HALF_UP)
             .toPlainString().replace(".", ",");
-    }
-
-    private String segurar(String valor) {
-        return valor == null || valor.isBlank() ? "-" : valor;
     }
 
     private void validarCamposCliente(String nome, String telefone, String cpf, String autorizaUsoImagem) {

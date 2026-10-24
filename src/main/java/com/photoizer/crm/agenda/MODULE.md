@@ -9,6 +9,8 @@
 > 4. **Segurança da decisão**: `confirmar-pagamento`, `aprovar` e `recusar` exigem `@RolesAllowed({"ADMIN","FOTOGRAFO"})` e o comprovante de entrada é servido pelo `documento` module (`/api/v1/documentos/comprovantes/{id}/entrada`, também ADMIN/FOTOGRAFO). A recusa grava `motivoRecusa`, `recusadoPor` (autor) e `dataRecusa`. O `AgendamentoResponse` expõe apenas flags (`temComprovanteEntrada`, `temComprovanteFinal`, `temTermoAssinado`), nunca os paths do filesystem.
 >
 > A assinatura fica em `agenda/model/Assinatura` (FK `agendamentoId`) com IP, user-agent, plataforma e fuso. A geração do PDF/snapshot imutável está em `PropostaPublicaService`. O template do termo é um valor de config, gerenciado em `config/api/PropostaTemplateController`.
+>
+> **Layout do PDF**: `TermoPdfComposer` monta o `PdfDocument` (capa com marca/status, fatos do ensaio, cartões cliente/ensaio/pacote/valores, PIX, cláusulas, assinaturas e caixa de autenticação) e `shared/pdf/PdfRenderer` desenha. O texto das cláusulas continua vindo do template; o parser reconhece `= Título =`, `# Seção`, `- item` e `Rótulo: valor`, e as linhas "Assinatura do contratante/Contratada" são substituídas pelo bloco visual de assinatura.
 
 ## 1. Responsabilidade
 Gerencia o ciclo de vida completo de ensaios fotográficos (agendamentos), repasses de fotógrafos e o fluxo de proposta/pré-reserva com assinatura digital. É o módulo central — coordena clientes, pacotes, financeiro, edição e comissões através de **Application Events**. (O submódulo `Tarefa` foi removido do código atual.)

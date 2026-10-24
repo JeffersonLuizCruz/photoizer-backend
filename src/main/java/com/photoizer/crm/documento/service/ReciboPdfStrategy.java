@@ -4,6 +4,7 @@ import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.documento.model.TipoDocumento;
 import org.springframework.stereotype.Component;
 
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
@@ -17,6 +18,9 @@ import java.util.List;
  */
 @Component
 public class ReciboPdfStrategy implements PdfContentStrategy<Agendamento> {
+
+    private static final DateTimeFormatter FMT_DATA_HORA =
+        DateTimeFormatter.ofPattern("dd/MM/yyyy 'às' HH:mm");
 
     @Override
     public TipoDocumento getTipo() {
@@ -43,7 +47,7 @@ public class ReciboPdfStrategy implements PdfContentStrategy<Agendamento> {
             "",
             "Cliente: " + cliente.getNome(),
             "Pacote: " + pacote.getNome(),
-            "Data do ensaio: " + agendamento.getDataHoraEnsaio(),
+            "Data do ensaio: " + agendamento.getDataHoraEnsaio().format(FMT_DATA_HORA),
             "",
             "Valor total: R$ " + PdfContentHelper.formatarValor(agendamento.getValorTotal()),
             "Valor pago (entrada): R$ " + PdfContentHelper.formatarValor(agendamento.getValorEntradaPago()),

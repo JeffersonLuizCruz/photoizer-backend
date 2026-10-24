@@ -9,6 +9,7 @@ import com.photoizer.crm.agenda.repository.AgendamentoRepository
 import com.photoizer.crm.agenda.repository.AssinaturaRepository
 import com.photoizer.crm.config.service.ConfiguracaoService
 import com.photoizer.crm.shared.exception.BadRequestException
+import com.photoizer.crm.shared.pdf.PdfDocument
 import com.photoizer.crm.shared.pdf.PdfWriter
 import com.photoizer.crm.shared.storage.FileStorageService
 import com.photoizer.crm.shared.storage.FileValidator
@@ -39,6 +40,7 @@ class PropostaPublicaServiceSpec extends Specification {
     def fileStorageService = Mock(FileStorageService)
     def fileValidator = Mock(FileValidator)
     def pdfWriter = Mock(PdfWriter)
+    def termoPdfComposer = new TermoPdfComposer()
     def configuracaoService = Mock(ConfiguracaoService)
     def templateService = Mock(PropostaTemplateService)
     def objectMapper = Mock(ObjectMapper)
@@ -53,6 +55,7 @@ class PropostaPublicaServiceSpec extends Specification {
         fileStorageService,
         fileValidator,
         pdfWriter,
+        termoPdfComposer,
         configuracaoService,
         templateService,
         objectMapper,
@@ -76,6 +79,8 @@ class PropostaPublicaServiceSpec extends Specification {
             status: StatusAgendamento.PRE_RESERVA,
             tokenPropostaExpiracao: LocalDateTime.now().minusDays(1))
         agendamentoRepository.findByTokenPropostaHash(HashUtils.sha256(token)) >> Optional.of(proposta)
+        agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(proposta.id) >> []
+        templateService.buildPlaceholders(*_) >> [:]
 
         when: "o link público é consultado"
         service.status(token)
@@ -91,6 +96,8 @@ class PropostaPublicaServiceSpec extends Specification {
             status: StatusAgendamento.CONFIRMADO,
             tokenPropostaExpiracao: LocalDateTime.now().plusDays(1))
         agendamentoRepository.findByTokenPropostaHash(HashUtils.sha256(token)) >> Optional.of(proposta)
+        agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(proposta.id) >> []
+        templateService.buildPlaceholders(*_) >> [:]
 
         when: "o cliente tenta assinar"
         service.assinar(token, "Maria", "11999999999", "m@x.com", "12345678901",
@@ -106,6 +113,8 @@ class PropostaPublicaServiceSpec extends Specification {
         def token = "token-campos"
         def proposta = propostaValida(token)
         agendamentoRepository.findByTokenPropostaHash(HashUtils.sha256(token)) >> Optional.of(proposta)
+        agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(proposta.id) >> []
+        templateService.buildPlaceholders(*_) >> [:]
 
         when: "a assinatura recebe dados incompletos"
         service.assinar(token, nome, telefone, "m@x.com", cpf, "São Paulo", "SP", autoriza,
@@ -133,11 +142,13 @@ class PropostaPublicaServiceSpec extends Specification {
         comprovante.getContentType() >> "application/pdf"
 
         agendamentoRepository.findByTokenPropostaHash(HashUtils.sha256(token)) >> Optional.of(proposta)
+        agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(proposta.id) >> []
+        templateService.buildPlaceholders(*_) >> [:]
         agendamentoService.resolverCliente(_, _, _, _, _, _) >> cliente
         fileStorageService.salvarEmSubdiretorio(comprovante, proposta.id, "comprovante_entrada") >>
             "uploads/comprovante.pdf"
         fileStorageService.getUploadDir() >> tempDir
-        pdfWriter.gerar(_, _) >> "pdf".bytes
+        pdfWriter.gerar(_ as PdfDocument) >> "pdf".bytes
         pathResolver.relativo(_) >> "propostas/${proposta.id}.pdf"
         objectMapper.writeValueAsString(_) >> "{}"
         assinaturaRepository.findByAgendamentoId(proposta.id) >> Optional.empty()
@@ -178,9 +189,11 @@ class PropostaPublicaServiceSpec extends Specification {
         def cliente = cliente()
 
         agendamentoRepository.findByTokenPropostaHash(HashUtils.sha256(token)) >> Optional.of(proposta)
+        agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(proposta.id) >> []
+        templateService.buildPlaceholders(*_) >> [:]
         agendamentoService.resolverCliente(_, _, _, _, _, _) >> cliente
         fileStorageService.getUploadDir() >> tempDir
-        pdfWriter.gerar(_, _) >> "pdf".bytes
+        pdfWriter.gerar(_ as PdfDocument) >> "pdf".bytes
         pathResolver.relativo(_) >> "propostas/${proposta.id}.pdf"
         objectMapper.writeValueAsString(_) >> "{}"
         assinaturaRepository.findByAgendamentoId(proposta.id) >> Optional.empty()
@@ -219,6 +232,9 @@ class PropostaPublicaServiceSpec extends Specification {
 
         agendamentoRepository.findByTokenPropostaHash(HashUtils.sha256(token)) >> Optional.of(proposta)
         agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(proposta.id) >> []
+        templateService.buildPlaceholders(*_) >> [:]
+        agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(proposta.id) >> []
+        templateService.buildPlaceholders(*_) >> [:]
         templateService.carregarTemplate() >> null
 
         when: "o link público é consultado"
@@ -243,9 +259,11 @@ class PropostaPublicaServiceSpec extends Specification {
         def cliente = cliente()
 
         agendamentoRepository.findByTokenPropostaHash(HashUtils.sha256(token)) >> Optional.of(proposta)
+        agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(proposta.id) >> []
+        templateService.buildPlaceholders(*_) >> [:]
         agendamentoService.resolverCliente(_, _, _, _, _, _) >> cliente
         fileStorageService.getUploadDir() >> tempDir
-        pdfWriter.gerar(_, _) >> "pdf".bytes
+        pdfWriter.gerar(_ as PdfDocument) >> "pdf".bytes
         pathResolver.relativo(_) >> "propostas/${proposta.id}.pdf"
         objectMapper.writeValueAsString(_) >> "{}"
         assinaturaRepository.findByAgendamentoId(proposta.id) >> Optional.empty()

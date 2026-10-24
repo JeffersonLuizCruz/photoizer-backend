@@ -1,69 +1,54 @@
 package com.photoizer.crm.shared.pdf;
 
-import com.lowagie.text.Document;
-import com.lowagie.text.Font;
-import com.lowagie.text.PageSize;
-import com.lowagie.text.Paragraph;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import java.io.ByteArrayOutputStream;
 import java.util.List;
 
 /**
- * PATTERN: Facade Pattern
+ * PATTERN: Facade
  *
- * Motivo: Centraliza a geração de PDF em um único serviço compartilhado.
- * A implementação atual usa OpenPDF (biblioteca leve e robusta) para gerar
- * PDFs com suporte completo a UTF-8, acentuação e layout flexível.
+ * Ponto unico de geracao de PDF do sistema. Esconde do dominio o motor de
+ * layout ({@link PdfRenderer}) e a conversao de texto em blocos
+ * ({@link PdfMarkupParser}).
  *
- * Antes: Geração manual de bytes PDF 1.4 com encoding WinAnsi limitado (490+ linhas).
- * Agora: Delega para OpenPDF, que lida com complexidade de formato PDF,
- * encoding Unicode, fontes e layout (~50 linhas).
- *
- * Todos os módulos que precisam gerar PDF (documento, contrato) delegam
- * para esta classe, escondendo a complexidade de geração de PDF.
- *
- * Evolução:
- * - v1: Implementação manual (frágil, sem suporte a acentos)
- * - v2: OpenPDF (código limpo, robusto, extensível)
+ * <p>Dois pontos de entrada:
+ * <ul>
+ *   <li>{@link #gerar(PdfDocument)} — documentos com layout completo
+ *       (termo de prestacao de servicos);</li>
+ *   <li>{@link #gerar(String, List)} — adapter retrocompativel para conteudo
+ *       textual simples (recibo), que tambem recebe o tema visual.</li>
+ * </ul>
  */
 @Component
 public class PdfWriter {
 
     private static final Logger log = LoggerFactory.getLogger(PdfWriter.class);
 
+    private final PdfRenderer renderer = new PdfRenderer();
+
     /**
-     * Gera um PDF com o título e linhas fornecidos.
-     *
-     * @param titulo título do documento (aparece em negrito no topo)
-     * @param linhas conteúdo do documento (uma linha por item da lista)
-     * @return array de bytes do PDF gerado
+     * Gera um PDF simples a partir de um titulo e linhas de texto.
+     * Mantido para consumidores que ainda trabalham com conteudo textual
+     * (ex.: recibo). As linhas passam pelo parser de marcacao, ganhando
+     * hierarquia, listas e pares rotulo/valor automaticamente.
      */
     public byte[] gerar(String titulo, List<String> linhas) {
-        try (var baos = new ByteArrayOutputStream()) {
-            var document = new Document(PageSize.A4, 50, 50, 50, 50);
-            var writer = com.lowagie.text.pdf.PdfWriter.getInstance(document, baos);
+        var texto = linhas == null ? "" : String.join("\n", linhas);
+        return gerar(PdfDocument.simple(titulo, PdfMarkupParser.parse(texto)));
+    }
 
-            document.open();
-
-            var fontTitulo = new Font(Font.HELVETICA, 14, Font.BOLD);
-            document.add(new Paragraph(titulo, fontTitulo));
-            document.add(new Paragraph(""));
-
-            var fontConteudo = new Font(Font.HELVETICA, 10);
-            for (String linha : linhas) {
-                document.add(new Paragraph(linha != null ? linha : "", fontConteudo));
-            }
-
-            document.close();
-            writer.close();
-
-            return baos.toByteArray();
-        } catch (Exception e) {
-            log.error("Erro ao gerar PDF: {}", e.getMessage(), e);
-            throw new RuntimeException("Erro ao gerar PDF", e);
+    /**
+     * Gera um PDF a partir de um documento ja estruturado em blocos.
+     */
+    public byte[] gerar(PdfDocument documento) {
+        try {
+            return renderer.render(documento);
+        } catch (RuntimeException e) {
+            log.error("Erro ao gerar PDF '{}': {}", documento != null ? documento.title() : null,
+                e.getMessage(), e);
+            throw e;
         }
     }
 }

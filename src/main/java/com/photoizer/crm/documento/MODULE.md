@@ -1,6 +1,8 @@
 # Modulo: Documento
 
 > **ATUALIZAÇÃO**: o termo de prestação de serviços assinado passou a ser gerado pelo módulo `agenda` (fluxo de proposta pública, ver `agenda/MODULE.md`). O módulo `documento` agora gera apenas **recibos** e serve **comprovantes**; `ContratoPdfStrategy`, `DocumentoEventListener`, `ContratoGeradoEvent` e o endpoint `GET /documentos/contratos/{id}` foram removidos. O `TipoDocumento` agora possui apenas `RECIBO`.
+>
+> **PDF (layout)**: recibos e termo usam o motor compartilhado `shared/pdf` — `PdfRenderer` (capa, blocos, cabeçalho/rodapé e paginação), `PdfTheme` (paleta/tipografia com fonte serifada embutida) e `PdfMarkupParser` (marcação do template). `PdfWriter.gerar(titulo, linhas)` permanece como adapter e aplica o mesmo tema.
 
 ## 1. Responsabilidade
 Geracao de **recibos em PDF** para agendamentos e servico de **comprovantes de pagamento** (entrada/final).
@@ -96,9 +98,9 @@ Nenhum teste especifico. Apenas `CrmApplicationTests` (smoke de contexto).
 
 ## 8. Dividas Remanescentes
 
-### 8.1 PDF nativo sem biblioteca — **P1** (pendente)
-- `PdfWriter` gera bytes PDF via OpenPDF (herdado do modulo `contrato`). Frágil, sem suporte a layout complexo.
-- **Solucao futura**: migrar para PDFBox/Flying Saucer (templates HTML).
+### 8.1 PDF nativo sem biblioteca — ✅ resolvido
+- O `PdfWriter` deixou de ser um despejo de parágrafos: delega para `shared/pdf/PdfRenderer` (OpenPDF), com tema centralizado, capa, cartões, rodapé paginado e fonte serifada embutida.
+- Testes: `PdfWriterSpec`, `PdfMarkupParserSpec`, `TermoPdfComposerSpec`.
 
 ### 8.2 Duplicacao de comprovante com modulo contrato — **P2** (pendente)
 - `downloadComprovante` pode duplicar logica do `ContratoController`.
