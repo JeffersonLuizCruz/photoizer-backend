@@ -39,6 +39,10 @@ public class FotoProcessingHelper {
         try {
             return imageProcessingService.aplicarMarcaDagua(original, targetDir, TEXTO_MARCA_DAGUA, OPACIDADE_MARCA)
                 .toString();
+        } catch (IllegalArgumentException e) {
+            // Arquivo não decodificável: o chamador converte em 422 com o nome da foto.
+            log.error("Imagem inválida para a foto {}: {}", fotoId, e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("Erro ao gerar marca d'água para foto {}: {} (upload abortado para não expor original)",
                 fotoId, e.getMessage());

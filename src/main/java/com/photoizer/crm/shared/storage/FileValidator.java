@@ -47,7 +47,8 @@ public class FileValidator {
 
     /** Limite de tamanho por contexto (defense-in-depth além do multipart global). */
     private static final Map<String, Long> MAX_SIZE_BY_CONTEXT = Map.of(
-        "image",   25 * MB,
+        // Fotos de ensaio em alta resolução chegam a ~50MB.
+        "image",   100 * MB,
         "raw",     60 * MB,
         "edited",  60 * MB,
         "receipt", 10 * MB,
@@ -68,20 +69,23 @@ public class FileValidator {
             throw new IllegalArgumentException("Contexto de upload inválido: " + context);
         }
 
+        var nomeArquivo = nomeParaMensagem(file.getOriginalFilename());
+
         var maxSize = MAX_SIZE_BY_CONTEXT.get(context);
         if (maxSize != null && file.getSize() > maxSize) {
             throw new IllegalArgumentException(
-                "Arquivo excede o limite de " + (maxSize / MB) + "MB para " + context);
+                "Arquivo '" + nomeArquivo + "' excede o limite de " + (maxSize / MB) + "MB para " + context);
         }
 
         var ext = extractExtension(file.getOriginalFilename());
         if (ext.isEmpty()) {
-            throw new IllegalArgumentException("Arquivo deve ter uma extensão");
+            throw new IllegalArgumentException("Arquivo '" + nomeArquivo + "' deve ter uma extensão");
         }
 
         if (!allowed.contains(ext.get().toLowerCase())) {
             throw new IllegalArgumentException(
-                "Tipo de arquivo não permitido: " + ext.get() + ". Permitidos para " + context + ": " + allowed);
+                "Tipo de arquivo não permitido para '" + nomeArquivo + "': " + ext.get()
+                    + ". Permitidos para " + context + ": " + allowed);
         }
 
         // Defense-in-depth: confere assinatura binária real (magic bytes),
@@ -142,6 +146,10 @@ public class FileValidator {
         if (!resolvedPath.startsWith(baseDir)) {
             throw new SecurityException("Tentativa de path traversal detectada: " + resolvedPath);
         }
+    }
+
+    private String nomeParaMensagem(String filename) {
+        return filename == null || filename.isBlank() ? "arquivo" : filename;
     }
 
     private java.util.Optional<String> extractExtension(String filename) {

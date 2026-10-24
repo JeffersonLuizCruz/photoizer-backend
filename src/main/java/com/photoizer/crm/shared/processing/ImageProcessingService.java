@@ -36,6 +36,10 @@ public class ImageProcessingService {
         var target = targetDir.resolve("wm_" + source.getFileName().toString());
 
         var original = ImageIO.read(source.toFile());
+        if (original == null) {
+            throw new IllegalArgumentException(
+                "Não foi possível decodificar a imagem: " + source.getFileName());
+        }
 
         int width = original.getWidth();
         int height = original.getHeight();

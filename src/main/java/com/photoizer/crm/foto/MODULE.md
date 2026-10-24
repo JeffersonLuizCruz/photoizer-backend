@@ -72,8 +72,11 @@ Nenhum.
 ### Fluxo 1: Upload de Fotos (Admin)
 `POST /api/v1/agendamentos/{agendamentoId}/fotos` → `FotoService.uploadFotos()`:
 1. Valida status via `AgendamentoReadService.isStatusPermitidoParaUpload()` (ACL): permitido apenas **após o pagamento final** (`EM_EDICAO`, `FINALIZADO`).
-2. Para cada arquivo: salva em `uploads/{agendamentoId}/orig/`, processa via `FotoProcessingHelper` (watermark 0.35 + thumbnail 300×200) com fallback.
+2. Para cada arquivo: valida o formato (`ImageIO.getImageReaders` → 422 com o nome do arquivo se ilegível), salva em `uploads/{agendamentoId}/orig/`, processa via `FotoProcessingHelper` (watermark 0.35 + thumbnail 300×200) com fallback.
 3. Cria `FotoEnsaio` `INEDITA`, `visivel=true`, `ordem = count + i`.
+4. Se a requisição falhar, a transação sofre rollback e **os arquivos gravados nesta chamada são removidos** (sem órfãos no volume).
+
+> O frontend envia as fotos em **lotes de ~50MB/5 arquivos**; cada requisição é atômica (um arquivo inválido derruba só aquele lote). Limites: 100MB/arquivo e 200MB/request.
 
 ### Fluxo 2: Publicação e Ordenação
 - `PATCH /publicar` → `publicar()`: valida status pago (`isStatusPermitidoParaPublicacao`) e muda todas as fotos `INEDITA` para `PUBLICADA` (publicação **manual** via botão "Publicar Galeria").

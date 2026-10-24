@@ -75,6 +75,7 @@ public enum ErrorCode {
     FOTO_ENSAIO_NAO_ENCONTRADA,
     FOTO_NAO_PERTENCE_AO_AGENDAMENTO,
     STATUS_FOTO_INVALIDO,
+    ARQUIVO_DE_IMAGEM_INVALIDO,
 
     // ─── Financeiro ────────────────────────────────────────────
     AGENDAMENTO_NAO_ENCONTRADO_PARA_FINANCEIRO,

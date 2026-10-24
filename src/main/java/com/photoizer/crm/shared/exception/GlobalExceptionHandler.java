@@ -120,7 +120,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ErrorResponse> handleMaxUploadSize(MaxUploadSizeExceededException e) {
         log.warn("Upload excedeu tamanho maximo: {}", e.getMessage());
-        return build(HttpStatus.PAYLOAD_TOO_LARGE, "Arquivo excede o tamanho máximo permitido de 10MB");
+        return build(HttpStatus.PAYLOAD_TOO_LARGE,
+            "O envio excedeu o limite de tamanho permitido. Envie menos fotos por vez.");
     }
 
     @ExceptionHandler(BadCredentialsException.class)

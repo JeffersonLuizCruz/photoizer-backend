@@ -1,6 +1,7 @@
 package com.photoizer.crm.foto.service;
 
 import com.photoizer.crm.foto.exception.AgendamentoNaoPermitidoParaUploadException;
+import com.photoizer.crm.foto.exception.ArquivoDeImagemInvalidoException;
 import com.photoizer.crm.foto.exception.FotoEnsaioNaoEncontradaException;
 import com.photoizer.crm.foto.exception.FotoNaoPertenceAoAgendamentoException;
 import com.photoizer.crm.foto.model.FotoEnsaio;
@@ -14,6 +15,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+
+import javax.imageio.ImageIO;
+import javax.imageio.stream.ImageInputStream;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -71,39 +75,88 @@ public class FotoService {
         }
 
         var fotos = new ArrayList<FotoEnsaio>();
+        var arquivosGravados = new ArrayList<Path>();
         var count = fotoEnsaioRepository.findMaxOrdemByAgendamentoId(agendamentoId) + 1;
 
-        for (int i = 0; i < arquivos.size(); i++) {
-            var arquivo = arquivos.get(i);
+        try {
+            for (int i = 0; i < arquivos.size(); i++) {
+                var arquivo = arquivos.get(i);
 
-            fileValidator.validate(arquivo, "image");
-            var originalPath = fileStorageService.salvarEmSubdiretorio(arquivo, agendamentoId, "orig");
-            var original = pathResolver.resolver(originalPath);
-            var targetDir = original.getParent();
+                fileValidator.validate(arquivo, "image");
 
-            var processada = fotoProcessingHelper.processar(original, targetDir, UUID.randomUUID());
+                var originalPath = fileStorageService.salvarEmSubdiretorio(arquivo, agendamentoId, "orig");
+                var original = pathResolver.resolver(originalPath);
+                arquivosGravados.add(original);
+                validarImagemLegivel(original, arquivo.getOriginalFilename());
+                var targetDir = original.getParent();
 
-            var fileName = arquivo.getOriginalFilename();
-            if (fileName == null || fileName.isBlank()) {
-                fileName = "foto_" + UUID.randomUUID() + ".jpg";
+                FotoProcessingHelper.ProcessedImages processada;
+                try {
+                    processada = fotoProcessingHelper.processar(original, targetDir, UUID.randomUUID());
+                } catch (IllegalArgumentException e) {
+                    // Arquivo com cabeçalho de imagem mas conteúdo corrompido.
+                    throw new ArquivoDeImagemInvalidoException(arquivo.getOriginalFilename(), e);
+                }
+                arquivosGravados.add(Path.of(processada.watermarkedPath()));
+                arquivosGravados.add(Path.of(processada.thumbPath()));
+
+                var fileName = arquivo.getOriginalFilename();
+                if (fileName == null || fileName.isBlank()) {
+                    fileName = "foto_" + UUID.randomUUID() + ".jpg";
+                }
+
+                var foto = FotoEnsaio.builder()
+                    .agendamentoId(agendamentoId)
+                    .fileName(fileName)
+                    .originalPath(originalPath)
+                    .watermarkedPath(pathResolver.relativo(Path.of(processada.watermarkedPath())))
+                    .thumbPath(pathResolver.relativo(Path.of(processada.thumbPath())))
+                    .ordem(count + i)
+                    .status(StatusFoto.INEDITA)
+                    .selecionadaPacote(false)
+                    .visivel(true)
+                    .build();
+
+                fotos.add(fotoEnsaioRepository.save(foto));
             }
 
-            var foto = FotoEnsaio.builder()
-                .agendamentoId(agendamentoId)
-                .fileName(fileName)
-                .originalPath(originalPath)
-                .watermarkedPath(pathResolver.relativo(Path.of(processada.watermarkedPath())))
-                .thumbPath(pathResolver.relativo(Path.of(processada.thumbPath())))
-                .ordem(count + i)
-                .status(StatusFoto.INEDITA)
-                .selecionadaPacote(false)
-                .visivel(true)
-                .build();
-
-            fotos.add(fotoEnsaioRepository.save(foto));
+            return fotos;
+        } catch (RuntimeException e) {
+            // A transação sofrerá rollback: remove os arquivos gravados nesta
+            // requisição para não acumular órfãos no volume de uploads.
+            limparArquivos(arquivosGravados);
+            throw e;
         }
+    }
 
-        return fotos;
+    /**
+     * Confere que o arquivo salvo é uma imagem em um formato que o ImageIO
+     * consegue decodificar. Evita que um arquivo renomeado/corrompido derrube
+     * o lote inteiro com um erro genérico — a mensagem inclui o nome original.
+     *
+     * <p>Valida o arquivo já salvo para não exigir uma segunda cópia do
+     * conteúdo em memória/temporário (uma foto pode ter ~50MB).
+     */
+    private void validarImagemLegivel(Path arquivoSalvo, String nomeOriginal) {
+        try (ImageInputStream imageInputStream = ImageIO.createImageInputStream(arquivoSalvo.toFile())) {
+            var readers = imageInputStream == null ? null : ImageIO.getImageReaders(imageInputStream);
+            if (readers == null || !readers.hasNext()) {
+                throw new ArquivoDeImagemInvalidoException(nomeOriginal);
+            }
+            readers.next().dispose();
+        } catch (IOException e) {
+            throw new ArquivoDeImagemInvalidoException(nomeOriginal, e);
+        }
+    }
+
+    private void limparArquivos(List<Path> caminhos) {
+        for (var caminho : caminhos) {
+            try {
+                Files.deleteIfExists(caminho);
+            } catch (IOException e) {
+                log.warn("Falha ao remover arquivo de upload abortado: {}", caminho, e);
+            }
+        }
     }
 
     public void deletar(UUID agendamentoId, UUID id) {

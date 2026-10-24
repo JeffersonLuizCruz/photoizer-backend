@@ -78,7 +78,7 @@ Cada módulo segue a estrutura: `model/`, `repository/`, `service/`, `api/`, DTO
   - Papéis: ADMIN, FOTOGRAFO, EDITOR, AGENDADOR (configurados via requestMatchers).
   - Senhas: BCryptPasswordEncoder.
 - **Upload de Arquivos:**
-  - Máx: 50MB/arquivo, 200MB/request.
+  - Máx: 100MB/arquivo, 200MB/request (o frontend envia fotos em lotes de ~50MB).
   - Salvos via `LocalFileStorageService` sob `app.storage.upload-dir` (env `UPLOAD_DIR`); o caminho gravado no banco é **relativo** e resolvido por `StoragePathResolver`.
   - Servidos via `FileServeHelper` (valida path traversal).
   - Imagens passam por watermark + thumbnail via Thumbnailator.
