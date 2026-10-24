@@ -9035,7 +9035,7 @@
           "schema" : {
             "type" : "integer",
             "format" : "int32",
-            "default" : 0
+            "default" : 1
           }
         }, {
           "name" : "size",
@@ -9053,7 +9053,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "type" : "object"
+                  "$ref" : "#/components/schemas/PageResponse"
                 }
               }
             }
@@ -12116,7 +12116,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "type" : "object"
+                  "$ref" : "#/components/schemas/PageResponse"
                 }
               }
             }

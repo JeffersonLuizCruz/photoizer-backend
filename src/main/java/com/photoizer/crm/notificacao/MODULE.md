@@ -126,7 +126,7 @@ Nenhum teste específico. Apenas `CrmApplicationTests` (smoke de contexto).
 - `NotificacaoEventListener.java` — `@Transactional` em cada `@EventListener` para atomicidade.
 - `NotificacaoRepository.java` — queries bulk: `marcarTodasComoLidas` (`@Modifying`), `deleteByUserId`.
 - `NotificacaoService.java` — `marcarTodasComoLidas` e `limpar` usam queries bulk; `listar` suporta `Pageable`.
-- `NotificacaoController.java` — `listar` aceita `page`/`size` params; retorna `Page<NotificacaoResponse>`.
+- `NotificacaoController.java` — `listar` aceita `page`/`size` (página 1-based); retorna `PageResponse<NotificacaoResponse>`.
 - `NotificacaoResponse.java` — `userId` removido (redundante com JWT).
 
 ### Refatoração P3 (padrões + limpeza)

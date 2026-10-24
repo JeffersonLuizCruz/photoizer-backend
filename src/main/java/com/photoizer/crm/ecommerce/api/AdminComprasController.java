@@ -2,6 +2,7 @@ package com.photoizer.crm.ecommerce.api;
 
 import com.photoizer.crm.ecommerce.service.CompraQueryService;
 import com.photoizer.crm.ecommerce.service.PagamentoExtraService;
+import com.photoizer.crm.shared.api.PageResponse;
 import com.photoizer.crm.shared.storage.FileServeHelper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -44,15 +45,16 @@ public class AdminComprasController {
 
     @GetMapping
     @Operation(summary = "Listar compras (paginado, filtrável por status e período)")
-    public ResponseEntity<?> listar(
+    public ResponseEntity<PageResponse<CompraExtraResponse>> listar(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dataInicio,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dataFim,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int perPage) {
-        var compras = compraQueryService.listarComprasPaginado(status, dataInicio, dataFim, page, perPage);
+        var safePage = Math.max(page, 1);
+        var compras = compraQueryService.listarComprasPaginado(status, dataInicio, dataFim, safePage, perPage);
         var response = compras.map(ecommerceMapper::toAdminResponse);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(PageResponse.from(response, safePage));
     }
 
     @GetMapping("/{id}/comprovante")

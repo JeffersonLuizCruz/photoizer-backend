@@ -1,6 +1,7 @@
 package com.photoizer.crm.notificacao.api;
 
 import com.photoizer.crm.notificacao.service.NotificacaoService;
+import com.photoizer.crm.shared.api.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.data.domain.PageRequest;
@@ -45,16 +46,17 @@ public class NotificacaoController {
 
     @GetMapping
     @Operation(summary = "Listar notificações do usuário autenticado (paginado)")
-    public ResponseEntity<?> listar(
+    public ResponseEntity<PageResponse<NotificacaoResponse>> listar(
             @AuthenticationPrincipal String userIdStr,
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "50") int size) {
         var userId = UUID.fromString(userIdStr);
         var safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
-        var pageable = PageRequest.of(page, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
+        var safePage = Math.max(page, 1);
+        var pageable = PageRequest.of(safePage - 1, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
         var notificacoes = notificacaoService.listar(userId, pageable)
             .map(notificacaoMapper::toResponse);
-        return ResponseEntity.ok(notificacoes);
+        return ResponseEntity.ok(PageResponse.from(notificacoes, safePage));
     }
 
     @GetMapping("/nao-lidas")
