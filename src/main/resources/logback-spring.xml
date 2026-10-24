@@ -5,8 +5,10 @@
     <property name="CONSOLE_TEXT_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %highlight(%-5level) %logger{36} [%X{traceId}] - %msg%n"/>
 
     <!-- Perfil de Usuário (default) + Desenvolvimento: console texto, DEBUG -->
-    <!-- Ativo quando NENHUM dos perfis homolog/prod estiver ativo -->
-    <springProfile name="!homolog, !prod">
+    <!-- Ativo somente quando NENHUM dos perfis homolog/prod estiver ativo.
+         Expressão com AND: a vírgula (OR) tornava a condição sempre verdadeira,
+         duplicando o log (texto + JSON) em produção. -->
+    <springProfile name="!homolog &amp; !prod">
         <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
             <encoder>
                 <pattern>${CONSOLE_TEXT_PATTERN}</pattern>
