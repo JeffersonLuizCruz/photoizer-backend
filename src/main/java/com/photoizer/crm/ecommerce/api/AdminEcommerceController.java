@@ -57,6 +57,9 @@ public class AdminEcommerceController {
     @GetMapping
     @Operation(summary = "Resumo completo do ecommerce do agendamento")
     public ResponseEntity<AdminEcommerceResumoResponse> resumo(@PathVariable UUID agendamentoId) {
+        var agendamento = galeriaQueryService.buscarAgendamentoPorId(agendamentoId);
+        var tokenGaleria = agendamento.getTokenGaleria();
+        var linkGaleria = tokenGaleria != null ? "/g/" + tokenGaleria : null;
         var fotos = galeriaQueryService.listarFotosPorAgendamento(agendamentoId);
         var compras = compraQueryService.listarComprasPorAgendamento(agendamentoId);
 
@@ -80,8 +83,8 @@ public class AdminEcommerceController {
         return ResponseEntity.ok(new AdminEcommerceResumoResponse(
             totalFotos, publicadas, selecionadas, pagas, aguardando,
             fotosResponse, comprasResponse, valorTotalExtras,
-            favoritosPorFoto, favoritosPorFoto.size(), null,
-            null
+            favoritosPorFoto, favoritosPorFoto.size(), linkGaleria,
+            tokenGaleria
         ));
     }
 
