@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -16,6 +17,8 @@ public interface FavoritoRepository extends JpaRepository<Favorito, UUID> {
     Optional<Favorito> findBySessionIdAndFotoId(UUID sessionId, UUID fotoId);
 
     void deleteBySessionIdAndFotoId(UUID sessionId, UUID fotoId);
+
+    void deleteByFotoIdIn(Collection<UUID> fotoIds);
 
     /** Contagem de curtidas por foto (sessões distintas) em um agendamento. */
     @Query("SELECT f.fotoId, COUNT(DISTINCT f.sessionId) FROM Favorito f " +

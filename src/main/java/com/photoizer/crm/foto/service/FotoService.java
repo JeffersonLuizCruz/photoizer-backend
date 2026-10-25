@@ -1,9 +1,11 @@
 package com.photoizer.crm.foto.service;
 
+import com.photoizer.crm.foto.event.FotosRemovidasEvent;
 import com.photoizer.crm.foto.exception.AgendamentoNaoPermitidoParaUploadException;
 import com.photoizer.crm.foto.exception.ArquivoDeImagemInvalidoException;
 import com.photoizer.crm.foto.exception.FotoEnsaioNaoEncontradaException;
 import com.photoizer.crm.foto.exception.FotoNaoPertenceAoAgendamentoException;
+import com.photoizer.crm.foto.exception.FotoVinculadaACompraException;
 import com.photoizer.crm.foto.model.FotoEnsaio;
 import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
@@ -12,6 +14,7 @@ import com.photoizer.crm.shared.storage.FileValidator;
 import com.photoizer.crm.shared.storage.StoragePathResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -23,8 +26,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -38,19 +43,22 @@ public class FotoService {
     private final com.photoizer.crm.foto.acl.AgendamentoReadService agendamentoReadService;
     private final FileValidator fileValidator;
     private final StoragePathResolver pathResolver;
+    private final ApplicationEventPublisher eventPublisher;
 
     public FotoService(FotoEnsaioRepository fotoEnsaioRepository,
                        FileStorageService fileStorageService,
                        FotoProcessingHelper fotoProcessingHelper,
                        com.photoizer.crm.foto.acl.AgendamentoReadService agendamentoReadService,
                        FileValidator fileValidator,
-                       StoragePathResolver pathResolver) {
+                       StoragePathResolver pathResolver,
+                       ApplicationEventPublisher eventPublisher) {
         this.fotoEnsaioRepository = fotoEnsaioRepository;
         this.fileStorageService = fileStorageService;
         this.fotoProcessingHelper = fotoProcessingHelper;
         this.agendamentoReadService = agendamentoReadService;
         this.fileValidator = fileValidator;
         this.pathResolver = pathResolver;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -170,19 +178,64 @@ public class FotoService {
     }
 
     public void deletar(UUID agendamentoId, UUID id) {
-        var foto = buscarPorId(id);
-        if (!foto.getAgendamentoId().equals(agendamentoId)) {
-            throw new FotoNaoPertenceAoAgendamentoException(id, agendamentoId);
+        deletarEmLote(agendamentoId, List.of(id));
+    }
+
+    /**
+     * Remove várias fotos de um agendamento de forma atômica: valida todas
+     * antes de apagar qualquer arquivo ou registro. Fotos vinculadas a uma
+     * compra (pendente ou paga) ou já incluídas no pacote são protegidas.
+     *
+     * @return quantidade de fotos removidas
+     */
+    public int deletarEmLote(UUID agendamentoId, List<UUID> fotoIds) {
+        var ids = new LinkedHashSet<>(fotoIds);
+        var fotos = fotoEnsaioRepository.findAllById(ids);
+
+        if (fotos.size() != ids.size()) {
+            var encontrados = fotos.stream().map(FotoEnsaio::getId).collect(Collectors.toSet());
+            var ausente = ids.stream()
+                .filter(id -> !encontrados.contains(id))
+                .findFirst()
+                .orElseThrow();
+            throw new FotoEnsaioNaoEncontradaException(ausente);
         }
-        deletarArquivo(foto.getOriginalPath());
-        deletarArquivo(foto.getWatermarkedPath());
-        deletarArquivo(foto.getThumbPath());
-        fotoEnsaioRepository.deleteById(id);
+
+        for (var foto : fotos) {
+            if (!foto.getAgendamentoId().equals(agendamentoId)) {
+                throw new FotoNaoPertenceAoAgendamentoException(foto.getId(), agendamentoId);
+            }
+        }
+
+        var protegidas = fotos.stream().filter(this::estaVinculadaACompra).count();
+        if (protegidas > 0) {
+            throw new FotoVinculadaACompraException((int) protegidas);
+        }
+
+        for (var foto : fotos) {
+            deletarArquivo(foto.getOriginalPath());
+            deletarArquivo(foto.getWatermarkedPath());
+            deletarArquivo(foto.getThumbPath());
+        }
+        fotoEnsaioRepository.deleteAll(fotos);
+
+        eventPublisher.publishEvent(new FotosRemovidasEvent(agendamentoId, List.copyOf(ids)));
+
         log.atInfo()
-            .addKeyValue("event_action", "foto.deletada")
-            .addKeyValue("foto_id", id)
+            .addKeyValue("event_action", "foto.deletadas_em_lote")
             .addKeyValue("agendamento_id", agendamentoId)
-            .log("Foto deletada");
+            .addKeyValue("quantidade", fotos.size())
+            .log("Fotos deletadas em lote");
+
+        return fotos.size();
+    }
+
+    private boolean estaVinculadaACompra(FotoEnsaio foto) {
+        return foto.getCompraExtraId() != null
+            || foto.isSelecionadaPacote()
+            || foto.getStatus() == StatusFoto.PAGA
+            || foto.getStatus() == StatusFoto.AGUARDANDO_COMPROVANTE
+            || foto.getStatus() == StatusFoto.AGUARDANDO_CONFIRMACAO;
     }
 
     public List<FotoEnsaio> publicar(UUID agendamentoId) {

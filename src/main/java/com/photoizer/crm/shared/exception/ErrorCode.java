@@ -74,6 +74,7 @@ public enum ErrorCode {
     // ─── Foto ──────────────────────────────────────────────────
     FOTO_ENSAIO_NAO_ENCONTRADA,
     FOTO_NAO_PERTENCE_AO_AGENDAMENTO,
+    FOTO_VINCULADA_A_COMPRA,
     STATUS_FOTO_INVALIDO,
     ARQUIVO_DE_IMAGEM_INVALIDO,
 

@@ -4,9 +4,16 @@ import com.photoizer.crm.foto.exception.FotoNaoPertenceAoAgendamentoException;
 import com.photoizer.crm.foto.model.FotoEnsaio;
 import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.service.FotoService;
+import com.photoizer.crm.shared.exception.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.security.RolesAllowed;
+import jakarta.validation.Valid;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -19,6 +26,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -119,12 +127,37 @@ public class FotoController {
     }
 
     @DeleteMapping("/{fotoId}")
-    @Operation(summary = "Remover foto")
+    @Operation(operationId = "removerFoto", summary = "Remover foto")
     public ResponseEntity<Void> deletar(
-            @PathVariable UUID agendamentoId,
-            @PathVariable UUID fotoId) {
+            @Parameter(description = "ID do agendamento") @PathVariable UUID agendamentoId,
+            @Parameter(description = "ID da foto") @PathVariable UUID fotoId) {
         fotoService.deletar(agendamentoId, fotoId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/remover-lote")
+    @Operation(
+        operationId = "removerFotosEmLote",
+        summary = "Remover fotos em lote",
+        description = "Remove permanentemente várias fotos do agendamento. A operação é atômica: "
+            + "se alguma foto não existir, não pertencer ao agendamento ou estiver vinculada a "
+            + "uma compra/pacote, nenhuma foto é removida.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Fotos removidas com sucesso"),
+        @ApiResponse(responseCode = "403", description = "Foto não pertence ao agendamento",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "404", description = "Foto não encontrada",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "409", description = "Foto vinculada a compra ou pacote",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "422", description = "Lista de fotos inválida",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    public ResponseEntity<FotosRemovidasResponse> removerEmLote(
+            @Parameter(description = "ID do agendamento") @PathVariable UUID agendamentoId,
+            @Valid @RequestBody RemoverFotosLoteRequest request) {
+        var removidas = fotoService.deletarEmLote(agendamentoId, request.fotoIds());
+        return ResponseEntity.ok(new FotosRemovidasResponse(removidas));
     }
 
     @PatchMapping("/{fotoId}/visibilidade")

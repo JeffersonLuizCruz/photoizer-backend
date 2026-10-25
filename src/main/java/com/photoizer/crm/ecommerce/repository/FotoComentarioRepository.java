@@ -4,6 +4,7 @@ import com.photoizer.crm.ecommerce.model.FotoComentario;
 import com.photoizer.crm.ecommerce.model.OrigemComentario;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -12,6 +13,8 @@ public interface FotoComentarioRepository extends JpaRepository<FotoComentario, 
     List<FotoComentario> findByFotoIdOrderByAuditInfoCreatedAtAsc(UUID fotoId);
 
     List<FotoComentario> findByAgendamentoIdOrderByAuditInfoCreatedAtAsc(UUID agendamentoId);
+
+    void deleteByFotoIdIn(Collection<UUID> fotoIds);
 
     long countByFotoIdAndOrigemAndLidaFalse(UUID fotoId, OrigemComentario origem);
 

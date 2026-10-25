@@ -17,8 +17,12 @@ foto/
 ├── api/
 │   ├── FotoController.java         # @RequestMapping("/api/v1/agendamentos/{agendamentoId}/fotos")
 │   ├── FotoEnsaioResponse.java     # Record DTO (sem static of())
+│   ├── RemoverFotosLoteRequest.java # Record: fotoIds (lote)
+│   ├── FotosRemovidasResponse.java # Record: removidas
 │   ├── FotoMapper.java             # MapStruct mapper (toResponse, toPublicResponse)
 │   └── FotoMetadataRequest.java    # Record: titulo, descricao, tags, categoria, dataSessao, destaque
+├── event/
+│   └── FotosRemovidasEvent.java    # Notifica ecommerce para limpar carrinho/favoritos/comentários
 ├── acl/
 │   └── AgendamentoReadService.java # Porta ACL — status permitido p/ upload e publicação
 ├── listener/
@@ -54,7 +58,9 @@ foto/
 | `FotoDownloadEvent` | ecommerce | Registra data de download |
 
 ### Eventos publicados
-Nenhum.
+| Evento | Módulo consumidor | Ação |
+|--------|-------------------|------|
+| `FotosRemovidasEvent` | ecommerce | Remove favoritos, itens de carrinho e comentários das fotos removidas |
 
 ## 4. Design Patterns Aplicados
 
@@ -87,6 +93,14 @@ Nenhum.
 - `PATCH /{fotoId}/status` → `alterarStatus()`: altera status individual; transição para `PUBLICADA` exige status pago.
 - `PUT /{fotoId}/imagem` → `substituirImagem()`: deleta 3 arquivos antigos, up original, regera via `FotoProcessingHelper`.
 
+### Fluxo 4: Remoção em lote
+- `POST /remover-lote` → `deletarEmLote(agendamentoId, fotoIds)`:
+  1. deduplica os IDs e valida existência (404) e propriedade do agendamento (403);
+  2. rejeita o lote inteiro (409) se alguma foto estiver vinculada a compra, pacote ou status de compra (`PAGA`/`AGUARDANDO_*`);
+  3. apaga os 3 arquivos de cada foto e remove os registros;
+  4. publica `FotosRemovidasEvent` para limpeza no ecommerce.
+- A remoção individual (`DELETE /{fotoId}`) reutiliza a mesma rotina e as mesmas proteções.
+
 ## 6. Regras Específicas
 1. **Upload e publicação liberados após o pagamento final** (`EM_EDICAO`…`FINALIZADO`), validado via porta ACL tanto no upload quanto na publicação.
 2. **Publicação manual**: botão "Publicar Galeria" (`PATCH /publicar`); sem publicação automática.
@@ -95,6 +109,7 @@ Nenhum.
 5. **`FotoEnsaioResponse`** não contém métodos estáticos — mapeamento via `FotoMapper`.
 6. **StatusFoto** com transições validadas via State Pattern.
 7. **Tags `@ElementCollection`** sem `orphanRemoval` (limitação JPA).
+8. **Fotos protegidas**: remoção bloqueada (409) para fotos com `compraExtraId`, `selecionadaPacote` ou status `PAGA`/`AGUARDANDO_*`; a remoção em lote é atômica e não apaga nada se houver foto protegida.
 
 ## 7. Dívidas Técnicas — Status (pós-refactor)
 

@@ -6394,6 +6394,113 @@
         } ]
       }
     },
+    "/api/v1/agendamentos/{agendamentoId}/fotos/remover-lote" : {
+      "post" : {
+        "tags" : [ "Fotos" ],
+        "summary" : "Remover fotos em lote",
+        "description" : "Remove permanentemente várias fotos do agendamento. A operação é atômica: se alguma foto não existir, não pertencer ao agendamento ou estiver vinculada a uma compra/pacote, nenhuma foto é removida.",
+        "operationId" : "removerFotosEmLote",
+        "parameters" : [ {
+          "name" : "agendamentoId",
+          "in" : "path",
+          "description" : "ID do agendamento",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RemoverFotosLoteRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Fotos removidas com sucesso",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FotosRemovidasResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Foto não pertence ao agendamento",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Foto não encontrada",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Foto vinculada a compra ou pacote",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Lista de fotos inválida",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/agendamentos/{agendamentoId}/fotografos" : {
       "get" : {
         "tags" : [ "Fotógrafos do Agendamento" ],
@@ -12526,10 +12633,11 @@
       "delete" : {
         "tags" : [ "Fotos" ],
         "summary" : "Remover foto",
-        "operationId" : "deletar",
+        "operationId" : "removerFoto",
         "parameters" : [ {
           "name" : "agendamentoId",
           "in" : "path",
+          "description" : "ID do agendamento",
           "required" : true,
           "schema" : {
             "type" : "string",
@@ -12538,6 +12646,7 @@
         }, {
           "name" : "fotoId",
           "in" : "path",
+          "description" : "ID da foto",
           "required" : true,
           "schema" : {
             "type" : "string",
@@ -14907,6 +15016,35 @@
           }
         },
         "required" : [ "email", "senha" ]
+      },
+      "RemoverFotosLoteRequest" : {
+        "type" : "object",
+        "description" : "IDs das fotos que serão removidas em lote",
+        "properties" : {
+          "fotoIds" : {
+            "type" : "array",
+            "description" : "IDs das fotos a remover",
+            "example" : [ "3fa85f64-5717-4562-b3fc-2c963f66afa6" ],
+            "items" : {
+              "type" : "string",
+              "format" : "uuid"
+            },
+            "minItems" : 1
+          }
+        },
+        "required" : [ "fotoIds" ]
+      },
+      "FotosRemovidasResponse" : {
+        "type" : "object",
+        "description" : "Resultado da remoção de fotos em lote",
+        "properties" : {
+          "removidas" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Quantidade de fotos removidas",
+            "example" : 12
+          }
+        }
       },
       "AdicionarFotografoRequest" : {
         "type" : "object",
