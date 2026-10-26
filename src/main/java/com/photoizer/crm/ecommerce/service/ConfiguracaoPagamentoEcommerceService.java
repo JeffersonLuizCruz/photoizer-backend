@@ -2,6 +2,8 @@ package com.photoizer.crm.ecommerce.service;
 
 import com.photoizer.crm.ecommerce.model.ConfiguracaoPagamentoEcommerce;
 import com.photoizer.crm.ecommerce.repository.ConfiguracaoPagamentoEcommerceRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional
 public class ConfiguracaoPagamentoEcommerceService {
+
+    private static final Logger log = LoggerFactory.getLogger(ConfiguracaoPagamentoEcommerceService.class);
 
     private final ConfiguracaoPagamentoEcommerceRepository repository;
 
@@ -36,11 +40,19 @@ public class ConfiguracaoPagamentoEcommerceService {
                 return nova;
             });
 
+        var usuario = usuarioAtual();
         configuracao.setPixChave(normalizar(pixChave));
         configuracao.setPixTipoChave(normalizar(pixTipoChave));
-        configuracao.setUpdatedBy(usuarioAtual());
+        configuracao.setUpdatedBy(usuario);
 
-        return repository.save(configuracao);
+        var salva = repository.save(configuracao);
+        // Nunca logar o valor da chave: PIX/CPF/CNPJ são dados sensíveis.
+        log.atInfo()
+            .addKeyValue("event_action", "ecommerce.pix_configurado")
+            .addKeyValue("usuario", usuario)
+            .addKeyValue("tem_chave", salva.getPixChave() != null)
+            .log("Configuração de PIX do e-commerce atualizada");
+        return salva;
     }
 
     private String normalizar(String valor) {

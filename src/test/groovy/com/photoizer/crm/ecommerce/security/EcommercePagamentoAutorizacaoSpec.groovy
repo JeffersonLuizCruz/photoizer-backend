@@ -7,13 +7,13 @@ import spock.lang.Specification
 
 class EcommercePagamentoAutorizacaoSpec extends Specification {
 
-    def "configuracao de pagamento exige ADMIN/FOTOGRAFO"() {
+    def "configuracao de pagamento exige ADMIN"() {
         given:
         def roles = AdminPagamentoEcommerceController.getAnnotation(RolesAllowed)
 
         expect:
         roles != null
-        roles.value().toList().sort() == ["ADMIN", "FOTOGRAFO"]
+        roles.value().toList().sort() == ["ADMIN"]
     }
 
     def "atualizacao de link de pagamento usa os mesmos papeis das compras"() {

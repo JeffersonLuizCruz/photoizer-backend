@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/admin/ecommerce/pagamento")
-@RolesAllowed({"ADMIN", "FOTOGRAFO"})
+@RolesAllowed({"ADMIN"})
 @Tag(name = OpenApiTags.ADMIN_ECOMMERCE, description = "Gestão administrativa do e-commerce de fotos.")
 public class AdminPagamentoEcommerceController {
 
@@ -28,7 +28,7 @@ public class AdminPagamentoEcommerceController {
 
     @GetMapping
     @Operation(operationId = "obterConfiguracaoPagamentoEcommerce",
-        summary = "Obter a configuração de PIX do e-commerce")
+        summary = "Obter a configuração de PIX do e-commerce (ADMIN)")
     public ResponseEntity<ConfiguracaoPagamentoResponse> obter() {
         var configuracao = configuracaoPagamentoService.obter();
         return ResponseEntity.ok(new ConfiguracaoPagamentoResponse(
@@ -37,8 +37,8 @@ public class AdminPagamentoEcommerceController {
 
     @PutMapping
     @Operation(operationId = "atualizarConfiguracaoPagamentoEcommerce",
-        summary = "Atualizar a configuração de PIX do e-commerce",
-        description = "A alteração reflete imediatamente em todas as galerias.")
+        summary = "Atualizar a configuração de PIX do e-commerce (ADMIN)",
+        description = "Somente ADMIN. A alteração reflete imediatamente em todas as galerias.")
     public ResponseEntity<ConfiguracaoPagamentoResponse> atualizar(
             @Valid @RequestBody AtualizarConfiguracaoPagamentoRequest request) {
         var configuracao = configuracaoPagamentoService.atualizar(

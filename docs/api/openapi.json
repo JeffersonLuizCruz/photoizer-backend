@@ -2867,7 +2867,7 @@
     "/api/v1/admin/ecommerce/pagamento" : {
       "get" : {
         "tags" : [ "Admin Ecommerce" ],
-        "summary" : "Obter a configuração de PIX do e-commerce",
+        "summary" : "Obter a configuração de PIX do e-commerce (ADMIN)",
         "operationId" : "obterConfiguracaoPagamentoEcommerce",
         "responses" : {
           "200" : {
@@ -2922,8 +2922,8 @@
       },
       "put" : {
         "tags" : [ "Admin Ecommerce" ],
-        "summary" : "Atualizar a configuração de PIX do e-commerce",
-        "description" : "A alteração reflete imediatamente em todas as galerias.",
+        "summary" : "Atualizar a configuração de PIX do e-commerce (ADMIN)",
+        "description" : "Somente ADMIN. A alteração reflete imediatamente em todas as galerias.",
         "operationId" : "atualizarConfiguracaoPagamentoEcommerce",
         "requestBody" : {
           "content" : {
