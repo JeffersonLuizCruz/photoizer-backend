@@ -156,3 +156,52 @@ ecommerce/
 | 4 | ~~**Testes unitários/integração**: nenhum teste específico existe~~ | **PARCIAL** (EcommerceServiceTest, SessionServiceTest, EcommerceSecurityTests atualizados) |
 | 5 | **Optimistic locking** (`@Version`): ausente em todas as entidades | P2 |
 | 6 | **`SessaoResponse.of()`**: único DTO com `static of()` restante (legado) | P3 |
+
+## 7. Galeria com seleção e edição (V8/V9)
+
+O ecommerce passou a suportar dois modos por galeria:
+
+- `DIRETO`: fluxo legado (seleção e compra na mesma galeria).
+- `COM_EDICAO`: cliente envia a seleção, o staff baixa os originais, edita, sobe as versões editadas e publica antes da comercialização.
+
+### Modelo
+
+- `GaleriaEnsaio` (`galerias_ensaio`): modo e fase (`SELECAO`, `SELECAO_ENVIADA`, `EM_EDICAO`, `COMERCIALIZACAO`).
+- `SelecaoEnsaio` (`selecoes_ensaio`): snapshot imutável da seleção, com número e status.
+- `SelecaoEnsaioItem` (`selecao_ensaio_itens`): foto, número de galeria, nome do arquivo e tipo (`PACOTE`/`EXTRA`).
+- `FotoEnsaio`: ganhou `numeroGaleria`, `versaoAtual` (`ORIGINAL`/`EDITADA`), paths editados e `emSelecaoEdicao`.
+
+### Endpoints
+
+Públicos:
+- `POST /api/v1/ecommerce/galeria/{token}/selecao`
+- `GET /api/v1/ecommerce/galeria/{token}/selecao`
+
+Staff:
+- `GET /api/v1/admin/selecoes/pendentes`
+- `GET /api/v1/admin/agendamentos/{id}/selecoes`
+- `GET /api/v1/admin/agendamentos/{id}/selecoes/{selecaoId}`
+- `GET .../download-zip` (originais + `manifest.csv`)
+- `POST .../iniciar`, `.../reabrir`, `.../publicar`
+- `GET/PUT /api/v1/admin/agendamentos/{id}/galeria[/modo]`
+
+### Regras
+
+1. O envio inclui fotos do pacote + extras do carrinho.
+2. Após o envio, a seleção fica bloqueada até reabertura.
+3. O download/comercialização só é liberado após a publicação da edição.
+4. A galeria publicada mostra somente as fotos da seleção com `versaoAtual = EDITADA`.
+5. Galerias `DIRETO` e existentes continuam com o comportamento anterior.
+6. O preço dos extras é congelado no snapshot da seleção.
+7. `EdicaoPublicadaEvent` troca a versão pública para `EDITADA`; `SelecaoCanceladaEvent` libera a seleção.
+8. `SelecaoEnviadaEvent` notifica o editor/fotógrafo.
+9. Toda seleção (cliente ou admin) valida foto publicada, visível, numerada e sem compra/download (`SelecaoFotoValidator`).
+10. O modo da galeria não pode ser alterado com seleção ativa/publicada, venda ou download (`podeAlterarModo`).
+11. A capa manual fica em `galerias_ensaio.capa_foto_id` + `capa_versao`; a versão é congelada e não muda sozinha após edição/publicação.
+12. `PUT /api/v1/admin/agendamentos/{id}/galeria/capa` define/remove a capa (ADMIN/FOTOGRAFO/EDITOR). `GET /api/v1/ecommerce/galeria/{token}/capa` serve o hero em até 2560px; `capaUrl` já sai com `?v={fotoId}-{versao}` e as respostas usam `no-store`.
+13. O endpoint público `GET /api/v1/ecommerce/fotos/{fotoId}/watermarked` serve a **prévia protegida de 800px** (`preview_v2_*`). Fotos antigas são reduzidas sob demanda a partir do watermark existente, em cache versionado.
+14. A marca d'água das novas prévias usa `© {nomeContratada}` (fallback `nomeFotografo` → `Photoizer Studio`). Arquivos finais de download continuam sem marca e em alta qualidade.
+15. A resposta pública da galeria inclui `valoresExtras` com o preço congelado por foto.
+16. Ao enviar a seleção, fotos do pacote são removidas do carrinho para não serem cobradas como extra.
+17. O override manual do staff (`PATCH /admin/agendamentos/{id}/fotos/{fotoId}/selecao`) passa pelas mesmas regras do cliente: valida limite do pacote, foto publicada/visível/numerada e bloqueia remoção de foto baixada/editada/comprada. Cada override gera log estruturado com agendamento, foto, usuário e total do pacote.
+18. O resumo admin (`GET /admin/agendamentos/{id}/ecommerce`) expõe `pacoteQuantidadeFotos` para a UI desabilitar “Incluir no pacote” quando o limite já foi atingido.

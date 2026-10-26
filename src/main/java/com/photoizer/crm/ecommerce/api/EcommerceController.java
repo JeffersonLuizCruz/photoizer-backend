@@ -8,14 +8,18 @@ import com.photoizer.crm.ecommerce.service.CompraQueryService;
 import com.photoizer.crm.ecommerce.service.ConfiguracaoPagamentoEcommerceService;
 import com.photoizer.crm.ecommerce.service.DownloadService;
 import com.photoizer.crm.ecommerce.service.EcommerceService;
+import com.photoizer.crm.ecommerce.service.GaleriaEnsaioService;
+import com.photoizer.crm.ecommerce.service.GaleriaCapaService;
 import com.photoizer.crm.ecommerce.service.GaleriaQueryService;
 import com.photoizer.crm.ecommerce.service.FavoritoService;
+import com.photoizer.crm.ecommerce.service.SelecaoEnsaioService;
 import com.photoizer.crm.ecommerce.service.SessionService;
 import com.photoizer.crm.foto.api.FotoEnsaioResponse;
 import com.photoizer.crm.foto.api.FotoMapper;
 import com.photoizer.crm.foto.model.FotoEnsaio;
 import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.service.FotoService;
+import com.photoizer.crm.foto.service.FotoPreviewService;
 import com.photoizer.crm.shared.storage.FileServeHelper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -65,6 +69,10 @@ public class EcommerceController {
     private final FotoMapper fotoMapper;
     private final FileServeHelper fileServeHelper;
     private final com.photoizer.crm.shared.storage.StoragePathResolver pathResolver;
+    private final SelecaoEnsaioService selecaoEnsaioService;
+    private final GaleriaEnsaioService galeriaEnsaioService;
+    private final GaleriaCapaService galeriaCapaService;
+    private final FotoPreviewService fotoPreviewService;
 
     public EcommerceController(EcommerceService ecommerceService,
                                GaleriaQueryService galeriaQueryService,
@@ -79,7 +87,11 @@ public class EcommerceController {
                                ConfiguracaoPagamentoEcommerceService configuracaoPagamentoService,
                                FotoMapper fotoMapper,
                                FileServeHelper fileServeHelper,
-                               com.photoizer.crm.shared.storage.StoragePathResolver pathResolver) {
+                               com.photoizer.crm.shared.storage.StoragePathResolver pathResolver,
+                               SelecaoEnsaioService selecaoEnsaioService,
+                               GaleriaEnsaioService galeriaEnsaioService,
+                               GaleriaCapaService galeriaCapaService,
+                               FotoPreviewService fotoPreviewService) {
         this.ecommerceService = ecommerceService;
         this.galeriaQueryService = galeriaQueryService;
         this.carrinhoService = carrinhoService;
@@ -94,6 +106,10 @@ public class EcommerceController {
         this.fotoMapper = fotoMapper;
         this.fileServeHelper = fileServeHelper;
         this.pathResolver = pathResolver;
+        this.selecaoEnsaioService = selecaoEnsaioService;
+        this.galeriaEnsaioService = galeriaEnsaioService;
+        this.galeriaCapaService = galeriaCapaService;
+        this.fotoPreviewService = fotoPreviewService;
     }
 
     @PostMapping("/sessao")
@@ -126,14 +142,53 @@ public class EcommerceController {
     public ResponseEntity<GaleriaResponse> galeria(@PathVariable UUID token) {
         var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
         var fotos = ecommerceService.listarFotosPublicadas(token);
+        var galeria = galeriaEnsaioService.obter(agendamento.getId());
+        var selecaoAtual = selecaoEnsaioService.obterAtiva(token).orElse(null);
+        var valoresExtras = galeriaQueryService.getValoresExtras(
+            agendamento.getId(), fotos.stream().map(com.photoizer.crm.foto.model.FotoEnsaio::getId).toList());
+        var capa = galeriaCapaService.resolver(galeria, fotos);
         var response = new GaleriaResponse(
             fotos.stream().map(fotoMapper::toPublicResponse).toList(),
             agendamento.getPacote().getQuantidadeFotos(),
             ecommerceService.getValorUnitarioFotoExtra(agendamento.getId()),
             agendamento.getPacote().getNome(),
-            agendamento.getLocalEnsaio()
+            agendamento.getLocalEnsaio(),
+            agendamento.getCliente() != null ? agendamento.getCliente().getNome() : null,
+            agendamento.getDataHoraEnsaio(),
+            capa != null ? capa.foto().getId() : null,
+            capa != null ? capa.versao().name() : null,
+            capa != null
+                ? "/api/v1/ecommerce/galeria/" + token + "/capa?v="
+                    + capa.foto().getId() + "-" + capa.versao().name()
+                : null,
+            galeria.getModo().name(),
+            galeria.getFase().name(),
+            galeria.permiteSelecionar(),
+            galeria.permiteComercializar(),
+            galeria.permiteComercializar(),
+            selecaoAtual,
+            valoresExtras
         );
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok()
+            .header("Cache-Control", "no-store, no-cache, must-revalidate")
+            .header("Pragma", "no-cache")
+            .header("Expires", "0")
+            .body(response);
+    }
+
+    @GetMapping("/galeria/{token}/capa")
+    @Operation(summary = "Servir a foto de capa da galeria em alta qualidade")
+    public ResponseEntity<Resource> capa(@PathVariable UUID token) {
+        var resource = galeriaCapaService.servir(token);
+        if (resource == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok()
+            .header("Cache-Control", "no-store, no-cache, must-revalidate")
+            .header("Pragma", "no-cache")
+            .header("Expires", "0")
+            .contentType(MediaType.IMAGE_JPEG)
+            .body(resource);
     }
 
     @PatchMapping("/galeria/{token}/selecionar")
@@ -143,6 +198,26 @@ public class EcommerceController {
             @RequestBody SelecionarRequest request) {
         var fotos = ecommerceService.selecionarFotos(token, request.fotoIds(), request.selecionada());
         return ResponseEntity.ok(fotos.stream().map(fotoMapper::toPublicResponse).toList());
+    }
+
+    @PostMapping("/galeria/{token}/selecao")
+    @Operation(summary = "Enviar a seleção de fotos para edição")
+    public ResponseEntity<SelecaoEnsaioResponse> enviarSelecao(
+            @PathVariable UUID token,
+            @RequestHeader(value = HEADER_SESSION, required = false) String sessionId,
+            @Valid @RequestBody EnviarSelecaoRequest request) {
+        var sessao = sessionId == null || sessionId.isBlank() ? null : resolverSessionId(sessionId);
+        var selecao = selecaoEnsaioService.enviar(
+            token, sessao, request.fotoIdsPacote(), request.observacao());
+        return ResponseEntity.status(HttpStatus.CREATED).body(selecao);
+    }
+
+    @GetMapping("/galeria/{token}/selecao")
+    @Operation(summary = "Consultar a seleção ativa da galeria")
+    public ResponseEntity<SelecaoEnsaioResponse> selecaoAtiva(@PathVariable UUID token) {
+        return selecaoEnsaioService.obterAtiva(token)
+            .map(ResponseEntity::ok)
+            .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
     @PostMapping("/galeria/{token}/carrinho")
@@ -170,15 +245,19 @@ public class EcommerceController {
     public ResponseEntity<CarrinhoResponse> listarCarrinho(
             @PathVariable UUID token,
             @RequestHeader(value = HEADER_SESSION, required = false) String sessionId) {
+        var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
         var itens = carrinhoService.listarCarrinho(token, resolverSessionId(sessionId));
-        var valorUnitario = ecommerceService.getValorUnitarioFotoExtraPorToken(token);
+        var valorUnitarioPadrao = ecommerceService.getValorUnitarioFotoExtra(agendamento.getId());
         var itensResponse = itens.stream()
             .map(com.photoizer.crm.ecommerce.model.ItemCarrinho::getFotoId)
             .map(fotoService::buscarPorId)
-            .map(fotoMapper::toPublicResponse)
-            .map(fotoResponse -> CarrinhoItemResponse.of(fotoResponse, itens.size(), 0, valorUnitario))
+            .map(foto -> CarrinhoItemResponse.of(
+                fotoMapper.toPublicResponse(foto),
+                itens.size(),
+                0,
+                galeriaQueryService.getValorUnitarioExtra(agendamento.getId(), foto.getId())))
             .toList();
-        return ResponseEntity.ok(CarrinhoResponse.of(itensResponse, valorUnitario));
+        return ResponseEntity.ok(CarrinhoResponse.of(itensResponse, valorUnitarioPadrao));
     }
 
     @GetMapping("/galeria/{token}/carrinho/quantidade")
@@ -280,10 +359,11 @@ public class EcommerceController {
     public ResponseEntity<Resource> downloadFoto(
             @PathVariable UUID token,
             @PathVariable UUID fotoId) {
-        var originalPath = downloadService.downloadFoto(token, fotoId);
-        var file = new FileSystemResource(originalPath);
+        var download = downloadService.downloadFoto(token, fotoId);
+        var file = new FileSystemResource(download.path());
         return ResponseEntity.ok()
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + originalPath.getFileName().toString() + "\"")
+            .header(HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=\"" + download.nome() + "\"")
             .contentType(MediaType.IMAGE_JPEG)
             .body(file);
     }
@@ -324,13 +404,17 @@ public class EcommerceController {
     }
 
     @GetMapping("/fotos/{fotoId}/watermarked")
-    @Operation(summary = "Servir foto com marca d'água (cache desabilitado)")
+    @Operation(summary = "Servir prévia protegida da foto (baixa resolução)")
     public ResponseEntity<Resource> servirWatermarked(@PathVariable UUID fotoId) {
         var foto = fotoService.buscarPorId(fotoId);
         if (!podeServirPublicamente(foto)) {
             return ResponseEntity.notFound().build();
         }
-        var file = new FileSystemResource(pathResolver.resolver(foto.getWatermarkedPath()));
+        var preview = fotoPreviewService.caminhoPreview(foto);
+        if (preview == null) {
+            return ResponseEntity.notFound().build();
+        }
+        var file = new FileSystemResource(pathResolver.resolver(preview));
         return ResponseEntity.ok()
             .cacheControl(CacheControl.noStore())
             .contentType(MediaType.IMAGE_JPEG)
@@ -338,14 +422,19 @@ public class EcommerceController {
     }
 
     @GetMapping("/fotos/{fotoId}/thumb")
-    @Operation(summary = "Servir thumbnail público")
+    @Operation(summary = "Servir thumbnail público protegido")
     public ResponseEntity<Resource> servirThumb(@PathVariable UUID fotoId) {
         var foto = fotoService.buscarPorId(fotoId);
         if (!podeServirPublicamente(foto)) {
             return ResponseEntity.notFound().build();
         }
-        var file = new FileSystemResource(pathResolver.resolver(foto.getThumbPath()));
+        var thumb = fotoPreviewService.caminhoThumb(foto);
+        if (thumb == null) {
+            return ResponseEntity.notFound().build();
+        }
+        var file = new FileSystemResource(pathResolver.resolver(thumb));
         return ResponseEntity.ok()
+            .cacheControl(CacheControl.noStore())
             .contentType(MediaType.IMAGE_JPEG)
             .body(file);
     }

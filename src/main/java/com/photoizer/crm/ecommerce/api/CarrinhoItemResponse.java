@@ -17,8 +17,8 @@ public record CarrinhoItemResponse(
      * Corrigido: subtotal agora é valorUnitario * quantidadeTotal (antes retornava apenas valorUnitario).
      */
     public static CarrinhoItemResponse of(FotoEnsaioResponse foto, int quantidadeTotal, int pacoteQuantidadeFotos, BigDecimal valorUnitario) {
-        var subtotal = valorUnitario.multiply(BigDecimal.valueOf(quantidadeTotal))
-            .setScale(2, RoundingMode.HALF_UP);
+        // O subtotal e por item; o total do carrinho e somado em CarrinhoResponse.
+        var subtotal = valorUnitario.setScale(2, RoundingMode.HALF_UP);
         return new CarrinhoItemResponse(
             foto,
             quantidadeTotal,

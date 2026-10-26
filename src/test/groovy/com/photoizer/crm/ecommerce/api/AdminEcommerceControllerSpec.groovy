@@ -1,6 +1,7 @@
 package com.photoizer.crm.ecommerce.api
 
 import com.photoizer.crm.agenda.model.Agendamento
+import com.photoizer.crm.pacote.model.Pacote
 import com.photoizer.crm.ecommerce.service.CompraQueryService
 import com.photoizer.crm.ecommerce.service.EcommerceService
 import com.photoizer.crm.ecommerce.service.FavoritoService
@@ -38,6 +39,7 @@ class AdminEcommerceControllerSpec extends Specification {
         def agendamento = Agendamento.builder()
             .id(agendamentoId)
             .tokenGaleria(tokenGaleria)
+            .pacote(Pacote.builder().quantidadeFotos(12).build())
             .build()
 
         galeriaQueryService.buscarAgendamentoPorId(agendamentoId) >> agendamento
@@ -51,6 +53,7 @@ class AdminEcommerceControllerSpec extends Specification {
         then:
         resposta.tokenGaleria() == tokenGaleria
         resposta.linkGaleria() == "/g/" + tokenGaleria
+        resposta.pacoteQuantidadeFotos() == 12
     }
 
     def "resumo nao inventa link quando o agendamento nao possui token"() {

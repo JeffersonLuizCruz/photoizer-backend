@@ -29,6 +29,7 @@ class FotoServiceSpec extends Specification {
     def fotoRepository = Mock(FotoEnsaioRepository)
     def fileStorageService = Mock(FileStorageService)
     def processingHelper = Mock(FotoProcessingHelper)
+    def previewService = Mock(FotoPreviewService)
     def agendamentoReadService = Mock(AgendamentoReadService)
     def fileValidator = Mock(FileValidator)
     def pathResolver = Mock(StoragePathResolver)
@@ -39,6 +40,7 @@ class FotoServiceSpec extends Specification {
         fotoRepository,
         fileStorageService,
         processingHelper,
+        previewService,
         agendamentoReadService,
         fileValidator,
         pathResolver,
@@ -68,6 +70,54 @@ class FotoServiceSpec extends Specification {
 
         cleanup:
         dir.toFile().deleteDir()
+    }
+
+    def "primeira versão editada não falha quando ainda não existem caminhos antigos"() {
+        given:
+        def tmp = Files.createTempDirectory("foto-editada-spec")
+        def editada = tmp.resolve("editada.png")
+        def bytes = novoArquivoPng("editada.png").bytes
+        Files.write(editada, bytes)
+        def watermarked = tmp.resolve("wm_editada.jpg")
+        def thumb = tmp.resolve("thumb_editada.jpg")
+        def preview = tmp.resolve("preview_editada.jpg")
+        Files.write(watermarked, bytes)
+        Files.write(thumb, bytes)
+        Files.write(preview, bytes)
+        def foto = FotoEnsaio.builder()
+            .id(UUID.randomUUID())
+            .agendamentoId(agendamentoId)
+            .fileName("IMG_1.png")
+            .originalPath("orig/1.png")
+            .watermarkedPath("wm/1.png")
+            .thumbPath("thumb/1.png")
+            .status(StatusFoto.PUBLICADA)
+            .visivel(true)
+            .build()
+        agendamentoReadService.isStatusPermitidoParaUpload(agendamentoId) >> true
+        fotoRepository.findById(foto.id) >> Optional.of(foto)
+        fileStorageService.salvarEmSubdiretorio(_, agendamentoId, "editadas") >> editada.toString()
+        pathResolver.resolver(editada.toString()) >> editada
+        processingHelper.processar(editada, editada.parent, foto.id) >>
+            new FotoProcessingHelper.ProcessedImages(watermarked.toString(), thumb.toString(), preview.toString())
+        pathResolver.relativo(Path.of(watermarked.toString())) >> "editadas/wm.jpg"
+        pathResolver.relativo(Path.of(thumb.toString())) >> "editadas/thumb.jpg"
+        pathResolver.relativo(Path.of(preview.toString())) >> "editadas/preview.jpg"
+        fileValidator.sanitizeFilename("editada.png") >> "editada.png"
+        fotoRepository.save(_ as FotoEnsaio) >> { args -> args[0] }
+
+        when:
+        def salva = service.uploadEditada(agendamentoId, foto.id, novoArquivoPng("editada.png"))
+
+        then:
+        noExceptionThrown()
+        salva.editadaPath == editada.toString()
+        salva.editadaFileName == "editada.png"
+        salva.editadaEm != null
+        salva.editadaPreviewPath == "editadas/preview.jpg"
+
+        cleanup:
+        tmp.toFile().deleteDir()
     }
 
     def "remove arquivos gravados quando o processamento falha"() {
@@ -126,6 +176,7 @@ class FotoServiceSpec extends Specification {
         def segunda = tmp.originais[1]
         def watermark = tmp.dir.resolve("wm.png")
         def thumb = tmp.dir.resolve("thumb.png")
+        def preview = tmp.dir.resolve("preview.png")
 
         agendamentoReadService.isStatusPermitidoParaUpload(agendamentoId) >> true
         fotoRepository.findMaxOrdemByAgendamentoId(agendamentoId) >> 4
@@ -137,9 +188,9 @@ class FotoServiceSpec extends Specification {
             tmp.originais.find { it.toString() == caminho }
         }
         processingHelper.processar(primeira, tmp.dir, _ as UUID) >>
-            new FotoProcessingHelper.ProcessedImages(watermark.toString(), thumb.toString())
+            new FotoProcessingHelper.ProcessedImages(watermark.toString(), thumb.toString(), preview.toString())
         processingHelper.processar(segunda, tmp.dir, _ as UUID) >>
-            new FotoProcessingHelper.ProcessedImages(watermark.toString(), thumb.toString())
+            new FotoProcessingHelper.ProcessedImages(watermark.toString(), thumb.toString(), preview.toString())
         pathResolver.relativo(_ as Path) >> "agendamento/foto.jpg"
 
         when:

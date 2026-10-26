@@ -11,6 +11,7 @@ public record AdminEcommerceResumoResponse(
     int totalFotos,
     int fotosPublicadas,
     int fotosSelecionadasPacote,
+    int pacoteQuantidadeFotos,
     int fotosPagas,
     int fotosAguardando,
     List<FotoEnsaioResponse> fotos,

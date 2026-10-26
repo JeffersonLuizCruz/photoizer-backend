@@ -1,5 +1,6 @@
 package com.photoizer.crm.foto.service;
 
+import com.photoizer.crm.config.service.MarcaDaguaService;
 import com.photoizer.crm.shared.processing.ImageProcessingService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,34 +11,38 @@ import java.util.UUID;
 
 /**
  * PATTERN: Template Method + DRY
- * Centraliza processamento de imagem (watermark + thumbnail) com fallback e log.
- * Elimina duplicação do padrão try/catch que existia em FotoService (2 cópias)
- * e padroniza opacidade/constantes em um único lugar.
+ * Centraliza processamento de imagem (watermark + thumbnail + prévia pública)
+ * com fallback e log.
  */
 @Component
 public class FotoProcessingHelper {
 
     private static final Logger log = LoggerFactory.getLogger(FotoProcessingHelper.class);
-    private static final String TEXTO_MARCA_DAGUA = "© Photoizer Studio";
-    private static final float OPACIDADE_MARCA = 0.35f;
 
     private final ImageProcessingService imageProcessingService;
+    private final MarcaDaguaService marcaDaguaService;
 
-    public FotoProcessingHelper(ImageProcessingService imageProcessingService) {
+    public FotoProcessingHelper(ImageProcessingService imageProcessingService,
+                                MarcaDaguaService marcaDaguaService) {
         this.imageProcessingService = imageProcessingService;
+        this.marcaDaguaService = marcaDaguaService;
     }
 
-    public record ProcessedImages(String watermarkedPath, String thumbPath) {}
+    public record ProcessedImages(String watermarkedPath, String thumbPath, String previewPath) {}
 
     public ProcessedImages processar(Path original, Path targetDir, UUID fotoId) {
-        String watermarkedPath = processarMarcaDagua(original, targetDir, fotoId);
+        var texto = marcaDaguaService.texto();
+        var opacidade = marcaDaguaService.opacidade();
+        String watermarkedPath = processarMarcaDagua(original, targetDir, fotoId, texto, opacidade);
         String thumbPath = processarThumb(original, targetDir, fotoId, watermarkedPath);
-        return new ProcessedImages(watermarkedPath, thumbPath);
+        String previewPath = processarPreview(original, targetDir, fotoId, texto, opacidade);
+        return new ProcessedImages(watermarkedPath, thumbPath, previewPath);
     }
 
-    private String processarMarcaDagua(Path original, Path targetDir, UUID fotoId) {
+    private String processarMarcaDagua(Path original, Path targetDir, UUID fotoId,
+                                       String texto, float opacidade) {
         try {
-            return imageProcessingService.aplicarMarcaDagua(original, targetDir, TEXTO_MARCA_DAGUA, OPACIDADE_MARCA)
+            return imageProcessingService.aplicarMarcaDagua(original, targetDir, texto, opacidade)
                 .toString();
         } catch (IllegalArgumentException e) {
             // Arquivo não decodificável: o chamador converte em 422 com o nome da foto.
@@ -68,6 +73,25 @@ public class FotoProcessingHelper {
                 .setCause(e)
                 .log("Erro ao gerar thumbnail; usando fallback");
             return fallback;
+        }
+    }
+
+    /**
+     * Prévia pública de baixa resolução. Em caso de falha, retorna null para
+     * que o serviço de prévia gere uma versão reduzida do watermark existente.
+     */
+    private String processarPreview(Path original, Path targetDir, UUID fotoId,
+                                    String texto, float opacidade) {
+        try {
+            return imageProcessingService.aplicarMarcaDaguaPreview(original, targetDir, texto, opacidade)
+                .toString();
+        } catch (Exception e) {
+            log.atWarn()
+                .addKeyValue("event_action", "foto.preview_falhou")
+                .addKeyValue("foto_id", fotoId)
+                .setCause(e)
+                .log("Erro ao gerar prévia protegida; será gerada sob demanda");
+            return null;
         }
     }
 }

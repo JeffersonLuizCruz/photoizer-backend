@@ -4,6 +4,7 @@ import com.photoizer.crm.agenda.event.AgendamentoCriadoEvent;
 import com.photoizer.crm.agenda.event.AgendamentoRealizadoEvent;
 import com.photoizer.crm.agenda.event.AgendamentoReatribuidoEvent;
 import com.photoizer.crm.agenda.event.PagamentoFinalRegistradoEvent;
+import com.photoizer.crm.ecommerce.event.SelecaoEnviadaEvent;
 import com.photoizer.crm.notificacao.model.TipoNotificacao;
 import com.photoizer.crm.notificacao.service.NotificacaoService;
 import org.slf4j.Logger;
@@ -80,6 +81,27 @@ public class NotificacaoEventListener {
                 + " foi confirmado. Sua partilha já está disponível para consulta.",
             "/minhas-financas",
             TipoNotificacao.PAGAMENTO_FINAL
+        );
+    }
+
+    @EventListener
+    @Transactional
+    public void onSelecaoEnviada(SelecaoEnviadaEvent event) {
+        var destinatarios = java.util.stream.Stream.of(event.editorId(), event.fotografoId())
+            .filter(java.util.Objects::nonNull)
+            .distinct()
+            .toList();
+        if (destinatarios.isEmpty()) return;
+
+        var mensagem = "O cliente " + event.clienteNome() + " enviou "
+            + event.quantidadePacote() + " foto(s) do pacote e "
+            + event.quantidadeExtras() + " extra(s) para edição.";
+        notificarFotografos(
+            destinatarios,
+            "Seleção recebida para edição",
+            mensagem,
+            "/agenda/" + event.agendamentoId() + "/selecoes",
+            TipoNotificacao.SELECAO_ENVIADA
         );
     }
 

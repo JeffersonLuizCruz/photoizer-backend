@@ -160,6 +160,13 @@ Cada módulo segue a estrutura: `model/`, `repository/`, `service/`, `api/`, DTO
   2. Seleciona fotos, adiciona ao carrinho.
   3. Checkout → gera `CompraExtra`.
   4. Upload comprovante → confirmação admin → fotos liberadas.
+- **Fluxo de Seleção + Edição (modo `COM_EDICAO`):**
+  1. Staff publica as fotos; cada uma recebe `numeroGaleria` sequencial e o nome original fica visível.
+  2. Cliente seleciona pacote + extras e envia `POST /ecommerce/galeria/{token}/selecao`; a seleção vira snapshot imutável.
+  3. Staff vê a seleção em `/admin/selecoes`, baixa os originais em ZIP com `manifest.csv` e envia as versões editadas.
+  4. Staff publica a edição; `EdicaoPublicadaEvent` troca `versaoAtual` para `EDITADA`.
+  5. Cliente baixa o pacote editado e compra extras com preço congelado.
+  - O modo é por galeria (`DIRETO`/`COM_EDICAO`), configurado em `/agenda/:id/fotos` (ADMIN). O padrão continua `DIRETO`.
 - **Swagger:** `/swagger-ui.html` (UI e `/v3/api-docs` livres em dev, staff autenticado em homolog, negados em prod).
   Padrão completo em `docs/API_DOCUMENTATION_STANDARD.md`. Spec versionada (`docs/api/openapi.json`) gerada por
   `mvn -Dtest=OpenApiSpecExporter test`; validada no build por `OpenApiContractTest` e pela checagem

@@ -30,21 +30,28 @@ public class CarrinhoService {
 
     private final ItemCarrinhoRepository itemCarrinhoRepository;
     private final GaleriaQueryService galeriaQueryService;
+    private final GaleriaEnsaioService galeriaEnsaioService;
 
     public CarrinhoService(ItemCarrinhoRepository itemCarrinhoRepository,
-                           GaleriaQueryService galeriaQueryService) {
+                           GaleriaQueryService galeriaQueryService,
+                           GaleriaEnsaioService galeriaEnsaioService) {
         this.itemCarrinhoRepository = itemCarrinhoRepository;
         this.galeriaQueryService = galeriaQueryService;
+        this.galeriaEnsaioService = galeriaEnsaioService;
     }
 
     public void adicionarAoCarrinho(UUID token, UUID sessionId, UUID fotoId) {
         var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
+        galeriaEnsaioService.validarCarrinhoPermitido(
+            galeriaEnsaioService.obter(agendamento.getId()));
         var foto = galeriaQueryService.buscarFotoPorId(fotoId);
 
         if (!foto.getAgendamentoId().equals(agendamento.getId())) {
             throw new FotoIndisponivelException("Foto não pertence a esta galeria");
         }
-        if (!foto.isVisivel() || foto.getStatus() != StatusFoto.PUBLICADA) {
+        if (!foto.isVisivel() || foto.getStatus() != StatusFoto.PUBLICADA
+            || foto.getCompraExtraId() != null
+            || !galeriaQueryService.isFotoDisponivelParaCarrinho(foto)) {
             throw new FotoIndisponivelException("Foto não está disponível para compra");
         }
         if (foto.isSelecionadaPacote()) {
@@ -66,6 +73,8 @@ public class CarrinhoService {
 
     public void removerDoCarrinho(UUID token, UUID sessionId, UUID fotoId) {
         var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
+        galeriaEnsaioService.validarCarrinhoPermitido(
+            galeriaEnsaioService.obter(agendamento.getId()));
         itemCarrinhoRepository.deleteBySessionIdAndAgendamentoIdAndFotoId(sessionId, agendamento.getId(), fotoId);
     }
 
@@ -85,18 +94,24 @@ public class CarrinhoService {
     public CalculoCarrinhoResponse calcularCarrinho(UUID token, UUID sessionId) {
         var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
         var itensCarrinho = itemCarrinhoRepository.findBySessionIdAndAgendamentoIdOrderByAuditInfoCreatedAtAsc(sessionId, agendamento.getId());
-        var valorUnitario = galeriaQueryService.getValorUnitarioFotoExtra(agendamento.getId());
+        var valorUnitarioPadrao = galeriaQueryService.getValorUnitarioFotoExtra(agendamento.getId());
         var quantidade = itensCarrinho.size();
-        var subtotal = valorUnitario.multiply(BigDecimal.valueOf(quantidade)).setScale(2, RoundingMode.HALF_UP);
 
         var itens = itensCarrinho.stream()
             .map(ItemCarrinho::getFotoId)
             .map(galeriaQueryService::buscarFotoPorId)
             .filter(foto -> foto.getAgendamentoId().equals(agendamento.getId()))
-            .map(foto -> new CalculoItemResponse(foto.getId(), foto.getFileName(), valorUnitario))
+            .map(foto -> new CalculoItemResponse(
+                foto.getId(),
+                foto.getFileName(),
+                galeriaQueryService.getValorUnitarioExtra(agendamento.getId(), foto.getId())))
             .toList();
+        var subtotal = itens.stream()
+            .map(CalculoItemResponse::valorUnitario)
+            .reduce(BigDecimal.ZERO, BigDecimal::add)
+            .setScale(2, RoundingMode.HALF_UP);
 
-        return new CalculoCarrinhoResponse(itens, quantidade, valorUnitario, subtotal, subtotal);
+        return new CalculoCarrinhoResponse(itens, quantidade, valorUnitarioPadrao, subtotal, subtotal);
     }
 
     public List<UUID> obterFotoIdsCarrinho(UUID token, UUID sessionId) {

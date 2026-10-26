@@ -60,8 +60,17 @@ public class FotoEnsaio {
     private String watermarkedPath;
 
     @NotBlank
-    @Column(nullable = false, length = 500)
+    @Size(max = 500)
+    @Column(length = 500)
     private String thumbPath;
+
+    @Size(max = 500)
+    @Column(length = 500)
+    private String previewPath;
+
+    @Size(max = 500)
+    @Column(length = 500)
+    private String editadaPreviewPath;
 
     @NotBlank
     @Column(nullable = false, length = 255)
@@ -70,11 +79,52 @@ public class FotoEnsaio {
     @Column(nullable = false)
     private int ordem;
 
+    /**
+     * Numero sequencial visivel da foto na galeria (1..N).
+     * Atribuido na publicacao, nao muda na edicao e nunca e reutilizado.
+     */
+    @Column(name = "numero_galeria")
+    private Integer numeroGaleria;
+
     @NotNull
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 25)
     private StatusFoto status;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private VersaoFoto versaoAtual = VersaoFoto.ORIGINAL;
+
+    @Size(max = 500)
+    @Column(length = 500)
+    private String editadaPath;
+
+    @Size(max = 500)
+    @Column(length = 500)
+    private String editadaWatermarkedPath;
+
+    @Size(max = 500)
+    @Column(length = 500)
+    private String editadaThumbPath;
+
+    @Size(max = 255)
+    @Column(length = 255)
+    private String editadaFileName;
+
+    @Column
+    private LocalDateTime editadaEm;
+
+    @Size(max = 255)
+    @Column(length = 255)
+    private String editadaPor;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean emSelecaoEdicao = false;
 
     @Column(nullable = false)
     private boolean selecionadaPacote;

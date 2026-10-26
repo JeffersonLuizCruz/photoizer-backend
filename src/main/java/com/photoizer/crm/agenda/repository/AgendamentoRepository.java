@@ -5,6 +5,7 @@ import com.photoizer.crm.agenda.model.StatusAgendamento;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -80,6 +81,7 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID>,
     @Query("SELECT a FROM Agendamento a WHERE a.cliente.id = :clienteId ORDER BY a.dataHoraEnsaio DESC")
     List<Agendamento> findByClienteId(@Param("clienteId") UUID clienteId);
 
+    @EntityGraph(attributePaths = {"cliente", "pacote"})
     java.util.Optional<Agendamento> findByTokenGaleria(UUID tokenGaleria);
 
     @Query("SELECT a FROM Agendamento a JOIN FETCH a.pacote LEFT JOIN FETCH a.editor WHERE a.tokenPropostaHash = :hash")

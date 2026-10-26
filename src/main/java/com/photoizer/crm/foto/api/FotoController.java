@@ -37,7 +37,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/agendamentos/{agendamentoId}/fotos")
-@RolesAllowed({"ADMIN", "FOTOGRAFO", "EDITOR", "AGENDADOR"})
+@RolesAllowed({"ADMIN", "FOTOGRAFO", "EDITOR"})
 @Tag(name = "Fotos", description = "Gestão de fotos do ensaio")
 public class FotoController {
 
@@ -90,7 +90,10 @@ public class FotoController {
             @PathVariable UUID agendamentoId,
             @PathVariable UUID fotoId) {
         var foto = buscarEValidarPropriedade(agendamentoId, fotoId);
-        var file = new FileSystemResource(pathResolver.resolver(foto.getWatermarkedPath()));
+        var caminho = foto.getEditadaWatermarkedPath() != null
+            ? foto.getEditadaWatermarkedPath()
+            : foto.getWatermarkedPath();
+        var file = new FileSystemResource(pathResolver.resolver(caminho));
         return ResponseEntity.ok()
             .contentType(resolverMediaType(foto.getFileName()))
             .body(file);
@@ -102,7 +105,10 @@ public class FotoController {
             @PathVariable UUID agendamentoId,
             @PathVariable UUID fotoId) {
         var foto = buscarEValidarPropriedade(agendamentoId, fotoId);
-        var file = new FileSystemResource(pathResolver.resolver(foto.getThumbPath()));
+        var caminho = foto.getEditadaThumbPath() != null
+            ? foto.getEditadaThumbPath()
+            : foto.getThumbPath();
+        var file = new FileSystemResource(pathResolver.resolver(caminho));
         return ResponseEntity.ok()
             .contentType(resolverMediaType(foto.getFileName()))
             .body(file);
@@ -112,6 +118,17 @@ public class FotoController {
     @Operation(summary = "Publicar todas as fotos do ensaio")
     public ResponseEntity<List<FotoEnsaioResponse>> publicar(@PathVariable UUID agendamentoId) {
         var fotos = fotoService.publicar(agendamentoId);
+        return ResponseEntity.ok(fotos.stream().map(fotoMapper::toResponse).toList());
+    }
+
+    @PostMapping("/renumerar")
+    @RolesAllowed({"ADMIN", "FOTOGRAFO"})
+    @Operation(
+        summary = "Renumerar a galeria sequencialmente",
+        description = "Reatribui 1..N as fotos publicadas e visiveis. Permitido apenas "
+            + "enquanto nenhuma foto foi selecionada, baixada, comprada ou vinculada a uma compra.")
+    public ResponseEntity<List<FotoEnsaioResponse>> renumerar(@PathVariable UUID agendamentoId) {
+        var fotos = fotoService.renumerar(agendamentoId);
         return ResponseEntity.ok(fotos.stream().map(fotoMapper::toResponse).toList());
     }
 
@@ -190,6 +207,23 @@ public class FotoController {
             return ResponseEntity.badRequest().build();
         }
         var foto = fotoService.substituirImagem(agendamentoId, fotoId, arquivo);
+        return ResponseEntity.ok(fotoMapper.toResponse(foto));
+    }
+
+    @PutMapping("/{fotoId}/editada")
+    @RolesAllowed({"ADMIN", "FOTOGRAFO", "EDITOR"})
+    @Operation(
+        summary = "Enviar a versão editada de uma foto",
+        description = "Preserva o RAW, o número de galeria e o nome de exibição. "
+            + "A versão só é exibida ao cliente quando a seleção é publicada.")
+    public ResponseEntity<FotoEnsaioResponse> uploadEditada(
+            @PathVariable UUID agendamentoId,
+            @PathVariable UUID fotoId,
+            @RequestParam("arquivo") MultipartFile arquivo) {
+        if (arquivo == null || arquivo.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+        var foto = fotoService.uploadEditada(agendamentoId, fotoId, arquivo);
         return ResponseEntity.ok(fotoMapper.toResponse(foto));
     }
 

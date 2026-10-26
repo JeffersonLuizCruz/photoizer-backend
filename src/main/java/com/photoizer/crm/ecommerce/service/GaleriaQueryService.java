@@ -7,14 +7,21 @@ import com.photoizer.crm.config.service.ConfiguracaoService;
 import com.photoizer.crm.ecommerce.exception.GaleriaNaoEncontradaException;
 import com.photoizer.crm.ecommerce.exception.TokenExpiradoException;
 import com.photoizer.crm.ecommerce.exception.FotoNaoEncontradaException;
+import com.photoizer.crm.ecommerce.model.ModoGaleria;
+import com.photoizer.crm.ecommerce.model.StatusSelecao;
+import com.photoizer.crm.ecommerce.repository.SelecaoEnsaioItemRepository;
+import com.photoizer.crm.ecommerce.repository.SelecaoEnsaioRepository;
 import com.photoizer.crm.foto.model.FotoEnsaio;
+import com.photoizer.crm.foto.model.VersaoFoto;
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -32,13 +39,22 @@ public class GaleriaQueryService {
     private final AgendamentoRepository agendamentoRepository;
     private final FotoEnsaioRepository fotoEnsaioRepository;
     private final ConfiguracaoService configuracaoService;
+    private final GaleriaEnsaioService galeriaEnsaioService;
+    private final SelecaoEnsaioRepository selecaoRepository;
+    private final SelecaoEnsaioItemRepository selecaoItemRepository;
 
     public GaleriaQueryService(AgendamentoRepository agendamentoRepository,
                                FotoEnsaioRepository fotoEnsaioRepository,
-                               ConfiguracaoService configuracaoService) {
+                               ConfiguracaoService configuracaoService,
+                               GaleriaEnsaioService galeriaEnsaioService,
+                               SelecaoEnsaioRepository selecaoRepository,
+                               SelecaoEnsaioItemRepository selecaoItemRepository) {
         this.agendamentoRepository = agendamentoRepository;
         this.fotoEnsaioRepository = fotoEnsaioRepository;
         this.configuracaoService = configuracaoService;
+        this.galeriaEnsaioService = galeriaEnsaioService;
+        this.selecaoRepository = selecaoRepository;
+        this.selecaoItemRepository = selecaoItemRepository;
     }
 
     public Agendamento buscarAgendamentoPorToken(UUID token) {
@@ -61,9 +77,49 @@ public class GaleriaQueryService {
             .orElseGet(this::getValorUnitarioFotoExtra);
     }
 
+    /**
+     * Preco do extra congelado no envio da selecao. Se a foto nao fizer parte
+     * de uma selecao publicada, usa a configuracao atual.
+     */
+    public BigDecimal getValorUnitarioExtra(UUID agendamentoId, UUID fotoId) {
+        var selecao = selecaoRepository
+            .findFirstByAgendamentoIdAndStatusInOrderByNumeroDesc(
+                agendamentoId, List.of(StatusSelecao.PUBLICADA));
+        return selecao
+            .flatMap(s -> selecaoItemRepository.findBySelecaoIdAndFotoId(s.getId(), fotoId))
+            .map(com.photoizer.crm.ecommerce.model.SelecaoEnsaioItem::getValorUnitario)
+            .filter(java.util.Objects::nonNull)
+            .orElseGet(() -> getValorUnitarioFotoExtra(agendamentoId));
+    }
+
     public List<FotoEnsaio> listarFotosPublicadas(UUID token) {
         var agendamento = buscarAgendamentoPorToken(token);
-        return fotoEnsaioRepository.findPublicadasVisiveisByAgendamentoId(agendamento.getId());
+        var fotos = fotoEnsaioRepository.findPublicadasVisiveisByAgendamentoId(agendamento.getId());
+        var galeria = galeriaEnsaioService.obter(agendamento.getId());
+
+        if (galeria.getModo() == ModoGaleria.DIRETO) {
+            return fotos;
+        }
+
+        // Depois de publicada a edicao, a galeria mostra somente as fotos da
+        // selecao publicada, na versao editada. Isso impede a venda de RAW.
+        if (!galeria.getFase().permiteComercializar()) {
+            return fotos;
+        }
+        var selecao = selecaoRepository
+            .findFirstByAgendamentoIdAndStatusInOrderByNumeroDesc(
+                agendamento.getId(), List.of(StatusSelecao.PUBLICADA));
+        if (selecao.isEmpty()) {
+            return List.of();
+        }
+        var ids = selecaoItemRepository
+            .findBySelecaoIdOrderByNumeroGaleriaAsc(selecao.get().getId()).stream()
+            .map(com.photoizer.crm.ecommerce.model.SelecaoEnsaioItem::getFotoId)
+            .collect(java.util.stream.Collectors.toSet());
+        return fotos.stream()
+            .filter(f -> ids.contains(f.getId()))
+            .filter(f -> f.getVersaoAtual() == VersaoFoto.EDITADA)
+            .toList();
     }
 
     public List<FotoEnsaio> listarFotosPorAgendamento(UUID agendamentoId) {
@@ -81,6 +137,96 @@ public class GaleriaQueryService {
     }
 
     public boolean isDownloadPermitido(FotoEnsaio foto) {
-        return foto.isSelecionadaPacote() || foto.getStatus() == com.photoizer.crm.foto.model.StatusFoto.PAGA;
+        if (!foto.isVisivel()) {
+            return false;
+        }
+        if (foto.getStatus() != com.photoizer.crm.foto.model.StatusFoto.PUBLICADA
+            && foto.getStatus() != com.photoizer.crm.foto.model.StatusFoto.PAGA) {
+            return false;
+        }
+        var galeria = galeriaEnsaioService.obter(foto.getAgendamentoId());
+        if (!galeria.permiteComercializar()) {
+            return false;
+        }
+        if (galeria.getModo() == ModoGaleria.COM_EDICAO) {
+            if (foto.getVersaoAtual() != VersaoFoto.EDITADA) {
+                return false;
+            }
+            // Fotos compradas continuam disponíveis em "Minhas compras" mesmo
+            // que uma nova seleção tenha sido publicada depois.
+            if (foto.getStatus() != com.photoizer.crm.foto.model.StatusFoto.PAGA
+                && !fotoEmSelecaoPublicada(foto)) {
+                return false;
+            }
+        }
+        return foto.isSelecionadaPacote()
+            || foto.getStatus() == com.photoizer.crm.foto.model.StatusFoto.PAGA;
+    }
+
+    /**
+     * Confere se a foto pode ser comprada agora.
+     *
+     * <p>No modo DIRETO basta estar publicada, visível e sem compra. No modo
+     * COM_EDICAO a foto precisa fazer parte da seleção publicada e estar na
+     * versão editada — impede vender RAW por chamada direta à API.
+     */
+    public boolean isFotoDisponivelParaCarrinho(FotoEnsaio foto) {
+        var galeria = galeriaEnsaioService.obter(foto.getAgendamentoId());
+        if (galeria.getModo() == ModoGaleria.DIRETO) {
+            return true;
+        }
+        if (galeria.getFase() == com.photoizer.crm.ecommerce.model.FaseGaleria.SELECAO) {
+            // Durante a seleção o cliente marca extras que serão editados junto
+            // com o pacote; ainda não há compra.
+            return true;
+        }
+        return isFotoComercializavel(foto);
+    }
+
+    public boolean isFotoComercializavel(FotoEnsaio foto) {
+        if (!foto.isVisivel()
+            || foto.getStatus() != com.photoizer.crm.foto.model.StatusFoto.PUBLICADA
+            || foto.getCompraExtraId() != null) {
+            return false;
+        }
+        var galeria = galeriaEnsaioService.obter(foto.getAgendamentoId());
+        if (galeria.getModo() == ModoGaleria.DIRETO) {
+            return true;
+        }
+        if (!galeria.getFase().permiteComercializar()
+            || foto.getVersaoAtual() != VersaoFoto.EDITADA) {
+            return false;
+        }
+        return fotoEmSelecaoPublicada(foto);
+    }
+
+    private boolean fotoEmSelecaoPublicada(FotoEnsaio foto) {
+        var selecao = selecaoRepository
+            .findFirstByAgendamentoIdAndStatusInOrderByNumeroDesc(
+                foto.getAgendamentoId(), List.of(StatusSelecao.PUBLICADA));
+        return selecao
+            .map(s -> selecaoItemRepository.findBySelecaoIdAndFotoId(s.getId(), foto.getId()).isPresent())
+            .orElse(false);
+    }
+
+    /**
+     * Preço congelado de cada foto extra, por foto. Fotos do pacote recebem o
+     * preço padrão apenas para preencher o mapa; o frontend só usa os extras.
+     */
+    public Map<UUID, BigDecimal> getValoresExtras(UUID agendamentoId, List<UUID> fotoIds) {
+        var padrao = getValorUnitarioFotoExtra(agendamentoId);
+        var congelados = new HashMap<UUID, BigDecimal>();
+        selecaoRepository
+            .findFirstByAgendamentoIdAndStatusInOrderByNumeroDesc(
+                agendamentoId, List.of(StatusSelecao.PUBLICADA))
+            .ifPresent(selecao -> selecaoItemRepository
+                .findBySelecaoIdOrderByNumeroGaleriaAsc(selecao.getId())
+                .stream()
+                .filter(item -> item.getValorUnitario() != null)
+                .forEach(item -> congelados.put(item.getFotoId(), item.getValorUnitario())));
+
+        var valores = new HashMap<UUID, BigDecimal>();
+        fotoIds.forEach(fotoId -> valores.put(fotoId, congelados.getOrDefault(fotoId, padrao)));
+        return valores;
     }
 }

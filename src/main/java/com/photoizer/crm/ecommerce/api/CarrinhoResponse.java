@@ -13,7 +13,9 @@ public record CarrinhoResponse(
 ) {
     public static CarrinhoResponse of(List<CarrinhoItemResponse> itens, BigDecimal valorUnitario) {
         var quantidade = itens.size();
-        var subtotal = valorUnitario.multiply(BigDecimal.valueOf(quantidade));
+        var subtotal = itens.stream()
+            .map(CarrinhoItemResponse::subtotal)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
         return new CarrinhoResponse(itens, quantidade, valorUnitario, subtotal);
     }
 }

@@ -1,11 +1,14 @@
 package com.photoizer.crm.foto.service;
 
+import com.photoizer.crm.foto.event.FotoEditadaEvent;
 import com.photoizer.crm.foto.event.FotosRemovidasEvent;
 import com.photoizer.crm.foto.exception.AgendamentoNaoPermitidoParaUploadException;
 import com.photoizer.crm.foto.exception.ArquivoDeImagemInvalidoException;
 import com.photoizer.crm.foto.exception.FotoEnsaioNaoEncontradaException;
+import com.photoizer.crm.foto.exception.FotoNaoEditavelException;
 import com.photoizer.crm.foto.exception.FotoNaoPertenceAoAgendamentoException;
 import com.photoizer.crm.foto.exception.FotoVinculadaACompraException;
+import com.photoizer.crm.foto.exception.RenumeracaoNaoPermitidaException;
 import com.photoizer.crm.foto.model.FotoEnsaio;
 import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
@@ -25,10 +28,14 @@ import javax.imageio.stream.ImageInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @Service
@@ -40,6 +47,7 @@ public class FotoService {
     private final FotoEnsaioRepository fotoEnsaioRepository;
     private final FileStorageService fileStorageService;
     private final FotoProcessingHelper fotoProcessingHelper;
+    private final FotoPreviewService fotoPreviewService;
     private final com.photoizer.crm.foto.acl.AgendamentoReadService agendamentoReadService;
     private final FileValidator fileValidator;
     private final StoragePathResolver pathResolver;
@@ -48,6 +56,7 @@ public class FotoService {
     public FotoService(FotoEnsaioRepository fotoEnsaioRepository,
                        FileStorageService fileStorageService,
                        FotoProcessingHelper fotoProcessingHelper,
+                       FotoPreviewService fotoPreviewService,
                        com.photoizer.crm.foto.acl.AgendamentoReadService agendamentoReadService,
                        FileValidator fileValidator,
                        StoragePathResolver pathResolver,
@@ -55,6 +64,7 @@ public class FotoService {
         this.fotoEnsaioRepository = fotoEnsaioRepository;
         this.fileStorageService = fileStorageService;
         this.fotoProcessingHelper = fotoProcessingHelper;
+        this.fotoPreviewService = fotoPreviewService;
         this.agendamentoReadService = agendamentoReadService;
         this.fileValidator = fileValidator;
         this.pathResolver = pathResolver;
@@ -80,6 +90,9 @@ public class FotoService {
     public List<FotoEnsaio> uploadFotos(UUID agendamentoId, List<MultipartFile> arquivos) {
         if (!agendamentoReadService.isStatusPermitidoParaUpload(agendamentoId)) {
             throw new AgendamentoNaoPermitidoParaUploadException();
+        }
+        if (temSelecaoAtiva(agendamentoId)) {
+            throw new FotoNaoEditavelException("a galeria já possui seleção enviada para edição");
         }
 
         var fotos = new ArrayList<FotoEnsaio>();
@@ -107,6 +120,9 @@ public class FotoService {
                 }
                 arquivosGravados.add(Path.of(processada.watermarkedPath()));
                 arquivosGravados.add(Path.of(processada.thumbPath()));
+                if (processada.previewPath() != null) {
+                    arquivosGravados.add(Path.of(processada.previewPath()));
+                }
 
                 var fileName = arquivo.getOriginalFilename();
                 if (fileName == null || fileName.isBlank()) {
@@ -119,6 +135,9 @@ public class FotoService {
                     .originalPath(originalPath)
                     .watermarkedPath(pathResolver.relativo(Path.of(processada.watermarkedPath())))
                     .thumbPath(pathResolver.relativo(Path.of(processada.thumbPath())))
+                    .previewPath(processada.previewPath() == null
+                        ? null
+                        : pathResolver.relativo(Path.of(processada.previewPath())))
                     .ordem(count + i)
                     .status(StatusFoto.INEDITA)
                     .selecionadaPacote(false)
@@ -216,6 +235,12 @@ public class FotoService {
             deletarArquivo(foto.getOriginalPath());
             deletarArquivo(foto.getWatermarkedPath());
             deletarArquivo(foto.getThumbPath());
+            deletarArquivo(foto.getPreviewPath());
+            deletarArquivo(foto.getEditadaPath());
+            deletarArquivo(foto.getEditadaWatermarkedPath());
+            deletarArquivo(foto.getEditadaThumbPath());
+            deletarArquivo(foto.getEditadaPreviewPath());
+            fotoPreviewService.removerLegados(foto);
         }
         fotoEnsaioRepository.deleteAll(fotos);
 
@@ -233,29 +258,101 @@ public class FotoService {
     private boolean estaVinculadaACompra(FotoEnsaio foto) {
         return foto.getCompraExtraId() != null
             || foto.isSelecionadaPacote()
+            || foto.isEmSelecaoEdicao()
+            || foto.getEditadaPath() != null
+            || foto.getDataDownload() != null
             || foto.getStatus() == StatusFoto.PAGA
             || foto.getStatus() == StatusFoto.AGUARDANDO_COMPROVANTE
             || foto.getStatus() == StatusFoto.AGUARDANDO_CONFIRMACAO;
     }
 
+    /**
+     * Publica as fotos pendentes e garante a numeracao sequencial da galeria.
+     *
+     * <p>A numeracao e atribuida na ordem de exibicao ({@code ordem}), e uma
+     * foto ja numerada nunca e renumerada. Fotos ocultas nao recebem numero:
+     * elas so serao numeradas quando forem exibidas.
+     */
     public List<FotoEnsaio> publicar(UUID agendamentoId) {
         if (!agendamentoReadService.isStatusPermitidoParaPublicacao(agendamentoId)) {
             throw new com.photoizer.crm.foto.exception.AgendamentoNaoPermitidoParaPublicacaoException();
         }
-        var fotos = fotoEnsaioRepository.findByAgendamentoIdOrderByOrdemAsc(agendamentoId);
-        var fotosParaPublicar = fotos.stream()
-            .filter(f -> f.getStatus() == StatusFoto.INEDITA)
-            .toList();
-        for (var foto : fotosParaPublicar) {
-            foto.setStatus(StatusFoto.PUBLICADA);
+        // A lock pessimista serializa publicacoes concorrentes do mesmo ensaio.
+        var fotos = fotoEnsaioRepository.findAllByAgendamentoIdForUpdate(agendamentoId);
+        if (fotos.stream().anyMatch(FotoEnsaio::isEmSelecaoEdicao)) {
+            throw new FotoNaoEditavelException("a galeria já possui seleção enviada para edição");
         }
-        var publicadas = fotoEnsaioRepository.saveAll(fotosParaPublicar);
+        var proximoNumero = new AtomicInteger(proximoNumeroGaleria(fotos));
+        var alteradas = new ArrayList<FotoEnsaio>();
+
+        for (var foto : fotos) {
+            var alterou = false;
+            if (foto.getStatus() == StatusFoto.INEDITA) {
+                foto.setStatus(StatusFoto.PUBLICADA);
+                alterou = true;
+            }
+            if (foto.getStatus() == StatusFoto.PUBLICADA
+                && foto.isVisivel()
+                && foto.getNumeroGaleria() == null) {
+                foto.setNumeroGaleria(proximoNumero.getAndIncrement());
+                alterou = true;
+            }
+            if (alterou) {
+                alteradas.add(foto);
+            }
+        }
+
+        var publicadas = fotoEnsaioRepository.saveAll(alteradas);
         log.atInfo()
             .addKeyValue("event_action", "foto.publicadas")
             .addKeyValue("agendamento_id", agendamentoId)
             .addKeyValue("quantidade", publicadas.size())
-            .log("Fotos publicadas");
+            .addKeyValue("ultimo_numero", publicadas.stream()
+                .map(FotoEnsaio::getNumeroGaleria)
+                .filter(java.util.Objects::nonNull)
+                .max(Integer::compareTo)
+                .orElse(0))
+            .log("Fotos publicadas e numeradas");
         return publicadas;
+    }
+
+    /**
+     * Reatribui a numeracao 1..N as fotos publicadas e visiveis.
+     *
+     * <p>Operacao explicita e destrutiva para a referencia visual: so pode
+     * ocorrer antes de qualquer foto ser selecionada, baixada, comprada ou
+     * vinculada a uma compra. Depois disso, os numeros sao imutaveis.
+     */
+    public List<FotoEnsaio> renumerar(UUID agendamentoId) {
+        var fotos = fotoEnsaioRepository.findAllByAgendamentoIdForUpdate(agendamentoId);
+        var bloqueadas = fotos.stream().filter(this::numeracaoBloqueada).count();
+        if (bloqueadas > 0) {
+            throw new RenumeracaoNaoPermitidaException((int) bloqueadas);
+        }
+
+        var fotosNumeraveis = fotos.stream()
+            .filter(f -> f.getStatus() == StatusFoto.PUBLICADA && f.isVisivel())
+            .sorted(Comparator.comparingInt(FotoEnsaio::getOrdem)
+                .thenComparing(FotoEnsaio::getId))
+            .toList();
+
+        var novosNumeros = new HashMap<UUID, Integer>();
+        var numero = 1;
+        for (var foto : fotosNumeraveis) {
+            novosNumeros.put(foto.getId(), numero++);
+        }
+
+        for (var foto : fotos) {
+            foto.setNumeroGaleria(novosNumeros.get(foto.getId()));
+        }
+
+        var salvas = fotoEnsaioRepository.saveAll(fotos);
+        log.atInfo()
+            .addKeyValue("event_action", "foto.galeria_renumerada")
+            .addKeyValue("agendamento_id", agendamentoId)
+            .addKeyValue("quantidade", fotosNumeraveis.size())
+            .log("Galeria renumerada");
+        return salvas;
     }
 
     /**
@@ -274,23 +371,50 @@ public class FotoService {
     }
 
     public FotoEnsaio alterarVisibilidade(UUID agendamentoId, UUID fotoId, boolean visivel) {
-        var foto = buscarPorId(fotoId);
-        if (!foto.getAgendamentoId().equals(agendamentoId)) {
-            throw new FotoNaoPertenceAoAgendamentoException(fotoId, agendamentoId);
+        var fotos = fotoEnsaioRepository.findAllByAgendamentoIdForUpdate(agendamentoId);
+        var foto = fotos.stream()
+            .filter(f -> f.getId().equals(fotoId))
+            .findFirst()
+            .orElseThrow(() -> new FotoNaoPertenceAoAgendamentoException(fotoId, agendamentoId));
+
+        // Ocultar uma foto vinculada a pacote/compra/edição/download remove o
+        // acesso do cliente à galeria. Exibir novamente continua permitido
+        // para que o staff consiga corrigir um estado oculto indevido.
+        if (!visivel && estaVinculadaACompra(foto)) {
+            throw new FotoNaoEditavelException(
+                "foto vinculada a pacote, compra, download ou edição não pode ser ocultada");
         }
         foto.setVisivel(visivel);
+        if (visivel) {
+            atribuirNumeroSeNecessario(foto, fotos);
+        }
         return fotoEnsaioRepository.save(foto);
     }
 
     public FotoEnsaio alterarStatus(UUID agendamentoId, UUID fotoId, StatusFoto status) {
-        var foto = buscarPorId(fotoId);
-        if (!foto.getAgendamentoId().equals(agendamentoId)) {
-            throw new FotoNaoPertenceAoAgendamentoException(fotoId, agendamentoId);
-        }
+        var fotos = fotoEnsaioRepository.findAllByAgendamentoIdForUpdate(agendamentoId);
+        var foto = fotos.stream()
+            .filter(f -> f.getId().equals(fotoId))
+            .findFirst()
+            .orElseThrow(() -> new FotoNaoPertenceAoAgendamentoException(fotoId, agendamentoId));
+
         if (status == StatusFoto.PUBLICADA && !agendamentoReadService.isStatusPermitidoParaPublicacao(agendamentoId)) {
             throw new com.photoizer.crm.foto.exception.AgendamentoNaoPermitidoParaPublicacaoException();
         }
+        if (foto.isEmSelecaoEdicao()) {
+            throw new FotoNaoEditavelException("foto faz parte de uma seleção ativa");
+        }
+        // Alterar o status de uma foto já entregue/comprada/baixada/em edição
+        // pode retirá-la da galeria do cliente ou reverter uma venda. O staff
+        // deve corrigir o vínculo antes de mexer no status.
+        if (estaVinculadaACompra(foto)) {
+            throw new FotoNaoEditavelException(
+                "foto vinculada a pacote, compra, download ou edição não pode ter o status alterado");
+        }
         foto.setStatus(foto.getStatus().transicionarPara(status));
+        if (foto.getStatus() == StatusFoto.PUBLICADA && foto.isVisivel()) {
+            atribuirNumeroSeNecessario(foto, fotos);
+        }
         return fotoEnsaioRepository.save(foto);
     }
 
@@ -298,6 +422,10 @@ public class FotoService {
         var foto = buscarPorId(fotoId);
         if (!foto.getAgendamentoId().equals(agendamentoId)) {
             throw new FotoNaoPertenceAoAgendamentoException(fotoId, agendamentoId);
+        }
+        if (estaVinculadaACompra(foto)
+            || foto.getVersaoAtual() == com.photoizer.crm.foto.model.VersaoFoto.EDITADA) {
+            throw new FotoNaoEditavelException("foto vinculada a seleção, edição, compra ou download");
         }
 
         fileValidator.validate(arquivo, "image");
@@ -310,16 +438,149 @@ public class FotoService {
         deletarArquivo(foto.getOriginalPath());
         deletarArquivo(foto.getWatermarkedPath());
         deletarArquivo(foto.getThumbPath());
+        deletarArquivo(foto.getPreviewPath());
+        // A imagem mudou: invalida prévias protegidas em cache (legado/thumb).
+        fotoPreviewService.removerLegados(foto);
 
         foto.setOriginalPath(originalPath);
         foto.setWatermarkedPath(pathResolver.relativo(Path.of(processada.watermarkedPath())));
         foto.setThumbPath(pathResolver.relativo(Path.of(processada.thumbPath())));
-        foto.setFileName(arquivo.getOriginalFilename());
-
+        foto.setPreviewPath(processada.previewPath() == null
+            ? null
+            : pathResolver.relativo(Path.of(processada.previewPath())));
+        // O nome de exibicao e imutavel: a substituicao troca apenas o arquivo.
+        // Assim o cliente e o staff continuam reconhecendo a mesma foto
+        // (#001 · IMG_1234.jpg) mesmo apos uma troca de imagem.
         return fotoEnsaioRepository.save(foto);
     }
 
+    /**
+     * Salva a versão editada de uma foto existente, preservando o RAW e a
+     * identidade da foto (id, numero de galeria e nome de exibição).
+     */
+    public FotoEnsaio uploadEditada(UUID agendamentoId, UUID fotoId,
+                                    org.springframework.web.multipart.MultipartFile arquivo) {
+        if (!agendamentoReadService.isStatusPermitidoParaUpload(agendamentoId)) {
+            throw new AgendamentoNaoPermitidoParaUploadException();
+        }
+
+        var foto = buscarPorId(fotoId);
+        if (!foto.getAgendamentoId().equals(agendamentoId)) {
+            throw new FotoNaoPertenceAoAgendamentoException(fotoId, agendamentoId);
+        }
+        if (foto.getStatus() != StatusFoto.PUBLICADA) {
+            throw new FotoNaoEditavelException("status atual " + foto.getStatus());
+        }
+        if (foto.getCompraExtraId() != null
+            || foto.getDataDownload() != null
+            || foto.getVersaoAtual() == com.photoizer.crm.foto.model.VersaoFoto.EDITADA
+            || foto.getStatus() == StatusFoto.PAGA
+            || foto.getStatus() == StatusFoto.AGUARDANDO_COMPROVANTE
+            || foto.getStatus() == StatusFoto.AGUARDANDO_CONFIRMACAO) {
+            throw new FotoNaoEditavelException("foto já vendida, baixada ou com edição publicada");
+        }
+
+        fileValidator.validate(arquivo, "image");
+        var arquivosNovos = new ArrayList<Path>();
+        var caminhosAntigos = java.util.stream.Stream.of(
+                foto.getEditadaPath(),
+                foto.getEditadaWatermarkedPath(),
+                foto.getEditadaThumbPath(),
+                foto.getEditadaPreviewPath())
+            .filter(java.util.Objects::nonNull)
+            .toList();
+
+        try {
+            var editadaPath = fileStorageService.salvarEmSubdiretorio(arquivo, agendamentoId, "editadas");
+            var editada = pathResolver.resolver(editadaPath);
+            arquivosNovos.add(editada);
+            validarImagemLegivel(editada, arquivo.getOriginalFilename());
+
+            var processada = fotoProcessingHelper.processar(editada, editada.getParent(), fotoId);
+            arquivosNovos.add(Path.of(processada.watermarkedPath()));
+            arquivosNovos.add(Path.of(processada.thumbPath()));
+            if (processada.previewPath() != null) {
+                arquivosNovos.add(Path.of(processada.previewPath()));
+            }
+
+            foto.setEditadaPath(editadaPath);
+            foto.setEditadaWatermarkedPath(pathResolver.relativo(Path.of(processada.watermarkedPath())));
+            foto.setEditadaThumbPath(pathResolver.relativo(Path.of(processada.thumbPath())));
+            foto.setEditadaPreviewPath(processada.previewPath() == null
+                ? null
+                : pathResolver.relativo(Path.of(processada.previewPath())));
+            foto.setEditadaFileName(fileValidator.sanitizeFilename(arquivo.getOriginalFilename()));
+            foto.setEditadaEm(LocalDateTime.now());
+            foto.setEditadaPor(usuarioAtual());
+            var salva = fotoEnsaioRepository.save(foto);
+
+            eventPublisher.publishEvent(new FotoEditadaEvent(agendamentoId, fotoId));
+
+            // Remove as versões editadas anteriores somente depois que a nova
+            // foi gravada e o snapshot foi atualizado com sucesso.
+            caminhosAntigos.forEach(this::deletarArquivo);
+            fotoPreviewService.removerLegados(foto);
+
+            log.atInfo()
+                .addKeyValue("event_action", "foto.editada_upload")
+                .addKeyValue("agendamento_id", agendamentoId)
+                .addKeyValue("foto_id", fotoId)
+                .log("Versão editada enviada");
+            return salva;
+        } catch (RuntimeException e) {
+            limparArquivos(arquivosNovos);
+            throw e;
+        }
+    }
+
+    private String usuarioAtual() {
+        var authentication = org.springframework.security.core.context.SecurityContextHolder
+            .getContext().getAuthentication();
+        return authentication != null && authentication.getName() != null
+            ? authentication.getName()
+            : "SYSTEM";
+    }
+
+    private boolean temSelecaoAtiva(UUID agendamentoId) {
+        var fotos = fotoEnsaioRepository.findByAgendamentoIdOrderByOrdemAsc(agendamentoId);
+        return fotos != null && fotos.stream().anyMatch(FotoEnsaio::isEmSelecaoEdicao);
+    }
+
+    private int proximoNumeroGaleria(List<FotoEnsaio> fotos) {
+        return fotos.stream()
+            .map(FotoEnsaio::getNumeroGaleria)
+            .filter(java.util.Objects::nonNull)
+            .max(Integer::compareTo)
+            .orElse(0) + 1;
+    }
+
+    private void atribuirNumeroSeNecessario(FotoEnsaio foto, List<FotoEnsaio> fotos) {
+        if (foto.getStatus() == StatusFoto.PUBLICADA
+            && foto.isVisivel()
+            && foto.getNumeroGaleria() == null) {
+            foto.setNumeroGaleria(proximoNumeroGaleria(fotos));
+        }
+    }
+
+    /**
+     * Bloqueia a renumeracao quando qualquer numero ja pode ter sido visto,
+     * baixado, comprado ou vinculado a uma selecao/compra.
+     */
+    private boolean numeracaoBloqueada(FotoEnsaio foto) {
+        return foto.isSelecionadaPacote()
+            || foto.isEmSelecaoEdicao()
+            || foto.getEditadaPath() != null
+            || foto.getDataDownload() != null
+            || foto.getCompraExtraId() != null
+            || foto.getStatus() == StatusFoto.PAGA
+            || foto.getStatus() == StatusFoto.AGUARDANDO_COMPROVANTE
+            || foto.getStatus() == StatusFoto.AGUARDANDO_CONFIRMACAO;
+    }
+
     private void deletarArquivo(String caminho) {
+        if (caminho == null || caminho.isBlank()) {
+            return;
+        }
         try {
             var path = pathResolver.resolver(caminho);
             if (path != null) {

@@ -5,9 +5,16 @@ import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.config.service.ConfiguracaoService;
 import com.photoizer.crm.ecommerce.exception.FotoIndisponivelException;
 import com.photoizer.crm.ecommerce.exception.LimitePacoteExcedidoException;
+import com.photoizer.crm.ecommerce.model.FaseGaleria;
+import com.photoizer.crm.ecommerce.model.GaleriaEnsaio;
+import com.photoizer.crm.ecommerce.model.ModoGaleria;
+import com.photoizer.crm.ecommerce.repository.SelecaoEnsaioItemRepository;
+import com.photoizer.crm.ecommerce.repository.SelecaoEnsaioRepository;
 import com.photoizer.crm.ecommerce.service.CarrinhoService;
+import com.photoizer.crm.ecommerce.service.GaleriaEnsaioService;
 import com.photoizer.crm.ecommerce.service.GaleriaQueryService;
 import com.photoizer.crm.ecommerce.service.SelecaoFotosService;
+import com.photoizer.crm.ecommerce.service.SelecaoFotoValidator;
 import com.photoizer.crm.ecommerce.repository.ItemCarrinhoRepository;
 import com.photoizer.crm.foto.model.FotoEnsaio;
 import com.photoizer.crm.foto.model.StatusFoto;
@@ -31,6 +38,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -57,6 +65,14 @@ class RegrasSegurancaLojaTest {
     private AgendamentoRepository agendamentoRepository;
     @Mock
     private ConfiguracaoService configuracaoService;
+    @Mock
+    private GaleriaEnsaioService galeriaEnsaioService;
+    @Mock
+    private SelecaoEnsaioRepository selecaoEnsaioRepository;
+    @Mock
+    private SelecaoEnsaioItemRepository selecaoEnsaioItemRepository;
+    @Mock
+    private SelecaoFotoValidator selecaoFotoValidator;
 
     @InjectMocks
     private SelecaoFotosService selecaoFotosService;
@@ -70,6 +86,14 @@ class RegrasSegurancaLojaTest {
     void setUp() {
         token = UUID.randomUUID();
         agendamentoId = UUID.randomUUID();
+        lenient().when(galeriaEnsaioService.obter(any(UUID.class))).thenReturn(
+            GaleriaEnsaio.builder()
+                .agendamentoId(agendamentoId)
+                .modo(ModoGaleria.DIRETO)
+                .fase(FaseGaleria.COMERCIALIZACAO)
+                .build());
+        lenient().when(galeriaQueryService.isFotoComercializavel(any())).thenReturn(true);
+        lenient().when(galeriaQueryService.isFotoDisponivelParaCarrinho(any())).thenReturn(true);
     }
 
     private Agendamento agendamentoComLimite(int quantidadeFotos) {
@@ -125,13 +149,29 @@ class RegrasSegurancaLojaTest {
     }
 
     @Test
+    void selecionarFotos_permiteReenviarFotoDoPacoteJaBaixada() {
+        var agendamento = agendamentoComLimite(3);
+        when(galeriaQueryService.buscarAgendamentoPorToken(token)).thenReturn(agendamento);
+        when(fotoEnsaioRepository.countSelecionadasPacoteByAgendamentoId(agendamentoId)).thenReturn(1);
+
+        var fotoA = foto(UUID.randomUUID(), true);
+        fotoA.setDataDownload(LocalDateTime.now());
+        when(fotoEnsaioRepository.findAllById(anyList())).thenReturn(List.of(fotoA));
+        when(fotoEnsaioRepository.findByAgendamentoIdOrderByOrdemAsc(agendamentoId)).thenReturn(List.of(fotoA));
+
+        selecaoFotosService.selecionarFotos(token, List.of(fotoA.getId()), true);
+
+        verify(selecaoFotoValidator, never()).validar(any(), any());
+    }
+
+    @Test
     void isDownloadPermitido_liberaApenasPacoteOuPaga() {
         var doPacote = foto(UUID.randomUUID(), true);
         var paga = foto(UUID.randomUUID(), false);
         paga.setStatus(StatusFoto.PAGA);
         var publicada = foto(UUID.randomUUID(), false);
 
-        var service = new GaleriaQueryService(agendamentoRepository, fotoEnsaioRepository, configuracaoService);
+        var service = new GaleriaQueryService(agendamentoRepository, fotoEnsaioRepository, configuracaoService, galeriaEnsaioService, selecaoEnsaioRepository, selecaoEnsaioItemRepository);
 
         assertThat(service.isDownloadPermitido(doPacote)).isTrue();
         assertThat(service.isDownloadPermitido(paga)).isTrue();
@@ -143,7 +183,7 @@ class RegrasSegurancaLojaTest {
         var agendamento = agendamentoComLimite(2);
         when(agendamentoRepository.findById(agendamentoId)).thenReturn(Optional.of(agendamento));
 
-        var service = new GaleriaQueryService(agendamentoRepository, fotoEnsaioRepository, configuracaoService);
+        var service = new GaleriaQueryService(agendamentoRepository, fotoEnsaioRepository, configuracaoService, galeriaEnsaioService, selecaoEnsaioRepository, selecaoEnsaioItemRepository);
 
         assertThat(service.getValorUnitarioFotoExtra(agendamentoId))
             .isEqualByComparingTo(new BigDecimal("20.00"));
@@ -210,7 +250,7 @@ class RegrasSegurancaLojaTest {
             .build();
         when(agendamentoRepository.findByTokenGaleria(token)).thenReturn(Optional.of(expirado));
 
-        var service = new GaleriaQueryService(agendamentoRepository, fotoEnsaioRepository, configuracaoService);
+        var service = new GaleriaQueryService(agendamentoRepository, fotoEnsaioRepository, configuracaoService, galeriaEnsaioService, selecaoEnsaioRepository, selecaoEnsaioItemRepository);
 
         assertThatThrownBy(() -> service.buscarAgendamentoPorToken(token))
             .isInstanceOf(com.photoizer.crm.ecommerce.exception.TokenExpiradoException.class);

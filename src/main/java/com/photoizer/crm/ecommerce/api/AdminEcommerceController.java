@@ -66,6 +66,9 @@ public class AdminEcommerceController {
         var totalFotos = fotos.size();
         var publicadas = (int) fotos.stream().filter(f -> f.getStatus() == StatusFoto.PUBLICADA).count();
         var selecionadas = (int) fotos.stream().filter(f -> f.isSelecionadaPacote()).count();
+        var pacoteQuantidadeFotos = agendamento.getPacote() != null
+            ? agendamento.getPacote().getQuantidadeFotos()
+            : 0;
         var pagas = (int) fotos.stream().filter(f -> f.getStatus() == StatusFoto.PAGA).count();
         var aguardando = (int) fotos.stream()
             .filter(f -> f.getCompraExtraId() != null && f.getStatus() == StatusFoto.PUBLICADA)
@@ -81,7 +84,7 @@ public class AdminEcommerceController {
         var favoritosPorFoto = favoritoService.contarFavoritosPorFoto(agendamentoId);
 
         return ResponseEntity.ok(new AdminEcommerceResumoResponse(
-            totalFotos, publicadas, selecionadas, pagas, aguardando,
+            totalFotos, publicadas, selecionadas, pacoteQuantidadeFotos, pagas, aguardando,
             fotosResponse, comprasResponse, valorTotalExtras,
             favoritosPorFoto, favoritosPorFoto.size(), linkGaleria,
             tokenGaleria

@@ -5,6 +5,7 @@ import com.photoizer.crm.ecommerce.exception.FotoIndisponivelException;
 import com.photoizer.crm.ecommerce.exception.FotoNaoEncontradaException;
 import com.photoizer.crm.ecommerce.exception.GaleriaNaoEncontradaException;
 import com.photoizer.crm.foto.model.FotoEnsaio;
+import com.photoizer.crm.foto.model.VersaoFoto;
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -44,7 +45,9 @@ public class DownloadService {
         this.pathResolver = pathResolver;
     }
 
-    public Path downloadFoto(UUID token, UUID fotoId) {
+    public record ArquivoDownload(Path path, String nome) {}
+
+    public ArquivoDownload downloadFoto(UUID token, UUID fotoId) {
         var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
         var foto = fotoEnsaioRepository.findById(fotoId)
             .orElseThrow(() -> new FotoNaoEncontradaException(fotoId));
@@ -59,7 +62,9 @@ public class DownloadService {
         eventPublisher.publishEvent(new FotoDownloadEvent(
             agendamento.getId(), List.of(fotoId)));
 
-        return pathResolver.resolver(foto.getOriginalPath());
+        return new ArquivoDownload(
+            caminhoDownload(foto),
+            nomeArquivoGaleria(foto));
     }
 
     @Transactional(readOnly = true)
@@ -94,10 +99,9 @@ public class DownloadService {
 
             try (var zos = new ZipOutputStream(Files.newOutputStream(zipPath))) {
                 for (var foto : fotos) {
-                    var originalPath = pathResolver.resolver(foto.getOriginalPath());
+                    var originalPath = caminhoDownload(foto);
                     if (Files.exists(originalPath)) {
-                        var entryName = foto.getOrdem() + "_" + foto.getFileName();
-                        zos.putNextEntry(new ZipEntry(entryName));
+                        zos.putNextEntry(new ZipEntry(nomeArquivoGaleria(foto)));
                         Files.copy(originalPath, zos);
                         zos.closeEntry();
                     }
@@ -112,6 +116,36 @@ public class DownloadService {
         } catch (IOException e) {
             limpaTempDir(tempDir);
             throw new GaleriaNaoEncontradaException("Erro ao gerar arquivo ZIP: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Nome amigavel e rastreavel para download: numero da galeria + nome original.
+     * O numero garante unicidade dentro do ZIP e a identificacao usada pelo cliente.
+     */
+    private Path caminhoDownload(FotoEnsaio foto) {
+        if (foto.getVersaoAtual() == VersaoFoto.EDITADA && foto.getEditadaPath() != null) {
+            return pathResolver.resolver(foto.getEditadaPath());
+        }
+        return pathResolver.resolver(foto.getOriginalPath());
+    }
+
+    private static String nomeArquivoGaleria(FotoEnsaio foto) {
+        var identificador = foto.getNumeroGaleria() != null
+            ? String.format("%03d", foto.getNumeroGaleria())
+            : String.valueOf(foto.getOrdem());
+        return identificador + "_" + nomeSeguro(foto.getFileName());
+    }
+
+    private static String nomeSeguro(String nome) {
+        if (nome == null || nome.isBlank()) {
+            return "foto.jpg";
+        }
+        try {
+            var apenasNome = Path.of(nome).getFileName().toString();
+            return apenasNome.replaceAll("[\\r\\n\\p{Cntrl}]", "_");
+        } catch (RuntimeException e) {
+            return "foto.jpg";
         }
     }
 

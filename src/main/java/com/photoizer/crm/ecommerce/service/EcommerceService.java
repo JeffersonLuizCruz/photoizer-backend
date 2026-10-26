@@ -51,6 +51,7 @@ public class EcommerceService {
     private final GaleriaQueryService galeriaQueryService;
     private final CarrinhoService carrinhoService;
     private final SelecaoFotosService selecaoFotosService;
+    private final GaleriaEnsaioService galeriaEnsaioService;
     private final FileValidator fileValidator;
 
     public EcommerceService(FotoEnsaioRepository fotoEnsaioRepository,
@@ -60,6 +61,7 @@ public class EcommerceService {
                             GaleriaQueryService galeriaQueryService,
                             CarrinhoService carrinhoService,
                             SelecaoFotosService selecaoFotosService,
+                            GaleriaEnsaioService galeriaEnsaioService,
                             FileValidator fileValidator) {
         this.fotoEnsaioRepository = fotoEnsaioRepository;
         this.compraExtraRepository = compraExtraRepository;
@@ -68,6 +70,7 @@ public class EcommerceService {
         this.galeriaQueryService = galeriaQueryService;
         this.carrinhoService = carrinhoService;
         this.selecaoFotosService = selecaoFotosService;
+        this.galeriaEnsaioService = galeriaEnsaioService;
         this.fileValidator = fileValidator;
     }
 
@@ -110,6 +113,8 @@ public class EcommerceService {
 
     public CompraExtra checkout(UUID token, UUID sessionId, MetodoPagamento metodoPagamento) {
         var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
+        galeriaEnsaioService.validarComercializacaoPermitida(
+            galeriaEnsaioService.obter(agendamento.getId()));
         var itensCarrinho = carrinhoService.listarCarrinho(token, sessionId);
 
         if (itensCarrinho.isEmpty()) {
@@ -125,13 +130,17 @@ public class EcommerceService {
         if (fotos.isEmpty()) {
             throw new FotoIndisponivelException("Nenhuma foto valida no carrinho");
         }
+        if (fotos.stream().anyMatch(f -> !galeriaQueryService.isFotoComercializavel(f))) {
+            throw new FotoIndisponivelException("Uma ou mais fotos não estão disponíveis para compra");
+        }
 
         if (fotos.stream().anyMatch(FotoEnsaio::isSelecionadaPacote)) {
             throw new FotoIndisponivelException("Fotos ja incluidas no pacote nao podem ser cobradas como extras");
         }
 
-        var valorUnitario = galeriaQueryService.getValorUnitarioFotoExtra(agendamento.getId());
-        var valorTotal = valorUnitario.multiply(BigDecimal.valueOf(fotos.size()))
+        var valorTotal = fotos.stream()
+            .map(foto -> galeriaQueryService.getValorUnitarioExtra(agendamento.getId(), foto.getId()))
+            .reduce(BigDecimal.ZERO, BigDecimal::add)
             .setScale(2, RoundingMode.HALF_UP);
 
         var compra = CompraExtra.builder()

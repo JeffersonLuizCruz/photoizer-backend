@@ -2518,6 +2518,97 @@
         } ]
       }
     },
+    "/api/v1/agendamentos/{agendamentoId}/fotos/{fotoId}/editada" : {
+      "put" : {
+        "tags" : [ "Fotos" ],
+        "summary" : "Enviar a versão editada de uma foto",
+        "description" : "Preserva o RAW, o número de galeria e o nome de exibição. A versão só é exibida ao cliente quando a seleção é publicada.",
+        "operationId" : "uploadEditada",
+        "parameters" : [ {
+          "name" : "agendamentoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "fotoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "arquivo" : {
+                    "type" : "string",
+                    "format" : "binary"
+                  }
+                },
+                "required" : [ "arquivo" ]
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FotoEnsaioResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/agendamentos/{agendamentoId}/fotografos/{fotografoId}" : {
       "put" : {
         "tags" : [ "Fotógrafos do Agendamento" ],
@@ -2760,6 +2851,180 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ConfiguracaoPagamentoResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Um ou mais campos estão inválidos",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/admin/agendamentos/{agendamentoId}/galeria/modo" : {
+      "put" : {
+        "tags" : [ "Admin Galeria" ],
+        "summary" : "Alterar o modo da galeria (DIRETO ou COM_EDICAO)",
+        "operationId" : "alterarModo",
+        "parameters" : [ {
+          "name" : "agendamentoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AlterarModoGaleriaRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/GaleriaEnsaioResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Um ou mais campos estão inválidos",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/admin/agendamentos/{agendamentoId}/galeria/capa" : {
+      "put" : {
+        "tags" : [ "Admin Galeria" ],
+        "summary" : "Definir ou remover a foto de capa da galeria",
+        "operationId" : "definirCapa",
+        "parameters" : [ {
+          "name" : "agendamentoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DefinirCapaRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/GaleriaEnsaioResponse"
                 }
               }
             }
@@ -4486,6 +4751,110 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/SessaoCarrinhoResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ecommerce/galeria/{token}/selecao" : {
+      "get" : {
+        "tags" : [ "Ecommerce" ],
+        "summary" : "Consultar a seleção ativa da galeria",
+        "operationId" : "selecaoAtiva",
+        "parameters" : [ {
+          "name" : "token",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SelecaoEnsaioResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "Ecommerce" ],
+        "summary" : "Enviar a seleção de fotos para edição",
+        "operationId" : "enviarSelecao",
+        "parameters" : [ {
+          "name" : "token",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "X-Session-Id",
+          "in" : "header",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/EnviarSelecaoRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SelecaoEnsaioResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Um ou mais campos estão inválidos",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6394,6 +6763,76 @@
         } ]
       }
     },
+    "/api/v1/agendamentos/{agendamentoId}/fotos/renumerar" : {
+      "post" : {
+        "tags" : [ "Fotos" ],
+        "summary" : "Renumerar a galeria sequencialmente",
+        "description" : "Reatribui 1..N as fotos publicadas e visiveis. Permitido apenas enquanto nenhuma foto foi selecionada, baixada, comprada ou vinculada a uma compra.",
+        "operationId" : "renumerar",
+        "parameters" : [ {
+          "name" : "agendamentoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/FotoEnsaioResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/agendamentos/{agendamentoId}/fotos/remover-lote" : {
       "post" : {
         "tags" : [ "Fotos" ],
@@ -6748,6 +7187,228 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/AgendamentoResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/admin/agendamentos/{agendamentoId}/selecoes/{selecaoId}/reabrir" : {
+      "post" : {
+        "tags" : [ "Admin Seleções" ],
+        "summary" : "Reabrir a seleção para o cliente ajustar",
+        "operationId" : "reabrir",
+        "parameters" : [ {
+          "name" : "agendamentoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "selecaoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SelecaoEnsaioResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/admin/agendamentos/{agendamentoId}/selecoes/{selecaoId}/publicar" : {
+      "post" : {
+        "tags" : [ "Admin Seleções" ],
+        "summary" : "Publicar a edição e liberar a comercialização",
+        "operationId" : "publicar",
+        "parameters" : [ {
+          "name" : "agendamentoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "selecaoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SelecaoEnsaioResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/admin/agendamentos/{agendamentoId}/selecoes/{selecaoId}/iniciar" : {
+      "post" : {
+        "tags" : [ "Admin Seleções" ],
+        "summary" : "Marcar a seleção como em edição",
+        "operationId" : "iniciar",
+        "parameters" : [ {
+          "name" : "agendamentoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "selecaoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SelecaoEnsaioResponse"
                 }
               }
             }
@@ -10733,6 +11394,46 @@
         }
       }
     },
+    "/api/v1/ecommerce/galeria/{token}/capa" : {
+      "get" : {
+        "tags" : [ "Ecommerce" ],
+        "summary" : "Servir a foto de capa da galeria em alta qualidade",
+        "operationId" : "capa",
+        "parameters" : [ {
+          "name" : "token",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "string",
+                  "format" : "binary"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/ecommerce/galeria/{token}/calcular" : {
       "get" : {
         "tags" : [ "Ecommerce" ],
@@ -10782,7 +11483,7 @@
     "/api/v1/ecommerce/fotos/{fotoId}/watermarked" : {
       "get" : {
         "tags" : [ "Ecommerce" ],
-        "summary" : "Servir foto com marca d'água (cache desabilitado)",
+        "summary" : "Servir prévia protegida da foto (baixa resolução)",
         "operationId" : "servirWatermarked",
         "parameters" : [ {
           "name" : "fotoId",
@@ -10822,7 +11523,7 @@
     "/api/v1/ecommerce/fotos/{fotoId}/thumb" : {
       "get" : {
         "tags" : [ "Ecommerce" ],
-        "summary" : "Servir thumbnail público",
+        "summary" : "Servir thumbnail público protegido",
         "operationId" : "servirThumb",
         "parameters" : [ {
           "name" : "fotoId",
@@ -12170,6 +12871,66 @@
         } ]
       }
     },
+    "/api/v1/admin/selecoes/pendentes" : {
+      "get" : {
+        "tags" : [ "Admin Seleções" ],
+        "summary" : "Listar seleções aguardando edição",
+        "operationId" : "pendentes",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/SelecaoPendenteResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/admin/ecommerce/compras" : {
       "get" : {
         "tags" : [ "Admin Compras" ],
@@ -12471,6 +13232,289 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/EcommerceAnalyticsResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/admin/agendamentos/{agendamentoId}/selecoes" : {
+      "get" : {
+        "tags" : [ "Admin Seleções" ],
+        "summary" : "Listar o histórico de seleções do agendamento",
+        "operationId" : "listar",
+        "parameters" : [ {
+          "name" : "agendamentoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/SelecaoEnsaioResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/admin/agendamentos/{agendamentoId}/selecoes/{selecaoId}" : {
+      "get" : {
+        "tags" : [ "Admin Seleções" ],
+        "summary" : "Detalhar a seleção com número e nome de cada foto",
+        "operationId" : "detalhar",
+        "parameters" : [ {
+          "name" : "agendamentoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "selecaoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SelecaoEnsaioResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/admin/agendamentos/{agendamentoId}/selecoes/{selecaoId}/download-zip" : {
+      "get" : {
+        "tags" : [ "Admin Seleções" ],
+        "summary" : "Baixar os originais da seleção para edição",
+        "operationId" : "downloadZip",
+        "parameters" : [ {
+          "name" : "agendamentoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "selecaoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/StreamingResponseBody"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/admin/agendamentos/{agendamentoId}/galeria" : {
+      "get" : {
+        "tags" : [ "Admin Galeria" ],
+        "summary" : "Consultar o modo e a fase da galeria",
+        "operationId" : "obter",
+        "parameters" : [ {
+          "name" : "agendamentoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/GaleriaEnsaioResponse"
                 }
               }
             }
@@ -14110,8 +15154,28 @@
             "type" : "integer",
             "format" : "int32"
           },
+          "numeroGaleria" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
           "status" : {
             "type" : "string"
+          },
+          "versaoAtual" : {
+            "type" : "string"
+          },
+          "temVersaoEditada" : {
+            "type" : "boolean"
+          },
+          "emSelecaoEdicao" : {
+            "type" : "boolean"
+          },
+          "editadaFileName" : {
+            "type" : "string"
+          },
+          "editadaEm" : {
+            "type" : "string",
+            "format" : "date-time"
           },
           "selecionadaPacote" : {
             "type" : "boolean"
@@ -14348,6 +15412,54 @@
             "type" : "string",
             "description" : "Tipo da chave PIX",
             "example" : "CNPJ"
+          }
+        }
+      },
+      "AlterarModoGaleriaRequest" : {
+        "type" : "object",
+        "properties" : {
+          "modo" : {
+            "type" : "string",
+            "enum" : [ "DIRETO", "COM_EDICAO" ]
+          }
+        },
+        "required" : [ "modo" ]
+      },
+      "GaleriaEnsaioResponse" : {
+        "type" : "object",
+        "properties" : {
+          "agendamentoId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "modo" : {
+            "type" : "string"
+          },
+          "fase" : {
+            "type" : "string"
+          },
+          "selecaoAtualId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "capaFotoId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "capaVersao" : {
+            "type" : "string"
+          },
+          "podeAlterarModo" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "DefinirCapaRequest" : {
+        "type" : "object",
+        "properties" : {
+          "fotoId" : {
+            "type" : "string",
+            "format" : "uuid"
           }
         }
       },
@@ -14620,6 +15732,118 @@
         "properties" : {
           "sessao" : {
             "type" : "string"
+          }
+        }
+      },
+      "EnviarSelecaoRequest" : {
+        "type" : "object",
+        "properties" : {
+          "fotoIdsPacote" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "format" : "uuid"
+            },
+            "minItems" : 1
+          },
+          "observacao" : {
+            "type" : "string",
+            "maxLength" : 2000,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "fotoIdsPacote" ]
+      },
+      "SelecaoEnsaioItemResponse" : {
+        "type" : "object",
+        "properties" : {
+          "fotoId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "numeroGaleria" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "nomeArquivo" : {
+            "type" : "string"
+          },
+          "tipo" : {
+            "type" : "string"
+          },
+          "ordem" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "valorUnitario" : {
+            "type" : "number"
+          },
+          "editada" : {
+            "type" : "boolean"
+          },
+          "editadaEm" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "foto" : {
+            "$ref" : "#/components/schemas/FotoEnsaioResponse"
+          }
+        }
+      },
+      "SelecaoEnsaioResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "agendamentoId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "numero" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "observacaoCliente" : {
+            "type" : "string"
+          },
+          "enviadaEm" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "iniciadaEm" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "concluidaEm" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "publicadaEm" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "originaisBaixadosEm" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "quantidadePacote" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "quantidadeExtras" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "itens" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/SelecaoEnsaioItemResponse"
+            }
           }
         }
       },
@@ -16482,6 +17706,47 @@
           },
           "localEnsaio" : {
             "type" : "string"
+          },
+          "clienteNome" : {
+            "type" : "string"
+          },
+          "dataHoraEnsaio" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "capaFotoId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "capaVersao" : {
+            "type" : "string"
+          },
+          "capaUrl" : {
+            "type" : "string"
+          },
+          "modoGaleria" : {
+            "type" : "string"
+          },
+          "faseGaleria" : {
+            "type" : "string"
+          },
+          "podeSelecionar" : {
+            "type" : "boolean"
+          },
+          "podeComprar" : {
+            "type" : "boolean"
+          },
+          "podeBaixar" : {
+            "type" : "boolean"
+          },
+          "selecaoAtual" : {
+            "$ref" : "#/components/schemas/SelecaoEnsaioResponse"
+          },
+          "valoresExtras" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "number"
+            }
           }
         }
       },
@@ -17123,6 +18388,48 @@
           }
         }
       },
+      "SelecaoPendenteResponse" : {
+        "type" : "object",
+        "properties" : {
+          "agendamentoId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "selecaoId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "numero" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "clienteNome" : {
+            "type" : "string"
+          },
+          "pacoteNome" : {
+            "type" : "string"
+          },
+          "quantidadePacote" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "quantidadeExtras" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "enviadaEm" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "diasAguardando" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
       "AdminComprasRelatorioResponse" : {
         "type" : "object",
         "properties" : {
@@ -17215,6 +18522,10 @@
             "format" : "int32"
           },
           "fotosSelecionadasPacote" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "pacoteQuantidadeFotos" : {
             "type" : "integer",
             "format" : "int32"
           },
