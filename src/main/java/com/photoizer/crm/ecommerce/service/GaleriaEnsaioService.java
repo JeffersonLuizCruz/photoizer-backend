@@ -14,6 +14,8 @@ import com.photoizer.crm.foto.model.FotoEnsaio;
 import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.model.VersaoFoto;
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
+import com.photoizer.crm.shared.exception.ErrorCode;
+import com.photoizer.crm.shared.exception.UnprocessableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -25,9 +27,10 @@ import java.util.UUID;
 /**
  * Fachada da configuracao comercial da galeria.
  *
- * <p>A ausencia de linha significa galeria legada. Nesse caso o modo padrao e
- * {@code DIRETO} e a fase {@code COMERCIALIZACAO}, preservando o comportamento
- * anterior a esta funcionalidade.
+ * <p>A ausencia de linha significa galeria nova (ou ainda nao configurada).
+ * O modo padrao e sempre {@code COM_EDICAO}, com fase {@code SELECAO}. O fluxo
+ * legado {@code DIRETO} foi desativado e so permanece legivel para linhas
+ * antigas que nao puderam ser migradas.
  */
 @Service
 @Transactional
@@ -105,7 +108,14 @@ public class GaleriaEnsaioService {
     }
 
     public GaleriaEnsaio alterarModo(UUID agendamentoId, ModoGaleria novoModo) {
+        if (novoModo != ModoGaleria.COM_EDICAO) {
+            throw new UnprocessableException(ErrorCode.MODO_GALERIA_INVALIDO,
+                "O fluxo direto da galeria foi desativado. Use o fluxo com seleção + edição.");
+        }
         var galeria = obterParaAtualizacao(agendamentoId);
+        if (galeria.getModo() == novoModo) {
+            return galeria;
+        }
         if (selecaoRepository.existsByAgendamentoIdAndStatusIn(agendamentoId, STATUS_ATIVOS)) {
             throw new GaleriaEmEdicaoException("alterar o modo enquanto há seleção em andamento");
         }
@@ -219,14 +229,12 @@ public class GaleriaEnsaioService {
 
     private ModoGaleria modoPadrao() {
         var valor = configuracaoService.getValor(ConfigKey.GALERIA_MODO_PADRAO);
-        try {
-            return ModoGaleria.valueOf(valor == null ? "DIRETO" : valor.trim().toUpperCase());
-        } catch (IllegalArgumentException e) {
+        if (valor != null && !"COM_EDICAO".equalsIgnoreCase(valor.trim())) {
             log.atWarn()
-                .addKeyValue("event_action", "galeria.modo_padrao_invalido")
+                .addKeyValue("event_action", "galeria.modo_padrao_ignorado")
                 .addKeyValue("valor", valor)
-                .log("Modo de galeria inválido na configuração; usando DIRETO");
-            return ModoGaleria.DIRETO;
+                .log("Fluxo direto da galeria desativado; usando COM_EDICAO");
         }
+        return ModoGaleria.COM_EDICAO;
     }
 }

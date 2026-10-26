@@ -3001,7 +3001,7 @@
     "/api/v1/admin/agendamentos/{agendamentoId}/galeria/modo" : {
       "put" : {
         "tags" : [ "Admin Galeria" ],
-        "summary" : "Alterar o modo da galeria (DIRETO ou COM_EDICAO)",
+        "summary" : "Alterar o modo da galeria (somente COM_EDICAO; DIRETO foi desativado)",
         "operationId" : "alterarModo",
         "parameters" : [ {
           "name" : "agendamentoId",

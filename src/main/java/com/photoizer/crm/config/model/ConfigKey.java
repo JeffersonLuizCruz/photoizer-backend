@@ -37,7 +37,7 @@ public enum ConfigKey {
     TAXA_DESLOCAMENTO("taxaDeslocamentoPadrao", Type.DECIMAL, "0.00"),
 
     // ── Galeria / E-commerce ────────────────────────────────────
-    GALERIA_MODO_PADRAO("galeriaModoPadrao", Type.TEXT, "DIRETO"),
+    GALERIA_MODO_PADRAO("galeriaModoPadrao", Type.TEXT, "COM_EDICAO"),
 
     // ── Dados da contratada ─────────────────────────────────────
     NOME_FOTOGRAFO("nomeFotografo", Type.TEXT, ""),

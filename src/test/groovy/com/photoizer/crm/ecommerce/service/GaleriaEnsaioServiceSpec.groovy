@@ -1,6 +1,7 @@
 package com.photoizer.crm.ecommerce.service
 
 import com.photoizer.crm.config.service.ConfiguracaoService
+import com.photoizer.crm.config.model.ConfigKey
 import com.photoizer.crm.ecommerce.exception.GaleriaEmEdicaoException
 import com.photoizer.crm.ecommerce.model.FaseGaleria
 import com.photoizer.crm.ecommerce.model.GaleriaEnsaio
@@ -13,6 +14,7 @@ import com.photoizer.crm.foto.model.FotoEnsaio
 import com.photoizer.crm.foto.model.StatusFoto
 import com.photoizer.crm.foto.model.VersaoFoto
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository
+import com.photoizer.crm.shared.exception.UnprocessableException
 import spock.lang.Specification
 import spock.lang.Subject
 
@@ -29,21 +31,44 @@ class GaleriaEnsaioServiceSpec extends Specification {
     def service = new GaleriaEnsaioService(
         galeriaRepository, selecaoRepository, selecaoItemRepository, fotoRepository, configuracaoService)
 
-    def "não permite trocar o modo depois que a edição foi publicada"() {
+    def "não permite migrar galeria legada depois que a edição foi publicada"() {
         given:
-        def galeria = galeria(ModoGaleria.COM_EDICAO, FaseGaleria.COMERCIALIZACAO)
+        def galeria = galeria(ModoGaleria.DIRETO, FaseGaleria.COMERCIALIZACAO)
         galeriaRepository.findById(agendamentoId) >> Optional.of(galeria)
         galeriaRepository.findByIdForUpdate(agendamentoId) >> Optional.of(galeria)
         selecaoRepository.existsByAgendamentoIdAndStatusIn(agendamentoId, [StatusSelecao.ENVIADA, StatusSelecao.EM_EDICAO, StatusSelecao.CONCLUIDA]) >> false
         selecaoRepository.existsByAgendamentoIdAndStatusIn(agendamentoId, [StatusSelecao.PUBLICADA]) >> true
 
         when:
-        service.alterarModo(agendamentoId, ModoGaleria.DIRETO)
+        service.alterarModo(agendamentoId, ModoGaleria.COM_EDICAO)
 
         then:
         def erro = thrown(GaleriaEmEdicaoException)
         erro.message.contains("publicação")
         0 * galeriaRepository.save(_)
+    }
+
+    def "não permite reativar o fluxo direto desativado"() {
+        when:
+        service.alterarModo(agendamentoId, ModoGaleria.DIRETO)
+
+        then:
+        def erro = thrown(UnprocessableException)
+        erro.message.contains("desativado")
+        0 * galeriaRepository.findByIdForUpdate(_)
+    }
+
+    def "galeria sem configuração assume COM_EDICAO na fase de seleção"() {
+        given:
+        galeriaRepository.findById(agendamentoId) >> Optional.empty()
+        configuracaoService.getValor(ConfigKey.GALERIA_MODO_PADRAO) >> "DIRETO"
+
+        when:
+        def galeria = service.obter(agendamentoId)
+
+        then:
+        galeria.modo == ModoGaleria.COM_EDICAO
+        galeria.fase == FaseGaleria.SELECAO
     }
 
     def "permite ativar seleção e edição em galeria limpa"() {

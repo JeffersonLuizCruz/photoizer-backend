@@ -166,7 +166,7 @@ Cada módulo segue a estrutura: `model/`, `repository/`, `service/`, `api/`, DTO
   3. Staff vê a seleção em `/admin/selecoes`, baixa os originais em ZIP com `manifest.csv` e envia as versões editadas.
   4. Staff publica a edição; `EdicaoPublicadaEvent` troca `versaoAtual` para `EDITADA`.
   5. Cliente baixa o pacote editado e compra extras com preço congelado.
-  - O modo é por galeria (`DIRETO`/`COM_EDICAO`), configurado em `/agenda/:id/fotos` (ADMIN). O padrão continua `DIRETO`.
+  - O fluxo legado `DIRETO` foi desativado. O padrão é `COM_EDICAO` (seleção + edição) em `/agenda/:id/fotos`; a `V13` migra as galerias sem uso para `COM_EDICAO/SELECAO`. `DIRETO` só permanece como leitura para linhas antigas não migradas.
 - **Swagger:** `/swagger-ui.html` (UI e `/v3/api-docs` livres em dev, staff autenticado em homolog, negados em prod).
   Padrão completo em `docs/API_DOCUMENTATION_STANDARD.md`. Spec versionada (`docs/api/openapi.json`) gerada por
   `mvn -Dtest=OpenApiSpecExporter test`; validada no build por `OpenApiContractTest` e pela checagem

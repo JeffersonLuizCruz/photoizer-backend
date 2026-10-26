@@ -116,7 +116,8 @@ ecommerce/
 
 ### Pagamento de fotos extras
 - `GET /api/v1/ecommerce/pagamento` (público) retorna o PIX atual do e-commerce.
-- `GET/PUT /api/v1/admin/ecommerce/pagamento` (ADMIN/FOTOGRAFO) edita o PIX global; a alteração reflete em todas as galerias.
+- `GET/PUT /api/v1/admin/ecommerce/pagamento` (**ADMIN**) edita o PIX global; a alteração reflete em todas as galerias. O controle também fica disponível no workspace da galeria (aba Visão geral), por meio do `GaleriaPagamentoPixCard`.
+- A chave não é copiada para a compra: o checkout e a seção `Minhas Compras` sempre exibem a configuração atual. Assim, uma correção feita pelo staff aparece nas compras PIX pendentes após a atualização/polling.
 - `PATCH /api/v1/admin/ecommerce/compras/{id}/link-pagamento` (ADMIN/FOTOGRAFO) define/remove o link de cartão de uma compra.
 - O cliente vê o PIX e o link de cartão no checkout; o link também aparece em `Minhas Compras` com atualização periódica.
 
@@ -157,11 +158,11 @@ ecommerce/
 | 5 | **Optimistic locking** (`@Version`): ausente em todas as entidades | P2 |
 | 6 | **`SessaoResponse.of()`**: único DTO com `static of()` restante (legado) | P3 |
 
-## 7. Galeria com seleção e edição (V8/V9)
+## 7. Galeria com seleção e edição (V8/V9/V13)
 
 O ecommerce passou a suportar dois modos por galeria:
 
-- `DIRETO`: fluxo legado (seleção e compra na mesma galeria).
+- `DIRETO`: fluxo legado **desativado**. Permanece apenas como leitura para linhas antigas que não puderam ser migradas.
 - `COM_EDICAO`: cliente envia a seleção, o staff baixa os originais, edita, sobe as versões editadas e publica antes da comercialização.
 
 ### Modelo
@@ -199,7 +200,10 @@ Staff:
 4. Na comercialização a galeria mostra as fotos da seleção publicada
    (`versaoAtual = EDITADA`) **e** as fotos restantes (fora da seleção). As
    restantes podem ser compradas e entram em edição sob demanda.
-5. Galerias `DIRETO` e existentes continuam com o comportamento anterior.
+5. O fluxo legado `DIRETO` foi desativado (`V13`). Galerias limpas são migradas
+   para `COM_EDICAO/SELECAO`; `DIRETO` só permanece como leitura para linhas
+   antigas com seleção/compra/download/edição, e novas galerias sempre usam
+   `COM_EDICAO`.
 6. O preço dos extras é congelado no snapshot da seleção no momento em que a
    foto entra no carrinho. `getValorUnitarioExtra` considera a seleção ativa
    antes da publicação e a publicada depois dela.
