@@ -8,6 +8,7 @@ import com.photoizer.crm.ecommerce.event.FotoDownloadEvent;
 import com.photoizer.crm.ecommerce.event.FotosSelecionadasEvent;
 import com.photoizer.crm.ecommerce.event.SelecaoCanceladaEvent;
 import com.photoizer.crm.ecommerce.event.SelecaoEnviadaEvent;
+import com.photoizer.crm.ecommerce.event.SelecaoAprovadaEvent;
 import com.photoizer.crm.ecommerce.event.SelecaoExtraAdicionadaEvent;
 import com.photoizer.crm.ecommerce.event.SelecaoExtraRemovidaEvent;
 import com.photoizer.crm.foto.model.StatusFoto;
@@ -119,6 +120,25 @@ public class FotoEcommerceEventListener {
         var fotos = fotoEnsaioRepository.findAllById(event.fotoIds());
         for (var foto : fotos) {
             if (foto.getAgendamentoId().equals(event.agendamentoId())) {
+                foto.setEmSelecaoEdicao(false);
+            }
+        }
+        fotoEnsaioRepository.saveAll(fotos);
+    }
+
+    @EventListener
+    @Transactional
+    public void handleSelecaoAprovada(SelecaoAprovadaEvent event) {
+        log.atInfo()
+            .addKeyValue("event_action", "foto.selecao_aprovada")
+            .addKeyValue("agendamento_id", event.agendamentoId())
+            .addKeyValue("selecao_id", event.selecaoId())
+            .addKeyValue("quantidade", event.fotoIds().size())
+            .log("Seleção aprovada sem edição; fotos liberadas em versão original");
+        var fotos = fotoEnsaioRepository.findAllById(event.fotoIds());
+        for (var foto : fotos) {
+            if (foto.getAgendamentoId().equals(event.agendamentoId())) {
+                // O entregavel deste modo e o original: nao troca versaoAtual.
                 foto.setEmSelecaoEdicao(false);
             }
         }

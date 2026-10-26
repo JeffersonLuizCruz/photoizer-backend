@@ -128,10 +128,11 @@ public class CompraQueryService {
     public List<CompraExtraPendenteEdicaoResponse> listarPendentesEdicao(UUID agendamentoId) {
         var fotosPendentes = fotoService.listarPendentesEdicao().stream()
             .filter(foto -> agendamentoId == null || foto.getAgendamentoId().equals(agendamentoId))
-            // Edição sob demanda só existe no modo COM_EDICAO. Galerias DIRETO
-            // entregam o próprio arquivo original e não entram nesta fila.
+            // Edição sob demanda só existe em galerias que exigem edição.
+            // Galerias SEM_EDICAO/DIRETO entregam o próprio arquivo original e
+            // não entram nesta fila.
             .filter(foto -> galeriaEnsaioService.obter(foto.getAgendamentoId()).getModo()
-                == com.photoizer.crm.ecommerce.model.ModoGaleria.COM_EDICAO)
+                .requerEdicao())
             .toList();
         if (fotosPendentes.isEmpty()) {
             return List.of();

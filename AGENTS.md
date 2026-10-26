@@ -160,13 +160,13 @@ Cada módulo segue a estrutura: `model/`, `repository/`, `service/`, `api/`, DTO
   2. Seleciona fotos, adiciona ao carrinho.
   3. Checkout → gera `CompraExtra`.
   4. Upload comprovante → confirmação admin → fotos liberadas.
-- **Fluxo de Seleção + Edição (modo `COM_EDICAO`):**
+- **Fluxo de Seleção + Edição (modos `COM_EDICAO` e `SEM_EDICAO`):**
   1. Staff publica as fotos; cada uma recebe `numeroGaleria` sequencial e o nome original fica visível.
   2. Cliente seleciona pacote + extras e envia `POST /ecommerce/galeria/{token}/selecao`; a seleção vira snapshot imutável.
-  3. Staff vê a seleção em `/admin/selecoes`, baixa os originais em ZIP com `manifest.csv` e envia as versões editadas.
-  4. Staff publica a edição; `EdicaoPublicadaEvent` troca `versaoAtual` para `EDITADA`.
-  5. Cliente baixa o pacote editado e compra extras com preço congelado.
-  - O fluxo legado `DIRETO` foi desativado. O padrão é `COM_EDICAO` (seleção + edição) em `/agenda/:id/fotos`; a `V13` migra as galerias sem uso para `COM_EDICAO/SELECAO`. `DIRETO` só permanece como leitura para linhas antigas não migradas.
+  3. Em `COM_EDICAO`, o staff vê a seleção em `/admin/selecoes`, baixa os originais em ZIP com `manifest.csv`, envia as versões editadas e publica; `EdicaoPublicadaEvent` troca `versaoAtual` para `EDITADA`.
+  4. Em `SEM_EDICAO`, o staff apenas aprova a seleção (`publicar`); `SelecaoAprovadaEvent` libera o pacote em `versaoAtual = ORIGINAL`, sem passar por edição. Enquanto não houver download ou venda, a seleção aprovada pode ser reaberta (`reabrir`), voltando a galeria para `SELECAO`.
+  5. Cliente baixa o pacote (editado ou original) e compra extras com preço congelado. Extras só ficam baixáveis após a confirmação do pagamento; em `SEM_EDICAO` não entram na fila de edição sob demanda.
+  - O fluxo legado `DIRETO` foi desativado. O padrão é `COM_EDICAO` (seleção + edição) em `/agenda/:id/fotos`; a `V13` migra as galerias sem uso para `COM_EDICAO/SELECAO` e a `V15` adiciona `SEM_EDICAO`. `DIRETO` só permanece como leitura para linhas antigas não migradas.
 - **Swagger:** `/swagger-ui.html` (UI e `/v3/api-docs` livres em dev, staff autenticado em homolog, negados em prod).
   Padrão completo em `docs/API_DOCUMENTATION_STANDARD.md`. Spec versionada (`docs/api/openapi.json`) gerada por
   `mvn -Dtest=OpenApiSpecExporter test`; validada no build por `OpenApiContractTest` e pela checagem

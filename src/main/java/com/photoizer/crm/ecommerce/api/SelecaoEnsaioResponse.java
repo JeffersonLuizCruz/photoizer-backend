@@ -17,5 +17,6 @@ public record SelecaoEnsaioResponse(
     LocalDateTime originaisBaixadosEm,
     long quantidadePacote,
     long quantidadeExtras,
-    List<SelecaoEnsaioItemResponse> itens
+    List<SelecaoEnsaioItemResponse> itens,
+    boolean podeReabrir
 ) {}

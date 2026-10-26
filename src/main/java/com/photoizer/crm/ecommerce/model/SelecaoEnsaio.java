@@ -98,6 +98,16 @@ public class SelecaoEnsaio {
         publicadaEm = LocalDateTime.now();
     }
 
+    /**
+     * Aprova a selecao no fluxo sem edicao. O snapshot passa de ENVIADA
+     * direto para PUBLICADA, sem marcar itens como editados.
+     */
+    public void aprovar() {
+        status.validarTransicao(StatusSelecao.PUBLICADA);
+        status = StatusSelecao.PUBLICADA;
+        publicadaEm = LocalDateTime.now();
+    }
+
     public void cancelar() {
         status.validarTransicao(StatusSelecao.CANCELADA);
         status = StatusSelecao.CANCELADA;

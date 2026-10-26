@@ -21,6 +21,7 @@ public record GaleriaResponse(
     String capaUrl,
     String modoGaleria,
     String faseGaleria,
+    boolean requerEdicao,
     boolean podeSelecionar,
     boolean podeComprar,
     boolean podeBaixar,

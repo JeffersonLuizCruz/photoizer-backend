@@ -97,20 +97,22 @@ public class GaleriaEnsaioService {
                 "Galeria não encontrada após criação: " + agendamentoId));
     }
 
-    public boolean podeAlterarModo(UUID agendamentoId) {        if (selecaoRepository.existsByAgendamentoIdAndStatusIn(agendamentoId, STATUS_ATIVOS)) {
+    public boolean podeAlterarModo(UUID agendamentoId) {
+        if (selecaoRepository.existsByAgendamentoIdAndStatusIn(agendamentoId, STATUS_ATIVOS)) {
             return false;
         }
         if (selecaoRepository.existsByAgendamentoIdAndStatusIn(
                 agendamentoId, List.of(StatusSelecao.PUBLICADA))) {
             return false;
         }
-        return !temVendaOuDownload(agendamentoId);
+        return !temVendaOuDownload(agendamentoId) && !temEdicaoRealizada(agendamentoId);
     }
 
     public GaleriaEnsaio alterarModo(UUID agendamentoId, ModoGaleria novoModo) {
-        if (novoModo != ModoGaleria.COM_EDICAO) {
+        if (!novoModo.disponivelParaNovasGalerias()) {
             throw new UnprocessableException(ErrorCode.MODO_GALERIA_INVALIDO,
-                "O fluxo direto da galeria foi desativado. Use o fluxo com seleção + edição.");
+                "O fluxo direto da galeria foi desativado. Use o fluxo com seleção "
+                    + "e edição ou o fluxo sem edição.");
         }
         var galeria = obterParaAtualizacao(agendamentoId);
         if (galeria.getModo() == novoModo) {
@@ -121,15 +123,16 @@ public class GaleriaEnsaioService {
         }
         if (selecaoRepository.existsByAgendamentoIdAndStatusIn(
                 agendamentoId, List.of(StatusSelecao.PUBLICADA))) {
-            throw new GaleriaEmEdicaoException("alterar o modo após a publicação da edição");
+            throw new GaleriaEmEdicaoException("alterar o modo após a publicação da seleção");
         }
         if (temVendaOuDownload(agendamentoId)) {
             throw new GaleriaEmEdicaoException("alterar o modo após venda ou download");
         }
+        if (temEdicaoRealizada(agendamentoId)) {
+            throw new GaleriaEmEdicaoException("alterar o modo após o envio de versões editadas");
+        }
         galeria.setModo(novoModo);
-        galeria.setFase(novoModo == ModoGaleria.COM_EDICAO
-            ? FaseGaleria.SELECAO
-            : FaseGaleria.COMERCIALIZACAO);
+        galeria.setFase(faseInicial(novoModo));
         galeria.setSelecaoAtualId(null);
         log.atInfo()
             .addKeyValue("event_action", "galeria.modo_alterado")
@@ -169,7 +172,7 @@ public class GaleriaEnsaioService {
             throw new com.photoizer.crm.ecommerce.exception.FotoIndisponivelException(
                 "A foto de capa precisa estar visível e publicada");
         }
-        if (galeria.getModo() == ModoGaleria.COM_EDICAO
+        if (galeria.getModo().usaSelecaoSnapshot()
             && galeria.getFase() == FaseGaleria.COMERCIALIZACAO) {
             var publicada = selecaoRepository
                 .findFirstByAgendamentoIdAndStatusInOrderByNumeroDesc(
@@ -199,6 +202,14 @@ public class GaleriaEnsaioService {
         return galeriaRepository.save(galeria);
     }
 
+    /**
+     * Reabertura permitida enquanto nenhuma foto foi baixada ou vendida.
+     * Usada pela reabertura de uma seleção SEM_EDICAO já aprovada.
+     */
+    public boolean podeReabrirSelecao(UUID agendamentoId) {
+        return !temVendaOuDownload(agendamentoId);
+    }
+
     private boolean temVendaOuDownload(UUID agendamentoId) {
         var fotos = fotoRepository.findByAgendamentoIdOrderByOrdemAsc(agendamentoId);
         return fotos.stream().anyMatch(f ->
@@ -207,6 +218,16 @@ public class GaleriaEnsaioService {
                 || f.getStatus() == StatusFoto.PAGA
                 || f.getStatus() == StatusFoto.AGUARDANDO_COMPROVANTE
                 || f.getStatus() == StatusFoto.AGUARDANDO_CONFIRMACAO);
+    }
+
+    /**
+     * Existe trabalho de edicao ja feito para este ensaio. Trocar para o modo
+     * sem edicao descartaria esse trabalho e mudaria o entregavel do cliente.
+     */
+    private boolean temEdicaoRealizada(UUID agendamentoId) {
+        var fotos = fotoRepository.findByAgendamentoIdOrderByOrdemAsc(agendamentoId);
+        return fotos.stream().anyMatch(f ->
+            f.getEditadaPath() != null || f.getVersaoAtual() == VersaoFoto.EDITADA);
     }
 
     public void validarSelecaoPermitida(GaleriaEnsaio galeria) {
@@ -222,18 +243,26 @@ public class GaleriaEnsaioService {
     }
 
     private FaseGaleria faseInicial(ModoGaleria modo) {
-        return modo == ModoGaleria.COM_EDICAO
+        return modo.usaSelecaoSnapshot()
             ? FaseGaleria.SELECAO
             : FaseGaleria.COMERCIALIZACAO;
     }
 
     private ModoGaleria modoPadrao() {
         var valor = configuracaoService.getValor(ConfigKey.GALERIA_MODO_PADRAO);
-        if (valor != null && !"COM_EDICAO".equalsIgnoreCase(valor.trim())) {
+        if (valor != null && !valor.isBlank()) {
+            try {
+                var configurado = ModoGaleria.valueOf(valor.trim().toUpperCase());
+                if (configurado.disponivelParaNovasGalerias()) {
+                    return configurado;
+                }
+            } catch (IllegalArgumentException ignored) {
+                // Valor invalido: cai no default abaixo.
+            }
             log.atWarn()
                 .addKeyValue("event_action", "galeria.modo_padrao_ignorado")
                 .addKeyValue("valor", valor)
-                .log("Fluxo direto da galeria desativado; usando COM_EDICAO");
+                .log("Modo padrão de galeria inválido ou desativado; usando COM_EDICAO");
         }
         return ModoGaleria.COM_EDICAO;
     }

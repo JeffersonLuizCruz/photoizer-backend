@@ -78,6 +78,14 @@ public class GaleriaEnsaio {
         this.fase = FaseGaleria.COMERCIALIZACAO;
     }
 
+    /**
+     * Aprova a selecao sem edicao: o snapshot fica congelado e a galeria passa
+     * direto para comercializacao, entregando os arquivos originais.
+     */
+    public void aprovarSemEdicao() {
+        this.fase = FaseGaleria.COMERCIALIZACAO;
+    }
+
     public void reabrirSelecao() {
         this.selecaoAtualId = null;
         this.fase = FaseGaleria.SELECAO;

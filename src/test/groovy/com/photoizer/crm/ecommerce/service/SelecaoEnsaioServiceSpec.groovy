@@ -2,6 +2,7 @@ package com.photoizer.crm.ecommerce.service
 
 import com.photoizer.crm.agenda.model.Agendamento
 import com.photoizer.crm.ecommerce.event.EdicaoPublicadaEvent
+import com.photoizer.crm.ecommerce.event.SelecaoCanceladaEvent
 import com.photoizer.crm.ecommerce.event.SelecaoEnviadaEvent
 import com.photoizer.crm.ecommerce.event.SelecaoExtraAdicionadaEvent
 import com.photoizer.crm.ecommerce.event.SelecaoExtraRemovidaEvent
@@ -110,6 +111,7 @@ class SelecaoEnsaioServiceSpec extends Specification {
         given:
         def selecao = selecao(StatusSelecao.CONCLUIDA)
         def itens = [item(1, false), item(2, true)]
+        galeriaService.obterParaAtualizacao(agendamentoId) >> galeria()
         selecaoRepository.findByIdForUpdate(selecao.id) >> Optional.of(selecao)
         itemRepository.findBySelecaoIdOrderByNumeroGaleriaAsc(selecao.id) >> itens
 
@@ -130,6 +132,7 @@ class SelecaoEnsaioServiceSpec extends Specification {
         selecaoRepository.findByIdForUpdate(selecao.id) >> Optional.of(selecao)
         itemRepository.findBySelecaoIdOrderByNumeroGaleriaAsc(selecao.id) >> itens
         galeriaService.obterParaAtualizacao(agendamentoId) >> galeria()
+        galeriaService.obter(agendamentoId) >> galeria()
         selecaoRepository.save(_ as SelecaoEnsaio) >> { args -> args[0] }
         fotoRepository.findAllById(_ as Iterable) >> fotos
 
@@ -138,21 +141,145 @@ class SelecaoEnsaioServiceSpec extends Specification {
 
         then:
         resposta.status == 'PUBLICADA'
+        !resposta.podeReabrir
         1 * eventPublisher.publishEvent({ it instanceof EdicaoPublicadaEvent
             && it.agendamentoId() == agendamentoId
             && it.fotoIds().size() == 2 })
     }
 
-    def "bloqueia reabertura de seleção já publicada"() {
+    def "aprova seleção sem edição e libera a comercialização"() {
+        given:
+        def selecao = selecao(StatusSelecao.ENVIADA)
+        def itens = [item(1, false), item(2, false)]
+        def fotos = [foto(1), foto(2)]
+        def galeria = galeria(ModoGaleria.SEM_EDICAO)
+        galeriaService.obterParaAtualizacao(agendamentoId) >> galeria
+        galeriaService.obter(agendamentoId) >> galeria
+        galeriaService.podeReabrirSelecao(agendamentoId) >> true
+        selecaoRepository.findByIdForUpdate(selecao.id) >> Optional.of(selecao)
+        itemRepository.findBySelecaoIdOrderByNumeroGaleriaAsc(selecao.id) >> itens
+        selecaoRepository.save(_ as SelecaoEnsaio) >> { args -> args[0] }
+        fotoRepository.findAllById(_ as Iterable) >> fotos
+
+        when:
+        def resposta = service.publicar(agendamentoId, selecao.id)
+
+        then:
+        resposta.status == 'PUBLICADA'
+        resposta.quantidadePacote == 2
+        resposta.podeReabrir
+        1 * eventPublisher.publishEvent({ it instanceof com.photoizer.crm.ecommerce.event.SelecaoAprovadaEvent
+            && it.agendamentoId() == agendamentoId
+            && it.fotoIds().size() == 2 })
+        0 * eventPublisher.publishEvent({ it instanceof EdicaoPublicadaEvent })
+    }
+
+    def "aprovação sem edição não exige itens editados"() {
+        given:
+        def selecao = selecao(StatusSelecao.ENVIADA)
+        def itens = [item(1, false)]
+        def galeria = galeria(ModoGaleria.SEM_EDICAO)
+        galeriaService.obterParaAtualizacao(agendamentoId) >> galeria
+        galeriaService.obter(agendamentoId) >> galeria
+        galeriaService.podeReabrirSelecao(agendamentoId) >> true
+        selecaoRepository.findByIdForUpdate(selecao.id) >> Optional.of(selecao)
+        itemRepository.findBySelecaoIdOrderByNumeroGaleriaAsc(selecao.id) >> itens
+        selecaoRepository.save(_ as SelecaoEnsaio) >> { args -> args[0] }
+        fotoRepository.findAllById(_ as Iterable) >> [foto(1)]
+
+        when:
+        service.publicar(agendamentoId, selecao.id)
+
+        then:
+        noExceptionThrown()
+        selecao.status == StatusSelecao.PUBLICADA
+        selecao.publicadaEm != null
+        itens.every { !it.editada }
+    }
+
+    def "bloqueia início de edição em galeria sem edição"() {
+        given:
+        galeriaService.obterParaAtualizacao(agendamentoId) >> galeria(ModoGaleria.SEM_EDICAO)
+        def selecao = selecao(StatusSelecao.ENVIADA)
+        selecaoRepository.findById(selecao.id) >> Optional.of(selecao)
+
+        when:
+        service.iniciar(agendamentoId, selecao.id)
+
+        then:
+        thrown(SelecaoNaoEditavelException)
+        0 * selecaoRepository.save(_)
+    }
+
+    def "bloqueia download de originais em galeria sem edição"() {
+        given:
+        galeriaService.obterParaAtualizacao(agendamentoId) >> galeria(ModoGaleria.SEM_EDICAO)
+        def selecao = selecao(StatusSelecao.ENVIADA)
+        selecaoRepository.findById(selecao.id) >> Optional.of(selecao)
+
+        when:
+        service.registrarDownloadOriginais(agendamentoId, selecao.id)
+
+        then:
+        thrown(SelecaoNaoEditavelException)
+        0 * selecaoRepository.save(_)
+    }
+
+    def "bloqueia reabertura de seleção publicada em galeria com edição"() {
         given:
         def selecao = selecao(StatusSelecao.PUBLICADA)
-        selecaoRepository.findById(selecao.id) >> Optional.of(selecao)
+        galeriaService.obterParaAtualizacao(agendamentoId) >> galeria(ModoGaleria.COM_EDICAO)
+        selecaoRepository.findByIdForUpdate(selecao.id) >> Optional.of(selecao)
+        itemRepository.findBySelecaoIdOrderByNumeroGaleriaAsc(selecao.id) >> [item(1, true)]
 
         when:
         service.reabrir(agendamentoId, selecao.id)
 
         then:
         thrown(SelecaoNaoEditavelException)
+        0 * selecaoRepository.save(_)
+    }
+
+    def "reabre seleção SEM_EDICAO aprovada sem download ou venda"() {
+        given:
+        def selecao = selecao(StatusSelecao.PUBLICADA)
+        def galeria = galeria(ModoGaleria.SEM_EDICAO)
+        galeria.fase = FaseGaleria.COMERCIALIZACAO
+        galeriaService.obterParaAtualizacao(agendamentoId) >> galeria
+        galeriaService.podeReabrirSelecao(agendamentoId) >> true
+        selecaoRepository.findByIdForUpdate(selecao.id) >> Optional.of(selecao)
+        itemRepository.findBySelecaoIdOrderByNumeroGaleriaAsc(selecao.id) >> [item(1, false)]
+        selecaoRepository.save(_ as SelecaoEnsaio) >> { args -> args[0] }
+        fotoRepository.findAllById(_ as Iterable) >> [foto(1)]
+
+        when:
+        def resposta = service.reabrir(agendamentoId, selecao.id)
+
+        then:
+        resposta.status == 'CANCELADA'
+        !resposta.podeReabrir
+        galeria.fase == FaseGaleria.SELECAO
+        1 * eventPublisher.publishEvent({ it instanceof SelecaoCanceladaEvent
+            && it.agendamentoId() == agendamentoId
+            && it.fotoIds().size() == 1 })
+    }
+
+    def "bloqueia reabertura SEM_EDICAO após download ou venda"() {
+        given:
+        def selecao = selecao(StatusSelecao.PUBLICADA)
+        def galeria = galeria(ModoGaleria.SEM_EDICAO)
+        galeria.fase = FaseGaleria.COMERCIALIZACAO
+        galeriaService.obterParaAtualizacao(agendamentoId) >> galeria
+        galeriaService.podeReabrirSelecao(agendamentoId) >> false
+        selecaoRepository.findByIdForUpdate(selecao.id) >> Optional.of(selecao)
+        itemRepository.findBySelecaoIdOrderByNumeroGaleriaAsc(selecao.id) >> [item(1, false)]
+
+        when:
+        service.reabrir(agendamentoId, selecao.id)
+
+        then:
+        def erro = thrown(SelecaoNaoEditavelException)
+        erro.message.contains("download ou venda")
         0 * selecaoRepository.save(_)
     }
 
@@ -329,10 +456,14 @@ class SelecaoEnsaioServiceSpec extends Specification {
     }
 
     private GaleriaEnsaio galeria() {
+        return galeria(ModoGaleria.COM_EDICAO)
+    }
+
+    private GaleriaEnsaio galeria(ModoGaleria modo) {
         return GaleriaEnsaio.builder()
             .agendamentoId(agendamentoId)
-            .modo(ModoGaleria.COM_EDICAO)
-            .fase(FaseGaleria.SELECAO)
+            .modo(modo)
+            .fase(modo.requerEdicao() ? FaseGaleria.SELECAO : FaseGaleria.SELECAO_ENVIADA)
             .build()
     }
 

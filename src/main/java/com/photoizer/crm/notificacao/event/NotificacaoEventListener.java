@@ -95,10 +95,11 @@ public class NotificacaoEventListener {
 
         var mensagem = "O cliente " + event.clienteNome() + " enviou "
             + event.quantidadePacote() + " foto(s) do pacote e "
-            + event.quantidadeExtras() + " extra(s) para edição.";
+            + event.quantidadeExtras() + " extra(s) "
+            + (event.requerEdicao() ? "para edição." : "aguardando aprovação.");
         notificarFotografos(
             destinatarios,
-            "Seleção recebida para edição",
+            event.requerEdicao() ? "Seleção recebida para edição" : "Seleção recebida para aprovação",
             mensagem,
             "/agenda/" + event.agendamentoId() + "/selecoes",
             TipoNotificacao.SELECAO_ENVIADA

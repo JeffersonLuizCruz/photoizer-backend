@@ -9,13 +9,14 @@ import com.photoizer.crm.ecommerce.event.SelecaoCanceladaEvent;
 import com.photoizer.crm.ecommerce.event.SelecaoEnviadaEvent;
 import com.photoizer.crm.ecommerce.event.SelecaoExtraAdicionadaEvent;
 import com.photoizer.crm.ecommerce.event.SelecaoExtraRemovidaEvent;
+import com.photoizer.crm.ecommerce.event.SelecaoAprovadaEvent;
 import com.photoizer.crm.ecommerce.exception.FotoIndisponivelException;
 import com.photoizer.crm.ecommerce.exception.FotoNaoEncontradaException;
 import com.photoizer.crm.ecommerce.exception.FotosEditadasIncompletasException;
 import com.photoizer.crm.ecommerce.exception.SelecaoJaEnviadaException;
 import com.photoizer.crm.ecommerce.exception.SelecaoNaoEditavelException;
 import com.photoizer.crm.ecommerce.exception.SelecaoNaoEncontradaException;
-import com.photoizer.crm.ecommerce.model.ModoGaleria;
+import com.photoizer.crm.ecommerce.model.GaleriaEnsaio;
 import com.photoizer.crm.ecommerce.model.SelecaoEnsaio;
 import com.photoizer.crm.ecommerce.model.SelecaoEnsaioItem;
 import com.photoizer.crm.ecommerce.model.StatusSelecao;
@@ -100,9 +101,9 @@ public class SelecaoEnsaioService {
         var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
         var galeria = galeriaService.obterParaAtualizacao(agendamento.getId());
 
-        if (galeria.getModo() != ModoGaleria.COM_EDICAO) {
+        if (!galeria.getModo().usaSelecaoSnapshot()) {
             throw new SelecaoNaoEditavelException(
-                "Esta galeria não está habilitada para envio de seleção para edição");
+                "Esta galeria não está habilitada para envio de seleção");
         }
         galeriaService.validarSelecaoPermitida(galeria);
         if (selecaoRepository.existsByAgendamentoIdAndStatusIn(agendamento.getId(), STATUS_ATIVOS)) {
@@ -185,7 +186,8 @@ public class SelecaoEnsaioService {
             (int) itens.stream().filter(i -> i.getTipo() == TipoItemSelecao.EXTRA).count(),
             agendamento.nomeCliente(),
             agendamento.getEditor() != null ? agendamento.getEditor().getId() : null,
-            agendamento.getFotografo() != null ? agendamento.getFotografo().getId() : null
+            agendamento.getFotografo() != null ? agendamento.getFotografo().getId() : null,
+            galeria.getModo().requerEdicao()
         ));
 
         log.atInfo()
@@ -329,17 +331,22 @@ public class SelecaoEnsaioService {
                     itens.stream().filter(i -> i.getTipo() == TipoItemSelecao.EXTRA).count(),
                     selecao.getEnviadaEm(),
                     Math.max(0, ChronoUnit.DAYS.between(
-                        selecao.getEnviadaEm().toLocalDate(), LocalDate.now()))
+                        selecao.getEnviadaEm().toLocalDate(), LocalDate.now())),
+                    galeriaService.obter(selecao.getAgendamentoId()).getModo().requerEdicao()
                 );
             })
             .toList();
     }
 
     public SelecaoEnsaioResponse iniciar(UUID agendamentoId, UUID selecaoId) {
+        var galeria = galeriaService.obterParaAtualizacao(agendamentoId);
+        if (!galeria.getModo().requerEdicao()) {
+            throw new SelecaoNaoEditavelException(
+                "Esta galeria não passa por edição; use a aprovação da seleção");
+        }
         var selecao = buscarSelecao(agendamentoId, selecaoId);
         if (selecao.getStatus() == StatusSelecao.ENVIADA) {
             selecao.iniciarEdicao();
-            var galeria = galeriaService.obterParaAtualizacao(agendamentoId);
             galeria.iniciarEdicao();
             selecaoRepository.save(selecao);
         }
@@ -347,6 +354,11 @@ public class SelecaoEnsaioService {
     }
 
     public void registrarDownloadOriginais(UUID agendamentoId, UUID selecaoId) {
+        var galeria = galeriaService.obterParaAtualizacao(agendamentoId);
+        if (!galeria.getModo().requerEdicao()) {
+            throw new SelecaoNaoEditavelException(
+                "Esta galeria não passa por edição; não há originais para baixar");
+        }
         var selecao = buscarSelecao(agendamentoId, selecaoId);
         if (selecao.getStatus() == StatusSelecao.ENVIADA) {
             selecao.iniciarEdicao();
@@ -354,22 +366,30 @@ public class SelecaoEnsaioService {
         selecao.registrarDownloadOriginais();
         selecaoRepository.save(selecao);
         if (selecao.getStatus() == StatusSelecao.EM_EDICAO) {
-            var galeria = galeriaService.obterParaAtualizacao(agendamentoId);
             galeria.iniciarEdicao();
         }
     }
 
     public SelecaoEnsaioResponse reabrir(UUID agendamentoId, UUID selecaoId) {
-        var selecao = buscarSelecao(agendamentoId, selecaoId);
-        if (selecao.getStatus() == StatusSelecao.PUBLICADA) {
-            throw new SelecaoNaoEditavelException(
-                "Seleção já publicada não pode ser reaberta. Crie uma nova seleção.");
-        }
+        // Galeria bloqueada antes da seleção, na mesma ordem de enviar/publicar.
+        var galeria = galeriaService.obterParaAtualizacao(agendamentoId);
+        var selecao = buscarSelecaoParaAtualizacao(agendamentoId, selecaoId);
         var itens = itemRepository.findBySelecaoIdOrderByNumeroGaleriaAsc(selecaoId);
+
+        if (selecao.getStatus() == StatusSelecao.PUBLICADA) {
+            if (!galeria.getModo().entregaOriginal()) {
+                throw new SelecaoNaoEditavelException(
+                    "Seleção já publicada não pode ser reaberta. Crie uma nova seleção.");
+            }
+            if (!galeriaService.podeReabrirSelecao(agendamentoId)) {
+                throw new SelecaoNaoEditavelException(
+                    "Seleção aprovada não pode ser reaberta após download ou venda das fotos.");
+            }
+        }
+
         selecao.cancelar();
         selecaoRepository.save(selecao);
 
-        var galeria = galeriaService.obterParaAtualizacao(agendamentoId);
         galeria.reabrirSelecao();
         eventPublisher.publishEvent(new SelecaoCanceladaEvent(
             agendamentoId, selecaoId, itens.stream().map(SelecaoEnsaioItem::getFotoId).toList()));
@@ -378,21 +398,38 @@ public class SelecaoEnsaioService {
             .addKeyValue("event_action", "selecao.reaberta")
             .addKeyValue("agendamento_id", agendamentoId)
             .addKeyValue("selecao_id", selecaoId)
+            .addKeyValue("modo", galeria.getModo())
             .log("Seleção reaberta para o cliente");
         return paraResponse(selecao, itens);
     }
 
     public SelecaoEnsaioResponse publicar(UUID agendamentoId, UUID selecaoId) {
-        // O lock serializa a publicação com a inclusão de extras pelo cliente.
-        // Sem ele, um extra poderia entrar depois da checagem de "tudo editado".
+        // A galeria e bloqueada antes da selecao para manter a mesma ordem de
+        // locks de enviar() e evitar deadlock entre envio e publicacao/aprovacao.
+        var galeria = galeriaService.obterParaAtualizacao(agendamentoId);
         var selecao = buscarSelecaoParaAtualizacao(agendamentoId, selecaoId);
         var itens = itemRepository.findBySelecaoIdOrderByNumeroGaleriaAsc(selecaoId);
+
+        if (selecao.getStatus() == StatusSelecao.PUBLICADA) {
+            return paraResponse(selecao, itens);
+        }
+        if (!galeria.getModo().usaSelecaoSnapshot()) {
+            throw new SelecaoNaoEditavelException("Esta galeria não possui seleção");
+        }
+
+        if (galeria.getModo().requerEdicao()) {
+            publicarEdicao(galeria, selecao, itens);
+        } else {
+            aprovarSemEdicao(galeria, selecao, itens);
+        }
+        return paraResponse(selecao, itens);
+    }
+
+    private void publicarEdicao(GaleriaEnsaio galeria,
+                                SelecaoEnsaio selecao, List<SelecaoEnsaioItem> itens) {
         var pendentes = itens.stream().filter(i -> !i.isEditada()).count();
         if (pendentes > 0) {
             throw new FotosEditadasIncompletasException(pendentes);
-        }
-        if (selecao.getStatus() == StatusSelecao.PUBLICADA) {
-            return paraResponse(selecao, itens);
         }
         if (selecao.getStatus() == StatusSelecao.ENVIADA) {
             selecao.iniciarEdicao();
@@ -403,18 +440,35 @@ public class SelecaoEnsaioService {
         selecao.publicar();
         selecaoRepository.save(selecao);
 
-        var galeria = galeriaService.obterParaAtualizacao(agendamentoId);
         galeria.publicarEdicao();
         eventPublisher.publishEvent(new EdicaoPublicadaEvent(
-            agendamentoId, selecaoId, itens.stream().map(SelecaoEnsaioItem::getFotoId).toList()));
+            galeria.getAgendamentoId(), selecao.getId(),
+            itens.stream().map(SelecaoEnsaioItem::getFotoId).toList()));
 
         log.atInfo()
             .addKeyValue("event_action", "selecao.publicada")
-            .addKeyValue("agendamento_id", agendamentoId)
-            .addKeyValue("selecao_id", selecaoId)
+            .addKeyValue("agendamento_id", galeria.getAgendamentoId())
+            .addKeyValue("selecao_id", selecao.getId())
             .addKeyValue("quantidade", itens.size())
             .log("Edição publicada para o cliente");
-        return paraResponse(selecao, itens);
+    }
+
+    private void aprovarSemEdicao(GaleriaEnsaio galeria,
+                                  SelecaoEnsaio selecao, List<SelecaoEnsaioItem> itens) {
+        selecao.aprovar();
+        selecaoRepository.save(selecao);
+
+        galeria.aprovarSemEdicao();
+        eventPublisher.publishEvent(new SelecaoAprovadaEvent(
+            galeria.getAgendamentoId(), selecao.getId(),
+            itens.stream().map(SelecaoEnsaioItem::getFotoId).toList()));
+
+        log.atInfo()
+            .addKeyValue("event_action", "selecao.aprovada")
+            .addKeyValue("agendamento_id", galeria.getAgendamentoId())
+            .addKeyValue("selecao_id", selecao.getId())
+            .addKeyValue("quantidade", itens.size())
+            .log("Seleção aprovada sem edição; fotos originais liberadas");
     }
 
     /**
@@ -528,6 +582,17 @@ public class SelecaoEnsaioService {
                     .map(fotoMapper::toResponse)
                     .orElse(null)))
             .toList();
+
+        var status = selecao.getStatus();
+        var podeReabrir = status == StatusSelecao.ENVIADA
+            || status == StatusSelecao.EM_EDICAO
+            || status == StatusSelecao.CONCLUIDA;
+        if (status == StatusSelecao.PUBLICADA) {
+            var galeria = galeriaService.obter(selecao.getAgendamentoId());
+            podeReabrir = galeria.getModo().entregaOriginal()
+                && galeriaService.podeReabrirSelecao(selecao.getAgendamentoId());
+        }
+
         return new SelecaoEnsaioResponse(
             selecao.getId(),
             selecao.getAgendamentoId(),
@@ -541,6 +606,7 @@ public class SelecaoEnsaioService {
             selecao.getOriginaisBaixadosEm(),
             itens.stream().filter(i -> i.getTipo() == TipoItemSelecao.PACOTE).count(),
             itens.stream().filter(i -> i.getTipo() == TipoItemSelecao.EXTRA).count(),
-            itensResponse);
+            itensResponse,
+            podeReabrir);
     }
 }

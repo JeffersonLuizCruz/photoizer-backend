@@ -39,7 +39,7 @@ public class AdminGaleriaEnsaioController {
 
     @PutMapping("/modo")
     @RolesAllowed({"ADMIN"})
-    @Operation(summary = "Alterar o modo da galeria (somente COM_EDICAO; DIRETO foi desativado)")
+    @Operation(summary = "Alterar o modo da galeria (COM_EDICAO ou SEM_EDICAO; DIRETO foi desativado)")
     public ResponseEntity<GaleriaEnsaioResponse> alterarModo(
             @PathVariable UUID agendamentoId,
             @Valid @RequestBody AlterarModoGaleriaRequest request) {
@@ -68,6 +68,7 @@ public class AdminGaleriaEnsaioController {
             galeria.getSelecaoAtualId(),
             galeria.getCapaFotoId(),
             galeria.getCapaVersao() != null ? galeria.getCapaVersao().name() : null,
+            galeria.getModo().requerEdicao(),
             galeriaService.podeAlterarModo(galeria.getAgendamentoId()));
     }
 }

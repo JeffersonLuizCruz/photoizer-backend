@@ -9,5 +9,6 @@ public record GaleriaEnsaioResponse(
     UUID selecaoAtualId,
     UUID capaFotoId,
     String capaVersao,
+    boolean requerEdicao,
     boolean podeAlterarModo
 ) {}

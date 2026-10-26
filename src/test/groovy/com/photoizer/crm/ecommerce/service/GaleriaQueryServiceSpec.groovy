@@ -39,6 +39,51 @@ class GaleriaQueryServiceSpec extends Specification {
         selecaoRepository,
         selecaoItemRepository)
 
+    def "download do pacote em galeria sem edição usa o original após aprovação"() {
+        given:
+        def foto = foto(VersaoFoto.ORIGINAL)
+        foto.selecionadaPacote = true
+        galeriaEnsaioService.obter(agendamentoId) >>
+            galeria(ModoGaleria.SEM_EDICAO, FaseGaleria.COMERCIALIZACAO)
+
+        expect:
+        service.isDownloadPermitido(foto)
+    }
+
+    def "extra em galeria sem edição só é baixável depois de confirmado o pagamento"() {
+        given:
+        def publicada = foto(VersaoFoto.ORIGINAL)
+        def paga = foto(VersaoFoto.ORIGINAL)
+        paga.status = StatusFoto.PAGA
+        galeriaEnsaioService.obter(agendamentoId) >>
+            galeria(ModoGaleria.SEM_EDICAO, FaseGaleria.COMERCIALIZACAO)
+
+        expect:
+        !service.isDownloadPermitido(publicada)
+        service.isDownloadPermitido(paga)
+    }
+
+    def "nada é baixável antes da aprovação em galeria sem edição"() {
+        given:
+        def foto = foto(VersaoFoto.ORIGINAL)
+        foto.selecionadaPacote = true
+        galeriaEnsaioService.obter(agendamentoId) >>
+            galeria(ModoGaleria.SEM_EDICAO, FaseGaleria.SELECAO_ENVIADA)
+
+        expect:
+        !service.isDownloadPermitido(foto)
+    }
+
+    def "foto da seleção publicada em galeria sem edição é comercializável em original"() {
+        given:
+        def foto = foto(VersaoFoto.ORIGINAL)
+        galeriaEnsaioService.obter(agendamentoId) >>
+            galeria(ModoGaleria.SEM_EDICAO, FaseGaleria.COMERCIALIZACAO)
+
+        expect:
+        service.isFotoComercializavel(foto)
+    }
+
     def "foto restante fora da seleção publicada é comercializável com edição sob demanda"() {
         given:
         def foto = foto(VersaoFoto.ORIGINAL)

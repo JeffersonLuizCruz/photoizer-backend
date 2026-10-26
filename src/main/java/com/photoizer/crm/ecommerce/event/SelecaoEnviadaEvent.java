@@ -11,5 +11,6 @@ public record SelecaoEnviadaEvent(
     int quantidadeExtras,
     String clienteNome,
     UUID editorId,
-    UUID fotografoId
+    UUID fotografoId,
+    boolean requerEdicao
 ) {}

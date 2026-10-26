@@ -42,10 +42,26 @@ class FotoEcommerceEventListenerSpec extends Specification {
 
         when:
         listener.handleSelecaoEnviada(new SelecaoEnviadaEvent(
-            agendamentoId, UUID.randomUUID(), [foto.id], 1, 0, "Cliente", null, null))
+            agendamentoId, UUID.randomUUID(), [foto.id], 1, 0, "Cliente", null, null, true))
 
         then:
         foto.emSelecaoEdicao
+    }
+
+    def "aprovação sem edição libera a foto e mantém a versão original"() {
+        given:
+        def foto = foto(agendamentoId)
+        foto.editadaPath = null
+        fotoRepository.findAllById(_) >> [foto]
+        fotoRepository.saveAll(_) >> { args -> args[0] as List }
+
+        when:
+        listener.handleSelecaoAprovada(new com.photoizer.crm.ecommerce.event.SelecaoAprovadaEvent(
+            agendamentoId, UUID.randomUUID(), [foto.id]))
+
+        then:
+        !foto.emSelecaoEdicao
+        foto.versaoAtual == VersaoFoto.ORIGINAL
     }
 
     def "não altera foto de outro agendamento"() {

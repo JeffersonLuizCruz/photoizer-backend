@@ -163,6 +163,7 @@ public class EcommerceController {
                 : null,
             galeria.getModo().name(),
             galeria.getFase().name(),
+            galeria.getModo().requerEdicao(),
             galeria.permiteSelecionar(),
             galeria.permiteComercializar(),
             galeria.permiteComercializar(),

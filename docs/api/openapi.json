@@ -3001,7 +3001,7 @@
     "/api/v1/admin/agendamentos/{agendamentoId}/galeria/modo" : {
       "put" : {
         "tags" : [ "Admin Galeria" ],
-        "summary" : "Alterar o modo da galeria (somente COM_EDICAO; DIRETO foi desativado)",
+        "summary" : "Alterar o modo da galeria (COM_EDICAO ou SEM_EDICAO; DIRETO foi desativado)",
         "operationId" : "alterarModo",
         "parameters" : [ {
           "name" : "agendamentoId",
@@ -7628,7 +7628,7 @@
     "/api/v1/admin/agendamentos/{agendamentoId}/selecoes/{selecaoId}/publicar" : {
       "post" : {
         "tags" : [ "Admin Seleções" ],
-        "summary" : "Publicar a edição e liberar a comercialização",
+        "summary" : "Publicar a edição ou aprovar a seleção (galeria sem edição)",
         "operationId" : "publicar",
         "parameters" : [ {
           "name" : "agendamentoId",
@@ -15808,7 +15808,7 @@
         "properties" : {
           "modo" : {
             "type" : "string",
-            "enum" : [ "DIRETO", "COM_EDICAO" ]
+            "enum" : [ "DIRETO", "COM_EDICAO", "SEM_EDICAO" ]
           }
         },
         "required" : [ "modo" ]
@@ -15836,6 +15836,9 @@
           },
           "capaVersao" : {
             "type" : "string"
+          },
+          "requerEdicao" : {
+            "type" : "boolean"
           },
           "podeAlterarModo" : {
             "type" : "boolean"
@@ -16232,6 +16235,9 @@
             "items" : {
               "$ref" : "#/components/schemas/SelecaoEnsaioItemResponse"
             }
+          },
+          "podeReabrir" : {
+            "type" : "boolean"
           }
         }
       },
@@ -18118,6 +18124,9 @@
           "faseGaleria" : {
             "type" : "string"
           },
+          "requerEdicao" : {
+            "type" : "boolean"
+          },
           "podeSelecionar" : {
             "type" : "boolean"
           },
@@ -18815,6 +18824,9 @@
           "diasAguardando" : {
             "type" : "integer",
             "format" : "int64"
+          },
+          "requerEdicao" : {
+            "type" : "boolean"
           }
         }
       },

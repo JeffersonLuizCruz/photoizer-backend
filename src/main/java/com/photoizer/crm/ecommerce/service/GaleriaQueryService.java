@@ -7,7 +7,6 @@ import com.photoizer.crm.config.service.ConfiguracaoService;
 import com.photoizer.crm.ecommerce.exception.GaleriaNaoEncontradaException;
 import com.photoizer.crm.ecommerce.exception.TokenExpiradoException;
 import com.photoizer.crm.ecommerce.exception.FotoNaoEncontradaException;
-import com.photoizer.crm.ecommerce.model.ModoGaleria;
 import com.photoizer.crm.ecommerce.model.StatusSelecao;
 import com.photoizer.crm.ecommerce.repository.SelecaoEnsaioItemRepository;
 import com.photoizer.crm.ecommerce.repository.SelecaoEnsaioRepository;
@@ -108,7 +107,7 @@ public class GaleriaQueryService {
         var fotos = fotoEnsaioRepository.findPublicadasVisiveisByAgendamentoId(agendamento.getId());
         var galeria = galeriaEnsaioService.obter(agendamento.getId());
 
-        if (galeria.getModo() == ModoGaleria.DIRETO) {
+        if (!galeria.getModo().usaSelecaoSnapshot()) {
             return fotos;
         }
 
@@ -149,7 +148,7 @@ public class GaleriaQueryService {
         if (!galeria.permiteComercializar()) {
             return false;
         }
-        if (galeria.getModo() == ModoGaleria.COM_EDICAO) {
+        if (galeria.getModo().requerEdicao()) {
             if (foto.getVersaoAtual() != VersaoFoto.EDITADA) {
                 return false;
             }
@@ -160,6 +159,7 @@ public class GaleriaQueryService {
                 return false;
             }
         }
+        // Nos modos SEM_EDICAO e DIRETO o entregável é o arquivo original.
         return foto.isSelecionadaPacote()
             || foto.getStatus() == com.photoizer.crm.foto.model.StatusFoto.PAGA;
     }
@@ -175,7 +175,7 @@ public class GaleriaQueryService {
      */
     public boolean isFotoDisponivelParaCarrinho(FotoEnsaio foto) {
         var galeria = galeriaEnsaioService.obter(foto.getAgendamentoId());
-        if (galeria.getModo() == ModoGaleria.DIRETO) {
+        if (!galeria.getModo().usaSelecaoSnapshot()) {
             return true;
         }
         var fase = galeria.getFase();
@@ -183,7 +183,8 @@ public class GaleriaQueryService {
             || fase == com.photoizer.crm.ecommerce.model.FaseGaleria.SELECAO_ENVIADA
             || fase == com.photoizer.crm.ecommerce.model.FaseGaleria.EM_EDICAO) {
             // Durante a seleção/edição o cliente marca extras que serão
-            // editados junto com o pacote; ainda não há compra.
+            // editados junto com o pacote (ou aprovados junto, no fluxo sem
+            // edição); ainda não há compra.
             return true;
         }
         return isFotoComercializavel(foto);
@@ -204,16 +205,17 @@ public class GaleriaQueryService {
             return false;
         }
         var galeria = galeriaEnsaioService.obter(foto.getAgendamentoId());
-        if (galeria.getModo() == ModoGaleria.DIRETO) {
+        if (!galeria.getModo().usaSelecaoSnapshot()) {
             return true;
         }
         if (!galeria.getFase().permiteComercializar()) {
             return false;
         }
-        if (fotoEmSelecaoPublicada(foto)) {
+        if (galeria.getModo().requerEdicao() && fotoEmSelecaoPublicada(foto)) {
             return foto.getVersaoAtual() == VersaoFoto.EDITADA;
         }
-        // Foto restante: será editada pelo estúdio após a compra.
+        // SEM_EDICAO: a foto da seleção publicada é entregue em original.
+        // COM_EDICAO: foto restante será editada pelo estúdio após a compra.
         return true;
     }
 

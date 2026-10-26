@@ -13,5 +13,6 @@ public record SelecaoPendenteResponse(
     long quantidadePacote,
     long quantidadeExtras,
     LocalDateTime enviadaEm,
-    long diasAguardando
+    long diasAguardando,
+    boolean requerEdicao
 ) {}

@@ -89,6 +89,68 @@ class GaleriaEnsaioServiceSpec extends Specification {
         galeria.fase == FaseGaleria.SELECAO
     }
 
+    def "permite ativar seleção sem edição em galeria limpa"() {
+        given:
+        def galeria = galeria(ModoGaleria.COM_EDICAO, FaseGaleria.SELECAO)
+        galeriaRepository.findById(agendamentoId) >> Optional.of(galeria)
+        galeriaRepository.findByIdForUpdate(agendamentoId) >> Optional.of(galeria)
+        selecaoRepository.existsByAgendamentoIdAndStatusIn(agendamentoId, [StatusSelecao.ENVIADA, StatusSelecao.EM_EDICAO, StatusSelecao.CONCLUIDA]) >> false
+        selecaoRepository.existsByAgendamentoIdAndStatusIn(agendamentoId, [StatusSelecao.PUBLICADA]) >> false
+        fotoRepository.findByAgendamentoIdOrderByOrdemAsc(agendamentoId) >> []
+        galeriaRepository.save(galeria) >> galeria
+
+        when:
+        service.alterarModo(agendamentoId, ModoGaleria.SEM_EDICAO)
+
+        then:
+        galeria.modo == ModoGaleria.SEM_EDICAO
+        galeria.fase == FaseGaleria.SELECAO
+    }
+
+    def "não permite trocar para sem edição quando já existe versão editada"() {
+        given:
+        def galeria = galeria(ModoGaleria.COM_EDICAO, FaseGaleria.SELECAO)
+        galeriaRepository.findById(agendamentoId) >> Optional.of(galeria)
+        galeriaRepository.findByIdForUpdate(agendamentoId) >> Optional.of(galeria)
+        selecaoRepository.existsByAgendamentoIdAndStatusIn(agendamentoId, [StatusSelecao.ENVIADA, StatusSelecao.EM_EDICAO, StatusSelecao.CONCLUIDA]) >> false
+        selecaoRepository.existsByAgendamentoIdAndStatusIn(agendamentoId, [StatusSelecao.PUBLICADA]) >> false
+        fotoRepository.findByAgendamentoIdOrderByOrdemAsc(agendamentoId) >>
+            [foto(VersaoFoto.EDITADA, "editadas/1.jpg")]
+
+        when:
+        service.alterarModo(agendamentoId, ModoGaleria.SEM_EDICAO)
+
+        then:
+        def erro = thrown(GaleriaEmEdicaoException)
+        erro.message.contains("versões editadas")
+        0 * galeriaRepository.save(_)
+    }
+
+    def "respeita o modo padrão sem edição da configuração"() {
+        given:
+        galeriaRepository.findById(agendamentoId) >> Optional.empty()
+        configuracaoService.getValor(ConfigKey.GALERIA_MODO_PADRAO) >> "SEM_EDICAO"
+
+        when:
+        def galeria = service.obter(agendamentoId)
+
+        then:
+        galeria.modo == ModoGaleria.SEM_EDICAO
+        galeria.fase == FaseGaleria.SELECAO
+    }
+
+    def "podeAlterarModo é falso quando já existe versão editada"() {
+        given:
+        selecaoRepository.existsByAgendamentoIdAndStatusIn(agendamentoId, [StatusSelecao.ENVIADA, StatusSelecao.EM_EDICAO, StatusSelecao.CONCLUIDA]) >> false
+        selecaoRepository.existsByAgendamentoIdAndStatusIn(agendamentoId, [StatusSelecao.PUBLICADA]) >> false
+        fotoRepository.findByAgendamentoIdOrderByOrdemAsc(agendamentoId) >>
+            [foto(VersaoFoto.EDITADA, "editadas/1.jpg")]
+
+        expect:
+        !service.podeAlterarModo(agendamentoId)
+    }
+
+
     def "podeAlterarModo é falso quando existe seleção publicada"() {
         given:
         selecaoRepository.existsByAgendamentoIdAndStatusIn(agendamentoId, [StatusSelecao.ENVIADA, StatusSelecao.EM_EDICAO, StatusSelecao.CONCLUIDA]) >> false
@@ -106,6 +168,25 @@ class GaleriaEnsaioServiceSpec extends Specification {
 
         expect:
         service.podeAlterarModo(agendamentoId)
+    }
+
+    def "pode reabrir seleção enquanto não houver download ou venda"() {
+        given:
+        fotoRepository.findByAgendamentoIdOrderByOrdemAsc(agendamentoId) >>
+            [foto(VersaoFoto.ORIGINAL, null)]
+
+        expect:
+        service.podeReabrirSelecao(agendamentoId)
+    }
+
+    def "não pode reabrir seleção após download das fotos"() {
+        given:
+        def foto = foto(VersaoFoto.ORIGINAL, null)
+        foto.dataDownload = java.time.LocalDateTime.now()
+        fotoRepository.findByAgendamentoIdOrderByOrdemAsc(agendamentoId) >> [foto]
+
+        expect:
+        !service.podeReabrirSelecao(agendamentoId)
     }
 
     def "define capa publicada e congela a versão original"() {

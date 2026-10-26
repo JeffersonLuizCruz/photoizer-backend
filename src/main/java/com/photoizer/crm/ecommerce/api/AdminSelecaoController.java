@@ -72,7 +72,7 @@ public class AdminSelecaoController {
     }
 
     @PostMapping("/agendamentos/{agendamentoId}/selecoes/{selecaoId}/publicar")
-    @Operation(summary = "Publicar a edição e liberar a comercialização")
+    @Operation(summary = "Publicar a edição ou aprovar a seleção (galeria sem edição)")
     public ResponseEntity<SelecaoEnsaioResponse> publicar(
             @PathVariable UUID agendamentoId,
             @PathVariable UUID selecaoId) {

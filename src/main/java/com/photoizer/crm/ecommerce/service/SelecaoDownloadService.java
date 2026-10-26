@@ -38,6 +38,7 @@ public class SelecaoDownloadService {
     private final SelecaoEnsaioItemRepository itemRepository;
     private final FotoEnsaioRepository fotoRepository;
     private final SelecaoEnsaioService selecaoService;
+    private final GaleriaEnsaioService galeriaService;
     private final StoragePathResolver pathResolver;
     private final FileValidator fileValidator;
 
@@ -45,12 +46,14 @@ public class SelecaoDownloadService {
                                   SelecaoEnsaioItemRepository itemRepository,
                                   FotoEnsaioRepository fotoRepository,
                                   SelecaoEnsaioService selecaoService,
+                                  GaleriaEnsaioService galeriaService,
                                   StoragePathResolver pathResolver,
                                   FileValidator fileValidator) {
         this.selecaoRepository = selecaoRepository;
         this.itemRepository = itemRepository;
         this.fotoRepository = fotoRepository;
         this.selecaoService = selecaoService;
+        this.galeriaService = galeriaService;
         this.pathResolver = pathResolver;
         this.fileValidator = fileValidator;
     }
@@ -60,6 +63,11 @@ public class SelecaoDownloadService {
     public record SelecaoZip(String fileName, List<ItemZip> itens) {}
 
     public SelecaoZip preparar(UUID agendamentoId, UUID selecaoId) {
+        var galeria = galeriaService.obter(agendamentoId);
+        if (!galeria.getModo().requerEdicao()) {
+            throw new com.photoizer.crm.ecommerce.exception.SelecaoNaoEditavelException(
+                "Esta galeria não passa por edição; não há originais para baixar");
+        }
         var selecao = selecaoRepository.findById(selecaoId)
             .orElseThrow(() -> new SelecaoNaoEncontradaException(selecaoId));
         if (!selecao.getAgendamentoId().equals(agendamentoId)) {
