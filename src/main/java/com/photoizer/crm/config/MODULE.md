@@ -1,7 +1,7 @@
 # Módulo: Config
 
 ## 1. Responsabilidade
-Gerencia configurações globais do sistema no modelo chave-valor. Consumido por `agenda`, `comissao`, `financeiro`, `contrato`, `despesa` e `fotografo` (via evento) para obter percentuais, taxas, prazos, template de contrato e o nome do fotógrafo.
+Gerencia configurações globais do sistema no modelo chave-valor. Consumido por `agenda`, `comissao`, `financeiro`, `contrato`, `despesa` e `fotografo` (via evento) para obter percentuais, taxas, prazos, template de contrato e o nome do fotógrafo. Também armazena e serve a logo da contratada usada na proposta pública.
 
 ## 2. Estrutura
 ```
@@ -14,9 +14,11 @@ config/
 ├── event/
 │   └── FotografoConfiguradoEvent.java # Publicado ao salvar NOME_FOTOGRAFO
 ├── service/
-│   └── ConfiguracaoService.java    # CRUD type-safe via ConfigKey + cache + publicação de evento
+│   ├── ConfiguracaoService.java    # CRUD type-safe via ConfigKey + cache + publicação de evento
+│   └── LogoContratadaService.java  # Upload/remoção e resolução da logo (upload ou arte padrão)
 ├── api/
-│   ├── ConfiguracaoController.java # GET/PUT /api/v1/config (Map<String,String> plano)
+│   ├── ConfiguracaoController.java # GET/PUT /api/v1/config + POST/DELETE /config/logo (ADMIN)
+│   ├── LogoContratadaController.java # GET público /api/v1/config/logo
 │   └── ConfiguracaoRequest.java    # Record DTO de entrada (legado, não usado pelo controller)
 └── exception/
     └── ConfiguracaoInvalidaException.java  # Exceção específica para valores inválidos
@@ -49,10 +51,13 @@ Publica `FotografoConfiguradoEvent(nome)` ao salvar a chave `NOME_FOTOGRAFO` com
 - `GET /api/v1/config` → `Map<String, String>` **plano** com todas as chaves (`getConfig`). O frontend lê os campos diretamente (ex.: `nomeContratada`).
 - `getValor(ConfigKey)` → busca por chave, retorna valor bruto ou default do enum.
 - `getValorDecimal(ConfigKey)` / `getValorInteiro(ConfigKey)` → busca + conversão tipada.
+- `GET /api/v1/config/logo` → público; serve o upload configurado ou a arte padrão `branding/logo-padrao.png` (usado na proposta pública).
 
 ### Fluxo 2: Atualização
 - `PUT /api/v1/config` → `ConfiguracaoRequest` com `Map<ConfigKey, String>`; upsert chave a chave com validação de tipo.
 - `atualizar(ConfigKey, String)` → upsert individual com validação.
+- `POST /api/v1/config/logo` (ADMIN) → valida imagem (`logo`, até 3 MB), salva em `uploads/`, grava `LOGO_CONTRATADA` e apaga a anterior.
+- `DELETE /api/v1/config/logo` (ADMIN) → apaga o upload e volta a usar a arte padrão.
 
 ### Chaves conhecidas (centralizadas no `ConfigKey` enum)
 | Constante | Chave no banco | Tipo | Default |
@@ -66,6 +71,7 @@ Publica `FotografoConfiguradoEvent(nome)` ao salvar a chave `NOME_FOTOGRAFO` com
 | `NOME_CONTRATADA` | `nomeContratada` | TEXT | `""` (editável na Configuração) |
 | `CNPJ_CONTRATADA` | `cnpjContratada` | TEXT | `""` |
 | `ENDERECO_CONTRATADA` | `enderecoContratada` | TEXT | `""` |
+| `LOGO_CONTRATADA` | `logoContratada` | TEXT | `""` (caminho do upload; vazio usa a arte padrão) |
 | `PIX_CHAVE` | `pixChave` | TEXT | `""` |
 | `PIX_TIPO_CHAVE` | `pixTipoChave` | TEXT | `CNPJ` |
 | `CONTRATO_DIAS_VALIDADE` | `contratoDiasValidade` | INTEGER | `7` |
@@ -80,7 +86,9 @@ Publica `FotografoConfiguradoEvent(nome)` ao salvar a chave `NOME_FOTOGRAFO` com
 5. **Sem auditoria nem BaseEntity**: `Configuracao` é chave-valor mínimo.
 
 ## 6. Testes
-Nenhum teste específico.
+- `LogoContratadaServiceSpec` (Spock): upload/substituição, remoção, fallback para a arte padrão e arquivo configurado inexistente.
+- `AutorizacaoControllersTest`: garante que o controller público da logo está explicitamente classificado.
+- `OpenApiContractTest`: valida a spec versionada após a inclusão dos endpoints.
 
 ## 7. Débitas Resolvidas (Fase 2)
 

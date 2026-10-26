@@ -44,6 +44,7 @@ public enum ConfigKey {
     NOME_CONTRATADA("nomeContratada", Type.TEXT, ""),
     CNPJ_CONTRATADA("cnpjContratada", Type.TEXT, ""),
     ENDERECO_CONTRATADA("enderecoContratada", Type.TEXT, ""),
+    LOGO_CONTRATADA("logoContratada", Type.TEXT, ""),
     PIX_CHAVE("pixChave", Type.TEXT, ""),
     PIX_TIPO_CHAVE("pixTipoChave", Type.TEXT, "CNPJ"),
 

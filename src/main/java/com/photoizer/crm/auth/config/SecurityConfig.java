@@ -63,6 +63,7 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.GET, "/api/v1/ecommerce/pagamento").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/v1/ecommerce/sessao").permitAll()
                     .requestMatchers("/api/v1/propostas/publico/**").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/config/logo").permitAll()
                     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/avaliacoes/depoimentos").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/v1/avaliacoes").permitAll()

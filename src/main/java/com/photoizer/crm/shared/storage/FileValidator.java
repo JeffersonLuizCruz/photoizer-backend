@@ -24,6 +24,7 @@ import java.util.Set;
  * - "raw": cr2, nef, arw, raf, dng, orf, rw2, pef
  * - "edited": tiff, tif, psd, jpg, jpeg, png
  * - "receipt": jpg, jpeg, png, pdf
+ * - "logo": jpg, jpeg, png, webp
  * - "any": jpg, jpeg, png, pdf, zip (fallback amplo)
  */
 @Component
@@ -40,6 +41,7 @@ public class FileValidator {
         "raw",     Set.of(".cr2", ".nef", ".arw", ".raf", ".dng", ".orf", ".rw2", ".pef"),
         "edited",  Set.of(".tiff", ".tif", ".psd", ".jpg", ".jpeg", ".png"),
         "receipt", Set.of(".jpg", ".jpeg", ".png", ".pdf"),
+        "logo",    Set.of(".jpg", ".jpeg", ".png", ".webp"),
         "any",     Set.of(".jpg", ".jpeg", ".png", ".pdf", ".zip")
     );
 
@@ -52,6 +54,7 @@ public class FileValidator {
         "raw",     60 * MB,
         "edited",  60 * MB,
         "receipt", 10 * MB,
+        "logo",    3 * MB,
         "any",     25 * MB
     );
 
