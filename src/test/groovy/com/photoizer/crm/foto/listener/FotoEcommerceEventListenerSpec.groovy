@@ -2,6 +2,8 @@ package com.photoizer.crm.foto.listener
 
 import com.photoizer.crm.ecommerce.event.EdicaoPublicadaEvent
 import com.photoizer.crm.ecommerce.event.SelecaoEnviadaEvent
+import com.photoizer.crm.ecommerce.event.SelecaoExtraAdicionadaEvent
+import com.photoizer.crm.ecommerce.event.SelecaoExtraRemovidaEvent
 import com.photoizer.crm.foto.model.FotoEnsaio
 import com.photoizer.crm.foto.model.StatusFoto
 import com.photoizer.crm.foto.model.VersaoFoto
@@ -59,6 +61,50 @@ class FotoEcommerceEventListenerSpec extends Specification {
         then:
         foto.versaoAtual == VersaoFoto.ORIGINAL
         foto.emSelecaoEdicao
+    }
+
+    def "extra anexado à seleção marca a foto como em seleção"() {
+        given:
+        def foto = foto(agendamentoId)
+        foto.emSelecaoEdicao = false
+        fotoRepository.findById(foto.id) >> Optional.of(foto)
+        fotoRepository.save(_ as FotoEnsaio) >> { args -> args[0] }
+
+        when:
+        listener.handleSelecaoExtraAdicionada(new SelecaoExtraAdicionadaEvent(
+            agendamentoId, UUID.randomUUID(), foto.id))
+
+        then:
+        foto.emSelecaoEdicao
+    }
+
+    def "extra removido da seleção libera a foto"() {
+        given:
+        def foto = foto(agendamentoId)
+        fotoRepository.findById(foto.id) >> Optional.of(foto)
+        fotoRepository.save(_ as FotoEnsaio) >> { args -> args[0] }
+
+        when:
+        listener.handleSelecaoExtraRemovida(new SelecaoExtraRemovidaEvent(
+            agendamentoId, UUID.randomUUID(), foto.id))
+
+        then:
+        !foto.emSelecaoEdicao
+    }
+
+    def "evento de extra não altera foto de outro agendamento"() {
+        given:
+        def foto = foto(UUID.randomUUID())
+        foto.emSelecaoEdicao = false
+        fotoRepository.findById(foto.id) >> Optional.of(foto)
+
+        when:
+        listener.handleSelecaoExtraAdicionada(new SelecaoExtraAdicionadaEvent(
+            agendamentoId, UUID.randomUUID(), foto.id))
+
+        then:
+        !foto.emSelecaoEdicao
+        0 * fotoRepository.save(_)
     }
 
     private FotoEnsaio foto(UUID agendamentoId) {

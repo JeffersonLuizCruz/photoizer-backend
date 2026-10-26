@@ -4,10 +4,12 @@ import com.photoizer.crm.foto.acl.AgendamentoReadService
 import com.photoizer.crm.foto.event.FotosRemovidasEvent
 import com.photoizer.crm.foto.exception.ArquivoDeImagemInvalidoException
 import com.photoizer.crm.foto.exception.FotoEnsaioNaoEncontradaException
+import com.photoizer.crm.foto.exception.FotoNaoEditavelException
 import com.photoizer.crm.foto.exception.FotoNaoPertenceAoAgendamentoException
 import com.photoizer.crm.foto.exception.FotoVinculadaACompraException
 import com.photoizer.crm.foto.model.FotoEnsaio
 import com.photoizer.crm.foto.model.StatusFoto
+import com.photoizer.crm.foto.model.VersaoFoto
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository
 import com.photoizer.crm.shared.storage.FileStorageService
 import com.photoizer.crm.shared.storage.FileValidator
@@ -322,6 +324,127 @@ class FotoServiceSpec extends Specification {
         StatusFoto.AGUARDANDO_CONFIRMACAO | false       | false
         StatusFoto.PUBLICADA              | true        | false
         StatusFoto.PUBLICADA              | false       | true
+    }
+
+    def "envia versão editada de extra comprado e mantém a versão original até liberar"() {
+        given:
+        def tmp = Files.createTempDirectory("foto-extra-spec")
+        def editada = tmp.resolve("editada.png")
+        def bytes = novoArquivoPng("editada.png").bytes
+        Files.write(editada, bytes)
+        def watermarked = tmp.resolve("wm_editada.jpg")
+        def thumb = tmp.resolve("thumb_editada.jpg")
+        def preview = tmp.resolve("preview_editada.jpg")
+        Files.write(watermarked, bytes)
+        Files.write(thumb, bytes)
+        Files.write(preview, bytes)
+        def foto = FotoEnsaio.builder()
+            .id(UUID.randomUUID())
+            .agendamentoId(agendamentoId)
+            .fileName("IMG_1.png")
+            .originalPath("orig/1.png")
+            .watermarkedPath("wm/1.png")
+            .thumbPath("thumb/1.png")
+            .status(StatusFoto.PAGA)
+            .compraExtraId(UUID.randomUUID())
+            .versaoAtual(VersaoFoto.ORIGINAL)
+            .visivel(true)
+            .build()
+        agendamentoReadService.isStatusPermitidoParaUpload(agendamentoId) >> true
+        fotoRepository.findById(foto.id) >> Optional.of(foto)
+        fileStorageService.salvarEmSubdiretorio(_, agendamentoId, "editadas") >> editada.toString()
+        pathResolver.resolver(editada.toString()) >> editada
+        processingHelper.processar(editada, editada.parent, foto.id) >>
+            new FotoProcessingHelper.ProcessedImages(watermarked.toString(), thumb.toString(), preview.toString())
+        pathResolver.relativo(Path.of(watermarked.toString())) >> "editadas/wm.jpg"
+        pathResolver.relativo(Path.of(thumb.toString())) >> "editadas/thumb.jpg"
+        pathResolver.relativo(Path.of(preview.toString())) >> "editadas/preview.jpg"
+        fileValidator.sanitizeFilename("editada.png") >> "editada.png"
+        fotoRepository.save(_ as FotoEnsaio) >> { args -> args[0] }
+
+        when:
+        def salva = service.uploadEditadaCompraExtra(
+            agendamentoId, foto.id, novoArquivoPng("editada.png"))
+
+        then:
+        salva.editadaPath == editada.toString()
+        salva.versaoAtual == VersaoFoto.ORIGINAL
+        0 * eventPublisher.publishEvent(_)
+
+        cleanup:
+        tmp.toFile().deleteDir()
+    }
+
+    def "não envia edição de extra antes do pagamento"() {
+        given:
+        def foto = FotoEnsaio.builder()
+            .id(UUID.randomUUID())
+            .agendamentoId(agendamentoId)
+            .fileName("IMG_1.png")
+            .originalPath("orig/1.png")
+            .watermarkedPath("wm/1.png")
+            .thumbPath("thumb/1.png")
+            .status(StatusFoto.PUBLICADA)
+            .compraExtraId(UUID.randomUUID())
+            .visivel(true)
+            .build()
+        agendamentoReadService.isStatusPermitidoParaUpload(agendamentoId) >> true
+        fotoRepository.findById(foto.id) >> Optional.of(foto)
+
+        when:
+        service.uploadEditadaCompraExtra(agendamentoId, foto.id, novoArquivoPng("editada.png"))
+
+        then:
+        thrown(FotoNaoEditavelException)
+        0 * fileStorageService.salvarEmSubdiretorio(_, _, _)
+    }
+
+    def "libera download da edição de extra comprado"() {
+        given:
+        def foto = FotoEnsaio.builder()
+            .id(UUID.randomUUID())
+            .agendamentoId(agendamentoId)
+            .fileName("IMG_1.png")
+            .originalPath("orig/1.png")
+            .watermarkedPath("wm/1.png")
+            .thumbPath("thumb/1.png")
+            .status(StatusFoto.PAGA)
+            .compraExtraId(UUID.randomUUID())
+            .editadaPath("editadas/1.jpg")
+            .versaoAtual(VersaoFoto.ORIGINAL)
+            .visivel(true)
+            .build()
+        fotoRepository.findById(foto.id) >> Optional.of(foto)
+        fotoRepository.save(_ as FotoEnsaio) >> { args -> args[0] }
+
+        when:
+        def salva = service.publicarEditadaCompraExtra(agendamentoId, foto.id)
+
+        then:
+        salva.versaoAtual == VersaoFoto.EDITADA
+    }
+
+    def "não libera extra sem versão editada"() {
+        given:
+        def foto = FotoEnsaio.builder()
+            .id(UUID.randomUUID())
+            .agendamentoId(agendamentoId)
+            .fileName("IMG_1.png")
+            .originalPath("orig/1.png")
+            .watermarkedPath("wm/1.jpg")
+            .thumbPath("thumb/1.jpg")
+            .status(StatusFoto.PAGA)
+            .compraExtraId(UUID.randomUUID())
+            .visivel(true)
+            .build()
+        fotoRepository.findById(foto.id) >> Optional.of(foto)
+
+        when:
+        service.publicarEditadaCompraExtra(agendamentoId, foto.id)
+
+        then:
+        thrown(FotoNaoEditavelException)
+        0 * fotoRepository.save(_)
     }
 
     private FotoEnsaio fotoComArquivos(Path dir,

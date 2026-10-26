@@ -3,6 +3,9 @@ package com.photoizer.crm.ecommerce.service
 import com.photoizer.crm.agenda.model.Agendamento
 import com.photoizer.crm.ecommerce.event.EdicaoPublicadaEvent
 import com.photoizer.crm.ecommerce.event.SelecaoEnviadaEvent
+import com.photoizer.crm.ecommerce.event.SelecaoExtraAdicionadaEvent
+import com.photoizer.crm.ecommerce.event.SelecaoExtraRemovidaEvent
+import com.photoizer.crm.ecommerce.exception.FotoIndisponivelException
 import com.photoizer.crm.ecommerce.exception.FotosEditadasIncompletasException
 import com.photoizer.crm.ecommerce.exception.SelecaoNaoEditavelException
 import com.photoizer.crm.ecommerce.model.FaseGaleria
@@ -107,7 +110,7 @@ class SelecaoEnsaioServiceSpec extends Specification {
         given:
         def selecao = selecao(StatusSelecao.CONCLUIDA)
         def itens = [item(1, false), item(2, true)]
-        selecaoRepository.findById(selecao.id) >> Optional.of(selecao)
+        selecaoRepository.findByIdForUpdate(selecao.id) >> Optional.of(selecao)
         itemRepository.findBySelecaoIdOrderByNumeroGaleriaAsc(selecao.id) >> itens
 
         when:
@@ -124,7 +127,7 @@ class SelecaoEnsaioServiceSpec extends Specification {
         def selecao = selecao(StatusSelecao.CONCLUIDA)
         def itens = [item(1, true), item(2, true)]
         def fotos = [foto(1), foto(2)]
-        selecaoRepository.findById(selecao.id) >> Optional.of(selecao)
+        selecaoRepository.findByIdForUpdate(selecao.id) >> Optional.of(selecao)
         itemRepository.findBySelecaoIdOrderByNumeroGaleriaAsc(selecao.id) >> itens
         galeriaService.obterParaAtualizacao(agendamentoId) >> galeria()
         selecaoRepository.save(_ as SelecaoEnsaio) >> { args -> args[0] }
@@ -151,6 +154,171 @@ class SelecaoEnsaioServiceSpec extends Specification {
         then:
         thrown(SelecaoNaoEditavelException)
         0 * selecaoRepository.save(_)
+    }
+
+    def "anexa extra ao snapshot durante a edição com o preço congelado"() {
+        given:
+        def selecao = selecao(StatusSelecao.EM_EDICAO)
+        def foto = foto(3)
+        selecaoRepository.findFirstByAgendamentoIdAndStatusInOrderByNumeroDesc(agendamentoId, _) >>
+            Optional.of(selecao)
+        selecaoRepository.findByIdForUpdate(selecao.id) >> Optional.of(selecao)
+        itemRepository.findBySelecaoIdAndFotoId(selecao.id, foto.id) >> Optional.empty()
+        galeriaQueryService.buscarAgendamentoPorId(agendamentoId) >> agendamento(2)
+        fotoRepository.findById(foto.id) >> Optional.of(foto)
+        galeriaQueryService.getValorUnitarioFotoExtra(agendamentoId) >> new BigDecimal("20.00")
+
+        when:
+        service.incluirExtra(agendamentoId, foto.id)
+
+        then:
+        1 * itemRepository.save({ SelecaoEnsaioItem item ->
+            item.selecaoId == selecao.id
+                && item.fotoId == foto.id
+                && item.tipo == TipoItemSelecao.EXTRA
+                && item.valorUnitario == new BigDecimal("20.00")
+                && !item.editada
+        }) >> { args -> args[0] }
+        1 * eventPublisher.publishEvent({ it instanceof SelecaoExtraAdicionadaEvent
+            && it.agendamentoId() == agendamentoId
+            && it.selecaoId() == selecao.id
+            && it.fotoId() == foto.id })
+        0 * selecaoRepository.save(_)
+    }
+
+    def "volta a seleção concluída para em edição ao anexar um extra"() {
+        given:
+        def selecao = selecao(StatusSelecao.CONCLUIDA)
+        def foto = foto(3)
+        selecaoRepository.findFirstByAgendamentoIdAndStatusInOrderByNumeroDesc(agendamentoId, _) >>
+            Optional.of(selecao)
+        selecaoRepository.findByIdForUpdate(selecao.id) >> Optional.of(selecao)
+        itemRepository.findBySelecaoIdAndFotoId(selecao.id, foto.id) >> Optional.empty()
+        galeriaQueryService.buscarAgendamentoPorId(agendamentoId) >> agendamento(2)
+        fotoRepository.findById(foto.id) >> Optional.of(foto)
+        galeriaQueryService.getValorUnitarioFotoExtra(agendamentoId) >> new BigDecimal("20.00")
+        itemRepository.save(_ as SelecaoEnsaioItem) >> { args -> args[0] }
+        selecaoRepository.save(_ as SelecaoEnsaio) >> { args -> args[0] }
+
+        when:
+        service.incluirExtra(agendamentoId, foto.id)
+
+        then:
+        selecao.status == StatusSelecao.EM_EDICAO
+        selecao.concluidaEm == null
+        1 * selecaoRepository.save(selecao)
+    }
+
+    def "não anexa extra quando não há seleção ativa"() {
+        given:
+        selecaoRepository.findFirstByAgendamentoIdAndStatusInOrderByNumeroDesc(agendamentoId, _) >>
+            Optional.empty()
+
+        when:
+        service.incluirExtra(agendamentoId, UUID.randomUUID())
+
+        then:
+        0 * itemRepository.save(_)
+        0 * eventPublisher.publishEvent(_)
+    }
+
+    def "rejeita extra que já faz parte do pacote"() {
+        given:
+        def selecao = selecao(StatusSelecao.EM_EDICAO)
+        def foto = foto(1)
+        foto.selecionadaPacote = true
+        selecaoRepository.findFirstByAgendamentoIdAndStatusInOrderByNumeroDesc(agendamentoId, _) >>
+            Optional.of(selecao)
+        selecaoRepository.findByIdForUpdate(selecao.id) >> Optional.of(selecao)
+        itemRepository.findBySelecaoIdAndFotoId(selecao.id, foto.id) >> Optional.empty()
+        galeriaQueryService.buscarAgendamentoPorId(agendamentoId) >> agendamento(2)
+        fotoRepository.findById(foto.id) >> Optional.of(foto)
+
+        when:
+        service.incluirExtra(agendamentoId, foto.id)
+
+        then:
+        thrown(FotoIndisponivelException)
+        0 * itemRepository.save(_)
+    }
+
+    def "remove do snapshot o extra ainda não editado"() {
+        given:
+        def selecao = selecao(StatusSelecao.EM_EDICAO)
+        def item = itemExtra(selecao.id, false)
+        selecaoRepository.findFirstByAgendamentoIdAndStatusInOrderByNumeroDesc(agendamentoId, _) >>
+            Optional.of(selecao)
+        selecaoRepository.findByIdForUpdate(selecao.id) >> Optional.of(selecao)
+        itemRepository.findBySelecaoIdAndFotoId(selecao.id, item.fotoId) >> Optional.of(item)
+        itemRepository.countBySelecaoId(selecao.id) >> 2
+        itemRepository.countBySelecaoIdAndEditadaTrue(selecao.id) >> 1
+
+        when:
+        service.removerExtra(agendamentoId, item.fotoId)
+
+        then:
+        1 * itemRepository.delete(item)
+        1 * eventPublisher.publishEvent({ it instanceof SelecaoExtraRemovidaEvent
+            && it.agendamentoId() == agendamentoId
+            && it.fotoId() == item.fotoId })
+        0 * selecaoRepository.save(_)
+    }
+
+    def "bloqueia remoção de extra já editado"() {
+        given:
+        def selecao = selecao(StatusSelecao.EM_EDICAO)
+        def item = itemExtra(selecao.id, true)
+        selecaoRepository.findFirstByAgendamentoIdAndStatusInOrderByNumeroDesc(agendamentoId, _) >>
+            Optional.of(selecao)
+        selecaoRepository.findByIdForUpdate(selecao.id) >> Optional.of(selecao)
+        itemRepository.findBySelecaoIdAndFotoId(selecao.id, item.fotoId) >> Optional.of(item)
+
+        when:
+        service.removerExtra(agendamentoId, item.fotoId)
+
+        then:
+        thrown(SelecaoNaoEditavelException)
+        0 * itemRepository.delete(_)
+        0 * eventPublisher.publishEvent(_)
+    }
+
+    def "não remove item do pacote ao limpar o carrinho"() {
+        given:
+        def selecao = selecao(StatusSelecao.EM_EDICAO)
+        def item = SelecaoEnsaioItem.builder()
+            .id(UUID.randomUUID())
+            .selecaoId(selecao.id)
+            .fotoId(UUID.randomUUID())
+            .numeroGaleria(1)
+            .tipo(TipoItemSelecao.PACOTE)
+            .ordem(0)
+            .editada(false)
+            .build()
+        selecaoRepository.findFirstByAgendamentoIdAndStatusInOrderByNumeroDesc(agendamentoId, _) >>
+            Optional.of(selecao)
+        selecaoRepository.findByIdForUpdate(selecao.id) >> Optional.of(selecao)
+        itemRepository.findBySelecaoIdAndFotoId(selecao.id, item.fotoId) >> Optional.of(item)
+
+        when:
+        service.removerExtra(agendamentoId, item.fotoId)
+
+        then:
+        0 * itemRepository.delete(_)
+        0 * eventPublisher.publishEvent(_)
+    }
+
+    private SelecaoEnsaioItem itemExtra(UUID selecaoId, boolean editada) {
+        return SelecaoEnsaioItem.builder()
+            .id(UUID.randomUUID())
+            .selecaoId(selecaoId)
+            .fotoId(UUID.randomUUID())
+            .numeroGaleria(3)
+            .tipo(TipoItemSelecao.EXTRA)
+            .ordem(2)
+            .nomeArquivo("IMG_3.jpg")
+            .valorUnitario(new BigDecimal("20.00"))
+            .editada(editada)
+            .build()
     }
 
     private Agendamento agendamento(int quantidade) {

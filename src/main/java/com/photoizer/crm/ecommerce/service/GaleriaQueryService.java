@@ -78,18 +78,29 @@ public class GaleriaQueryService {
     }
 
     /**
-     * Preco do extra congelado no envio da selecao. Se a foto nao fizer parte
-     * de uma selecao publicada, usa a configuracao atual.
+     * Preco do extra congelado no snapshot da selecao. Considera a selecao
+     * ativa (ENVIADA/EM_EDICAO/CONCLUIDA) e a ultima publicada, para que o
+     * carrinho use o mesmo valor durante a edicao e depois da publicacao.
+     * Se a foto nao fizer parte de nenhuma selecao, usa a configuracao atual.
      */
     public BigDecimal getValorUnitarioExtra(UUID agendamentoId, UUID fotoId) {
-        var selecao = selecaoRepository
-            .findFirstByAgendamentoIdAndStatusInOrderByNumeroDesc(
-                agendamentoId, List.of(StatusSelecao.PUBLICADA));
+        var selecao = buscarSelecaoComPrecoCongelado(agendamentoId);
         return selecao
             .flatMap(s -> selecaoItemRepository.findBySelecaoIdAndFotoId(s.getId(), fotoId))
             .map(com.photoizer.crm.ecommerce.model.SelecaoEnsaioItem::getValorUnitario)
             .filter(java.util.Objects::nonNull)
             .orElseGet(() -> getValorUnitarioFotoExtra(agendamentoId));
+    }
+
+    private java.util.Optional<com.photoizer.crm.ecommerce.model.SelecaoEnsaio> buscarSelecaoComPrecoCongelado(
+            UUID agendamentoId) {
+        return selecaoRepository.findFirstByAgendamentoIdAndStatusInOrderByNumeroDesc(
+            agendamentoId,
+            List.of(
+                StatusSelecao.ENVIADA,
+                StatusSelecao.EM_EDICAO,
+                StatusSelecao.CONCLUIDA,
+                StatusSelecao.PUBLICADA));
     }
 
     public List<FotoEnsaio> listarFotosPublicadas(UUID token) {
@@ -101,25 +112,15 @@ public class GaleriaQueryService {
             return fotos;
         }
 
-        // Depois de publicada a edicao, a galeria mostra somente as fotos da
-        // selecao publicada, na versao editada. Isso impede a venda de RAW.
         if (!galeria.getFase().permiteComercializar()) {
             return fotos;
         }
-        var selecao = selecaoRepository
-            .findFirstByAgendamentoIdAndStatusInOrderByNumeroDesc(
-                agendamento.getId(), List.of(StatusSelecao.PUBLICADA));
-        if (selecao.isEmpty()) {
-            return List.of();
-        }
-        var ids = selecaoItemRepository
-            .findBySelecaoIdOrderByNumeroGaleriaAsc(selecao.get().getId()).stream()
-            .map(com.photoizer.crm.ecommerce.model.SelecaoEnsaioItem::getFotoId)
-            .collect(java.util.stream.Collectors.toSet());
-        return fotos.stream()
-            .filter(f -> ids.contains(f.getId()))
-            .filter(f -> f.getVersaoAtual() == VersaoFoto.EDITADA)
-            .toList();
+
+        // Em comercializacao a galeria mostra as fotos da selecao publicada
+        // (editadas) e tambem as fotos restantes, que ficam disponiveis para
+        // compra com edicao sob demanda. O frontend distingue as duas pela
+        // versao atual: EDITADA = pronta; ORIGINAL = sera editada apos a compra.
+        return fotos;
     }
 
     public List<FotoEnsaio> listarFotosPorAgendamento(UUID agendamentoId) {
@@ -164,25 +165,38 @@ public class GaleriaQueryService {
     }
 
     /**
-     * Confere se a foto pode ser comprada agora.
+     * Confere se a foto pode entrar no carrinho agora.
      *
      * <p>No modo DIRETO basta estar publicada, visível e sem compra. No modo
-     * COM_EDICAO a foto precisa fazer parte da seleção publicada e estar na
-     * versão editada — impede vender RAW por chamada direta à API.
+     * COM_EDICAO o carrinho também funciona durante a seleção e a edição: os
+     * extras escolhidos ali são anexados ao snapshot da seleção ativa para
+     * serem editados junto com o pacote. Na comercialização vale a regra de
+     * {@link #isFotoComercializavel(FotoEnsaio)}.
      */
     public boolean isFotoDisponivelParaCarrinho(FotoEnsaio foto) {
         var galeria = galeriaEnsaioService.obter(foto.getAgendamentoId());
         if (galeria.getModo() == ModoGaleria.DIRETO) {
             return true;
         }
-        if (galeria.getFase() == com.photoizer.crm.ecommerce.model.FaseGaleria.SELECAO) {
-            // Durante a seleção o cliente marca extras que serão editados junto
-            // com o pacote; ainda não há compra.
+        var fase = galeria.getFase();
+        if (fase == com.photoizer.crm.ecommerce.model.FaseGaleria.SELECAO
+            || fase == com.photoizer.crm.ecommerce.model.FaseGaleria.SELECAO_ENVIADA
+            || fase == com.photoizer.crm.ecommerce.model.FaseGaleria.EM_EDICAO) {
+            // Durante a seleção/edição o cliente marca extras que serão
+            // editados junto com o pacote; ainda não há compra.
             return true;
         }
         return isFotoComercializavel(foto);
     }
 
+    /**
+     * Confere se a foto pode ser comprada agora.
+     *
+     * <p>No modo DIRETO basta estar publicada, visível e sem compra. No modo
+     * COM_EDICAO/COMERCIALIZACAO, as fotos da seleção publicada precisam estar
+     * na versão editada. As fotos restantes (fora da seleção) também podem ser
+     * compradas: elas entram no fluxo de edição sob demanda antes do download.
+     */
     public boolean isFotoComercializavel(FotoEnsaio foto) {
         if (!foto.isVisivel()
             || foto.getStatus() != com.photoizer.crm.foto.model.StatusFoto.PUBLICADA
@@ -193,11 +207,14 @@ public class GaleriaQueryService {
         if (galeria.getModo() == ModoGaleria.DIRETO) {
             return true;
         }
-        if (!galeria.getFase().permiteComercializar()
-            || foto.getVersaoAtual() != VersaoFoto.EDITADA) {
+        if (!galeria.getFase().permiteComercializar()) {
             return false;
         }
-        return fotoEmSelecaoPublicada(foto);
+        if (fotoEmSelecaoPublicada(foto)) {
+            return foto.getVersaoAtual() == VersaoFoto.EDITADA;
+        }
+        // Foto restante: será editada pelo estúdio após a compra.
+        return true;
     }
 
     private boolean fotoEmSelecaoPublicada(FotoEnsaio foto) {
@@ -216,9 +233,7 @@ public class GaleriaQueryService {
     public Map<UUID, BigDecimal> getValoresExtras(UUID agendamentoId, List<UUID> fotoIds) {
         var padrao = getValorUnitarioFotoExtra(agendamentoId);
         var congelados = new HashMap<UUID, BigDecimal>();
-        selecaoRepository
-            .findFirstByAgendamentoIdAndStatusInOrderByNumeroDesc(
-                agendamentoId, List.of(StatusSelecao.PUBLICADA))
+        buscarSelecaoComPrecoCongelado(agendamentoId)
             .ifPresent(selecao -> selecaoItemRepository
                 .findBySelecaoIdOrderByNumeroGaleriaAsc(selecao.getId())
                 .stream()

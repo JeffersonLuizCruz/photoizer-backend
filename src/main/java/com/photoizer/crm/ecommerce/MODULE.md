@@ -184,19 +184,44 @@ Staff:
 - `GET .../download-zip` (originais + `manifest.csv`)
 - `POST .../iniciar`, `.../reabrir`, `.../publicar`
 - `GET/PUT /api/v1/admin/agendamentos/{id}/galeria[/modo]`
+- `GET /api/v1/admin/ecommerce/extras/pendentes-edicao?agendamentoId=` (ADMIN/FOTOGRAFO/EDITOR)
+- `PUT /api/v1/agendamentos/{id}/fotos/{fotoId}/editada-compra` (upload da edição sob demanda)
+- `POST /api/v1/agendamentos/{id}/fotos/{fotoId}/editada-compra/publicar` (libera o download)
 
 ### Regras
 
 1. O envio inclui fotos do pacote + extras do carrinho.
-2. Após o envio, a seleção fica bloqueada até reabertura.
+2. Depois do envio, os itens do pacote ficam bloqueados. O cliente ainda pode
+   anexar/remover **extras** enquanto a seleção está ativa (`ENVIADA`,
+   `EM_EDICAO` ou `CONCLUIDA`); o carrinho sincroniza o snapshot via
+   `ItemCarrinhoAdicionadoEvent`/`ItemCarrinhoRemovidoEvent`.
 3. O download/comercialização só é liberado após a publicação da edição.
-4. A galeria publicada mostra somente as fotos da seleção com `versaoAtual = EDITADA`.
+4. Na comercialização a galeria mostra as fotos da seleção publicada
+   (`versaoAtual = EDITADA`) **e** as fotos restantes (fora da seleção). As
+   restantes podem ser compradas e entram em edição sob demanda.
 5. Galerias `DIRETO` e existentes continuam com o comportamento anterior.
-6. O preço dos extras é congelado no snapshot da seleção.
-7. `EdicaoPublicadaEvent` troca a versão pública para `EDITADA`; `SelecaoCanceladaEvent` libera a seleção.
-8. `SelecaoEnviadaEvent` notifica o editor/fotógrafo.
-9. Toda seleção (cliente ou admin) valida foto publicada, visível, numerada e sem compra/download (`SelecaoFotoValidator`).
-10. O modo da galeria não pode ser alterado com seleção ativa/publicada, venda ou download (`podeAlterarModo`).
+6. O preço dos extras é congelado no snapshot da seleção no momento em que a
+   foto entra no carrinho. `getValorUnitarioExtra` considera a seleção ativa
+   antes da publicação e a publicada depois dela.
+7. `EdicaoPublicadaEvent` troca a versão pública para `EDITADA`;
+   `SelecaoCanceladaEvent` libera a seleção.
+8. `SelecaoEnviadaEvent` notifica o editor/fotógrafo. Extras anexados depois
+   disparam `SelecaoExtraAdicionadaEvent`/`SelecaoExtraRemovidaEvent` para
+   marcar/desmarcar `emSelecaoEdicao`.
+9. Toda seleção (cliente ou admin) valida foto publicada, visível, numerada e
+   sem compra/download (`SelecaoFotoValidator`).
+10. O modo da galeria não pode ser alterado com seleção ativa/publicada, venda
+    ou download (`podeAlterarModo`).
+11. A publicação exige que **todos** os itens do snapshot (pacote + extras)
+    tenham versão editada. Um extra anexado depois deixa a seleção `CONCLUIDA`
+    novamente `EM_EDICAO`.
+12. Extras comprados depois da publicação não entram em uma nova seleção:
+    ficam `PAGA` + `versaoAtual = ORIGINAL` e aparecem na fila
+    `GET /api/v1/admin/ecommerce/extras/pendentes-edicao`.
+13. O estúdio envia a versão editada em
+    `PUT /api/v1/agendamentos/{id}/fotos/{fotoId}/editada-compra` e libera o
+    download em `POST .../editada-compra/publicar` (troca `versaoAtual` para
+    `EDITADA`). Antes da liberação o download permanece bloqueado.
 11. A capa manual fica em `galerias_ensaio.capa_foto_id` + `capa_versao`; a versão é congelada e não muda sozinha após edição/publicação.
 12. `PUT /api/v1/admin/agendamentos/{id}/galeria/capa` define/remove a capa (ADMIN/FOTOGRAFO/EDITOR). `GET /api/v1/ecommerce/galeria/{token}/capa` serve o hero em até 2560px; `capaUrl` já sai com `?v={fotoId}-{versao}` e as respostas usam `no-store`.
 13. O endpoint público `GET /api/v1/ecommerce/fotos/{fotoId}/watermarked` serve a **prévia protegida de 800px** (`preview_v2_*`). Fotos antigas são reduzidas sob demanda a partir do watermark existente, em cache versionado.

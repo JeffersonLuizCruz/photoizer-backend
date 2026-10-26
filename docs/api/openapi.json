@@ -2609,6 +2609,97 @@
         } ]
       }
     },
+    "/api/v1/agendamentos/{agendamentoId}/fotos/{fotoId}/editada-compra" : {
+      "put" : {
+        "tags" : [ "Fotos" ],
+        "summary" : "Enviar a versão editada de uma foto extra comprada",
+        "description" : "Use quando a foto foi comprada depois da publicação da galeria e precisa ser editada sob demanda. A liberação do download é feita em POST /{fotoId}/editada-compra/publicar.",
+        "operationId" : "uploadEditadaCompraExtra",
+        "parameters" : [ {
+          "name" : "agendamentoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "fotoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "arquivo" : {
+                    "type" : "string",
+                    "format" : "binary"
+                  }
+                },
+                "required" : [ "arquivo" ]
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FotoEnsaioResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/agendamentos/{agendamentoId}/fotografos/{fotografoId}" : {
       "put" : {
         "tags" : [ "Fotógrafos do Agendamento" ],
@@ -6718,6 +6809,81 @@
                   "items" : {
                     "$ref" : "#/components/schemas/FotoEnsaioResponse"
                   }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/agendamentos/{agendamentoId}/fotos/{fotoId}/editada-compra/publicar" : {
+      "post" : {
+        "tags" : [ "Fotos" ],
+        "summary" : "Liberar o download da edição de uma foto extra comprada",
+        "description" : "Troca a versão pública para EDITADA depois que a versão editada foi enviada. Requer compra paga e versão editada existente.",
+        "operationId" : "publicarEditadaCompraExtra",
+        "parameters" : [ {
+          "name" : "agendamentoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "fotoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FotoEnsaioResponse"
                 }
               }
             }
@@ -12931,6 +13097,75 @@
         } ]
       }
     },
+    "/api/v1/admin/ecommerce/extras/pendentes-edicao" : {
+      "get" : {
+        "tags" : [ "Admin Edição de Extras" ],
+        "summary" : "Listar compras com fotos extras aguardando edição",
+        "operationId" : "pendentes",
+        "parameters" : [ {
+          "name" : "agendamentoId",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/CompraExtraPendenteEdicaoResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/admin/ecommerce/compras" : {
       "get" : {
         "tags" : [ "Admin Compras" ],
@@ -18427,6 +18662,35 @@
           "diasAguardando" : {
             "type" : "integer",
             "format" : "int64"
+          }
+        }
+      },
+      "CompraExtraPendenteEdicaoResponse" : {
+        "type" : "object",
+        "properties" : {
+          "compraId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "agendamentoId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "clienteNome" : {
+            "type" : "string"
+          },
+          "valorTotal" : {
+            "type" : "number"
+          },
+          "dataPagamento" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "fotos" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/FotoEnsaioResponse"
+            }
           }
         }
       },

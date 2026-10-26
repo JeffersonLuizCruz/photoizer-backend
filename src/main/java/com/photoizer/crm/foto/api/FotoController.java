@@ -227,6 +227,37 @@ public class FotoController {
         return ResponseEntity.ok(fotoMapper.toResponse(foto));
     }
 
+    @PutMapping("/{fotoId}/editada-compra")
+    @RolesAllowed({"ADMIN", "FOTOGRAFO", "EDITOR"})
+    @Operation(
+        summary = "Enviar a versão editada de uma foto extra comprada",
+        description = "Use quando a foto foi comprada depois da publicação da galeria e "
+            + "precisa ser editada sob demanda. A liberação do download é feita em "
+            + "POST /{fotoId}/editada-compra/publicar.")
+    public ResponseEntity<FotoEnsaioResponse> uploadEditadaCompraExtra(
+            @PathVariable UUID agendamentoId,
+            @PathVariable UUID fotoId,
+            @RequestParam("arquivo") MultipartFile arquivo) {
+        if (arquivo == null || arquivo.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+        var foto = fotoService.uploadEditadaCompraExtra(agendamentoId, fotoId, arquivo);
+        return ResponseEntity.ok(fotoMapper.toResponse(foto));
+    }
+
+    @PostMapping("/{fotoId}/editada-compra/publicar")
+    @RolesAllowed({"ADMIN", "FOTOGRAFO", "EDITOR"})
+    @Operation(
+        summary = "Liberar o download da edição de uma foto extra comprada",
+        description = "Troca a versão pública para EDITADA depois que a versão editada "
+            + "foi enviada. Requer compra paga e versão editada existente.")
+    public ResponseEntity<FotoEnsaioResponse> publicarEditadaCompraExtra(
+            @PathVariable UUID agendamentoId,
+            @PathVariable UUID fotoId) {
+        var foto = fotoService.publicarEditadaCompraExtra(agendamentoId, fotoId);
+        return ResponseEntity.ok(fotoMapper.toResponse(foto));
+    }
+
     private FotoEnsaio buscarEValidarPropriedade(UUID agendamentoId, UUID fotoId) {
         var foto = fotoService.buscarPorId(fotoId);
         if (!foto.getAgendamentoId().equals(agendamentoId)) {

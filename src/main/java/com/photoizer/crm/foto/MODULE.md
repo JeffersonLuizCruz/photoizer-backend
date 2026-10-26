@@ -93,7 +93,17 @@ foto/
 - `PATCH /{fotoId}/status` → `alterarStatus()`: altera status individual; transição para `PUBLICADA` exige status pago e fotos protegidas não podem ter o status alterado.
 - `PUT /{fotoId}/imagem` → `substituirImagem()`: bloqueado para fotos vinculadas a pacote, compra, download ou edição; deleta 4 arquivos antigos, sobe original e regera via `FotoProcessingHelper`.
 
-### Fluxo 4: Remoção em lote
+### Fluxo 4: Edição sob demanda de extra comprado
+- `PUT /{fotoId}/editada-compra` → `uploadEditadaCompraExtra()`: permite foto
+  `PAGA` vinculada a `compraExtraId`, grava a versão editada e mantém
+  `versaoAtual = ORIGINAL` até a liberação.
+- `POST /{fotoId}/editada-compra/publicar` → `publicarEditadaCompraExtra()`:
+  exige `editadaPath` e troca `versaoAtual` para `EDITADA`, liberando o
+  download no e-commerce.
+- A fila `GET /api/v1/admin/ecommerce/extras/pendentes-edicao` consulta
+  `findExtrasPendentesEdicao()` (fotos `PAGA` com `versaoAtual != EDITADA`).
+
+### Fluxo 5: Remoção em lote
 - `POST /remover-lote` → `deletarEmLote(agendamentoId, fotoIds)`:
   1. deduplica os IDs e valida existência (404) e propriedade do agendamento (403);
   2. rejeita o lote inteiro (409) se alguma foto estiver vinculada a compra, pacote ou status de compra (`PAGA`/`AGUARDANDO_*`);

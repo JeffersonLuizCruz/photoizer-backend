@@ -7,6 +7,10 @@ import com.photoizer.crm.ecommerce.api.SelecaoPendenteResponse;
 import com.photoizer.crm.ecommerce.event.EdicaoPublicadaEvent;
 import com.photoizer.crm.ecommerce.event.SelecaoCanceladaEvent;
 import com.photoizer.crm.ecommerce.event.SelecaoEnviadaEvent;
+import com.photoizer.crm.ecommerce.event.SelecaoExtraAdicionadaEvent;
+import com.photoizer.crm.ecommerce.event.SelecaoExtraRemovidaEvent;
+import com.photoizer.crm.ecommerce.exception.FotoIndisponivelException;
+import com.photoizer.crm.ecommerce.exception.FotoNaoEncontradaException;
 import com.photoizer.crm.ecommerce.exception.FotosEditadasIncompletasException;
 import com.photoizer.crm.ecommerce.exception.SelecaoJaEnviadaException;
 import com.photoizer.crm.ecommerce.exception.SelecaoNaoEditavelException;
@@ -195,6 +199,100 @@ public class SelecaoEnsaioService {
         return paraResponse(selecaoSalva, itens);
     }
 
+    /**
+     * Anexa uma foto extra ao snapshot da selecao ativa. Chamado quando o
+     * cliente adiciona um extra ao carrinho enquanto a selecao ja foi enviada
+     * e o estudio ainda esta editando. Sem isso o extra ficaria no carrinho
+     * sem entrar no trabalho de edicao.
+     */
+    public void incluirExtra(UUID agendamentoId, UUID fotoId) {
+        var selecaoOpt = selecaoRepository.findFirstByAgendamentoIdAndStatusInOrderByNumeroDesc(
+            agendamentoId, STATUS_ATIVOS);
+        if (selecaoOpt.isEmpty()) {
+            return;
+        }
+        var selecao = selecaoRepository.findByIdForUpdate(selecaoOpt.get().getId())
+            .orElse(selecaoOpt.get());
+        if (itemRepository.findBySelecaoIdAndFotoId(selecao.getId(), fotoId).isPresent()) {
+            return;
+        }
+
+        var agendamento = galeriaQueryService.buscarAgendamentoPorId(agendamentoId);
+        var foto = fotoRepository.findById(fotoId)
+            .orElseThrow(() -> new FotoNaoEncontradaException(fotoId));
+        if (foto.isSelecionadaPacote()) {
+            throw new FotoIndisponivelException(
+                "Foto já incluída no pacote não pode ser adicionada como extra");
+        }
+        selecaoFotoValidator.validar(foto, agendamento);
+
+        var item = novoItem(
+            selecao.getId(),
+            foto,
+            TipoItemSelecao.EXTRA,
+            galeriaQueryService.getValorUnitarioFotoExtra(agendamentoId));
+        itemRepository.save(item);
+
+        if (selecao.getStatus() == StatusSelecao.CONCLUIDA) {
+            selecao.reabrirEdicao();
+            selecaoRepository.save(selecao);
+        }
+
+        eventPublisher.publishEvent(new SelecaoExtraAdicionadaEvent(
+            agendamentoId, selecao.getId(), fotoId));
+
+        log.atInfo()
+            .addKeyValue("event_action", "selecao.extra_adicionado")
+            .addKeyValue("agendamento_id", agendamentoId)
+            .addKeyValue("selecao_id", selecao.getId())
+            .addKeyValue("foto_id", fotoId)
+            .addKeyValue("valor_unitario", item.getValorUnitario())
+            .log("Extra anexado à seleção em edição");
+    }
+
+    /**
+     * Remove um extra do snapshot da selecao ativa. So e permitido enquanto a
+     * foto ainda nao foi editada; depois disso o estudio precisa ser acionado.
+     */
+    public void removerExtra(UUID agendamentoId, UUID fotoId) {
+        var selecaoOpt = selecaoRepository.findFirstByAgendamentoIdAndStatusInOrderByNumeroDesc(
+            agendamentoId, STATUS_ATIVOS);
+        if (selecaoOpt.isEmpty()) {
+            return;
+        }
+        var selecao = selecaoRepository.findByIdForUpdate(selecaoOpt.get().getId())
+            .orElse(selecaoOpt.get());
+        var item = itemRepository.findBySelecaoIdAndFotoId(selecao.getId(), fotoId).orElse(null);
+        if (item == null || item.getTipo() != TipoItemSelecao.EXTRA) {
+            return;
+        }
+        if (item.isEditada()) {
+            throw new SelecaoNaoEditavelException(
+                "A foto extra já foi editada e não pode ser removida do carrinho. "
+                    + "Fale com o estúdio para ajustar a seleção.");
+        }
+
+        itemRepository.delete(item);
+        eventPublisher.publishEvent(new SelecaoExtraRemovidaEvent(
+            agendamentoId, selecao.getId(), fotoId));
+
+        if (selecao.getStatus() == StatusSelecao.EM_EDICAO) {
+            var total = itemRepository.countBySelecaoId(selecao.getId());
+            var editadas = itemRepository.countBySelecaoIdAndEditadaTrue(selecao.getId());
+            if (total > 0 && total == editadas) {
+                selecao.concluir();
+                selecaoRepository.save(selecao);
+            }
+        }
+
+        log.atInfo()
+            .addKeyValue("event_action", "selecao.extra_removido")
+            .addKeyValue("agendamento_id", agendamentoId)
+            .addKeyValue("selecao_id", selecao.getId())
+            .addKeyValue("foto_id", fotoId)
+            .log("Extra removido da seleção em edição");
+    }
+
     public SelecaoEnsaioResponse detalhar(UUID agendamentoId, UUID selecaoId) {
         var selecao = buscarSelecao(agendamentoId, selecaoId);
         return paraResponse(selecao, itemRepository.findBySelecaoIdOrderByNumeroGaleriaAsc(selecaoId));
@@ -285,7 +383,9 @@ public class SelecaoEnsaioService {
     }
 
     public SelecaoEnsaioResponse publicar(UUID agendamentoId, UUID selecaoId) {
-        var selecao = buscarSelecao(agendamentoId, selecaoId);
+        // O lock serializa a publicação com a inclusão de extras pelo cliente.
+        // Sem ele, um extra poderia entrar depois da checagem de "tudo editado".
+        var selecao = buscarSelecaoParaAtualizacao(agendamentoId, selecaoId);
         var itens = itemRepository.findBySelecaoIdOrderByNumeroGaleriaAsc(selecaoId);
         var pendentes = itens.stream().filter(i -> !i.isEditada()).count();
         if (pendentes > 0) {
@@ -345,6 +445,15 @@ public class SelecaoEnsaioService {
 
     private SelecaoEnsaio buscarSelecao(UUID agendamentoId, UUID selecaoId) {
         var selecao = selecaoRepository.findById(selecaoId)
+            .orElseThrow(() -> new SelecaoNaoEncontradaException(selecaoId));
+        if (!selecao.getAgendamentoId().equals(agendamentoId)) {
+            throw new SelecaoNaoEncontradaException(selecaoId);
+        }
+        return selecao;
+    }
+
+    private SelecaoEnsaio buscarSelecaoParaAtualizacao(UUID agendamentoId, UUID selecaoId) {
+        var selecao = selecaoRepository.findByIdForUpdate(selecaoId)
             .orElseThrow(() -> new SelecaoNaoEncontradaException(selecaoId));
         if (!selecao.getAgendamentoId().equals(agendamentoId)) {
             throw new SelecaoNaoEncontradaException(selecaoId);

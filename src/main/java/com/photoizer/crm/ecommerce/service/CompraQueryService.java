@@ -2,6 +2,7 @@ package com.photoizer.crm.ecommerce.service;
 
 import com.photoizer.crm.ecommerce.api.AdminCompraDetalheResponse;
 import com.photoizer.crm.ecommerce.api.AdminComprasRelatorioResponse;
+import com.photoizer.crm.ecommerce.api.CompraExtraPendenteEdicaoResponse;
 import com.photoizer.crm.ecommerce.api.EcommerceMapper;
 import com.photoizer.crm.ecommerce.exception.CompraNaoEncontradaException;
 import com.photoizer.crm.ecommerce.model.CompraExtra;
@@ -38,6 +39,7 @@ public class CompraQueryService {
     private final CompraExtraRepository compraExtraRepository;
     private final FotoService fotoService;
     private final GaleriaQueryService galeriaQueryService;
+    private final GaleriaEnsaioService galeriaEnsaioService;
     private final EcommerceMapper ecommerceMapper;
     private final FotoMapper fotoMapper;
     private final com.photoizer.crm.shared.storage.StoragePathResolver pathResolver;
@@ -45,12 +47,14 @@ public class CompraQueryService {
     public CompraQueryService(CompraExtraRepository compraExtraRepository,
                               FotoService fotoService,
                               GaleriaQueryService galeriaQueryService,
+                              GaleriaEnsaioService galeriaEnsaioService,
                               EcommerceMapper ecommerceMapper,
                               FotoMapper fotoMapper,
                               com.photoizer.crm.shared.storage.StoragePathResolver pathResolver) {
         this.compraExtraRepository = compraExtraRepository;
         this.fotoService = fotoService;
         this.galeriaQueryService = galeriaQueryService;
+        this.galeriaEnsaioService = galeriaEnsaioService;
         this.ecommerceMapper = ecommerceMapper;
         this.fotoMapper = fotoMapper;
         this.pathResolver = pathResolver;
@@ -115,6 +119,47 @@ public class CompraQueryService {
             return compraExtraRepository.findByPeriodo(dataInicio, dataFim, pageable);
         }
         return compraExtraRepository.findAll(pageable);
+    }
+
+    /**
+     * Fila de edição sob demanda: compras pagas que possuem fotos extras ainda
+     * em versão ORIGINAL (compradas depois da publicação da galeria).
+     */
+    public List<CompraExtraPendenteEdicaoResponse> listarPendentesEdicao(UUID agendamentoId) {
+        var fotosPendentes = fotoService.listarPendentesEdicao().stream()
+            .filter(foto -> agendamentoId == null || foto.getAgendamentoId().equals(agendamentoId))
+            // Edição sob demanda só existe no modo COM_EDICAO. Galerias DIRETO
+            // entregam o próprio arquivo original e não entram nesta fila.
+            .filter(foto -> galeriaEnsaioService.obter(foto.getAgendamentoId()).getModo()
+                == com.photoizer.crm.ecommerce.model.ModoGaleria.COM_EDICAO)
+            .toList();
+        if (fotosPendentes.isEmpty()) {
+            return List.of();
+        }
+
+        var fotosPorCompra = fotosPendentes.stream()
+            .collect(java.util.stream.Collectors.groupingBy(
+                com.photoizer.crm.foto.model.FotoEnsaio::getCompraExtraId));
+        var compras = compraExtraRepository.findAllById(fotosPorCompra.keySet());
+
+        return compras.stream()
+            .sorted(java.util.Comparator.comparing(
+                CompraExtra::getDataPagamento,
+                java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
+            .map(compra -> {
+                var agendamento = galeriaQueryService.buscarAgendamentoPorId(compra.getAgendamentoId());
+                var fotos = fotosPorCompra.get(compra.getId()).stream()
+                    .map(fotoMapper::toResponse)
+                    .toList();
+                return new CompraExtraPendenteEdicaoResponse(
+                    compra.getId(),
+                    compra.getAgendamentoId(),
+                    agendamento.nomeCliente(),
+                    compra.getValorTotal(),
+                    compra.getDataPagamento(),
+                    fotos);
+            })
+            .toList();
     }
 
     public AdminComprasRelatorioResponse gerarRelatorio() {

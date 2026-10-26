@@ -2,12 +2,15 @@ package com.photoizer.crm.ecommerce.service;
 
 import com.photoizer.crm.ecommerce.api.CalculoCarrinhoResponse;
 import com.photoizer.crm.ecommerce.api.CalculoItemResponse;
+import com.photoizer.crm.ecommerce.event.ItemCarrinhoAdicionadoEvent;
+import com.photoizer.crm.ecommerce.event.ItemCarrinhoRemovidoEvent;
 import com.photoizer.crm.ecommerce.exception.CarrinhoVazioException;
 import com.photoizer.crm.ecommerce.exception.FotoIndisponivelException;
 import com.photoizer.crm.ecommerce.exception.FotoNaoEncontradaException;
 import com.photoizer.crm.ecommerce.model.ItemCarrinho;
 import com.photoizer.crm.ecommerce.repository.ItemCarrinhoRepository;
 import com.photoizer.crm.foto.model.StatusFoto;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,20 +33,18 @@ public class CarrinhoService {
 
     private final ItemCarrinhoRepository itemCarrinhoRepository;
     private final GaleriaQueryService galeriaQueryService;
-    private final GaleriaEnsaioService galeriaEnsaioService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public CarrinhoService(ItemCarrinhoRepository itemCarrinhoRepository,
                            GaleriaQueryService galeriaQueryService,
-                           GaleriaEnsaioService galeriaEnsaioService) {
+                           ApplicationEventPublisher eventPublisher) {
         this.itemCarrinhoRepository = itemCarrinhoRepository;
         this.galeriaQueryService = galeriaQueryService;
-        this.galeriaEnsaioService = galeriaEnsaioService;
+        this.eventPublisher = eventPublisher;
     }
 
     public void adicionarAoCarrinho(UUID token, UUID sessionId, UUID fotoId) {
         var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
-        galeriaEnsaioService.validarCarrinhoPermitido(
-            galeriaEnsaioService.obter(agendamento.getId()));
         var foto = galeriaQueryService.buscarFotoPorId(fotoId);
 
         if (!foto.getAgendamentoId().equals(agendamento.getId())) {
@@ -68,14 +69,18 @@ public class CarrinhoService {
                 .sessionId(sessionId)
                 .build();
             itemCarrinhoRepository.save(item);
+            // O listener de extras anexa a foto à seleção ativa (se houver)
+            // para que o estúdio a edite junto com o pacote.
+            eventPublisher.publishEvent(new ItemCarrinhoAdicionadoEvent(agendamento.getId(), fotoId));
         }
     }
 
     public void removerDoCarrinho(UUID token, UUID sessionId, UUID fotoId) {
         var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
-        galeriaEnsaioService.validarCarrinhoPermitido(
-            galeriaEnsaioService.obter(agendamento.getId()));
         itemCarrinhoRepository.deleteBySessionIdAndAgendamentoIdAndFotoId(sessionId, agendamento.getId(), fotoId);
+        // Remove também do snapshot da seleção ativa, quando a foto ainda não
+        // foi editada. O listener valida a regra e bloqueia remoções tardias.
+        eventPublisher.publishEvent(new ItemCarrinhoRemovidoEvent(agendamento.getId(), fotoId));
     }
 
     @Transactional(readOnly = true)

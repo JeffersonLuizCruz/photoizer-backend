@@ -20,8 +20,12 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
- * Snapshot imutavel da selecao enviada pelo cliente. O staff trabalha sobre
- * este snapshot, nunca sobre o estado mutavel de {@code selecionadaPacote}.
+ * Snapshot da selecao enviada pelo cliente. O staff trabalha sobre este
+ * snapshot, nunca sobre o estado mutavel de {@code selecionadaPacote}.
+ *
+ * <p>Os itens do pacote sao imutaveis depois do envio. Apenas itens do tipo
+ * {@code EXTRA} podem ser anexados/removidos enquanto a selecao esta ativa,
+ * para permitir que o cliente continue escolhendo extras durante a edicao.
  */
 @Entity
 @Table(name = "selecoes_ensaio")
@@ -75,6 +79,17 @@ public class SelecaoEnsaio {
         status.validarTransicao(StatusSelecao.CONCLUIDA);
         status = StatusSelecao.CONCLUIDA;
         concluidaEm = LocalDateTime.now();
+    }
+
+    /**
+     * Reabre a edição quando um novo extra é anexado depois que todos os
+     * itens já estavam editados. A publicação volta a exigir a edição do novo
+     * item.
+     */
+    public void reabrirEdicao() {
+        status.validarTransicao(StatusSelecao.EM_EDICAO);
+        status = StatusSelecao.EM_EDICAO;
+        concluidaEm = null;
     }
 
     public void publicar() {

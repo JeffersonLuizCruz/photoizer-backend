@@ -8,6 +8,8 @@ import com.photoizer.crm.ecommerce.event.FotoDownloadEvent;
 import com.photoizer.crm.ecommerce.event.FotosSelecionadasEvent;
 import com.photoizer.crm.ecommerce.event.SelecaoCanceladaEvent;
 import com.photoizer.crm.ecommerce.event.SelecaoEnviadaEvent;
+import com.photoizer.crm.ecommerce.event.SelecaoExtraAdicionadaEvent;
+import com.photoizer.crm.ecommerce.event.SelecaoExtraRemovidaEvent;
 import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.model.VersaoFoto;
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
@@ -70,6 +72,40 @@ public class FotoEcommerceEventListener {
             }
         }
         fotoEnsaioRepository.saveAll(fotos);
+    }
+
+    @EventListener
+    @Transactional
+    public void handleSelecaoExtraAdicionada(SelecaoExtraAdicionadaEvent event) {
+        log.atInfo()
+            .addKeyValue("event_action", "foto.extra_selecao_adicionado")
+            .addKeyValue("agendamento_id", event.agendamentoId())
+            .addKeyValue("selecao_id", event.selecaoId())
+            .addKeyValue("foto_id", event.fotoId())
+            .log("Extra anexado à seleção; foto reservada para edição");
+        var foto = fotoEnsaioRepository.findById(event.fotoId()).orElse(null);
+        if (foto == null || !foto.getAgendamentoId().equals(event.agendamentoId())) {
+            return;
+        }
+        foto.setEmSelecaoEdicao(true);
+        fotoEnsaioRepository.save(foto);
+    }
+
+    @EventListener
+    @Transactional
+    public void handleSelecaoExtraRemovida(SelecaoExtraRemovidaEvent event) {
+        log.atInfo()
+            .addKeyValue("event_action", "foto.extra_selecao_removido")
+            .addKeyValue("agendamento_id", event.agendamentoId())
+            .addKeyValue("selecao_id", event.selecaoId())
+            .addKeyValue("foto_id", event.fotoId())
+            .log("Extra removido da seleção; foto liberada");
+        var foto = fotoEnsaioRepository.findById(event.fotoId()).orElse(null);
+        if (foto == null || !foto.getAgendamentoId().equals(event.agendamentoId())) {
+            return;
+        }
+        foto.setEmSelecaoEdicao(false);
+        fotoEnsaioRepository.save(foto);
     }
 
     @EventListener

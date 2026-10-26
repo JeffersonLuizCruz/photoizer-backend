@@ -211,19 +211,6 @@ public class GaleriaEnsaioService {
         }
     }
 
-    /**
-     * O carrinho pode ser montado durante a selecao (para o cliente marcar
-     * extras que deseja editar) e durante a comercializacao. Ele fica
-     * bloqueado enquanto a selecao esta enviada/em edicao.
-     */
-    public void validarCarrinhoPermitido(GaleriaEnsaio galeria) {
-        if (galeria.getModo() == ModoGaleria.COM_EDICAO
-            && galeria.getFase() != FaseGaleria.SELECAO
-            && galeria.getFase() != FaseGaleria.COMERCIALIZACAO) {
-            throw new GaleriaEmEdicaoException("alterar o carrinho");
-        }
-    }
-
     private FaseGaleria faseInicial(ModoGaleria modo) {
         return modo == ModoGaleria.COM_EDICAO
             ? FaseGaleria.SELECAO

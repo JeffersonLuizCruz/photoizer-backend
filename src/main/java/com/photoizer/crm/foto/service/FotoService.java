@@ -82,6 +82,11 @@ public class FotoService {
     }
 
     @Transactional(readOnly = true)
+    public List<FotoEnsaio> listarPendentesEdicao() {
+        return fotoEnsaioRepository.findExtrasPendentesEdicao();
+    }
+
+    @Transactional(readOnly = true)
     public FotoEnsaio buscarPorId(UUID id) {
         return fotoEnsaioRepository.findById(id)
             .orElseThrow(() -> new FotoEnsaioNaoEncontradaException(id));
@@ -480,6 +485,74 @@ public class FotoService {
             throw new FotoNaoEditavelException("foto já vendida, baixada ou com edição publicada");
         }
 
+        var salva = salvarVersaoEditada(foto, agendamentoId, arquivo);
+        eventPublisher.publishEvent(new FotoEditadaEvent(agendamentoId, fotoId));
+        return salva;
+    }
+
+    /**
+     * Envia a versão editada de uma foto comprada como extra depois da
+     * publicação. A foto já está paga, por isso o bloqueio de venda do
+     * {@link #uploadEditada} não se aplica; a liberação para download acontece
+     * em {@link #publicarEditadaCompraExtra}.
+     */
+    public FotoEnsaio uploadEditadaCompraExtra(UUID agendamentoId, UUID fotoId,
+                                               org.springframework.web.multipart.MultipartFile arquivo) {
+        if (!agendamentoReadService.isStatusPermitidoParaUpload(agendamentoId)) {
+            throw new AgendamentoNaoPermitidoParaUploadException();
+        }
+
+        var foto = buscarPorId(fotoId);
+        if (!foto.getAgendamentoId().equals(agendamentoId)) {
+            throw new FotoNaoPertenceAoAgendamentoException(fotoId, agendamentoId);
+        }
+        if (foto.getCompraExtraId() == null) {
+            throw new FotoNaoEditavelException("foto não pertence a uma compra extra");
+        }
+        if (foto.getStatus() != StatusFoto.PAGA) {
+            throw new FotoNaoEditavelException("a compra da foto ainda não foi paga");
+        }
+        if (foto.getVersaoAtual() == com.photoizer.crm.foto.model.VersaoFoto.EDITADA) {
+            throw new FotoNaoEditavelException("a edição desta foto já foi liberada");
+        }
+
+        return salvarVersaoEditada(foto, agendamentoId, arquivo);
+    }
+
+    /**
+     * Libera o download da versão editada enviada para uma foto comprada como
+     * extra após a publicação da galeria.
+     */
+    public FotoEnsaio publicarEditadaCompraExtra(UUID agendamentoId, UUID fotoId) {
+        var foto = buscarPorId(fotoId);
+        if (!foto.getAgendamentoId().equals(agendamentoId)) {
+            throw new FotoNaoPertenceAoAgendamentoException(fotoId, agendamentoId);
+        }
+        if (foto.getCompraExtraId() == null) {
+            throw new FotoNaoEditavelException("foto não pertence a uma compra extra");
+        }
+        if (foto.getStatus() != StatusFoto.PAGA) {
+            throw new FotoNaoEditavelException("a compra da foto ainda não foi paga");
+        }
+        if (foto.getEditadaPath() == null) {
+            throw new FotoNaoEditavelException("envie a versão editada antes de liberar o download");
+        }
+        if (foto.getVersaoAtual() == com.photoizer.crm.foto.model.VersaoFoto.EDITADA) {
+            return foto;
+        }
+
+        foto.setVersaoAtual(com.photoizer.crm.foto.model.VersaoFoto.EDITADA);
+        var salva = fotoEnsaioRepository.save(foto);
+        log.atInfo()
+            .addKeyValue("event_action", "foto.editada_compra_liberada")
+            .addKeyValue("agendamento_id", agendamentoId)
+            .addKeyValue("foto_id", fotoId)
+            .log("Edição de extra comprada liberada para download");
+        return salva;
+    }
+
+    private FotoEnsaio salvarVersaoEditada(FotoEnsaio foto, UUID agendamentoId,
+                                           org.springframework.web.multipart.MultipartFile arquivo) {
         fileValidator.validate(arquivo, "image");
         var arquivosNovos = new ArrayList<Path>();
         var caminhosAntigos = java.util.stream.Stream.of(
@@ -496,7 +569,7 @@ public class FotoService {
             arquivosNovos.add(editada);
             validarImagemLegivel(editada, arquivo.getOriginalFilename());
 
-            var processada = fotoProcessingHelper.processar(editada, editada.getParent(), fotoId);
+            var processada = fotoProcessingHelper.processar(editada, editada.getParent(), foto.getId());
             arquivosNovos.add(Path.of(processada.watermarkedPath()));
             arquivosNovos.add(Path.of(processada.thumbPath()));
             if (processada.previewPath() != null) {
@@ -514,8 +587,6 @@ public class FotoService {
             foto.setEditadaPor(usuarioAtual());
             var salva = fotoEnsaioRepository.save(foto);
 
-            eventPublisher.publishEvent(new FotoEditadaEvent(agendamentoId, fotoId));
-
             // Remove as versões editadas anteriores somente depois que a nova
             // foi gravada e o snapshot foi atualizado com sucesso.
             caminhosAntigos.forEach(this::deletarArquivo);
@@ -524,7 +595,7 @@ public class FotoService {
             log.atInfo()
                 .addKeyValue("event_action", "foto.editada_upload")
                 .addKeyValue("agendamento_id", agendamentoId)
-                .addKeyValue("foto_id", fotoId)
+                .addKeyValue("foto_id", foto.getId())
                 .log("Versão editada enviada");
             return salva;
         } catch (RuntimeException e) {

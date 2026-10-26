@@ -58,6 +58,21 @@ public interface FotoEnsaioRepository extends JpaRepository<FotoEnsaio, UUID> {
 
     List<FotoEnsaio> findByCompraExtraId(UUID compraExtraId);
 
+    /**
+     * Fotos extras compradas que ainda não tiveram a versão editada liberada.
+     * Alimenta a fila de edição sob demanda no workspace da galeria.
+     */
+    @Query("""
+        SELECT f FROM FotoEnsaio f
+        WHERE f.compraExtraId IS NOT NULL
+          AND f.status = 'PAGA'
+          AND f.versaoAtual <> 'EDITADA'
+        ORDER BY f.compraExtraId ASC,
+                 COALESCE(f.numeroGaleria, 2147483647) ASC,
+                 f.ordem ASC
+        """)
+    List<FotoEnsaio> findExtrasPendentesEdicao();
+
     @Query("SELECT COALESCE(MAX(f.ordem), -1) FROM FotoEnsaio f WHERE f.agendamentoId = :agendamentoId")
     int findMaxOrdemByAgendamentoId(@Param("agendamentoId") UUID agendamentoId);
 }
