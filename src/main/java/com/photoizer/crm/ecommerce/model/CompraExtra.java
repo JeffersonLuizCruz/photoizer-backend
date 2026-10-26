@@ -79,4 +79,22 @@ public class CompraExtra {
 
     @Column(columnDefinition = "TEXT")
     private String motivoRecusa;
+
+    /**
+     * Indica que o valor desta compra já foi somado ao financeiro do agendamento
+     * (valorExtras/valorTotalFinal). Evita contabilização dupla em eventos
+     * reentregues e permite reconciliar compras antigas no boot.
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean extrasContabilizados = false;
+
+    /**
+     * Indica que o recebimento desta compra já foi refletido em valorEntradaPago.
+     * Separado de {@link #extrasContabilizados} porque uma compra pendente já
+     * entra no total a receber, mas só conta como recebida após a confirmação.
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean pagamentoContabilizado = false;
 }

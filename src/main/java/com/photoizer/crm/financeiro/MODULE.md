@@ -20,6 +20,7 @@ financeiro/
 ├── service/
 │   ├── PagamentoService.java              # Registro de pagamentos + publica PagamentoRegistradoEvent
 │   ├── ExtraVendaService.java             # Venda de fotos/vídeos extras + publica eventos
+│   ├── CompraExtraFinanceiroService.java  # Contabiliza/estorna compras extras do e-commerce no agendamento
 │   ├── FinanceiroQueryService.java        # Queries de leitura: preview, resumo, relatórios, fluxo de caixa, bloqueio
 │   ├── FinanceiroDashboardService.java    # Dashboard agregado (delega repasses ao FinanceCalculator)
 │   ├── FinanceiroRelatorioService.java    # Relatórios para exportação (queries SQL)
@@ -38,9 +39,10 @@ financeiro/
 │   └── ~14 records de Response/preview
 ├── event/
 │   ├── PagamentoRegistradoEvent.java      # Domain Event — publicado ao registrar pagamento
-│   └── ExtrasAdicionadosEvent.java        # Domain Event — publicado ao adicionar extras
+│   ├── ExtrasAdicionadosEvent.java        # Domain Event — publicado ao adicionar extras
+│   └── ExtrasRemovidosEvent.java          # Domain Event — publicado ao estornar extras cancelados
 ├── listener/
-│   └── FinanceiroEventListener.java       # Consome AgendamentoRealizadoEvent + CompraExtraConfirmadaEvent
+│   └── FinanceiroEventListener.java       # Consome CompraExtraCriada/Confirmada/Cancelada do e-commerce
 ├── exception/
 │   ├── PagamentoNaoEncontradoException.java
 │   ├── AgendamentoNaoEncontradoParaFinanceiroException.java
@@ -66,13 +68,16 @@ financeiro/
 | Evento | Ação |
 |--------|------|
 | `agenda.AgendamentoRealizadoEvent` | `FinanceiroEventListener.handleAgendamentoRealizado` — log |
-| `ecommerce.CompraExtraConfirmadaEvent` | `PagamentoService.registrarPagamentoExtraEcommerce` — contabiliza extras |
+| `ecommerce.CompraExtraCriadaEvent` | `CompraExtraFinanceiroService.contabilizarCriacao` — soma extras em valorExtras/valorTotalFinal |
+| `ecommerce.CompraExtraConfirmadaEvent` | `CompraExtraFinanceiroService.contabilizarPagamento` — soma recebimento em valorEntradaPago |
+| `ecommerce.CompraExtraCanceladaEvent` | `CompraExtraFinanceiroService.contabilizarCancelamento` — estorna extras ainda não pagos |
 
 ### Eventos publicados
 | Evento | Ação |
 |--------|------|
 | `PagamentoRegistradoEvent` | Consumido por `agenda.PagamentoFinanceiroEventListener` — atualiza status/valores do Agendamento |
 | `ExtrasAdicionadosEvent` | Consumido por `agenda.PagamentoFinanceiroEventListener` — atualiza valorExtras/valorTotalFinal |
+| `ExtrasRemovidosEvent` | Consumido por `agenda.PagamentoFinanceiroEventListener` — estorna valorExtras/valorTotalFinal |
 | `ComissaoSolicitadaEvent` | Consumido por `comissao.IndicacaoListener` — cria Indicacao |
 
 ## 4. Fluxos Principais
@@ -111,8 +116,10 @@ financeiro/
 - `GET /financeiro/relatorios/inadimplencia` → inclui receitas manuais e agendamentos com data do ensaio vencida e `valorRestante > 0`.
 - Os demais relatórios de exportação (`resumo-mensal`, `rentabilidade-*`, `comparativo`, `fiscal`) continuam baseados em receitas manuais; a tela de Relatórios expõe o relatório **Ensaios e Avulsos** para os agendamentos.
 
-### Fluxo 8: Reconciliador
-`ReconciliarComprasExtraFinanceiro.run`: no boot, busca `CompraExtra PAGA` sem `Pagamento` correspondente e chama `PagamentoService.registrarPagamentoExtraEcommerce()`.
+### Fluxo 8: Compras extras do e-commerce e reconciliador
+`CompraExtraFinanceiroService` contabiliza o checkout em `valorExtras/valorTotalFinal`, o recebimento em `valorEntradaPago` e estorna extras de compras canceladas. As flags `extras_contabilizados`/`pagamento_contabilizado` em `compras_extras` tornam os eventos idempotentes.
+
+`ReconciliarComprasExtraFinanceiro.run`: no boot, percorre as compras e repara eventuais lacunas de contabilização (compras antigas, eventos perdidos e pagamentos sem recebimento aplicado).
 
 ## 5. Regras Específicas
 1. **Status ignorados** em todos os cálculos: `CANCELADO`, `NO_SHOW`; "pagamento final" considerado para `EM_EDICAO`, `FINALIZADO`.

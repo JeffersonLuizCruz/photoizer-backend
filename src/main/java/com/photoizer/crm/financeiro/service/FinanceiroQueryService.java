@@ -232,7 +232,9 @@ public class FinanceiroQueryService {
             ? agendamento.getValorEntradaPago()
             : BigDecimal.ZERO;
 
-        var saldoDevedor = valorCobrado.subtract(totalRecebido);
+        var saldoDevedor = agendamento.getValorRestante() != null
+            ? agendamento.getValorRestante()
+            : valorCobrado.subtract(totalRecebido).max(BigDecimal.ZERO);
         var statusPagamento = saldoDevedor.compareTo(BigDecimal.ZERO) <= 0
             ? "PAGO"
             : (totalRecebido.signum() > 0 ? "PARCIAL" : "PENDENTE");

@@ -105,6 +105,40 @@ class EcommercePagamentoSpec extends Specification {
         link << ["ftp://arquivo", "javascript:alert(1)", "sem-url", "https://"]
     }
 
+    def "nao confirma compra cancelada"() {
+        given:
+        def compra = CompraExtra.builder()
+            .id(UUID.randomUUID())
+            .status(StatusCompraExtra.CANCELADA)
+            .build()
+        compraRepository.findById(compra.id) >> Optional.of(compra)
+
+        when:
+        pagamentoService.confirmarPagamento(compra.id)
+
+        then:
+        thrown(ConflictException)
+        0 * compraRepository.save(_)
+        0 * eventPublisher.publishEvent(_)
+    }
+
+    def "confirmacao de compra ja paga e idempotente"() {
+        given:
+        def compra = CompraExtra.builder()
+            .id(UUID.randomUUID())
+            .status(StatusCompraExtra.PAGA)
+            .valorTotal(new BigDecimal("15.00"))
+            .build()
+        compraRepository.findById(compra.id) >> Optional.of(compra)
+
+        when:
+        pagamentoService.confirmarPagamento(compra.id)
+
+        then:
+        0 * compraRepository.save(_)
+        0 * eventPublisher.publishEvent(_)
+    }
+
     @Unroll
     def "nao permite link em compra com status #status"() {
         given:

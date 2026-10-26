@@ -135,6 +135,13 @@ public class PagamentoExtraService {
     }
 
     private void marcarCompraPaga(CompraExtra compra) {
+        if (compra.getStatus() == StatusCompraExtra.PAGA) {
+            return;
+        }
+        if (compra.getStatus() == StatusCompraExtra.CANCELADA) {
+            throw new ConflictException("Compra cancelada não pode ser confirmada");
+        }
+
         compra.setStatus(StatusCompraExtra.PAGA);
         compra.setDataPagamento(LocalDateTime.now());
         compraExtraRepository.save(compra);

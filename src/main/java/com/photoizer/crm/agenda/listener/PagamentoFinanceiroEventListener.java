@@ -5,6 +5,7 @@ import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.financeiro.event.ExtrasAdicionadosEvent;
+import com.photoizer.crm.financeiro.event.ExtrasRemovidosEvent;
 import com.photoizer.crm.financeiro.event.PagamentoRegistradoEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -103,5 +104,28 @@ public class PagamentoFinanceiroEventListener {
             .addKeyValue("valor_extras", agendamento.getValorExtras())
             .addKeyValue("valor_total_final", agendamento.getValorTotalFinal())
             .log("Extras contabilizados no agendamento");
+    }
+
+    @EventListener
+    @Transactional
+    public void handleExtrasRemovidos(ExtrasRemovidosEvent event) {
+        log.atInfo()
+            .addKeyValue("event_action", "agenda.extras_removidos")
+            .addKeyValue("agendamento_id", event.agendamentoId())
+            .addKeyValue("valor_total", event.valorTotal())
+            .log("Extras cancelados no financeiro");
+
+        var agendamento = agendamentoRepository.findByIdWithLock(event.agendamentoId())
+            .orElseThrow(() -> new AgendamentoNaoEncontradoException(event.agendamentoId()));
+
+        agendamento.removerExtras(event.valorTotal());
+        agendamentoRepository.save(agendamento);
+
+        log.atInfo()
+            .addKeyValue("event_action", "agenda.extras_estornados")
+            .addKeyValue("agendamento_id", agendamento.getId())
+            .addKeyValue("valor_extras", agendamento.getValorExtras())
+            .addKeyValue("valor_total_final", agendamento.getValorTotalFinal())
+            .log("Extras estornados do agendamento");
     }
 }

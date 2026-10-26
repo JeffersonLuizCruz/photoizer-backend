@@ -4,7 +4,9 @@ import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.documento.model.TipoDocumento;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -42,16 +44,24 @@ public class ReciboPdfStrategy implements PdfContentStrategy<Agendamento> {
                 "Agendamento " + agendamento.getId() + " com cliente ou pacote nulo");
         }
 
-        return List.of(
+        var linhas = new ArrayList<String>(List.of(
             "Recibo de pagamento referente ao agendamento:",
             "",
             "Cliente: " + cliente.getNome(),
             "Pacote: " + pacote.getNome(),
             "Data do ensaio: " + agendamento.getDataHoraEnsaio().format(FMT_DATA_HORA),
             "",
-            "Valor total: R$ " + PdfContentHelper.formatarValor(agendamento.getValorTotal()),
-            "Valor pago (entrada): R$ " + PdfContentHelper.formatarValor(agendamento.getValorEntradaPago()),
-            "Valor restante: R$ " + PdfContentHelper.formatarValor(agendamento.getValorRestante())
-        );
+            "Valor total do pacote: R$ " + PdfContentHelper.formatarValor(agendamento.getValorTotal())
+        ));
+
+        if (agendamento.getValorExtras() != null
+            && agendamento.getValorExtras().compareTo(BigDecimal.ZERO) > 0) {
+            linhas.add("Extras: R$ " + PdfContentHelper.formatarValor(agendamento.getValorExtras()));
+            linhas.add("Total final: R$ " + PdfContentHelper.formatarValor(agendamento.getValorTotalFinal()));
+        }
+
+        linhas.add("Valor pago (total): R$ " + PdfContentHelper.formatarValor(agendamento.getValorEntradaPago()));
+        linhas.add("Valor restante: R$ " + PdfContentHelper.formatarValor(agendamento.getValorRestante()));
+        return linhas;
     }
 }

@@ -105,10 +105,10 @@ ecommerce/
 ### Eventos publicados
 | Evento | Consumidores |
 |--------|-------------|
-| `CompraExtraCriadaEvent` | `financeiro.FinanceiroEventListener` |
-| `CompraExtraConfirmadaEvent` | `financeiro.FinanceiroEventListener` |
+| `CompraExtraCriadaEvent` | `financeiro.FinanceiroEventListener` (soma extras no agendamento) |
+| `CompraExtraConfirmadaEvent` | `financeiro.FinanceiroEventListener` (soma recebimento no agendamento) |
 | `CompraExtraFotosAssociadasEvent` | `foto.FotoEcommerceEventListener` |
-| `CompraExtraCanceladaEvent` | `foto.FotoEcommerceEventListener` |
+| `CompraExtraCanceladaEvent` | `foto.FotoEcommerceEventListener` + `financeiro.FinanceiroEventListener` (estorna extras) |
 | `CompraExtraPagaEvent` | `foto.FotoEcommerceEventListener` |
 | `FotosSelecionadasEvent` | `foto.FotoEcommerceEventListener` |
 | `FotoDownloadEvent` | `foto.FotoEcommerceEventListener` |

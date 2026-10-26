@@ -200,19 +200,40 @@ class AgendamentoDomainSpec extends Specification {
         agendamento.status == StatusAgendamento.AGUARDANDO_PAGAMENTO_FINAL
     }
 
-    def "pagamento de e-commerce reduz o saldo sem alterar a entrada do pacote"() {
-        given: "um agendamento com extras"
+    def "pagamento de e-commerce soma ao recebido e recalcula o saldo"() {
+        given: "um agendamento de R\$ 1.000,00 com R\$ 200,00 em extras e entrada de R\$ 300,00"
         def agendamento = agendamento(
             status: StatusAgendamento.CONFIRMADO,
+            valorTotal: new BigDecimal("1000.00"),
+            valorExtras: new BigDecimal("200.00"),
+            valorTotalFinal: new BigDecimal("1200.00"),
             valorEntradaPago: new BigDecimal("300.00"),
-            valorRestante: new BigDecimal("700.00"))
+            valorRestante: new BigDecimal("900.00"))
 
-        when: "uma compra extra é paga"
-        agendamento.registrarPagamentoEcommerce(new BigDecimal("50.00"))
+        when: "a compra extra de R\$ 200,00 é paga"
+        agendamento.registrarPagamentoEcommerce(new BigDecimal("200.00"))
 
-        then: "somente o saldo é reduzido"
-        agendamento.valorEntradaPago == new BigDecimal("300.00")
-        agendamento.valorRestante == new BigDecimal("650.00")
+        then: "o recebimento entra na entrada paga e o saldo fica correto"
+        agendamento.valorEntradaPago == new BigDecimal("500.00")
+        agendamento.valorRestante == new BigDecimal("700.00")
+    }
+
+    def "remoção de extras cancelados recalcula o total final e o saldo"() {
+        given: "um agendamento com R\$ 200,00 em extras"
+        def agendamento = agendamento(
+            valorTotal: new BigDecimal("1000.00"),
+            valorExtras: new BigDecimal("200.00"),
+            valorTotalFinal: new BigDecimal("1200.00"),
+            valorEntradaPago: new BigDecimal("300.00"),
+            valorRestante: new BigDecimal("900.00"))
+
+        when: "os extras são estornados"
+        agendamento.removerExtras(new BigDecimal("200.00"))
+
+        then: "o total final volta ao pacote e o saldo é recalculado"
+        agendamento.valorExtras == BigDecimal.ZERO
+        agendamento.valorTotalFinal == new BigDecimal("1000.00")
+        agendamento.valorRestante == new BigDecimal("700.00")
     }
 
     def "adiciona extras recalculando o total final"() {

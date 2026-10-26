@@ -1,5 +1,6 @@
 package com.photoizer.crm.financeiro.service;
 
+import com.photoizer.crm.ecommerce.model.MetodoPagamento;
 import com.photoizer.crm.shared.model.FormaPagamento;
 import com.photoizer.crm.shared.model.TipoPagamento;
 import com.photoizer.crm.financeiro.api.PagamentoRequest;
@@ -139,15 +140,35 @@ public class PagamentoService {
     /**
      * Registra pagamento de compra extra do e-commerce.
      * Publica PagamentoRegistradoEvent com isExtraEcommerce=true.
+     *
+     * <p>A criação do {@link Pagamento} é idempotente por {@code compraExtraId},
+     * mas o evento é publicado mesmo quando o pagamento já existe: a flag
+     * {@code pagamentoContabilizado} da compra garante que o recebimento seja
+     * aplicado ao agendamento uma única vez, inclusive ao reconciliar dados
+     * antigos criados antes desta correção.
      */
     public Pagamento registrarPagamentoExtraEcommerce(UUID agendamentoId, BigDecimal valor, UUID compraExtraId) {
+        return registrarPagamentoExtraEcommerce(agendamentoId, valor, compraExtraId, null);
+    }
+
+    public Pagamento registrarPagamentoExtraEcommerce(UUID agendamentoId, BigDecimal valor,
+                                                      UUID compraExtraId, MetodoPagamento metodoPagamento) {
         var existente = pagamentoRepository.findByCompraExtraId(compraExtraId);
         if (existente.isPresent()) {
-            log.atWarn()
-                .addKeyValue("event_action", "financeiro.pagamento_extra_duplicado")
+            var pagamento = existente.get();
+            if (enriquecerPagamentoExtra(pagamento, metodoPagamento)) {
+                pagamento = pagamentoRepository.save(pagamento);
+            }
+            eventPublisher.publishEvent(new PagamentoRegistradoEvent(
+                agendamentoId, pagamento.getId(), pagamento.getValor(), true, compraExtraId));
+            log.atInfo()
+                .addKeyValue("event_action", "financeiro.pagamento_extra_recontabilizado")
+                .addKeyValue("agendamento_id", agendamentoId)
                 .addKeyValue("compra_extra_id", compraExtraId)
-                .log("Pagamento da compra extra já registrado; duplicata ignorada");
-            return existente.get();
+                .addKeyValue("pagamento_id", pagamento.getId())
+                .addKeyValue("valor", pagamento.getValor())
+                .log("Pagamento de compra extra recontabilizado no financeiro");
+            return pagamento;
         }
 
         var agendamento = agendamentoRepository.findById(agendamentoId)
@@ -165,6 +186,8 @@ public class PagamentoService {
             .dataPagamento(LocalDateTime.now())
             .compraExtraId(compraExtraId)
             .observacao("Fotos extras (e-commerce)")
+            .tipoPagamento(TipoPagamento.EXTRA)
+            .formaPagamento(formaPagamentoDe(metodoPagamento))
             .build();
         var saved = pagamentoRepository.save(pagamento);
 
@@ -177,9 +200,28 @@ public class PagamentoService {
             .addKeyValue("compra_extra_id", compraExtraId)
             .addKeyValue("pagamento_id", saved.getId())
             .addKeyValue("valor", valor)
+            .addKeyValue("forma_pagamento", saved.getFormaPagamento())
             .log("Pagamento de compra extra registrado no financeiro");
 
         return saved;
+    }
+
+    private boolean enriquecerPagamentoExtra(Pagamento pagamento, MetodoPagamento metodoPagamento) {
+        var alterado = false;
+        if (pagamento.getTipoPagamento() == null) {
+            pagamento.setTipoPagamento(TipoPagamento.EXTRA);
+            alterado = true;
+        }
+        var forma = formaPagamentoDe(metodoPagamento);
+        if (pagamento.getFormaPagamento() == null && forma != null) {
+            pagamento.setFormaPagamento(forma);
+            alterado = true;
+        }
+        return alterado;
+    }
+
+    private FormaPagamento formaPagamentoDe(MetodoPagamento metodoPagamento) {
+        return metodoPagamento != null ? FormaPagamento.valueOf(metodoPagamento.name()) : null;
     }
 
     /**

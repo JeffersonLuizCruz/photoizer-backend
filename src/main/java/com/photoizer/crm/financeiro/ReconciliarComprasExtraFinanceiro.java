@@ -2,49 +2,75 @@ package com.photoizer.crm.financeiro;
 
 import com.photoizer.crm.ecommerce.model.StatusCompraExtra;
 import com.photoizer.crm.ecommerce.repository.CompraExtraRepository;
-import com.photoizer.crm.financeiro.repository.PagamentoRepository;
-import com.photoizer.crm.financeiro.service.PagamentoService;
+import com.photoizer.crm.financeiro.service.CompraExtraFinanceiroService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Reconciliador de boot: garante que compras extras antigas ou cujo evento
+ * falhou sejam contabilizadas no financeiro do agendamento.
+ *
+ * <p>Cada compra é processada em uma transação própria (via service), então uma
+ * falha isolada não impede a correção das demais nem deixa a compra em estado
+ * parcial; ela será tentada novamente no próximo boot.
+ */
 @Component
 public class ReconciliarComprasExtraFinanceiro implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(ReconciliarComprasExtraFinanceiro.class);
 
     private final CompraExtraRepository compraExtraRepository;
-    private final PagamentoRepository pagamentoRepository;
-    private final PagamentoService pagamentoService;
+    private final CompraExtraFinanceiroService compraExtraFinanceiroService;
 
     public ReconciliarComprasExtraFinanceiro(CompraExtraRepository compraExtraRepository,
-                                             PagamentoRepository pagamentoRepository,
-                                             PagamentoService pagamentoService) {
+                                             CompraExtraFinanceiroService compraExtraFinanceiroService) {
         this.compraExtraRepository = compraExtraRepository;
-        this.pagamentoRepository = pagamentoRepository;
-        this.pagamentoService = pagamentoService;
+        this.compraExtraFinanceiroService = compraExtraFinanceiroService;
     }
 
     @Override
-    @Transactional
     public void run(String... args) {
-        var pagas = compraExtraRepository.findByStatus(StatusCompraExtra.PAGA);
-        var reconciliadas = 0;
-        var jaReconciliadas = 0;
-        for (var compra : pagas) {
-            if (pagamentoRepository.findByCompraExtraId(compra.getId()).isPresent()) {
-                jaReconciliadas++;
-                continue;
+        var compras = compraExtraRepository.findAll();
+        var criacoes = 0;
+        var pagamentos = 0;
+        var estornos = 0;
+
+        for (var compra : compras) {
+            try {
+                if (compra.getStatus() == StatusCompraExtra.CANCELADA) {
+                    if (Boolean.TRUE.equals(compra.getExtrasContabilizados())
+                        && !Boolean.TRUE.equals(compra.getPagamentoContabilizado())) {
+                        compraExtraFinanceiroService.contabilizarCancelamento(compra);
+                        estornos++;
+                    }
+                    continue;
+                }
+
+                if (!Boolean.TRUE.equals(compra.getExtrasContabilizados())) {
+                    compraExtraFinanceiroService.contabilizarCriacao(compra);
+                    criacoes++;
+                }
+                if (compra.getStatus() == StatusCompraExtra.PAGA
+                    && !Boolean.TRUE.equals(compra.getPagamentoContabilizado())) {
+                    compraExtraFinanceiroService.contabilizarPagamento(compra);
+                    pagamentos++;
+                }
+            } catch (RuntimeException ex) {
+                log.atError()
+                    .addKeyValue("event_action", "financeiro.reconciliacao_compra_extra_falhou")
+                    .addKeyValue("compra_extra_id", compra.getId())
+                    .addKeyValue("agendamento_id", compra.getAgendamentoId())
+                    .setCause(ex)
+                    .log("Falha ao reconciliar compra extra; será tentado no próximo boot");
             }
-            pagamentoService.registrarPagamentoExtraEcommerce(
-                compra.getAgendamentoId(), compra.getValorTotal(), compra.getId());
-            reconciliadas++;
         }
-        if (reconciliadas > 0 || jaReconciliadas > 0) {
-            log.info("Reconciliação financeira: {} nova(s), {} já contabilizada(s) de {} compra(s) PAGA.",
-                reconciliadas, jaReconciliadas, pagas.size());
+
+        if (criacoes > 0 || pagamentos > 0 || estornos > 0) {
+            log.info("Reconciliação financeira de compras extras: {} extra(s) contabilizado(s), "
+                    + "{} pagamento(s) contabilizado(s), {} estorno(s).",
+                criacoes, pagamentos, estornos);
         }
     }
 }

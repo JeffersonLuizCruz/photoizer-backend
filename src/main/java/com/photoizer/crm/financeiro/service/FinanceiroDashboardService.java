@@ -186,6 +186,8 @@ public class FinanceiroDashboardService {
             agg.realizadas(),
             agg.entradaEnsaios(),
             agg.restanteEnsaios(),
+            // Extras do e-commerce já compõem entradaEnsaios/restanteEnsaios;
+            // preencher este campo separadamente duplicaria a receita.
             BigDecimal.ZERO,
             agg.receitasAvulsasBruto(),
             agg.comissao(),

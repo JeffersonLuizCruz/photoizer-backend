@@ -1,5 +1,6 @@
 package com.photoizer.crm.ecommerce.service;
 
+import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.ecommerce.event.CompraExtraCriadaEvent;
 import com.photoizer.crm.ecommerce.event.CompraExtraFotosAssociadasEvent;
 import com.photoizer.crm.ecommerce.event.TokenGaleriaRegeneradoEvent;
@@ -113,6 +114,11 @@ public class EcommerceService {
 
     public CompraExtra checkout(UUID token, UUID sessionId, MetodoPagamento metodoPagamento) {
         var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
+        if (agendamento.getStatus() == StatusAgendamento.CANCELADO
+            || agendamento.getStatus() == StatusAgendamento.NO_SHOW) {
+            throw new FotoIndisponivelException(
+                "A galeria não está disponível para compra porque o agendamento foi cancelado");
+        }
         galeriaEnsaioService.validarComercializacaoPermitida(
             galeriaEnsaioService.obter(agendamento.getId()));
         var itensCarrinho = carrinhoService.listarCarrinho(token, sessionId);

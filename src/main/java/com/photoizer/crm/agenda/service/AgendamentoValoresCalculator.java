@@ -71,9 +71,11 @@ public class AgendamentoValoresCalculator {
 
         var valorEntradaExigido = EntradaUtils.calcularEntradaExigida(valorTotal, percentualEntrada);
         var valorEntradaPagoEfetivo = valorEntradaPago != null ? valorEntradaPago : BigDecimal.ZERO;
-        var valorRestante = valorTotal.subtract(valorEntradaPagoEfetivo);
+        var valorExtrasEfetivo = valorExtras != null ? valorExtras : BigDecimal.ZERO;
+        var valorTotalFinal = valorTotal.add(valorExtrasEfetivo);
+        var valorRestante = valorTotalFinal.subtract(valorEntradaPagoEfetivo).max(BigDecimal.ZERO);
         return new ValoresAgendamento(valorTotal, valorEntradaExigido, valorEntradaPagoEfetivo,
-            valorRestante, valorExtras, valorTotal.add(valorExtras), taxaDeslocamento, percentualEntrada);
+            valorRestante, valorExtrasEfetivo, valorTotalFinal, taxaDeslocamento, percentualEntrada);
     }
 
     private ValoresAgendamento comEntradaPaga(BigDecimal valorTotal, BigDecimal valorExtras,

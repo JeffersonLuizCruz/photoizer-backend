@@ -434,14 +434,16 @@ public class Agendamento {
     }
 
     /**
-     * Registra pagamento de compra extra do e-commerce.
-     * NÃO altera valorEntradaPago (que é exclusivo do pacote).
-     * Apenas diminui valorRestante — o impacto no valorTotalFinal
-     * já foi aplicado quando a compra foi criada (via adicionarExtras).
+     * Registra o recebimento de uma compra extra do e-commerce.
+     * O valor da compra já foi somado em valorExtras/valorTotalFinal quando
+     * o checkout foi criado; aqui ele passa a compor o total recebido
+     * (valorEntradaPago) e o saldo é recalculado a partir do total final.
      */
     public void registrarPagamentoEcommerce(BigDecimal valorPago) {
         if (valorPago == null || valorPago.signum() <= 0) return;
-        this.valorRestante = this.valorRestante.subtract(valorPago).max(BigDecimal.ZERO);
+        this.valorEntradaPago = this.valorEntradaPago.add(valorPago);
+        this.valorRestante = this.valorTotalFinal.subtract(this.valorEntradaPago)
+            .max(BigDecimal.ZERO);
     }
 
     /**
@@ -453,6 +455,18 @@ public class Agendamento {
     public void adicionarExtras(BigDecimal valorExtras) {
         if (valorExtras == null || valorExtras.signum() <= 0) return;
         this.valorExtras = this.valorExtras.add(valorExtras);
+        this.valorTotalFinal = this.valorTotal.add(this.valorExtras);
+        this.valorRestante = this.valorTotalFinal.subtract(this.valorEntradaPago)
+            .max(BigDecimal.ZERO);
+    }
+
+    /**
+     * Remove o valor de extras cancelados (ex.: compra do e-commerce recusada).
+     * Mantém valorExtras e valorTotalFinal consistentes e recalcula o saldo.
+     */
+    public void removerExtras(BigDecimal valorExtras) {
+        if (valorExtras == null || valorExtras.signum() <= 0) return;
+        this.valorExtras = this.valorExtras.subtract(valorExtras).max(BigDecimal.ZERO);
         this.valorTotalFinal = this.valorTotal.add(this.valorExtras);
         this.valorRestante = this.valorTotalFinal.subtract(this.valorEntradaPago)
             .max(BigDecimal.ZERO);

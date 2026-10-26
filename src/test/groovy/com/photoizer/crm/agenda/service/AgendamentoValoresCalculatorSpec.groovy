@@ -92,6 +92,20 @@ class AgendamentoValoresCalculatorSpec extends Specification {
         valores.percentualEntrada() == new BigDecimal("30.00")
     }
 
+    def "recalcula o restante incluindo os extras já vendidos"() {
+        given: "um pacote de R\$ 1.000,00 com R\$ 200,00 em extras e R\$ 300,00 recebidos"
+        def valorBase = new BigDecimal("1000.00")
+
+        when: "os valores são recalculados"
+        def valores = calculator.calcularValoresAtualizacao(
+            valorBase, BigDecimal.ZERO, new BigDecimal("30.00"),
+            new BigDecimal("300.00"), new BigDecimal("200.00"))
+
+        then: "o total final e o restante incluem os extras"
+        valores.valorTotalFinal() == new BigDecimal("1200.00")
+        valores.valorRestante() == new BigDecimal("900.00")
+    }
+
     def "rejeita entrada já paga maior que o valor total"() {
         when: "o cálculo recebe uma entrada acima do total"
         calculator.calcularValoresProposta(
