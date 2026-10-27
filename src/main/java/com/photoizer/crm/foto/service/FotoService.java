@@ -87,6 +87,11 @@ public class FotoService {
     }
 
     @Transactional(readOnly = true)
+    public List<FotoEnsaio> listarTodas() {
+        return fotoEnsaioRepository.findAll();
+    }
+
+    @Transactional(readOnly = true)
     public FotoEnsaio buscarPorId(UUID id) {
         return fotoEnsaioRepository.findById(id)
             .orElseThrow(() -> new FotoEnsaioNaoEncontradaException(id));
@@ -457,6 +462,58 @@ public class FotoService {
         // Assim o cliente e o staff continuam reconhecendo a mesma foto
         // (#001 · IMG_1234.jpg) mesmo apos uma troca de imagem.
         return fotoEnsaioRepository.save(foto);
+    }
+
+    /**
+     * Reprocessa a marca d'água da foto com o texto atual das configurações.
+     *
+     * <p>O arquivo original e o arquivo final de download não são alterados.
+     * Apenas as versões protegidas (marca d'água, preview e thumbnails
+     * derivados) são regeneradas. Usado pela manutenção global em
+     * Configurações para atualizar fotos enviadas antes de o nome da empresa
+     * ser configurado.
+     */
+    public FotoEnsaio regerarMarcaDagua(UUID fotoId) {
+        var foto = buscarPorId(fotoId);
+        var original = pathResolver.resolver(foto.getOriginalPath());
+        if (original == null || !Files.exists(original)) {
+            throw new ArquivoDeImagemInvalidoException(foto.getFileName(),
+                new IllegalStateException("arquivo original não encontrado"));
+        }
+
+        var processada = fotoProcessingHelper.processar(original, original.getParent(), foto.getId());
+        foto.setWatermarkedPath(pathResolver.relativo(Path.of(processada.watermarkedPath())));
+        foto.setThumbPath(pathResolver.relativo(Path.of(processada.thumbPath())));
+        foto.setPreviewPath(processada.previewPath() == null
+            ? null
+            : pathResolver.relativo(Path.of(processada.previewPath())));
+
+        if (foto.getEditadaPath() != null) {
+            var editada = pathResolver.resolver(foto.getEditadaPath());
+            if (editada == null || !Files.exists(editada)) {
+                throw new ArquivoDeImagemInvalidoException(foto.getEditadaFileName(),
+                    new IllegalStateException("arquivo editado não encontrado"));
+            }
+            var processadaEditada = fotoProcessingHelper.processar(
+                editada, editada.getParent(), foto.getId());
+            foto.setEditadaWatermarkedPath(
+                pathResolver.relativo(Path.of(processadaEditada.watermarkedPath())));
+            foto.setEditadaThumbPath(
+                pathResolver.relativo(Path.of(processadaEditada.thumbPath())));
+            foto.setEditadaPreviewPath(processadaEditada.previewPath() == null
+                ? null
+                : pathResolver.relativo(Path.of(processadaEditada.previewPath())));
+        }
+
+        // Remove thumbnails públicos e prévias derivadas em cache para que
+        // sejam gerados novamente a partir da marca atualizada.
+        fotoPreviewService.removerLegados(foto);
+        var salva = fotoEnsaioRepository.save(foto);
+        log.atInfo()
+            .addKeyValue("event_action", "foto.marca_dagua_regerada")
+            .addKeyValue("foto_id", fotoId)
+            .log("Marca d'água da foto regenerada");
+        return salva;
     }
 
     /**

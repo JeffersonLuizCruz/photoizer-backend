@@ -9,15 +9,15 @@ import java.util.Map;
  * Texto central da marca d'agua das previsoes publicas.
  *
  * <p>O nome vem das Configuracoes (Dados da Contratada). Quando ainda nao foi
- * preenchido, usa o nome do fotografo e, por ultimo, o nome padrao do estudio.
+ * preenchido, usa o nome do fotografo e, por ultimo, um fallback neutro.
  * As fotos antigas mantem a marca gravada no arquivo; este texto vale para
- * novas fotos e novas edicoes.
+ * novas fotos, novas edicoes e para a regeneracao manual das fotos existentes.
  */
 @Service
 public class MarcaDaguaService {
 
     public static final float OPACIDADE_PADRAO = 0.35f;
-    private static final String FALLBACK = "Photoizer Studio";
+    private static final String FALLBACK = "Estúdio";
 
     private final ConfiguracaoService configuracaoService;
 

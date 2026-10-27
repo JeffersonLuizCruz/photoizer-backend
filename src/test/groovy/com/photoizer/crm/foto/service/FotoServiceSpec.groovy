@@ -447,6 +447,89 @@ class FotoServiceSpec extends Specification {
         0 * fotoRepository.save(_)
     }
 
+    def "regenera a marca d'água do original e da versão editada"() {
+        given:
+        def tmp = Files.createTempDirectory("foto-regerar-spec")
+        def original = tmp.resolve("orig_1.png")
+        def editada = tmp.resolve("editada_1.png")
+        Files.write(original, novoArquivoPng("orig_1.png").bytes)
+        Files.write(editada, novoArquivoPng("editada_1.png").bytes)
+        def wmOriginal = tmp.resolve("wm_orig_1.jpg")
+        def thumbOriginal = tmp.resolve("thumb_orig_1.jpg")
+        def previewOriginal = tmp.resolve("preview_v3_orig_1.jpg")
+        def wmEditada = tmp.resolve("wm_editada_1.jpg")
+        def thumbEditada = tmp.resolve("thumb_editada_1.jpg")
+        def previewEditada = tmp.resolve("preview_v3_editada_1.jpg")
+        def foto = FotoEnsaio.builder()
+            .id(UUID.randomUUID())
+            .agendamentoId(agendamentoId)
+            .fileName("orig_1.png")
+            .originalPath("orig/1.png")
+            .watermarkedPath("orig/wm_antigo.jpg")
+            .thumbPath("orig/thumb_antigo.jpg")
+            .editadaPath("editadas/1.png")
+            .editadaWatermarkedPath("editadas/wm_antigo.jpg")
+            .editadaThumbPath("editadas/thumb_antigo.jpg")
+            .status(StatusFoto.PUBLICADA)
+            .visivel(true)
+            .build()
+        fotoRepository.findById(foto.id) >> Optional.of(foto)
+        pathResolver.resolver(foto.originalPath) >> original
+        pathResolver.resolver(foto.editadaPath) >> editada
+        processingHelper.processar(original, original.parent, foto.id) >>
+            new FotoProcessingHelper.ProcessedImages(
+                wmOriginal.toString(), thumbOriginal.toString(), previewOriginal.toString())
+        processingHelper.processar(editada, editada.parent, foto.id) >>
+            new FotoProcessingHelper.ProcessedImages(
+                wmEditada.toString(), thumbEditada.toString(), previewEditada.toString())
+        pathResolver.relativo(Path.of(wmOriginal.toString())) >> "orig/wm_orig_1.jpg"
+        pathResolver.relativo(Path.of(thumbOriginal.toString())) >> "orig/thumb_orig_1.jpg"
+        pathResolver.relativo(Path.of(previewOriginal.toString())) >> "orig/preview_v3_orig_1.jpg"
+        pathResolver.relativo(Path.of(wmEditada.toString())) >> "editadas/wm_editada_1.jpg"
+        pathResolver.relativo(Path.of(thumbEditada.toString())) >> "editadas/thumb_editada_1.jpg"
+        pathResolver.relativo(Path.of(previewEditada.toString())) >> "editadas/preview_v3_editada_1.jpg"
+
+        when:
+        def salva = service.regerarMarcaDagua(foto.id)
+
+        then:
+        salva.watermarkedPath == "orig/wm_orig_1.jpg"
+        salva.thumbPath == "orig/thumb_orig_1.jpg"
+        salva.previewPath == "orig/preview_v3_orig_1.jpg"
+        salva.editadaWatermarkedPath == "editadas/wm_editada_1.jpg"
+        salva.editadaThumbPath == "editadas/thumb_editada_1.jpg"
+        salva.editadaPreviewPath == "editadas/preview_v3_editada_1.jpg"
+        1 * previewService.removerLegados(foto)
+        1 * fotoRepository.save(foto) >> foto
+
+        cleanup:
+        tmp.toFile().deleteDir()
+    }
+
+    def "rejeita regeneração quando o arquivo original não existe"() {
+        given:
+        def foto = FotoEnsaio.builder()
+            .id(UUID.randomUUID())
+            .agendamentoId(agendamentoId)
+            .fileName("sumida.jpg")
+            .originalPath("orig/sumida.jpg")
+            .watermarkedPath("orig/wm.jpg")
+            .thumbPath("orig/thumb.jpg")
+            .status(StatusFoto.PUBLICADA)
+            .visivel(true)
+            .build()
+        fotoRepository.findById(foto.id) >> Optional.of(foto)
+        pathResolver.resolver(foto.originalPath) >> null
+
+        when:
+        service.regerarMarcaDagua(foto.id)
+
+        then:
+        thrown(ArquivoDeImagemInvalidoException)
+        0 * processingHelper.processar(_, _, _)
+        0 * fotoRepository.save(_)
+    }
+
     private FotoEnsaio fotoComArquivos(Path dir,
                                        StatusFoto status = StatusFoto.PUBLICADA,
                                        boolean selecionadaPacote = false,

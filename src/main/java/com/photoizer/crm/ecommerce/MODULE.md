@@ -188,6 +188,7 @@ Staff:
 - `POST .../iniciar` (somente `COM_EDICAO`), `.../reabrir`, `.../publicar` (publica a edição ou aprova a seleção)
 - `GET/PUT /api/v1/admin/agendamentos/{id}/galeria[/modo]`
 - `PUT /api/v1/admin/agendamentos/{id}/galeria/titulo` (ADMIN/FOTOGRAFO/EDITOR)
+- `GET /api/v1/admin/galerias/marca-dagua/fotos` e `POST .../fotos/{fotoId}/regerar` (ADMIN; manutenção global da marca d'água)
 - `GET /api/v1/admin/ecommerce/extras/pendentes-edicao?agendamentoId=` (ADMIN/FOTOGRAFO/EDITOR)
 - `PUT /api/v1/agendamentos/{id}/fotos/{fotoId}/editada-compra` (upload da edição sob demanda)
 - `POST /api/v1/agendamentos/{id}/fotos/{fotoId}/editada-compra/publicar` (libera o download)
@@ -241,8 +242,8 @@ Staff:
     `EDITADA`). Antes da liberação o download permanece bloqueado.
 15. A capa manual fica em `galerias_ensaio.capa_foto_id` + `capa_versao`; a versão é congelada e não muda sozinha após edição/publicação.
 12. `PUT /api/v1/admin/agendamentos/{id}/galeria/capa` define/remove a capa (ADMIN/FOTOGRAFO/EDITOR). `GET /api/v1/ecommerce/galeria/{token}/capa` serve o hero em até 2560px; `capaUrl` já sai com `?v={fotoId}-{versao}` e as respostas usam `no-store`.
-13. O endpoint público `GET /api/v1/ecommerce/fotos/{fotoId}/watermarked` serve a **prévia protegida de 800px** (`preview_v2_*`). Fotos antigas são reduzidas sob demanda a partir do watermark existente, em cache versionado.
-14. A marca d'água das novas prévias usa `© {nomeContratada}` (fallback `nomeFotografo` → `Photoizer Studio`). Arquivos finais de download continuam sem marca e em alta qualidade.
+13. O endpoint público `GET /api/v1/ecommerce/fotos/{fotoId}/watermarked` serve a **prévia protegida de 560px e JPEG ~0.35** (`preview_v3_*`). Fotos antigas são reduzidas sob demanda a partir do watermark existente, em cache versionado.
+14. A marca d'água das novas prévias usa `© {nomeContratada}` (fallback `nomeFotografo` → `Estúdio`). Arquivos finais de download continuam sem marca e em alta qualidade.
 15. A resposta pública da galeria inclui `valoresExtras` com o preço congelado por foto.
 16. Ao enviar a seleção, fotos do pacote são removidas do carrinho para não serem cobradas como extra.
 17. O override manual do staff (`PATCH /admin/agendamentos/{id}/fotos/{fotoId}/selecao`) passa pelas mesmas regras do cliente: valida limite do pacote, foto publicada/visível/numerada e bloqueia remoção de foto baixada/editada/comprada. Cada override gera log estruturado com agendamento, foto, usuário e total do pacote.

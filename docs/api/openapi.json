@@ -7638,6 +7638,65 @@
         } ]
       }
     },
+    "/api/v1/admin/galerias/marca-dagua/fotos/{fotoId}/regerar" : {
+      "post" : {
+        "tags" : [ "Admin Galeria" ],
+        "summary" : "Regenerar a marca d'água de uma foto com o nome atual",
+        "operationId" : "regerar",
+        "parameters" : [ {
+          "name" : "fotoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/admin/agendamentos/{agendamentoId}/selecoes/{selecaoId}/reabrir" : {
       "post" : {
         "tags" : [ "Admin Seleções" ],
@@ -13337,6 +13396,66 @@
         } ]
       }
     },
+    "/api/v1/admin/galerias/marca-dagua/fotos" : {
+      "get" : {
+        "tags" : [ "Admin Galeria" ],
+        "summary" : "Listar fotos para regeneração da marca d'água",
+        "operationId" : "listarFotos",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/MarcaDaguaFotoResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/admin/ecommerce/extras/pendentes-edicao" : {
       "get" : {
         "tags" : [ "Admin Edição de Extras" ],
@@ -18965,6 +19084,19 @@
           },
           "requerEdicao" : {
             "type" : "boolean"
+          }
+        }
+      },
+      "MarcaDaguaFotoResponse" : {
+        "type" : "object",
+        "properties" : {
+          "fotoId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "agendamentoId" : {
+            "type" : "string",
+            "format" : "uuid"
           }
         }
       },

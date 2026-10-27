@@ -68,7 +68,7 @@ Publica `FotografoConfiguradoEvent(nome)` ao salvar a chave `NOME_FOTOGRAFO` com
 | `PERCENTUAL_ENTRADA` | `percentualEntrada` | DECIMAL | `30.00` |
 | `TAXA_DESLOCAMENTO` | `taxaDeslocamentoPadrao` | DECIMAL | `0.00` |
 | `NOME_FOTOGRAFO` | `nomeFotografo` | TEXT | `""` |
-| `NOME_CONTRATADA` | `nomeContratada` | TEXT | `""` (editável na Configuração) |
+| `NOME_CONTRATADA` | `nomeContratada` | TEXT | `""` (editável na Configuração; usado na marca d'água e no contrato) |
 | `CNPJ_CONTRATADA` | `cnpjContratada` | TEXT | `""` |
 | `ENDERECO_CONTRATADA` | `enderecoContratada` | TEXT | `""` |
 | `LOGO_CONTRATADA` | `logoContratada` | TEXT | `""` (caminho do upload; vazio usa a arte padrão) |

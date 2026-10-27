@@ -32,11 +32,11 @@ class MarcaDaguaServiceSpec extends Specification {
         service.texto() == '© Carol Oliva'
     }
 
-    def "usa o fallback do estudio quando nao ha nome configurado"() {
+    def "usa o fallback neutro quando nao ha nome configurado"() {
         given:
         configuracaoService.getConfig() >> [:]
 
         expect:
-        service.texto() == '© Photoizer Studio'
+        service.texto() == '© Estúdio'
     }
 }

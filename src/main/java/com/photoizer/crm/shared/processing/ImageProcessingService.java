@@ -29,15 +29,18 @@ public class ImageProcessingService {
     public static final int WATERMARK_MAX_DIM = 1600;
     public static final float WATERMARK_QUALITY = 0.85f;
 
-    /** Prévia pública protegida: baixa resolução para dificultar impressão. */
-    public static final int PREVIEW_MAX_DIM = 800;
-    public static final float PREVIEW_QUALITY = 0.60f;
+    /**
+     * Prévia pública protegida: baixa resolução e compressão forte para
+     * dificultar print/reaproveitamento e remoção de marca d'água por IA.
+     */
+    public static final int PREVIEW_MAX_DIM = 560;
+    public static final float PREVIEW_QUALITY = 0.35f;
 
     /**
      * Versão do cache da prévia pública. Ao mudar tamanho/qualidade, incremente
      * este valor para que os arquivos antigos deixem de ser usados.
      */
-    public static final String PREVIEW_VERSION = "v2";
+    public static final String PREVIEW_VERSION = "v3";
 
     /** Capa/hero: alta qualidade para a experiência emocional. */
     public static final int HERO_MAX_DIM = 2560;

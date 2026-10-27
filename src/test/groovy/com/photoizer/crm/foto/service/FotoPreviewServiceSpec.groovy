@@ -32,17 +32,17 @@ class FotoPreviewServiceSpec extends Specification {
 
     def "usa a prévia versionada gerada no upload"() {
         given:
-        def foto = foto(previewPath: "ag/preview_v2_orig_1.jpg")
+        def foto = foto(previewPath: "ag/preview_v3_orig_1.jpg")
 
         when:
         def caminho = service.caminhoPreview(foto)
 
         then:
-        caminho == "ag/preview_v2_orig_1.jpg"
+        caminho == "ag/preview_v3_orig_1.jpg"
         0 * imageProcessingService.redimensionarComMarcaExistente(_, _, _, _)
     }
 
-    def "gera prévia 800px a partir do watermark quando o cache é antigo"() {
+    def "gera prévia 560px a partir do watermark quando o cache é antigo"() {
         given:
         def wm = arquivo("wm.jpg")
         def foto = foto(previewPath: "ag/preview_orig_1.jpg")
@@ -54,7 +54,7 @@ class FotoPreviewServiceSpec extends Specification {
         def caminho = service.caminhoPreview(foto)
 
         then:
-        caminho.endsWith("preview_v2_${foto.id}_ORIGINAL.jpg")
+        caminho.endsWith("preview_v3_${foto.id}_ORIGINAL.jpg")
         1 * imageProcessingService.redimensionarComMarcaExistente(
             wm, _ as Path,
             ImageProcessingService.PREVIEW_MAX_DIM,
@@ -76,7 +76,7 @@ class FotoPreviewServiceSpec extends Specification {
         def caminho = service.caminhoPreview(foto)
 
         then:
-        caminho.endsWith("preview_v2_${foto.id}_EDITADA.jpg")
+        caminho.endsWith("preview_v3_${foto.id}_EDITADA.jpg")
         1 * imageProcessingService.redimensionarComMarcaExistente(
             wm, _ as Path,
             ImageProcessingService.PREVIEW_MAX_DIM,
@@ -87,7 +87,7 @@ class FotoPreviewServiceSpec extends Specification {
         given:
         def wm = arquivo("wm.jpg")
         def foto = foto()
-        def alvo = wm.parent.resolve("preview_v2_${foto.id}_ORIGINAL.jpg")
+        def alvo = wm.parent.resolve("preview_v3_${foto.id}_ORIGINAL.jpg")
         Files.write(alvo, [1, 2, 3] as byte[])
         pathResolver.resolver("ag/wm.jpg") >> wm
         pathResolver.relativo(alvo) >> alvo.toString()
@@ -115,9 +115,9 @@ class FotoPreviewServiceSpec extends Specification {
 
     def "prévia pública usa a qualidade reduzida configurada"() {
         expect:
-        ImageProcessingService.PREVIEW_MAX_DIM == 800
-        ImageProcessingService.PREVIEW_QUALITY == 0.60f
-        ImageProcessingService.PREVIEW_VERSION == "v2"
+        ImageProcessingService.PREVIEW_MAX_DIM == 560
+        ImageProcessingService.PREVIEW_QUALITY == 0.35f
+        ImageProcessingService.PREVIEW_VERSION == "v3"
     }
 
     private Path arquivo(String nome) {
