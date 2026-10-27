@@ -2998,6 +2998,93 @@
         } ]
       }
     },
+    "/api/v1/admin/agendamentos/{agendamentoId}/galeria/titulo" : {
+      "put" : {
+        "tags" : [ "Admin Galeria" ],
+        "summary" : "Definir ou remover o texto do hero da galeria",
+        "operationId" : "definirTituloHero",
+        "parameters" : [ {
+          "name" : "agendamentoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AtualizarTituloHeroRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/GaleriaEnsaioResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Um ou mais campos estão inválidos",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/admin/agendamentos/{agendamentoId}/galeria/modo" : {
       "put" : {
         "tags" : [ "Admin Galeria" ],
@@ -15803,15 +15890,15 @@
           }
         }
       },
-      "AlterarModoGaleriaRequest" : {
+      "AtualizarTituloHeroRequest" : {
         "type" : "object",
         "properties" : {
-          "modo" : {
+          "tituloHero" : {
             "type" : "string",
-            "enum" : [ "DIRETO", "COM_EDICAO", "SEM_EDICAO" ]
+            "maxLength" : 120,
+            "minLength" : 0
           }
-        },
-        "required" : [ "modo" ]
+        }
       },
       "GaleriaEnsaioResponse" : {
         "type" : "object",
@@ -15837,6 +15924,9 @@
           "capaVersao" : {
             "type" : "string"
           },
+          "tituloHero" : {
+            "type" : "string"
+          },
           "requerEdicao" : {
             "type" : "boolean"
           },
@@ -15844,6 +15934,16 @@
             "type" : "boolean"
           }
         }
+      },
+      "AlterarModoGaleriaRequest" : {
+        "type" : "object",
+        "properties" : {
+          "modo" : {
+            "type" : "string",
+            "enum" : [ "DIRETO", "COM_EDICAO", "SEM_EDICAO" ]
+          }
+        },
+        "required" : [ "modo" ]
       },
       "DefinirCapaRequest" : {
         "type" : "object",
@@ -18102,6 +18202,9 @@
             "type" : "string"
           },
           "clienteNome" : {
+            "type" : "string"
+          },
+          "tituloHero" : {
             "type" : "string"
           },
           "dataHoraEnsaio" : {

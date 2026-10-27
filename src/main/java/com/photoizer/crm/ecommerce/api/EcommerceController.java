@@ -154,6 +154,7 @@ public class EcommerceController {
             agendamento.getPacote().getNome(),
             agendamento.getLocalEnsaio(),
             agendamento.getCliente() != null ? agendamento.getCliente().getNome() : null,
+            galeria.getTituloHero(),
             agendamento.getDataHoraEnsaio(),
             capa != null ? capa.foto().getId() : null,
             capa != null ? capa.versao().name() : null,

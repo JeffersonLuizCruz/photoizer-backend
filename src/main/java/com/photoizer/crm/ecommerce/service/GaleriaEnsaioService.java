@@ -203,6 +203,28 @@ public class GaleriaEnsaioService {
     }
 
     /**
+     * Define ou remove o texto customizado exibido no hero da galeria.
+     *
+     * <p>Espaços em excesso são normalizados e texto em branco volta a
+     * {@code null}, fazendo o hero exibir o nome do cliente novamente.
+     */
+    public GaleriaEnsaio definirTituloHero(UUID agendamentoId, String tituloHero) {
+        var galeria = obterParaAtualizacao(agendamentoId);
+        var texto = tituloHero == null ? null : tituloHero.replaceAll("\\s+", " ").strip();
+        if (texto != null && texto.isEmpty()) {
+            texto = null;
+        }
+        galeria.setTituloHero(texto);
+        log.atInfo()
+            .addKeyValue("event_action", texto == null
+                ? "galeria.titulo_hero_removido"
+                : "galeria.titulo_hero_definido")
+            .addKeyValue("agendamento_id", agendamentoId)
+            .log("Texto do hero da galeria atualizado");
+        return galeriaRepository.save(galeria);
+    }
+
+    /**
      * Reabertura permitida enquanto nenhuma foto foi baixada ou vendida.
      * Usada pela reabertura de uma seleção SEM_EDICAO já aprovada.
      */

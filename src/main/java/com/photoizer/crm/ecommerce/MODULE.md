@@ -186,6 +186,7 @@ Staff:
 - `GET .../download-zip` (originais + `manifest.csv`; somente `COM_EDICAO`)
 - `POST .../iniciar` (somente `COM_EDICAO`), `.../reabrir`, `.../publicar` (publica a edição ou aprova a seleção)
 - `GET/PUT /api/v1/admin/agendamentos/{id}/galeria[/modo]`
+- `PUT /api/v1/admin/agendamentos/{id}/galeria/titulo` (ADMIN/FOTOGRAFO/EDITOR)
 - `GET /api/v1/admin/ecommerce/extras/pendentes-edicao?agendamentoId=` (ADMIN/FOTOGRAFO/EDITOR)
 - `PUT /api/v1/agendamentos/{id}/fotos/{fotoId}/editada-compra` (upload da edição sob demanda)
 - `POST /api/v1/agendamentos/{id}/fotos/{fotoId}/editada-compra/publicar` (libera o download)
@@ -245,3 +246,4 @@ Staff:
 16. Ao enviar a seleção, fotos do pacote são removidas do carrinho para não serem cobradas como extra.
 17. O override manual do staff (`PATCH /admin/agendamentos/{id}/fotos/{fotoId}/selecao`) passa pelas mesmas regras do cliente: valida limite do pacote, foto publicada/visível/numerada e bloqueia remoção de foto baixada/editada/comprada. Cada override gera log estruturado com agendamento, foto, usuário e total do pacote.
 18. O resumo admin (`GET /admin/agendamentos/{id}/ecommerce`) expõe `pacoteQuantidadeFotos` para a UI desabilitar “Incluir no pacote” quando o limite já foi atingido.
+19. O texto do hero fica em `galerias_ensaio.titulo_hero` (até 120 caracteres). Nulo/vazio faz o hero exibir o nome do cliente; a customização é independente do modo/fase e pode ser alterada a qualquer momento.

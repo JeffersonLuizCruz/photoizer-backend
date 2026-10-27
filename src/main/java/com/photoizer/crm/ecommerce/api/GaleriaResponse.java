@@ -15,6 +15,7 @@ public record GaleriaResponse(
     String pacoteNome,
     String localEnsaio,
     String clienteNome,
+    String tituloHero,
     LocalDateTime dataHoraEnsaio,
     UUID capaFotoId,
     String capaVersao,

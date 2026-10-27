@@ -57,6 +57,13 @@ public class GaleriaEnsaio {
     @Column(name = "capa_versao", length = 20)
     private VersaoFoto capaVersao;
 
+    /**
+     * Texto customizado do hero. Nulo ou vazio significa usar o nome do
+     * cliente, preservando o comportamento anterior.
+     */
+    @Column(name = "titulo_hero", length = 120)
+    private String tituloHero;
+
     public boolean permiteSelecionar() {
         return modo == ModoGaleria.DIRETO || fase.permiteSelecionar();
     }

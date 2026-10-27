@@ -60,6 +60,16 @@ public class AdminGaleriaEnsaioController {
         return ResponseEntity.ok(toResponse(galeria));
     }
 
+    @PutMapping("/titulo")
+    @RolesAllowed({"ADMIN", "FOTOGRAFO", "EDITOR"})
+    @Operation(summary = "Definir ou remover o texto do hero da galeria")
+    public ResponseEntity<GaleriaEnsaioResponse> definirTituloHero(
+            @PathVariable UUID agendamentoId,
+            @Valid @RequestBody AtualizarTituloHeroRequest request) {
+        return ResponseEntity.ok(toResponse(
+            galeriaService.definirTituloHero(agendamentoId, request.tituloHero())));
+    }
+
     private GaleriaEnsaioResponse toResponse(com.photoizer.crm.ecommerce.model.GaleriaEnsaio galeria) {
         return new GaleriaEnsaioResponse(
             galeria.getAgendamentoId(),
@@ -68,6 +78,7 @@ public class AdminGaleriaEnsaioController {
             galeria.getSelecaoAtualId(),
             galeria.getCapaFotoId(),
             galeria.getCapaVersao() != null ? galeria.getCapaVersao().name() : null,
+            galeria.getTituloHero(),
             galeria.getModo().requerEdicao(),
             galeriaService.podeAlterarModo(galeria.getAgendamentoId()));
     }

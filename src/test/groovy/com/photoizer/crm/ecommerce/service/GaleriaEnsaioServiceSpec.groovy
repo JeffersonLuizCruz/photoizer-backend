@@ -282,6 +282,52 @@ class GaleriaEnsaioServiceSpec extends Specification {
         0 * galeriaRepository.save(_)
     }
 
+    def "define o texto do hero normalizando espaços"() {
+        given:
+        def galeria = galeria(ModoGaleria.COM_EDICAO, FaseGaleria.SELECAO)
+        galeriaRepository.findById(agendamentoId) >> Optional.of(galeria)
+        galeriaRepository.findByIdForUpdate(agendamentoId) >> Optional.of(galeria)
+        galeriaRepository.save(galeria) >> galeria
+
+        when:
+        def salva = service.definirTituloHero(agendamentoId, "  Ana   &   Bebê  ")
+
+        then:
+        salva.tituloHero == "Ana & Bebê"
+        salva.modo == ModoGaleria.COM_EDICAO
+        salva.fase == FaseGaleria.SELECAO
+    }
+
+    def "texto do hero em branco volta a usar o nome do cliente"() {
+        given:
+        def galeria = galeria(ModoGaleria.COM_EDICAO, FaseGaleria.SELECAO)
+        galeria.tituloHero = "Título antigo"
+        galeriaRepository.findById(agendamentoId) >> Optional.of(galeria)
+        galeriaRepository.findByIdForUpdate(agendamentoId) >> Optional.of(galeria)
+        galeriaRepository.save(galeria) >> galeria
+
+        when:
+        def salva = service.definirTituloHero(agendamentoId, "   ")
+
+        then:
+        salva.tituloHero == null
+    }
+
+    def "texto do hero nulo remove a customização"() {
+        given:
+        def galeria = galeria(ModoGaleria.COM_EDICAO, FaseGaleria.SELECAO)
+        galeria.tituloHero = "Título antigo"
+        galeriaRepository.findById(agendamentoId) >> Optional.of(galeria)
+        galeriaRepository.findByIdForUpdate(agendamentoId) >> Optional.of(galeria)
+        galeriaRepository.save(galeria) >> galeria
+
+        when:
+        def salva = service.definirTituloHero(agendamentoId, null)
+
+        then:
+        salva.tituloHero == null
+    }
+
     private FotoEnsaio foto(VersaoFoto versao, String editadaPath) {
         return FotoEnsaio.builder()
             .id(UUID.randomUUID())
