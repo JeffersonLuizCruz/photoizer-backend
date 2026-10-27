@@ -113,6 +113,14 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID>,
     @Query("SELECT a FROM Agendamento a WHERE a.cliente.id = :clienteId ORDER BY a.dataHoraEnsaio DESC")
     List<Agendamento> findByClienteId(@Param("clienteId") UUID clienteId);
 
+    /**
+     * Ensaios visiveis na area do cliente: a partir de CONFIRMADO. Exclui
+     * pre-reservas, cancelados e no-show por decisao de produto.
+     */
+    @EntityGraph(attributePaths = {"pacote"})
+    List<Agendamento> findByClienteIdAndStatusInOrderByDataHoraEnsaioDesc(
+        UUID clienteId, Collection<StatusAgendamento> statuses);
+
     @EntityGraph(attributePaths = {"cliente", "pacote"})
     java.util.Optional<Agendamento> findByTokenGaleria(UUID tokenGaleria);
 

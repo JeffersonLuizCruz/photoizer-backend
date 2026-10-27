@@ -13029,6 +13029,66 @@
         } ]
       }
     },
+    "/api/v1/auth/cliente/agendamentos" : {
+      "get" : {
+        "tags" : [ "Agendamentos" ],
+        "summary" : "Listar os ensaios do cliente autenticado",
+        "operationId" : "listar",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/AgendamentoClienteResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/agendamentos" : {
       "get" : {
         "tags" : [ "Agendamentos" ],
@@ -19471,6 +19531,16 @@
           "tokenExpiracao" : {
             "type" : "string",
             "format" : "date-time"
+          },
+          "requerEdicao" : {
+            "type" : "boolean"
+          },
+          "pacoteNome" : {
+            "type" : "string"
+          },
+          "dataHoraEnsaio" : {
+            "type" : "string",
+            "format" : "date-time"
           }
         }
       },
@@ -19970,6 +20040,59 @@
             "type" : "string",
             "format" : "uuid",
             "description" : "Identificador do usuário"
+          }
+        }
+      },
+      "AgendamentoClienteResponse" : {
+        "type" : "object",
+        "description" : "Resumo do ensaio do ponto de vista do cliente.",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "pacoteNome" : {
+            "type" : "string"
+          },
+          "pacoteQuantidadeFotos" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "pacoteQuantidadeVideos" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "precoFotoExtra" : {
+            "type" : "number"
+          },
+          "dataHoraEnsaio" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "statusDescricao" : {
+            "type" : "string"
+          },
+          "tokenGaleria" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "localEnsaio" : {
+            "type" : "string"
+          },
+          "totalFotosPublicadas" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "fotosSelecionadasPacote" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "fotosPagas" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         }
       },

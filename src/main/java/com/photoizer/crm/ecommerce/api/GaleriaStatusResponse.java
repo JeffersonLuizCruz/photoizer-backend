@@ -18,6 +18,9 @@ public record GaleriaStatusResponse(
     int fotosPublicadas,
     String selecaoStatus,
     LocalDateTime selecaoEnviadaEm,
-    LocalDateTime tokenExpiracao
+    LocalDateTime tokenExpiracao,
+    boolean requerEdicao,
+    String pacoteNome,
+    LocalDateTime dataHoraEnsaio
 ) {
 }

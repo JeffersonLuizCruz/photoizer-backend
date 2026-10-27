@@ -290,7 +290,12 @@ Staff (`ADMIN/FOTOGRAFO`):
   (calculado por `GaleriaPerformanceCalculator`, com média apenas das amostras disponíveis).
 
 Público:
-- `GET /api/v1/ecommerce/galeria/{token}/status` — etapa e mensagem amigável, disponível mesmo com 0 fotos.
+- `GET /api/v1/ecommerce/galeria/{token}/status` — etapa e mensagem amigável, disponível mesmo com 0 fotos
+  (labels voltados ao cliente, `requerEdicao`, pacote e data do ensaio).
+
+Cliente autenticado:
+- `GET /api/v1/auth/cliente/agendamentos` — ensaios do cliente a partir de `CONFIRMADO` (exclui pré-reserva,
+  cancelado e no-show), com contadores agregados de fotos publicadas/selecionadas/pagas.
 
 ### Eventos e link do cliente
 
@@ -309,4 +314,9 @@ Público:
 4. Pagamentos pendentes e extras aguardando edição são **pendências** (badges), não etapas: uma
    galeria pode estar “em edição” e ter uma compra aguardando confirmação ao mesmo tempo.
 5. O endpoint público não expõe SLA interno, pagamentos ou dados do staff.
+6. Dados financeiros do pipeline (`valorExtras`/`comprasPendentes`) só são preenchidos para
+   `ADMIN`/`FOTOGRAFO`; `EDITOR` recebe a fila operacional com esses campos zerados e CSV sem as
+   colunas financeiras.
+7. CSV usa BOM UTF-8, separador `;`, decimal com vírgula e neutraliza fórmulas (`=`, `+`, `-`, `@`)
+   e quebras de linha em campos livres.
 

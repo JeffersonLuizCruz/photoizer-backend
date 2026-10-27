@@ -35,14 +35,16 @@ public record AgendamentoClienteResponse(
      */
     public static AgendamentoClienteResponse of(Agendamento a, int totalFotosPublicadas, int fotosSelecionadasPacote, int fotosPagas) {
         String statusDescricao = switch (a.getStatus().name()) {
-            case "AGENDADO" -> "Agendado";
+            case "PRE_RESERVA" -> "Pré-reserva";
+            case "AGUARDANDO_APROVACAO" -> "Aguardando aprovação";
+            case "PAGAMENTO_CONFIRMADO" -> "Pagamento confirmado";
             case "CONFIRMADO" -> "Confirmado";
             case "REALIZADO" -> "Ensaio Realizado";
+            case "AGUARDANDO_PAGAMENTO_FINAL" -> "Aguardando pagamento final";
             case "EM_EDICAO" -> "Fotos em Edição";
             case "FINALIZADO" -> "Finalizado";
             case "CANCELADO" -> "Cancelado";
             case "NO_SHOW" -> "Não Compareceu";
-            case "REAGENDADO" -> "Reagendado";
             default -> a.getStatus().name();
         };
         return new AgendamentoClienteResponse(

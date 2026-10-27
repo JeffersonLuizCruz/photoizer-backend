@@ -96,8 +96,9 @@ public class GaleriaPipelineQueryService {
     }
 
     public PageResponse<GaleriaPipelineItemResponse> listar(
-            EtapaGaleria etapa, String busca, boolean atrasadas, int page, int perPage) {
-        var filtrados = listarTodos(etapa, busca, atrasadas);
+            EtapaGaleria etapa, String busca, boolean atrasadas, int page, int perPage,
+            boolean incluirFinanceiro) {
+        var filtrados = listarTodos(etapa, busca, atrasadas, incluirFinanceiro);
 
         var pagina = Math.max(1, page);
         var tamanho = Math.min(Math.max(1, perPage), 100);
@@ -114,15 +115,15 @@ public class GaleriaPipelineQueryService {
     }
 
     public List<GaleriaPipelineItemResponse> listarTodos(
-            EtapaGaleria etapa, String busca, boolean atrasadas) {
-        return carregarItens(busca).stream()
+            EtapaGaleria etapa, String busca, boolean atrasadas, boolean incluirFinanceiro) {
+        return carregarItens(busca, incluirFinanceiro).stream()
             .filter(item -> etapa == null || item.etapa() == etapa)
             .filter(item -> !atrasadas || item.atrasada())
             .toList();
     }
 
-    public GaleriaPipelineResumoResponse resumo() {
-        var itens = carregarItens(null);
+    public GaleriaPipelineResumoResponse resumo(boolean incluirFinanceiro) {
+        var itens = carregarItens(null, incluirFinanceiro);
         return new GaleriaPipelineResumoResponse(
             itens.size(),
             contar(itens, EtapaGaleria.AGUARDANDO_UPLOAD),
@@ -144,17 +145,21 @@ public class GaleriaPipelineQueryService {
      */
     public GaleriaStatusResponse statusPublico(UUID token) {
         var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
-        var item = montarItens(List.of(agendamento)).getFirst();
+        var galeria = galeriaEnsaioService.obter(agendamento.getId());
+        var item = montarItens(List.of(agendamento), false).getFirst();
         return new GaleriaStatusResponse(
             item.etapa(),
-            item.etapaLabel(),
+            labelCliente(item.etapa()),
             mensagemCliente(item.etapa()),
             item.prazoEntrega(),
             item.totalFotos(),
             item.fotosPublicadas(),
             item.selecaoStatus(),
             item.selecaoEnviadaEm(),
-            item.tokenExpiracao());
+            item.tokenExpiracao(),
+            galeria.getModo().requerEdicao(),
+            agendamento.getPacote() != null ? agendamento.getPacote().getNome() : null,
+            agendamento.getDataHoraEnsaio());
     }
 
     /**
@@ -221,12 +226,17 @@ public class GaleriaPipelineQueryService {
      * Exporta a fila filtrada em CSV (separador ';' e BOM no controller), para
      * follow-up fora do sistema. Nao altera nenhum dado.
      */
-    public String gerarCsv(EtapaGaleria etapa, String busca, boolean atrasadas) {
-        var itens = listarTodos(etapa, busca, atrasadas);
+    public String gerarCsv(
+            EtapaGaleria etapa, String busca, boolean atrasadas, boolean incluirFinanceiro) {
+        var itens = listarTodos(etapa, busca, atrasadas, incluirFinanceiro);
         var csv = new StringBuilder();
         csv.append("Cliente;Pacote;Data do ensaio;Etapa;Prazo de entrega;Dias na etapa;")
             .append("Atrasada;Link expirado;Total de fotos;Publicadas;Selecionadas;Baixadas;")
-            .append("Extras a editar;Pagamentos pendentes;Valor extras;Proxima acao\n");
+            .append("Extras a editar;");
+        if (incluirFinanceiro) {
+            csv.append("Pagamentos pendentes;Valor extras;");
+        }
+        csv.append("Proxima acao\n");
         for (var item : itens) {
             csv.append(valorCsv(item.clienteNome())).append(';')
                 .append(valorCsv(item.pacoteNome())).append(';')
@@ -242,15 +252,17 @@ public class GaleriaPipelineQueryService {
                 .append(item.fotosPublicadas()).append(';')
                 .append(item.fotosSelecionadas()).append(';')
                 .append(item.fotosBaixadas()).append(';')
-                .append(item.extrasPendentesEdicao()).append(';')
-                .append(item.comprasPendentes()).append(';')
-                .append(item.valorExtras() != null ? item.valorExtras().toPlainString() : "0").append(';')
-                .append(valorCsv(item.proximaAcao())).append('\n');
+                .append(item.extrasPendentesEdicao()).append(';');
+            if (incluirFinanceiro) {
+                csv.append(item.comprasPendentes()).append(';')
+                    .append(formatarValorCsv(item.valorExtras())).append(';');
+            }
+            csv.append(valorCsv(item.proximaAcao())).append('\n');
         }
         return csv.toString();
     }
 
-    private List<GaleriaPipelineItemResponse> carregarItens(String busca) {
+    private List<GaleriaPipelineItemResponse> carregarItens(String busca, boolean incluirFinanceiro) {
         var desde = LocalDate.now().minusMonths(JANELA_MESES).atStartOfDay();
         var agendamentos = agendamentoRepository.findParaPipeline(STATUS_PIPELINE, desde);
         if (agendamentos.isEmpty()) {
@@ -262,11 +274,12 @@ public class GaleriaPipelineQueryService {
                 .filter(agendamento -> correspondeBusca(agendamento, termo))
                 .toList();
         }
-        return montarItens(agendamentos);
+        return montarItens(agendamentos, incluirFinanceiro);
     }
 
-    private List<GaleriaPipelineItemResponse> montarItens(List<Agendamento> agendamentos) {
-        return montarItens(carregarContexto(agendamentos));
+    private List<GaleriaPipelineItemResponse> montarItens(
+            List<Agendamento> agendamentos, boolean incluirFinanceiro) {
+        return montarItens(carregarContexto(agendamentos), incluirFinanceiro);
     }
 
     private ContextoPipeline carregarContexto(List<Agendamento> agendamentos) {
@@ -291,7 +304,8 @@ public class GaleriaPipelineQueryService {
         return new ContextoPipeline(agendamentos, fotos, compras, selecoes, galerias);
     }
 
-    private List<GaleriaPipelineItemResponse> montarItens(ContextoPipeline contexto) {
+    private List<GaleriaPipelineItemResponse> montarItens(
+            ContextoPipeline contexto, boolean incluirFinanceiro) {
         if (contexto.agendamentos().isEmpty()) {
             return List.of();
         }
@@ -320,8 +334,12 @@ public class GaleriaPipelineQueryService {
             var selecionadas = agregadoFotos != null ? (int) agregadoFotos.getSelecionadas() : 0;
             var baixadas = agregadoFotos != null ? (int) agregadoFotos.getBaixadas() : 0;
             var extrasPendentes = agregadoFotos != null ? (int) agregadoFotos.getExtrasPendentesEdicao() : 0;
-            var comprasPendentes = agregadoCompras != null ? (int) agregadoCompras.getPendentes() : 0;
-            var valorExtras = agregadoCompras != null && agregadoCompras.getValorPago() != null
+            var comprasPendentes = incluirFinanceiro && agregadoCompras != null
+                ? (int) agregadoCompras.getPendentes()
+                : 0;
+            var valorExtras = incluirFinanceiro
+                && agregadoCompras != null
+                && agregadoCompras.getValorPago() != null
                 ? agregadoCompras.getValorPago()
                 : BigDecimal.ZERO;
 
@@ -437,6 +455,19 @@ public class GaleriaPipelineQueryService {
         return "Continuar edição";
     }
 
+    private String labelCliente(EtapaGaleria etapa) {
+        return switch (etapa) {
+            case AGUARDANDO_UPLOAD -> "Preparando seu ensaio";
+            case FOTOS_NAO_PUBLICADAS -> "Fotos em revisão";
+            case AGUARDANDO_SELECAO -> "Escolha suas fotos";
+            case SELECAO_EM_EDICAO -> "Em edição";
+            case SELECAO_AGUARDANDO_APROVACAO -> "Em revisão final";
+            case AGUARDANDO_DOWNLOAD -> "Pronta para baixar";
+            case CONCLUIDA -> "Entregue";
+            case ARQUIVADA -> "Galeria arquivada";
+        };
+    }
+
     private String mensagemCliente(EtapaGaleria etapa) {
         return switch (etapa) {
             case AGUARDANDO_UPLOAD -> "Estamos organizando as fotos do seu ensaio.";
@@ -485,10 +516,11 @@ public class GaleriaPipelineQueryService {
     }
 
     private String valorCsv(String valor) {
-        if (valor == null) {
-            return "";
-        }
-        return "\"" + valor.replace("\"", "\"\"") + "\"";
+        return CsvCell.texto(valor);
+    }
+
+    private String formatarValorCsv(BigDecimal valor) {
+        return CsvCell.decimal(valor);
     }
 
     private record ContextoPipeline(

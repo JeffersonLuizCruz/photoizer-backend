@@ -48,6 +48,8 @@ import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 
@@ -60,6 +62,17 @@ import org.springframework.data.jpa.domain.Specification;
 public class AgendamentoService {
 
     private static final Logger log = LoggerFactory.getLogger(AgendamentoService.class);
+
+    /**
+     * Ensaios visiveis na area do cliente. A partir de CONFIRMADO; pre-reservas,
+     * cancelados e no-show nao aparecem em "Meus Ensaios".
+     */
+    private static final List<StatusAgendamento> STATUS_VISIVEIS_CLIENTE = List.of(
+        StatusAgendamento.CONFIRMADO,
+        StatusAgendamento.REALIZADO,
+        StatusAgendamento.AGUARDANDO_PAGAMENTO_FINAL,
+        StatusAgendamento.EM_EDICAO,
+        StatusAgendamento.FINALIZADO);
 
     private final ClienteRepository clienteRepository;
     private final PacoteQueryService pacoteQueryService;
@@ -394,16 +407,27 @@ public class AgendamentoService {
 
     @Transactional(readOnly = true)
     public List<AgendamentoClienteResponse> listarAgendamentosCliente(UUID clienteId) {
-        return agendamentoRepository.findByClienteId(clienteId).stream()
-            .map(a -> {
-                var totalPublicadas = fotoEnsaioRepository.countByAgendamentoIdAndStatus(
-                    a.getId(), StatusFoto.PUBLICADA);
-                var selecionadasPacote = fotoEnsaioRepository.countSelecionadasPacoteByAgendamentoId(
-                    a.getId());
-                var pagas = fotoEnsaioRepository.countPagasByAgendamentoId(a.getId());
-                return AgendamentoClienteResponse.of(a, totalPublicadas, selecionadasPacote, pagas);
-            })
-            .toList();
+        var agendamentos = agendamentoRepository
+            .findByClienteIdAndStatusInOrderByDataHoraEnsaioDesc(clienteId, STATUS_VISIVEIS_CLIENTE);
+        if (agendamentos.isEmpty()) {
+            return List.of();
+        }
+
+        var ids = agendamentos.stream().map(Agendamento::getId).toList();
+        var agregados = new HashMap<UUID, FotoEnsaioRepository.GaleriaPipelineFotos>();
+        fotoEnsaioRepository.agregarPipeline(ids)
+            .forEach(agregado -> agregados.put(agregado.getAgendamentoId(), agregado));
+
+        var responses = new ArrayList<AgendamentoClienteResponse>(agendamentos.size());
+        for (var agendamento : agendamentos) {
+            var agregado = agregados.get(agendamento.getId());
+            var totalPublicadas = agregado != null ? (int) agregado.getPublicadas() : 0;
+            var selecionadasPacote = agregado != null ? (int) agregado.getSelecionadas() : 0;
+            var pagas = agregado != null ? (int) agregado.getPagas() : 0;
+            responses.add(AgendamentoClienteResponse.of(
+                agendamento, totalPublicadas, selecionadasPacote, pagas));
+        }
+        return responses;
     }
 
     public AgendamentoResponse atualizar(UUID id, AtualizarAgendamentoRequest request) {

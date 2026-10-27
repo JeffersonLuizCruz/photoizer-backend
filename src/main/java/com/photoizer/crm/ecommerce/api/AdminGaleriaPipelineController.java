@@ -10,6 +10,7 @@ import jakarta.annotation.security.RolesAllowed;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -37,14 +38,16 @@ public class AdminGaleriaPipelineController {
             @RequestParam(required = false) String busca,
             @RequestParam(defaultValue = "false") boolean atrasadas,
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int perPage) {
-        return ResponseEntity.ok(pipelineQueryService.listar(etapa, busca, atrasadas, page, perPage));
+            @RequestParam(defaultValue = "20") int perPage,
+            Authentication authentication) {
+        return ResponseEntity.ok(pipelineQueryService.listar(
+            etapa, busca, atrasadas, page, perPage, incluirFinanceiro(authentication)));
     }
 
     @GetMapping("/pipeline/resumo")
     @Operation(summary = "Contadores por etapa para os cards e o badge do menu")
-    public ResponseEntity<GaleriaPipelineResumoResponse> resumo() {
-        return ResponseEntity.ok(pipelineQueryService.resumo());
+    public ResponseEntity<GaleriaPipelineResumoResponse> resumo(Authentication authentication) {
+        return ResponseEntity.ok(pipelineQueryService.resumo(incluirFinanceiro(authentication)));
     }
 
     @GetMapping("/desempenho")
@@ -60,12 +63,23 @@ public class AdminGaleriaPipelineController {
     public ResponseEntity<byte[]> exportarCsv(
             @RequestParam(required = false) EtapaGaleria etapa,
             @RequestParam(required = false) String busca,
-            @RequestParam(defaultValue = "false") boolean atrasadas) {
-        var conteudo = "\uFEFF" + pipelineQueryService.gerarCsv(etapa, busca, atrasadas);
+            @RequestParam(defaultValue = "false") boolean atrasadas,
+            Authentication authentication) {
+        var conteudo = "\uFEFF" + pipelineQueryService.gerarCsv(
+            etapa, busca, atrasadas, incluirFinanceiro(authentication));
         var nomeArquivo = "galerias-" + LocalDate.now() + ".csv";
         return ResponseEntity.ok()
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nomeArquivo + "\"")
             .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
             .body(conteudo.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private boolean incluirFinanceiro(Authentication authentication) {
+        if (authentication == null) {
+            return false;
+        }
+        return authentication.getAuthorities().stream().anyMatch(autoridade ->
+            "ROLE_ADMIN".equals(autoridade.getAuthority())
+                || "ROLE_FOTOGRAFO".equals(autoridade.getAuthority()));
     }
 }
