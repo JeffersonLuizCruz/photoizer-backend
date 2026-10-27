@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -39,4 +40,28 @@ public interface CompraExtraRepository extends JpaRepository<CompraExtra, UUID> 
 
     @Query("SELECT c.urlComprovante FROM CompraExtra c WHERE c.urlComprovante IS NOT NULL")
     List<String> caminhosComprovante();
+
+    interface CompraPipelineAgregado {
+        UUID getAgendamentoId();
+
+        long getPendentes();
+
+        BigDecimal getValorPago();
+    }
+
+    /**
+     * Compras pendentes e valor pago por galeria, para os badges da Central de
+     * Galerias. Pendente = aguardando comprovante ou confirmacao do staff.
+     */
+    @Query("""
+        SELECT c.agendamentoId AS agendamentoId,
+               SUM(CASE WHEN c.status IN :statusesPendentes THEN 1 ELSE 0 END) AS pendentes,
+               COALESCE(SUM(CASE WHEN c.status = 'PAGA' THEN c.valorTotal ELSE 0 END), 0) AS valorPago
+        FROM CompraExtra c
+        WHERE c.agendamentoId IN :agendamentoIds
+        GROUP BY c.agendamentoId
+        """)
+    List<CompraPipelineAgregado> agregarPipeline(
+        @Param("agendamentoIds") Collection<UUID> agendamentoIds,
+        @Param("statusesPendentes") Collection<StatusCompraExtra> statusesPendentes);
 }

@@ -22,7 +22,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -89,6 +92,49 @@ public class GaleriaEnsaioService {
                     .log("Configuração de galeria criada");
                 return galeriaRepository.save(nova);
             });
+    }
+
+    /**
+     * Carrega as galerias de varios agendamentos de uma vez. Agendamentos sem
+     * linha configurada recebem o modo padrao vigente e a fase inicial em
+     * memoria, sem gravar nada. Usado pela Central de Galerias para evitar N+1.
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, GaleriaEnsaio> obterEmLote(Collection<UUID> agendamentoIds) {
+        if (agendamentoIds == null || agendamentoIds.isEmpty()) {
+            return Map.of();
+        }
+        var modo = modoPadrao();
+        var galerias = new HashMap<UUID, GaleriaEnsaio>();
+        galeriaRepository.findAllById(agendamentoIds)
+            .forEach(galeria -> galerias.put(galeria.getAgendamentoId(), galeria));
+        agendamentoIds.forEach(agendamentoId -> galerias.computeIfAbsent(
+            agendamentoId,
+            chave -> GaleriaEnsaio.builder()
+                .agendamentoId(chave)
+                .modo(modo)
+                .fase(faseInicial(modo))
+                .build()));
+        return galerias;
+    }
+
+    /**
+     * Registra a primeira publicacao de fotos da galeria. Publicacoes
+     * posteriores nao alteram a data original, usada para medir o tempo
+     * ensaio -> publicacao.
+     */
+    public void registrarPublicacao(UUID agendamentoId, LocalDateTime publicadoEm) {
+        var galeria = obterOuCriar(agendamentoId);
+        var anterior = galeria.getPublicadaEm();
+        galeria.registrarPublicacao(publicadoEm);
+        if (galeria.getPublicadaEm() != null && !galeria.getPublicadaEm().equals(anterior)) {
+            galeriaRepository.save(galeria);
+            log.atInfo()
+                .addKeyValue("event_action", "galeria.fotos_publicadas")
+                .addKeyValue("agendamento_id", agendamentoId)
+                .addKeyValue("publicada_em", galeria.getPublicadaEm().toString())
+                .log("Primeira publicação de fotos registrada na galeria");
+        }
     }
 
     public GaleriaEnsaio obterParaAtualizacao(UUID agendamentoId) {

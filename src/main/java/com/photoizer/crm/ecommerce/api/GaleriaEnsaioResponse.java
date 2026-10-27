@@ -15,5 +15,6 @@ public record GaleriaEnsaioResponse(
     boolean podeAlterarModo,
     boolean arquivada,
     LocalDateTime arquivadaEm,
-    long bytesLiberados
+    long bytesLiberados,
+    LocalDateTime publicadaEm
 ) {}

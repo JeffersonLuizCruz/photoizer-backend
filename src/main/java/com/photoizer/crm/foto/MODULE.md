@@ -22,7 +22,8 @@ foto/
 │   ├── FotoMapper.java             # MapStruct mapper (toResponse, toPublicResponse)
 │   └── FotoMetadataRequest.java    # Record: titulo, descricao, tags, categoria, dataSessao, destaque
 ├── event/
-│   └── FotosRemovidasEvent.java    # Notifica ecommerce para limpar carrinho/favoritos/comentários
+│   ├── FotosRemovidasEvent.java    # Notifica ecommerce para limpar carrinho/favoritos/comentários
+│   └── FotosGaleriaPublicadasEvent.java # Publicação de fotos: ecommerce grava a data; agenda renova o link
 ├── acl/
 │   └── AgendamentoReadService.java # Porta ACL — status permitido p/ upload e publicação
 ├── listener/
@@ -61,6 +62,8 @@ foto/
 | Evento | Módulo consumidor | Ação |
 |--------|-------------------|------|
 | `FotosRemovidasEvent` | ecommerce | Remove favoritos, itens de carrinho e comentários das fotos removidas |
+| `FotosGaleriaPublicadasEvent` | ecommerce | Grava `galerias_ensaio.publicada_em` na primeira publicação |
+| `FotosGaleriaPublicadasEvent` | agenda | Estende a validade do link da galeria (+180 dias) sem rotacionar o token |
 
 ## 4. Design Patterns Aplicados
 

@@ -29,6 +29,7 @@ public final class OpenApiTags {
     public static final String ADMIN_COMPRAS = "Admin Compras";
     public static final String ADMIN_COMENTARIOS = "Admin Comentários";
     public static final String ADMIN_ANALYTICS = "Admin Analytics";
+    public static final String ADMIN_GALERIAS = "Admin Central de Galerias";
     public static final String AVALIACOES = "Avaliações";
     public static final String FINANCEIRO = "Financeiro";
     public static final String RELATORIOS_FINANCEIROS = "Relatórios Financeiros";
@@ -65,6 +66,7 @@ public final class OpenApiTags {
             new Tag().name(ADMIN_COMPRAS).description("Gestão administrativa das compras de fotos extras."),
             new Tag().name(ADMIN_COMENTARIOS).description("Moderação de comentários dos clientes por foto."),
             new Tag().name(ADMIN_ANALYTICS).description("Métricas e analytics do e-commerce."),
+            new Tag().name(ADMIN_GALERIAS).description("Fila operacional do ciclo de entrega da galeria."),
             new Tag().name(AVALIACOES).description("Avaliações e depoimentos."),
             new Tag().name(FINANCEIRO).description("Controle financeiro: receitas, lançamentos e fotos extras."),
             new Tag().name(RELATORIOS_FINANCEIROS).description("Relatórios financeiros agregados para exportação."),

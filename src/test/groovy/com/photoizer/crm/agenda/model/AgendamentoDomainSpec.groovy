@@ -278,4 +278,25 @@ class AgendamentoDomainSpec extends Specification {
         semCliente.nomeCliente() == "Pré-reserva"
         comCliente.nomeCliente() == "Ana"
     }
+
+    def "estende a validade do link da galeria sem reduzir a atual"() {
+        given: "um agendamento com link válido por 15 dias"
+        def agendamento = agendamento()
+        def atual = LocalDateTime.now().plusDays(15)
+        def estendida = atual.plusDays(180)
+        def anterior = atual.minusDays(1)
+        agendamento.tokenExpiracao = atual
+
+        when: "a validade é estendida após a publicação das fotos"
+        agendamento.estenderTokenGaleria(estendida)
+
+        then: "o token passa a valer pela nova data"
+        agendamento.tokenExpiracao == estendida
+
+        when: "uma validade menor é informada depois"
+        agendamento.estenderTokenGaleria(anterior)
+
+        then: "a validade maior é preservada"
+        agendamento.tokenExpiracao == estendida
+    }
 }

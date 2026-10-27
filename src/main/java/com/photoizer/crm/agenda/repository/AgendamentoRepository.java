@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -164,5 +165,23 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID>,
         @Param("inicioMenosBuffer") LocalDateTime inicioMenosBuffer,
         @Param("fim") LocalDateTime fim,
         @Param("statusesIgnorados") List<StatusAgendamento> statusesIgnorados);
+
+    /**
+     * Ensaios candidatos a aparecer na Central de Galerias. Inclui todo o
+     * trabalho em aberto (independente da idade) e os ensaios finalizados
+     * dentro da janela historica consultada. Cliente e pacote vem no mesmo
+     * select para montar a fila sem N+1.
+     */
+    @EntityGraph(attributePaths = {"cliente", "pacote"})
+    @Query("""
+        SELECT a FROM Agendamento a
+        WHERE a.status IN :statuses
+          AND (a.status <> com.photoizer.crm.agenda.model.StatusAgendamento.FINALIZADO
+               OR a.dataHoraEnsaio >= :desde)
+        ORDER BY a.dataHoraEnsaio DESC
+        """)
+    List<Agendamento> findParaPipeline(
+        @Param("statuses") Collection<StatusAgendamento> statuses,
+        @Param("desde") LocalDateTime desde);
 
 }

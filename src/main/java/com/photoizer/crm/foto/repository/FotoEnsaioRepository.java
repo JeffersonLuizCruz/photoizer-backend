@@ -135,6 +135,46 @@ public interface FotoEnsaioRepository extends JpaRepository<FotoEnsaio, UUID> {
         long getPendencias();
     }
 
+    /**
+     * Agregado por galeria usado pela Central de Galerias (pipeline). Evita
+     * carregar todas as fotos de todos os ensaios em memoria.
+     */
+    interface GaleriaPipelineFotos {
+        UUID getAgendamentoId();
+
+        long getTotal();
+
+        long getPublicadas();
+
+        long getBaixadas();
+
+        long getSelecionadas();
+
+        long getPagas();
+
+        long getExtrasPendentesEdicao();
+
+        long getArquivadas();
+    }
+
+    @Query("""
+        SELECT f.agendamentoId AS agendamentoId,
+               COUNT(f) AS total,
+               SUM(CASE WHEN f.status <> 'INEDITA' THEN 1 ELSE 0 END) AS publicadas,
+               SUM(CASE WHEN f.dataDownload IS NOT NULL THEN 1 ELSE 0 END) AS baixadas,
+               SUM(CASE WHEN f.selecionadaPacote = true THEN 1 ELSE 0 END) AS selecionadas,
+               SUM(CASE WHEN f.status = 'PAGA' THEN 1 ELSE 0 END) AS pagas,
+               SUM(CASE WHEN f.compraExtraId IS NOT NULL
+                         AND f.status = 'PAGA'
+                         AND f.versaoAtual <> 'EDITADA' THEN 1 ELSE 0 END) AS extrasPendentesEdicao,
+               SUM(CASE WHEN f.arquivosRemovidos = true THEN 1 ELSE 0 END) AS arquivadas
+        FROM FotoEnsaio f
+        WHERE f.agendamentoId IN :agendamentoIds
+        GROUP BY f.agendamentoId
+        """)
+    List<GaleriaPipelineFotos> agregarPipeline(
+        @Param("agendamentoIds") Collection<UUID> agendamentoIds);
+
     interface CaminhosFoto {
         UUID getId();
 

@@ -15,6 +15,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
@@ -64,12 +65,29 @@ public class GaleriaEnsaio {
     @Column(name = "titulo_hero", length = 120)
     private String tituloHero;
 
+    /**
+     * Momento da primeira publicacao das fotos da galeria. Nulo enquanto o
+     * staff ainda nao publicou nenhuma foto.
+     */
+    @Column(name = "publicada_em")
+    private LocalDateTime publicadaEm;
+
     public boolean permiteSelecionar() {
         return modo == ModoGaleria.DIRETO || fase.permiteSelecionar();
     }
 
     public boolean permiteComercializar() {
         return modo == ModoGaleria.DIRETO || fase.permiteComercializar();
+    }
+
+    /** Mantem a data da primeira publicacao; publicacoes posteriores nao a alteram. */
+    public void registrarPublicacao(LocalDateTime publicadoEm) {
+        if (publicadoEm == null) {
+            return;
+        }
+        if (this.publicadaEm == null || publicadoEm.isBefore(this.publicadaEm)) {
+            this.publicadaEm = publicadoEm;
+        }
     }
 
     public void iniciarSelecao(UUID selecaoId) {

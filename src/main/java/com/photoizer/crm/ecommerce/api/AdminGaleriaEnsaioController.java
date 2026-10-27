@@ -84,6 +84,7 @@ public class AdminGaleriaEnsaioController {
             galeriaService.podeAlterarModo(galeria.getAgendamentoId()),
             estado.arquivada(),
             estado.arquivadaEm(),
-            estado.bytesLiberados());
+            estado.bytesLiberados(),
+            galeria.getPublicadaEm());
     }
 }

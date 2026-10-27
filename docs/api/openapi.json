@@ -65,6 +65,9 @@
     "name" : "Admin Analytics",
     "description" : "Métricas e analytics do e-commerce."
   }, {
+    "name" : "Admin Central de Galerias",
+    "description" : "Fila operacional do ciclo de entrega da galeria."
+  }, {
     "name" : "Avaliações",
     "description" : "Avaliações e depoimentos."
   }, {
@@ -11727,6 +11730,45 @@
         }
       }
     },
+    "/api/v1/ecommerce/galeria/{token}/status" : {
+      "get" : {
+        "tags" : [ "Ecommerce" ],
+        "summary" : "Consultar a etapa atual do ensaio (visível ao cliente)",
+        "operationId" : "status",
+        "parameters" : [ {
+          "name" : "token",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/GaleriaStatusResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/ecommerce/galeria/{token}/favoritos" : {
       "get" : {
         "tags" : [ "Ecommerce" ],
@@ -13540,6 +13582,162 @@
                   "items" : {
                     "$ref" : "#/components/schemas/SelecaoPendenteResponse"
                   }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/admin/galerias/pipeline" : {
+      "get" : {
+        "tags" : [ "Admin Central de Galerias" ],
+        "summary" : "Listar a fila de galerias com a etapa operacional de cada ensaio",
+        "operationId" : "pipeline",
+        "parameters" : [ {
+          "name" : "etapa",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "AGUARDANDO_UPLOAD", "FOTOS_NAO_PUBLICADAS", "SELECAO_EM_EDICAO", "SELECAO_AGUARDANDO_APROVACAO", "AGUARDANDO_SELECAO", "AGUARDANDO_DOWNLOAD", "CONCLUIDA", "ARQUIVADA" ]
+          }
+        }, {
+          "name" : "busca",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "atrasadas",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
+        }, {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 1
+          }
+        }, {
+          "name" : "perPage",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/admin/galerias/pipeline/resumo" : {
+      "get" : {
+        "tags" : [ "Admin Central de Galerias" ],
+        "summary" : "Contadores por etapa para os cards e o badge do menu",
+        "operationId" : "resumo",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/GaleriaPipelineResumoResponse"
                 }
               }
             }
@@ -16669,6 +16867,10 @@
           "bytesLiberados" : {
             "type" : "integer",
             "format" : "int64"
+          },
+          "publicadaEm" : {
+            "type" : "string",
+            "format" : "date-time"
           }
         }
       },
@@ -19085,6 +19287,44 @@
           }
         }
       },
+      "GaleriaStatusResponse" : {
+        "type" : "object",
+        "properties" : {
+          "etapa" : {
+            "type" : "string",
+            "enum" : [ "AGUARDANDO_UPLOAD", "FOTOS_NAO_PUBLICADAS", "SELECAO_EM_EDICAO", "SELECAO_AGUARDANDO_APROVACAO", "AGUARDANDO_SELECAO", "AGUARDANDO_DOWNLOAD", "CONCLUIDA", "ARQUIVADA" ]
+          },
+          "etapaLabel" : {
+            "type" : "string"
+          },
+          "mensagem" : {
+            "type" : "string"
+          },
+          "previsaoEntrega" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "totalFotos" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "fotosPublicadas" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "selecaoStatus" : {
+            "type" : "string"
+          },
+          "selecaoEnviadaEm" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "tokenExpiracao" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
       "StreamingResponseBody" : { },
       "AdminCompraDetalheResponse" : {
         "type" : "object",
@@ -19765,6 +20005,59 @@
           },
           "requerEdicao" : {
             "type" : "boolean"
+          }
+        }
+      },
+      "GaleriaPipelineResumoResponse" : {
+        "type" : "object",
+        "properties" : {
+          "total" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "aguardandoUpload" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "fotosNaoPublicadas" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "aguardandoSelecao" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "selecaoEmEdicao" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "selecaoAguardandoAprovacao" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "aguardandoDownload" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "concluidas" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "arquivadas" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "atrasadas" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "comprasPendentes" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "extrasPendentesEdicao" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         }
       },

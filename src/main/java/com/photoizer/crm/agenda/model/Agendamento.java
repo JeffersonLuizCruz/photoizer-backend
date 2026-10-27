@@ -307,6 +307,19 @@ public class Agendamento {
     }
 
     /**
+     * Estende a validade do link da galeria sem trocar o token, preservando
+     * links que ja foram enviados ao cliente. Nunca reduz a validade atual.
+     */
+    public void estenderTokenGaleria(LocalDateTime novaExpiracao) {
+        if (novaExpiracao == null) {
+            return;
+        }
+        if (this.tokenExpiracao == null || this.tokenExpiracao.isBefore(novaExpiracao)) {
+            this.tokenExpiracao = novaExpiracao;
+        }
+    }
+
+    /**
      * Assinatura pública da proposta: vincula o cliente (auto-cadastro), registra
      * autorização de imagem, comprovante, assinatura e snapshot imutável,
      * transitando PRE_RESERVA -> AGUARDANDO_APROVACAO.

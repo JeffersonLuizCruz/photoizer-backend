@@ -1,6 +1,7 @@
 package com.photoizer.crm.foto.service;
 
 import com.photoizer.crm.foto.event.FotoEditadaEvent;
+import com.photoizer.crm.foto.event.FotosGaleriaPublicadasEvent;
 import com.photoizer.crm.foto.event.FotosRemovidasEvent;
 import com.photoizer.crm.foto.exception.AgendamentoNaoPermitidoParaUploadException;
 import com.photoizer.crm.foto.exception.ArquivoDeImagemInvalidoException;
@@ -333,6 +334,10 @@ public class FotoService {
         }
 
         var publicadas = fotoEnsaioRepository.saveAll(alteradas);
+        if (!publicadas.isEmpty()) {
+            eventPublisher.publishEvent(new FotosGaleriaPublicadasEvent(
+                agendamentoId, LocalDateTime.now(), publicadas.size()));
+        }
         log.atInfo()
             .addKeyValue("event_action", "foto.publicadas")
             .addKeyValue("agendamento_id", agendamentoId)
@@ -445,7 +450,12 @@ public class FotoService {
         if (foto.getStatus() == StatusFoto.PUBLICADA && foto.isVisivel()) {
             atribuirNumeroSeNecessario(foto, fotos);
         }
-        return fotoEnsaioRepository.save(foto);
+        var salva = fotoEnsaioRepository.save(foto);
+        if (status == StatusFoto.PUBLICADA) {
+            eventPublisher.publishEvent(new FotosGaleriaPublicadasEvent(
+                agendamentoId, LocalDateTime.now(), 1));
+        }
+        return salva;
     }
 
     public FotoEnsaio substituirImagem(UUID agendamentoId, UUID fotoId, MultipartFile arquivo) {

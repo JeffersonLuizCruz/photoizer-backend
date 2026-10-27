@@ -10,6 +10,7 @@ import com.photoizer.crm.ecommerce.service.DownloadService;
 import com.photoizer.crm.ecommerce.service.EcommerceService;
 import com.photoizer.crm.ecommerce.service.GaleriaEnsaioService;
 import com.photoizer.crm.ecommerce.service.GaleriaCapaService;
+import com.photoizer.crm.ecommerce.service.GaleriaPipelineQueryService;
 import com.photoizer.crm.ecommerce.service.GaleriaQueryService;
 import com.photoizer.crm.ecommerce.service.FavoritoService;
 import com.photoizer.crm.ecommerce.service.SelecaoEnsaioService;
@@ -73,6 +74,7 @@ public class EcommerceController {
     private final GaleriaEnsaioService galeriaEnsaioService;
     private final GaleriaCapaService galeriaCapaService;
     private final FotoPreviewService fotoPreviewService;
+    private final GaleriaPipelineQueryService galeriaPipelineQueryService;
 
     public EcommerceController(EcommerceService ecommerceService,
                                GaleriaQueryService galeriaQueryService,
@@ -91,7 +93,8 @@ public class EcommerceController {
                                SelecaoEnsaioService selecaoEnsaioService,
                                GaleriaEnsaioService galeriaEnsaioService,
                                GaleriaCapaService galeriaCapaService,
-                               FotoPreviewService fotoPreviewService) {
+                               FotoPreviewService fotoPreviewService,
+                               GaleriaPipelineQueryService galeriaPipelineQueryService) {
         this.ecommerceService = ecommerceService;
         this.galeriaQueryService = galeriaQueryService;
         this.carrinhoService = carrinhoService;
@@ -110,6 +113,7 @@ public class EcommerceController {
         this.galeriaEnsaioService = galeriaEnsaioService;
         this.galeriaCapaService = galeriaCapaService;
         this.fotoPreviewService = fotoPreviewService;
+        this.galeriaPipelineQueryService = galeriaPipelineQueryService;
     }
 
     @PostMapping("/sessao")
@@ -179,6 +183,16 @@ public class EcommerceController {
             .header("Pragma", "no-cache")
             .header("Expires", "0")
             .body(response);
+    }
+
+    @GetMapping("/galeria/{token}/status")
+    @Operation(summary = "Consultar a etapa atual do ensaio (visível ao cliente)")
+    public ResponseEntity<GaleriaStatusResponse> status(@PathVariable UUID token) {
+        return ResponseEntity.ok()
+            .header("Cache-Control", "no-store, no-cache, must-revalidate")
+            .header("Pragma", "no-cache")
+            .header("Expires", "0")
+            .body(galeriaPipelineQueryService.statusPublico(token));
     }
 
     @GetMapping("/galeria/{token}/capa")

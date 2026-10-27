@@ -33,4 +33,12 @@ public interface SelecaoEnsaioRepository extends JpaRepository<SelecaoEnsaio, UU
     List<SelecaoEnsaio> findByStatusInOrderByEnviadaEmAsc(Collection<StatusSelecao> statuses);
 
     boolean existsByAgendamentoIdAndStatusIn(UUID agendamentoId, Collection<StatusSelecao> statuses);
+
+    /**
+     * Ultimas selecoes relevantes de varias galerias (ativa ou publicada).
+     * Ordenadas por numero desc para que o primeiro item de cada agendamento
+     * seja a selecao mais recente.
+     */
+    List<SelecaoEnsaio> findByAgendamentoIdInAndStatusInOrderByNumeroDesc(
+        Collection<UUID> agendamentoIds, Collection<StatusSelecao> statuses);
 }

@@ -263,3 +263,45 @@ Quando o expurgo de uma galeria finalizada remove os arquivos das fotos:
 5. `AdminGaleriaEnsaioController` expõe `arquivada`, `arquivadaEm` e `bytesLiberados`; o workspace mostra o selo/aviso e o link para o painel de armazenamento.
 6. O frontend (`GaleriaClientePage`) trata o 410 e renderiza a tela "Esta galeria foi arquivada".
 7. Comprovantes, contratos assinados (`uploads/propostas/*.pdf`) e todo o histórico comercial permanecem intactos.
+
+## 9. Central de Galerias (V19)
+
+O módulo passou a expor uma **fila operacional** do pós-ensaio, além da venda de extras.
+
+### Modelo
+
+- `EtapaGaleria` (`ecommerce/model`) é uma etapa **derivada**, nunca persistida, com precedência:
+  arquivada → seleção ativa → sem fotos → fotos não publicadas → comercialização → aguardando seleção.
+- `GaleriaPipelineEtapaResolver` concentra a regra pura (testada em `GaleriaPipelineEtapaResolverSpec`).
+- `GaleriaPipelineQueryService` compõe `Agendamento`, `FotoEnsaio`, `SelecaoEnsaio`, `CompraExtra` e
+  `GaleriaEnsaio` com queries agregadas por agendamento (sem `findAll()` e sem N+1).
+- `galerias_ensaio.publicada_em` (V19) guarda a **primeira** publicação das fotos, usada para medir o
+  tempo ensaio → publicação. Publicações posteriores não alteram a data.
+
+### Endpoints
+
+Staff (`ADMIN/FOTOGRAFO/EDITOR`):
+- `GET /api/v1/admin/galerias/pipeline?etapa=&busca=&atrasadas=&page=&perPage=`
+- `GET /api/v1/admin/galerias/pipeline/resumo`
+
+Público:
+- `GET /api/v1/ecommerce/galeria/{token}/status` — etapa e mensagem amigável, disponível mesmo com 0 fotos.
+
+### Eventos e link do cliente
+
+- `FotoService.publicar()` publica `FotosGaleriaPublicadasEvent`.
+- `ecommerce.GaleriaPublicacaoListener` grava `galerias_ensaio.publicada_em`.
+- `agenda.AgendamentoGaleriaPublicadaListener` **estende** `tokenExpiracao` para publicação + 180 dias
+  sem rotacionar o token, preservando links já enviados. Corrige o caso em que o link (criado com a
+  proposta, +15 dias) vencia antes de o staff publicar as fotos.
+
+### Regras
+
+1. Etapa não é persistida: a fila sempre reflete o estado real de agenda/foto/seleção/compra.
+2. `diasNaEtapa` usa a data de realização, a publicação ou o envio da seleção, conforme a etapa.
+3. `prazoEntrega` = (data de realização, ou data do ensaio) + `pacote.diasParaEntrega`; `atrasada`
+   quando o prazo vence e a etapa não é terminal.
+4. Pagamentos pendentes e extras aguardando edição são **pendências** (badges), não etapas: uma
+   galeria pode estar “em edição” e ter uma compra aguardando confirmação ao mesmo tempo.
+5. O endpoint público não expõe SLA interno, pagamentos ou dados do staff.
+
