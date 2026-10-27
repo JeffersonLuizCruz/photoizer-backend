@@ -7755,6 +7755,64 @@
         } ]
       }
     },
+    "/api/v1/admin/armazenamento/historico/coletar" : {
+      "post" : {
+        "tags" : [ "Armazenamento" ],
+        "summary" : "Coletar o snapshot de hoje",
+        "description" : "Grava ou atualiza o snapshot da data corrente. Útil após o deploy e antes de uma limpeza grande.",
+        "operationId" : "coletarHistorico",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SnapshotArmazenamentoResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/admin/armazenamento/galerias/{agendamentoId}/expurgar" : {
       "post" : {
         "tags" : [ "Armazenamento" ],
@@ -14118,6 +14176,74 @@
         } ]
       }
     },
+    "/api/v1/admin/armazenamento/historico" : {
+      "get" : {
+        "tags" : [ "Armazenamento" ],
+        "summary" : "Histórico diário de consumo",
+        "description" : "Série de snapshots diários (até 730 dias). Dias sem coleta não aparecem.",
+        "operationId" : "historico",
+        "parameters" : [ {
+          "name" : "dias",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 30
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HistoricoArmazenamentoResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/admin/armazenamento/galerias" : {
       "get" : {
         "tags" : [ "Armazenamento" ],
@@ -17583,6 +17709,75 @@
           }
         }
       },
+      "SnapshotArmazenamentoResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "bytesFotos" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "bytesDerivados" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "bytesEditadas" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "bytesDocumentos" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "bytesPropostas" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "bytesOutros" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "bytesTotal" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "volumeTotal" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "volumeLivre" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalFotos" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "totalGalerias" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "galeriasArquivadas" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "fotosArquivadas" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "bytesLiberadosNoDia" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "coletadoEm" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
       "ExpurgarGaleriaResponse" : {
         "type" : "object",
         "properties" : {
@@ -19812,6 +20007,21 @@
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/ArquivoOrfaoResponse"
+            }
+          }
+        }
+      },
+      "HistoricoArmazenamentoResponse" : {
+        "type" : "object",
+        "properties" : {
+          "dias" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "snapshots" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/SnapshotArmazenamentoResponse"
             }
           }
         }

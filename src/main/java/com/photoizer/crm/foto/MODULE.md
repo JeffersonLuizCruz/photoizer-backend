@@ -193,3 +193,13 @@ Complementa o expurgo: encontra arquivos em `uploads/` que **nenhum módulo refe
 - **Endpoints** (ADMIN): `GET /api/v1/admin/armazenamento/orfaos` e `POST /api/v1/admin/armazenamento/orfaos/limpar`.
 - **UI**: card "Arquivos órfãos" na página de armazenamento, com análise sob demanda e confirmação antes da limpeza.
 
+## 11. Histórico diário de consumo (V18)
+
+- **Tabela** `armazenamento_snapshots` (PK `data`): bytes por categoria, total, volume total/livre, contadores de fotos/galerias/arquivadas e `bytes_liberados_no_dia`.
+- **Coleta**: `ArmazenamentoHistoricoService` grava/atualiza o snapshot do dia às **23:55** (`America/Sao_Paulo`, cron configurável em `app.storage.historico.cron`). Recoletar no mesmo dia faz `UPDATE` (idempotente).
+- **Startup**: `@EventListener(ApplicationReadyEvent)` garante um ponto no dia do deploy se ainda não existir; desligável com `app.storage.historico.coletar-no-startup=false` (usado nos testes).
+- **Coleta manual**: `POST /api/v1/admin/armazenamento/historico/coletar` grava o dia corrente.
+- **Consulta**: `GET /api/v1/admin/armazenamento/historico?dias=30` (1–730, ordem ascendente). Dias sem coleta não aparecem.
+- **Bytes liberados**: soma de `fotos_ensaio.bytes_liberados` com `arquivos_removidos_em` no dia; limpezas de órfãos aparecem apenas como queda no total.
+- **Sem backfill**: a série começa na primeira coleta.
+

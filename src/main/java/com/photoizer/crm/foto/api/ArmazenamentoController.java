@@ -1,6 +1,7 @@
 package com.photoizer.crm.foto.api;
 
 import com.photoizer.crm.foto.service.ArmazenamentoService;
+import com.photoizer.crm.foto.service.ArmazenamentoHistoricoService;
 import com.photoizer.crm.foto.service.ArquivosOrfaosService;
 import com.photoizer.crm.foto.service.ExpurgoGaleriaService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -37,13 +39,16 @@ public class ArmazenamentoController {
     private final ArmazenamentoService armazenamentoService;
     private final ExpurgoGaleriaService expurgoGaleriaService;
     private final ArquivosOrfaosService arquivosOrfaosService;
+    private final ArmazenamentoHistoricoService historicoService;
 
     public ArmazenamentoController(ArmazenamentoService armazenamentoService,
                                    ExpurgoGaleriaService expurgoGaleriaService,
-                                   ArquivosOrfaosService arquivosOrfaosService) {
+                                   ArquivosOrfaosService arquivosOrfaosService,
+                                   ArmazenamentoHistoricoService historicoService) {
         this.armazenamentoService = armazenamentoService;
         this.expurgoGaleriaService = expurgoGaleriaService;
         this.arquivosOrfaosService = arquivosOrfaosService;
+        this.historicoService = historicoService;
     }
 
     @GetMapping("/resumo")
@@ -115,5 +120,23 @@ public class ArmazenamentoController {
             + "Comprovantes, contratos e arquivos desconhecidos são preservados.")
     public ResponseEntity<LimparOrfaosResponse> limparOrfaos() {
         return ResponseEntity.ok(arquivosOrfaosService.limpar());
+    }
+
+    @GetMapping("/historico")
+    @Operation(
+        summary = "Histórico diário de consumo",
+        description = "Série de snapshots diários (até 730 dias). Dias sem coleta não aparecem.")
+    public ResponseEntity<HistoricoArmazenamentoResponse> historico(
+            @RequestParam(defaultValue = "30") int dias) {
+        return ResponseEntity.ok(historicoService.listar(dias));
+    }
+
+    @PostMapping("/historico/coletar")
+    @Operation(
+        summary = "Coletar o snapshot de hoje",
+        description = "Grava ou atualiza o snapshot da data corrente. Útil após o deploy e antes de "
+            + "uma limpeza grande.")
+    public ResponseEntity<SnapshotArmazenamentoResponse> coletarHistorico() {
+        return ResponseEntity.ok(historicoService.coletarHoje());
     }
 }

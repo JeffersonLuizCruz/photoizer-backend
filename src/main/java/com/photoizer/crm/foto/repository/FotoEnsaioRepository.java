@@ -93,6 +93,18 @@ public interface FotoEnsaioRepository extends JpaRepository<FotoEnsaio, UUID> {
         """)
     long somarBytesLiberados(@Param("agendamentoId") UUID agendamentoId);
 
+    long countByArquivosRemovidosTrue();
+
+    @Query("""
+        SELECT COALESCE(SUM(f.bytesLiberados), 0)
+        FROM FotoEnsaio f
+        WHERE f.arquivosRemovidos = true
+          AND f.arquivosRemovidosEm >= :inicio
+          AND f.arquivosRemovidosEm < :fim
+        """)
+    long somarBytesLiberadosEntre(@Param("inicio") java.time.LocalDateTime inicio,
+                                  @Param("fim") java.time.LocalDateTime fim);
+
     // ─── Agregações para o painel de armazenamento ────────────────────────
 
     interface ContagemFotos {
