@@ -283,6 +283,11 @@ O módulo passou a expor uma **fila operacional** do pós-ensaio, além da venda
 Staff (`ADMIN/FOTOGRAFO/EDITOR`):
 - `GET /api/v1/admin/galerias/pipeline?etapa=&busca=&atrasadas=&page=&perPage=`
 - `GET /api/v1/admin/galerias/pipeline/resumo`
+- `GET /api/v1/admin/galerias/pipeline/export.csv?etapa=&busca=&atrasadas=` (CSV com BOM UTF-8 e separador `;`)
+
+Staff (`ADMIN/FOTOGRAFO`):
+- `GET /api/v1/admin/galerias/desempenho?meses=6` — SLA, funil, extras e série mensal
+  (calculado por `GaleriaPerformanceCalculator`, com média apenas das amostras disponíveis).
 
 Público:
 - `GET /api/v1/ecommerce/galeria/{token}/status` — etapa e mensagem amigável, disponível mesmo com 0 fotos.

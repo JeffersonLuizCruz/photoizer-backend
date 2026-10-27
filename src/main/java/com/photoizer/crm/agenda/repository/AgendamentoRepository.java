@@ -184,4 +184,20 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID>,
         @Param("statuses") Collection<StatusAgendamento> statuses,
         @Param("desde") LocalDateTime desde);
 
+    /**
+     * Ensaios do periodo usado nos indicadores de gestao (SLA e funil).
+     * Inclui os que ainda nao entraram na fila (realizados/aguardando pagamento
+     * final) para que a taxa de publicacao no periodo seja fiel.
+     */
+    @EntityGraph(attributePaths = {"cliente", "pacote"})
+    @Query("""
+        SELECT a FROM Agendamento a
+        WHERE a.status IN :statuses
+          AND a.dataHoraEnsaio >= :desde
+        ORDER BY a.dataHoraEnsaio ASC
+        """)
+    List<Agendamento> findParaDesempenho(
+        @Param("statuses") Collection<StatusAgendamento> statuses,
+        @Param("desde") LocalDateTime desde);
+
 }

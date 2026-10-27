@@ -5,6 +5,7 @@ import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.ecommerce.api.GaleriaPipelineItemResponse;
 import com.photoizer.crm.ecommerce.api.GaleriaPipelineResumoResponse;
+import com.photoizer.crm.ecommerce.api.GaleriaPerformanceResponse;
 import com.photoizer.crm.ecommerce.api.GaleriaStatusResponse;
 import com.photoizer.crm.ecommerce.model.EtapaGaleria;
 import com.photoizer.crm.ecommerce.model.GaleriaEnsaio;
@@ -13,6 +14,7 @@ import com.photoizer.crm.ecommerce.model.StatusCompraExtra;
 import com.photoizer.crm.ecommerce.model.StatusSelecao;
 import com.photoizer.crm.ecommerce.repository.CompraExtraRepository;
 import com.photoizer.crm.ecommerce.repository.SelecaoEnsaioRepository;
+import com.photoizer.crm.ecommerce.service.GaleriaPerformanceCalculator.DadosGaleriaPerformance;
 import com.photoizer.crm.ecommerce.service.GaleriaPipelineEtapaResolver.DadosEtapa;
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
 import com.photoizer.crm.shared.api.PageResponse;
@@ -23,12 +25,14 @@ import java.math.BigDecimal;
 import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -50,6 +54,15 @@ public class GaleriaPipelineQueryService {
     private static final List<StatusAgendamento> STATUS_PIPELINE = List.of(
         StatusAgendamento.EM_EDICAO,
         StatusAgendamento.FINALIZADO);
+
+    private static final List<StatusAgendamento> STATUS_DESEMPENHO = List.of(
+        StatusAgendamento.REALIZADO,
+        StatusAgendamento.AGUARDANDO_PAGAMENTO_FINAL,
+        StatusAgendamento.EM_EDICAO,
+        StatusAgendamento.FINALIZADO);
+
+    private static final int MAX_MESES_DESEMPENHO = 24;
+    private static final DateTimeFormatter DATA_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private static final List<StatusSelecao> STATUS_SELECAO_RELEVANTES = List.of(
         StatusSelecao.ENVIADA,
@@ -84,10 +97,7 @@ public class GaleriaPipelineQueryService {
 
     public PageResponse<GaleriaPipelineItemResponse> listar(
             EtapaGaleria etapa, String busca, boolean atrasadas, int page, int perPage) {
-        var filtrados = carregarItens(busca).stream()
-            .filter(item -> etapa == null || item.etapa() == etapa)
-            .filter(item -> !atrasadas || item.atrasada())
-            .toList();
+        var filtrados = listarTodos(etapa, busca, atrasadas);
 
         var pagina = Math.max(1, page);
         var tamanho = Math.min(Math.max(1, perPage), 100);
@@ -101,6 +111,14 @@ public class GaleriaPipelineQueryService {
             pagina,
             tamanho,
             totalPaginas);
+    }
+
+    public List<GaleriaPipelineItemResponse> listarTodos(
+            EtapaGaleria etapa, String busca, boolean atrasadas) {
+        return carregarItens(busca).stream()
+            .filter(item -> etapa == null || item.etapa() == etapa)
+            .filter(item -> !atrasadas || item.atrasada())
+            .toList();
     }
 
     public GaleriaPipelineResumoResponse resumo() {
@@ -139,6 +157,99 @@ public class GaleriaPipelineQueryService {
             item.tokenExpiracao());
     }
 
+    /**
+     * Indicadores de gestao do periodo: SLA de publicacao/edicao, funil,
+     * extras e serie mensal. Usa os mesmos agregados da fila.
+     */
+    public GaleriaPerformanceResponse desempenho(int meses) {
+        var periodo = Math.min(Math.max(meses, 1), MAX_MESES_DESEMPENHO);
+        var inicio = LocalDate.now().minusMonths(periodo - 1L).withDayOfMonth(1).atStartOfDay();
+        var agendamentos = agendamentoRepository.findParaDesempenho(STATUS_DESEMPENHO, inicio);
+        var contexto = carregarContexto(agendamentos);
+        var hoje = LocalDate.now();
+        var dados = new ArrayList<DadosGaleriaPerformance>(agendamentos.size());
+
+        for (var agendamento : agendamentos) {
+            var galeria = contexto.galerias().get(agendamento.getId());
+            if (galeria == null) {
+                continue;
+            }
+            var fotos = contexto.fotos().get(agendamento.getId());
+            var compras = contexto.compras().get(agendamento.getId());
+            var selecao = contexto.selecoes().get(agendamento.getId());
+
+            var totalFotos = fotos != null ? (int) fotos.getTotal() : 0;
+            var publicadas = fotos != null ? (int) fotos.getPublicadas() : 0;
+            var arquivadas = fotos != null ? fotos.getArquivadas() : 0;
+            var etapa = GaleriaPipelineEtapaResolver.resolver(new DadosEtapa(
+                agendamento.getStatus(),
+                galeria.getModo(),
+                galeria.getFase(),
+                totalFotos,
+                publicadas,
+                arquivadas,
+                selecao != null ? selecao.getStatus() : null));
+            var prazoEntrega = calcularPrazo(agendamento);
+            var dataEnsaio = agendamento.getDataRealizacao() != null
+                ? agendamento.getDataRealizacao()
+                : agendamento.getDataHoraEnsaio();
+            var comercializada = galeria.getFase().permiteComercializar()
+                || (selecao != null && selecao.getStatus() == StatusSelecao.PUBLICADA);
+            var comprasPagas = compras != null ? (int) compras.getPagas() : 0;
+            var fotosPagas = fotos != null ? (int) fotos.getPagas() : 0;
+            var receita = compras != null && compras.getValorPago() != null
+                ? compras.getValorPago()
+                : BigDecimal.ZERO;
+
+            dados.add(new DadosGaleriaPerformance(
+                dataEnsaio,
+                publicadas > 0,
+                comercializada,
+                prazoEntrega != null && hoje.isAfter(prazoEntrega) && !etapa.isTerminal(),
+                fotosPagas,
+                comprasPagas,
+                receita,
+                galeria.getPublicadaEm(),
+                selecao != null ? selecao.getEnviadaEm() : null,
+                selecao != null ? selecao.getPublicadaEm() : null));
+        }
+
+        return GaleriaPerformanceCalculator.calcular(LocalDate.now(), periodo, dados);
+    }
+
+    /**
+     * Exporta a fila filtrada em CSV (separador ';' e BOM no controller), para
+     * follow-up fora do sistema. Nao altera nenhum dado.
+     */
+    public String gerarCsv(EtapaGaleria etapa, String busca, boolean atrasadas) {
+        var itens = listarTodos(etapa, busca, atrasadas);
+        var csv = new StringBuilder();
+        csv.append("Cliente;Pacote;Data do ensaio;Etapa;Prazo de entrega;Dias na etapa;")
+            .append("Atrasada;Link expirado;Total de fotos;Publicadas;Selecionadas;Baixadas;")
+            .append("Extras a editar;Pagamentos pendentes;Valor extras;Proxima acao\n");
+        for (var item : itens) {
+            csv.append(valorCsv(item.clienteNome())).append(';')
+                .append(valorCsv(item.pacoteNome())).append(';')
+                .append(valorCsv(formatarData(item.dataHoraEnsaio()))).append(';')
+                .append(valorCsv(item.etapaLabel())).append(';')
+                .append(valorCsv(item.prazoEntrega() != null
+                    ? item.prazoEntrega().format(DATA_FORMATTER)
+                    : "")).append(';')
+                .append(item.diasNaEtapa()).append(';')
+                .append(item.atrasada() ? "Sim" : "Nao").append(';')
+                .append(item.tokenExpirado() ? "Sim" : "Nao").append(';')
+                .append(item.totalFotos()).append(';')
+                .append(item.fotosPublicadas()).append(';')
+                .append(item.fotosSelecionadas()).append(';')
+                .append(item.fotosBaixadas()).append(';')
+                .append(item.extrasPendentesEdicao()).append(';')
+                .append(item.comprasPendentes()).append(';')
+                .append(item.valorExtras() != null ? item.valorExtras().toPlainString() : "0").append(';')
+                .append(valorCsv(item.proximaAcao())).append('\n');
+        }
+        return csv.toString();
+    }
+
     private List<GaleriaPipelineItemResponse> carregarItens(String busca) {
         var desde = LocalDate.now().minusMonths(JANELA_MESES).atStartOfDay();
         var agendamentos = agendamentoRepository.findParaPipeline(STATUS_PIPELINE, desde);
@@ -155,8 +266,12 @@ public class GaleriaPipelineQueryService {
     }
 
     private List<GaleriaPipelineItemResponse> montarItens(List<Agendamento> agendamentos) {
+        return montarItens(carregarContexto(agendamentos));
+    }
+
+    private ContextoPipeline carregarContexto(List<Agendamento> agendamentos) {
         if (agendamentos.isEmpty()) {
-            return List.of();
+            return new ContextoPipeline(List.of(), Map.of(), Map.of(), Map.of(), Map.of());
         }
 
         var ids = agendamentos.stream().map(Agendamento::getId).toList();
@@ -173,6 +288,18 @@ public class GaleriaPipelineQueryService {
             .findByAgendamentoIdInAndStatusInOrderByNumeroDesc(ids, STATUS_SELECAO_RELEVANTES)
             .forEach(selecao -> selecoes.putIfAbsent(selecao.getAgendamentoId(), selecao));
         var galerias = galeriaEnsaioService.obterEmLote(ids);
+        return new ContextoPipeline(agendamentos, fotos, compras, selecoes, galerias);
+    }
+
+    private List<GaleriaPipelineItemResponse> montarItens(ContextoPipeline contexto) {
+        if (contexto.agendamentos().isEmpty()) {
+            return List.of();
+        }
+        var agendamentos = contexto.agendamentos();
+        var fotos = contexto.fotos();
+        var compras = contexto.compras();
+        var selecoes = contexto.selecoes();
+        var galerias = contexto.galerias();
 
         var hoje = LocalDate.now();
         var agora = LocalDateTime.now();
@@ -351,6 +478,26 @@ public class GaleriaPipelineQueryService {
         }
         return Normalizer.normalize(valor.trim().toLowerCase(Locale.ROOT), Normalizer.Form.NFD)
             .replaceAll("\\p{M}", "");
+    }
+
+    private String formatarData(LocalDateTime valor) {
+        return valor == null ? "" : valor.format(DATA_FORMATTER);
+    }
+
+    private String valorCsv(String valor) {
+        if (valor == null) {
+            return "";
+        }
+        return "\"" + valor.replace("\"", "\"\"") + "\"";
+    }
+
+    private record ContextoPipeline(
+        List<Agendamento> agendamentos,
+        Map<UUID, FotoEnsaioRepository.GaleriaPipelineFotos> fotos,
+        Map<UUID, CompraExtraRepository.CompraPipelineAgregado> compras,
+        Map<UUID, SelecaoEnsaio> selecoes,
+        Map<UUID, GaleriaEnsaio> galerias
+    ) {
     }
 
     private record Acao(String label, String url) {

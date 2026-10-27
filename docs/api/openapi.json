@@ -13783,6 +13783,88 @@
         } ]
       }
     },
+    "/api/v1/admin/galerias/pipeline/export.csv" : {
+      "get" : {
+        "tags" : [ "Admin Central de Galerias" ],
+        "summary" : "Exportar a fila filtrada em CSV",
+        "operationId" : "exportarCsv",
+        "parameters" : [ {
+          "name" : "etapa",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "AGUARDANDO_UPLOAD", "FOTOS_NAO_PUBLICADAS", "SELECAO_EM_EDICAO", "SELECAO_AGUARDANDO_APROVACAO", "AGUARDANDO_SELECAO", "AGUARDANDO_DOWNLOAD", "CONCLUIDA", "ARQUIVADA" ]
+          }
+        }, {
+          "name" : "busca",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "atrasadas",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "text/csv" : {
+                "schema" : {
+                  "type" : "string",
+                  "format" : "byte"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/admin/galerias/marca-dagua/fotos" : {
       "get" : {
         "tags" : [ "Admin Galeria" ],
@@ -13798,6 +13880,73 @@
                   "items" : {
                     "$ref" : "#/components/schemas/MarcaDaguaFotoResponse"
                   }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/admin/galerias/desempenho" : {
+      "get" : {
+        "tags" : [ "Admin Central de Galerias" ],
+        "summary" : "Indicadores de SLA, funil e extras da Central de Galerias",
+        "operationId" : "desempenho",
+        "parameters" : [ {
+          "name" : "meses",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 6
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/GaleriaPerformanceResponse"
                 }
               }
             }
@@ -20071,6 +20220,105 @@
           "agendamentoId" : {
             "type" : "string",
             "format" : "uuid"
+          }
+        }
+      },
+      "GaleriaPerformanceResponse" : {
+        "type" : "object",
+        "properties" : {
+          "meses" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "totalGalerias" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "publicadas" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "comSelecao" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "comercializadas" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "comExtras" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "atrasadas" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "tempoMedioPublicacaoDias" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "tempoMedioEdicaoDias" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "tempoMedioEntregaDias" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "receitaExtras" : {
+            "type" : "number"
+          },
+          "ticketMedioExtras" : {
+            "type" : "number"
+          },
+          "extrasPorGaleria" : {
+            "type" : "number"
+          },
+          "conversaoExtras" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "totalFotosExtras" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "totalComprasPagas" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "serieMensal" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/SerieMensalResponse"
+            }
+          }
+        }
+      },
+      "SerieMensalResponse" : {
+        "type" : "object",
+        "properties" : {
+          "mes" : {
+            "type" : "string"
+          },
+          "galerias" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "publicadas" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "comExtras" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "receitaExtras" : {
+            "type" : "number"
+          },
+          "tempoMedioPublicacaoDias" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         }
       },

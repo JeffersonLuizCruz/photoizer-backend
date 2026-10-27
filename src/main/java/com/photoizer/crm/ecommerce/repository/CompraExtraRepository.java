@@ -47,16 +47,19 @@ public interface CompraExtraRepository extends JpaRepository<CompraExtra, UUID> 
         long getPendentes();
 
         BigDecimal getValorPago();
+
+        long getPagas();
     }
 
     /**
-     * Compras pendentes e valor pago por galeria, para os badges da Central de
-     * Galerias. Pendente = aguardando comprovante ou confirmacao do staff.
+     * Compras pendentes, valor pago e quantidade de compras pagas por galeria,
+     * para os badges e indicadores da Central de Galerias.
      */
     @Query("""
         SELECT c.agendamentoId AS agendamentoId,
                SUM(CASE WHEN c.status IN :statusesPendentes THEN 1 ELSE 0 END) AS pendentes,
-               COALESCE(SUM(CASE WHEN c.status = 'PAGA' THEN c.valorTotal ELSE 0 END), 0) AS valorPago
+               COALESCE(SUM(CASE WHEN c.status = 'PAGA' THEN c.valorTotal ELSE 0 END), 0) AS valorPago,
+               SUM(CASE WHEN c.status = 'PAGA' THEN 1 ELSE 0 END) AS pagas
         FROM CompraExtra c
         WHERE c.agendamentoId IN :agendamentoIds
         GROUP BY c.agendamentoId
