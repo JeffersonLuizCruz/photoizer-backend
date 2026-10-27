@@ -7697,6 +7697,64 @@
         } ]
       }
     },
+    "/api/v1/admin/armazenamento/orfaos/limpar" : {
+      "post" : {
+        "tags" : [ "Armazenamento" ],
+        "summary" : "Remover arquivos órfãos elegíveis",
+        "description" : "Apaga somente arquivos com nome reconhecido e mais de 24h sem referência no banco. Comprovantes, contratos e arquivos desconhecidos são preservados.",
+        "operationId" : "limparOrfaos",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LimparOrfaosResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/admin/armazenamento/galerias/{agendamentoId}/expurgar" : {
       "post" : {
         "tags" : [ "Armazenamento" ],
@@ -14002,6 +14060,64 @@
         } ]
       }
     },
+    "/api/v1/admin/armazenamento/orfaos" : {
+      "get" : {
+        "tags" : [ "Armazenamento" ],
+        "summary" : "Listar arquivos órfãos",
+        "description" : "Compara o diretório de uploads com os caminhos referenciados pelos módulos. Nomes desconhecidos são listados, mas nunca elegíveis para remoção.",
+        "operationId" : "orfaos",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ArquivosOrfaosResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/admin/armazenamento/galerias" : {
       "get" : {
         "tags" : [ "Armazenamento" ],
@@ -17454,6 +17570,19 @@
         },
         "required" : [ "dataHoraEnsaio", "fotografoId", "localEnsaio", "pacoteId" ]
       },
+      "LimparOrfaosResponse" : {
+        "type" : "object",
+        "properties" : {
+          "arquivos" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "bytesLiberados" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
       "ExpurgarGaleriaResponse" : {
         "type" : "object",
         "properties" : {
@@ -19624,6 +19753,66 @@
           "bytesLiberados" : {
             "type" : "integer",
             "format" : "int64"
+          }
+        }
+      },
+      "ArquivoOrfaoResponse" : {
+        "type" : "object",
+        "properties" : {
+          "caminho" : {
+            "type" : "string"
+          },
+          "bytes" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "modificadoEm" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "reconhecido" : {
+            "type" : "boolean"
+          },
+          "elegivel" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "ArquivosOrfaosResponse" : {
+        "type" : "object",
+        "properties" : {
+          "total" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "bytes" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "elegiveis" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "bytesElegiveis" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "desconhecidos" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "listados" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "truncado" : {
+            "type" : "boolean"
+          },
+          "arquivos" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ArquivoOrfaoResponse"
+            }
           }
         }
       },

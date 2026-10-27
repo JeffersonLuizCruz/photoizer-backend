@@ -21,4 +21,7 @@ public interface PagamentoRepository extends JpaRepository<Pagamento, UUID> {
 
     @Query("SELECT DISTINCT p.agendamento.id FROM Pagamento p WHERE p.formaPagamento = :forma")
     Set<UUID> findAgendamentoIdsByFormaPagamento(@Param("forma") FormaPagamento forma);
+
+    @Query("SELECT p.urlComprovante FROM Pagamento p WHERE p.urlComprovante IS NOT NULL")
+    List<String> caminhosComprovante();
 }

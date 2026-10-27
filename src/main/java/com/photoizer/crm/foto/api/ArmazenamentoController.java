@@ -1,6 +1,7 @@
 package com.photoizer.crm.foto.api;
 
 import com.photoizer.crm.foto.service.ArmazenamentoService;
+import com.photoizer.crm.foto.service.ArquivosOrfaosService;
 import com.photoizer.crm.foto.service.ExpurgoGaleriaService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -35,11 +36,14 @@ public class ArmazenamentoController {
 
     private final ArmazenamentoService armazenamentoService;
     private final ExpurgoGaleriaService expurgoGaleriaService;
+    private final ArquivosOrfaosService arquivosOrfaosService;
 
     public ArmazenamentoController(ArmazenamentoService armazenamentoService,
-                                   ExpurgoGaleriaService expurgoGaleriaService) {
+                                   ExpurgoGaleriaService expurgoGaleriaService,
+                                   ArquivosOrfaosService arquivosOrfaosService) {
         this.armazenamentoService = armazenamentoService;
         this.expurgoGaleriaService = expurgoGaleriaService;
+        this.arquivosOrfaosService = arquivosOrfaosService;
     }
 
     @GetMapping("/resumo")
@@ -93,5 +97,23 @@ public class ArmazenamentoController {
     })
     public ResponseEntity<ExpurgarGaleriaResponse> expurgar(@PathVariable UUID agendamentoId) {
         return ResponseEntity.ok(expurgoGaleriaService.expurgar(agendamentoId));
+    }
+
+    @GetMapping("/orfaos")
+    @Operation(
+        summary = "Listar arquivos órfãos",
+        description = "Compara o diretório de uploads com os caminhos referenciados pelos módulos. "
+            + "Nomes desconhecidos são listados, mas nunca elegíveis para remoção.")
+    public ResponseEntity<ArquivosOrfaosResponse> orfaos() {
+        return ResponseEntity.ok(arquivosOrfaosService.listar());
+    }
+
+    @PostMapping("/orfaos/limpar")
+    @Operation(
+        summary = "Remover arquivos órfãos elegíveis",
+        description = "Apaga somente arquivos com nome reconhecido e mais de 24h sem referência no banco. "
+            + "Comprovantes, contratos e arquivos desconhecidos são preservados.")
+    public ResponseEntity<LimparOrfaosResponse> limparOrfaos() {
+        return ResponseEntity.ok(arquivosOrfaosService.limpar());
     }
 }

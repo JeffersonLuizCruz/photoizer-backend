@@ -36,4 +36,7 @@ public interface CompraExtraRepository extends JpaRepository<CompraExtra, UUID> 
     BigDecimal totalPorStatus(@Param("status") StatusCompraExtra status);
 
     int countByStatus(StatusCompraExtra status);
+
+    @Query("SELECT c.urlComprovante FROM CompraExtra c WHERE c.urlComprovante IS NOT NULL")
+    List<String> caminhosComprovante();
 }

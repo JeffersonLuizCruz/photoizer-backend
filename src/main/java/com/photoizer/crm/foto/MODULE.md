@@ -183,3 +183,13 @@ O expurgo libera espaço em disco **sem apagar registros**.
 - **Painel**: `GET /api/v1/admin/armazenamento/{resumo,galerias}` mede o disco; `POST .../galerias/{id}/expurgar` executa; `GET .../manifesto` baixa o CSV antes da remoção.
 - **Idempotência**: uma execução interrompida pode ser retomada; fotos já arquivadas são ignoradas e a segunda chamada completa responde 422 "já foi arquivada".
 
+## 10. Limpeza de arquivos órfãos
+
+Complementa o expurgo: encontra arquivos em `uploads/` que **nenhum módulo referencia**.
+
+- **Providers**: cada módulo dono de arquivo implementa `shared.storage.ArquivosReferenciadosProvider` — `foto` (8 paths + caches por id), `agenda` (comprovantes, termo e assinatura), `ecommerce` (compra extra), `financeiro` (pagamento), `despesa` e `config` (logo da contratada).
+- **Serviço**: `ArquivosOrfaosService` agrega os providers, varre o diretório uma vez e classifica cada arquivo não referenciado.
+- **Segurança**: só nomes reconhecidos (`orig_`, `wm_`, `thumb_`, `preview_`, `hero_`, `editadas_`, `comprovante_` e `propostas/*.pdf`) são elegíveis; arquivos com menos de 24h são ignorados (upload em andamento); nomes desconhecidos são apenas listados.
+- **Endpoints** (ADMIN): `GET /api/v1/admin/armazenamento/orfaos` e `POST /api/v1/admin/armazenamento/orfaos/limpar`.
+- **UI**: card "Arquivos órfãos" na página de armazenamento, com análise sob demanda e confirmação antes da limpeza.
+

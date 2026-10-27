@@ -123,6 +123,43 @@ public interface FotoEnsaioRepository extends JpaRepository<FotoEnsaio, UUID> {
         long getPendencias();
     }
 
+    interface CaminhosFoto {
+        UUID getId();
+
+        UUID getAgendamentoId();
+
+        String getOriginalPath();
+
+        String getWatermarkedPath();
+
+        String getThumbPath();
+
+        String getPreviewPath();
+
+        String getEditadaPath();
+
+        String getEditadaWatermarkedPath();
+
+        String getEditadaThumbPath();
+
+        String getEditadaPreviewPath();
+    }
+
+    @Query("""
+        SELECT f.id AS id,
+               f.agendamentoId AS agendamentoId,
+               f.originalPath AS originalPath,
+               f.watermarkedPath AS watermarkedPath,
+               f.thumbPath AS thumbPath,
+               f.previewPath AS previewPath,
+               f.editadaPath AS editadaPath,
+               f.editadaWatermarkedPath AS editadaWatermarkedPath,
+               f.editadaThumbPath AS editadaThumbPath,
+               f.editadaPreviewPath AS editadaPreviewPath
+        FROM FotoEnsaio f
+        """)
+    List<CaminhosFoto> caminhosDasFotos();
+
     @Query("""
         SELECT f.agendamentoId AS agendamentoId,
                COUNT(f) AS total,

@@ -17,6 +17,29 @@ import java.util.UUID;
 
 public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID>, JpaSpecificationExecutor<Agendamento> {
 
+    interface CaminhosArquivo {
+        String getUrlComprovanteEntrada();
+
+        String getUrlComprovanteFinal();
+
+        String getUrlPdfAssinatura();
+
+        String getUrlAssinaturaImagem();
+    }
+
+    @Query("""
+        SELECT a.urlComprovanteEntrada AS urlComprovanteEntrada,
+               a.urlComprovanteFinal AS urlComprovanteFinal,
+               a.urlPdfAssinatura AS urlPdfAssinatura,
+               a.urlAssinaturaImagem AS urlAssinaturaImagem
+        FROM Agendamento a
+        WHERE a.urlComprovanteEntrada IS NOT NULL
+           OR a.urlComprovanteFinal IS NOT NULL
+           OR a.urlPdfAssinatura IS NOT NULL
+           OR a.urlAssinaturaImagem IS NOT NULL
+        """)
+    List<CaminhosArquivo> caminhosDeArquivo();
+
     /**
      * Lista todos os agendamentos com o cliente carregado, para o painel de
      * armazenamento (evita N+1 ao montar a lista de galerias).

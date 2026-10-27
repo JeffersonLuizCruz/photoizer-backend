@@ -82,4 +82,7 @@ public interface DespesaRepository extends JpaRepository<Despesa, UUID>, JpaSpec
         @Param("categoria") String categoria);
 
     List<Despesa> findByStatusAndDataBetween(@Param("status") StatusDespesa status, @Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
+
+    @Query("SELECT d.urlComprovante FROM Despesa d WHERE d.urlComprovante IS NOT NULL")
+    List<String> caminhosComprovante();
 }
