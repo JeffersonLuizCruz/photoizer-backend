@@ -117,13 +117,13 @@ foto/
 ## 6. Regras Específicas
 1. **Upload e publicação liberados após o pagamento final** (`EM_EDICAO`…`FINALIZADO`), validado via porta ACL tanto no upload quanto na publicação.
 2. **Publicação manual**: botão "Publicar Galeria" (`PATCH /publicar`); sem publicação automática.
-3. **Versões por foto** (`originalPath`, `watermarkedPath` 1600px, `thumbPath` 300×200 e `previewPath` para o cliente, em 560px).
+3. **Versões por foto** (`originalPath`, `watermarkedPath` 1600px, `thumbPath` 300×200 e `previewPath` para o cliente, em 800px).
 4. **Fallback com log**: falha em watermark/thumbnail usa o path original e registra `log.warn`.
 5. **`FotoEnsaioResponse`** não contém métodos estáticos — mapeamento via `FotoMapper`.
 6. **StatusFoto** com transições validadas via State Pattern.
 7. **Tags `@ElementCollection`** sem `orphanRemoval` (limitação JPA).
 8. **Fotos protegidas**: remoção, alteração de status, ocultação e substituição de imagem bloqueadas (409) para fotos com `compraExtraId`, `selecionadaPacote`, `emSelecaoEdicao`, `editadaPath`, `dataDownload` ou status `PAGA`/`AGUARDANDO_*`; a remoção em lote é atômica e não apaga nada se houver foto protegida.
-9. **Prévia pública protegida**: o endpoint público de watermark serve `preview_v3_*` em **560px e JPEG ~0.35**, para reduzir detalhe disponível em prints e dificultar remoção de marca por IA. O thumbnail público também é gerado a partir da versão com watermark (`thumb_protegido_*`). Fotos antigas (ou com cache de uma versão anterior) têm uma versão reduzida gerada sob demanda a partir do watermark já gravado (`preview_v3_{fotoId}_{versao}.jpg`), preservando a marca antiga. Ao mudar tamanho/qualidade, incremente `ImageProcessingService.PREVIEW_VERSION`.
+9. **Prévia pública protegida**: o endpoint público de watermark serve `preview_v4_*` em **800px e JPEG ~0.60**, resolução reduzida em relação ao original para dificultar impressão sem prejudicar a nitidez na galeria do cliente. O thumbnail público também é gerado a partir da versão com watermark (`thumb_protegido_*`). Fotos antigas (ou com cache de uma versão anterior) têm uma versão reduzida gerada sob demanda a partir do watermark já gravado (`preview_v4_{fotoId}_{versao}.jpg`), preservando a marca antiga. Ao mudar tamanho/qualidade, incremente `ImageProcessingService.PREVIEW_VERSION`.
 10. **Marca d'água**: novas fotos/edições usam `© {nomeContratada}` (fallback `nomeFotografo` → `Estúdio`). O texto da marca é escalado com a largura da imagem.
 11. **Regeneração**: `POST /api/v1/admin/galerias/marca-dagua/fotos/{fotoId}/regerar` reprocessa original e versão editada com o nome atual, limpa caches de prévia/thumb e não altera o original nem o download final.
 
@@ -178,7 +178,7 @@ foto/
 O expurgo libera espaço em disco **sem apagar registros**.
 
 - **Elegibilidade**: agendamento `FINALIZADO`, galeria com fotos ainda não arquivadas, sem seleção ativa (`emSelecaoEdicao`) e sem compra `AGUARDANDO_COMPROVANTE`/`AGUARDANDO_CONFIRMACAO`.
-- **Serviço**: `ExpurgoGaleriaService.expurgar(agendamentoId)` apaga os 8 paths de cada foto (original, watermark, thumb, preview e os 4 da versão editada) mais os caches `preview_v3_<fotoId>_*`, `thumb_protegido_<fotoId>_*`, `hero_<fotoId>_*` e `preview_legacy_<fotoId>_*`.
+- **Serviço**: `ExpurgoGaleriaService.expurgar(agendamentoId)` apaga os 8 paths de cada foto (original, watermark, thumb, preview e os 4 da versão editada) mais os caches `preview_v*_<fotoId>_*`, `thumb_protegido_<fotoId>_*`, `hero_<fotoId>_*` e `preview_legacy_<fotoId>_*`.
 - **Preservado**: registros de `FotoEnsaio`, `numeroGaleria`, seleção, compras, histórico de download, comprovantes (`comprovante_*`) e contratos (`propostas/*.pdf`). A remoção é por lista explícita de caminhos, nunca pela pasta inteira.
 - **Flags**: `arquivosRemovidos`, `arquivosRemovidosEm`, `arquivosRemovidosPor`, `bytesLiberados`. O estado de "galeria arquivada" é derivado quando todas as fotos estão arquivadas.
 - **Evento**: `GaleriaArquivadaEvent` → `ecommerce.FotosRemovidasListener` limpa carrinho, favoritos, comentários, capa/hero e caches.

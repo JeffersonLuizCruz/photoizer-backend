@@ -242,7 +242,7 @@ Staff:
     `EDITADA`). Antes da liberação o download permanece bloqueado.
 15. A capa manual fica em `galerias_ensaio.capa_foto_id` + `capa_versao`; a versão é congelada e não muda sozinha após edição/publicação.
 12. `PUT /api/v1/admin/agendamentos/{id}/galeria/capa` define/remove a capa (ADMIN/FOTOGRAFO/EDITOR). `GET /api/v1/ecommerce/galeria/{token}/capa` serve o hero em até 2560px; `capaUrl` já sai com `?v={fotoId}-{versao}` e as respostas usam `no-store`.
-13. O endpoint público `GET /api/v1/ecommerce/fotos/{fotoId}/watermarked` serve a **prévia protegida de 560px e JPEG ~0.35** (`preview_v3_*`). Fotos antigas são reduzidas sob demanda a partir do watermark existente, em cache versionado.
+13. O endpoint público `GET /api/v1/ecommerce/fotos/{fotoId}/watermarked` serve a **prévia protegida de 800px e JPEG ~0.60** (`preview_v4_*`). Fotos antigas são reduzidas sob demanda a partir do watermark existente, em cache versionado.
 14. A marca d'água das novas prévias usa `© {nomeContratada}` (fallback `nomeFotografo` → `Estúdio`). Arquivos finais de download continuam sem marca e em alta qualidade.
 15. A resposta pública da galeria inclui `valoresExtras` com o preço congelado por foto.
 16. Ao enviar a seleção, fotos do pacote são removidas do carrinho para não serem cobradas como extra.

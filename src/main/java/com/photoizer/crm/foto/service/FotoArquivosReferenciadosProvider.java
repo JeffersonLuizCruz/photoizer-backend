@@ -1,6 +1,7 @@
 package com.photoizer.crm.foto.service;
 
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
+import com.photoizer.crm.shared.processing.ImageProcessingService;
 import com.photoizer.crm.shared.storage.ArquivosReferenciadosProvider;
 import org.springframework.stereotype.Component;
 
@@ -38,7 +39,8 @@ public class FotoArquivosReferenciadosProvider implements ArquivosReferenciadosP
 
             var pasta = foto.getAgendamentoId().toString();
             for (var versao : VERSOES) {
-                caminhos.add(pasta + "/preview_v3_" + foto.getId() + "_" + versao + ".jpg");
+                caminhos.add(pasta + "/preview_" + ImageProcessingService.PREVIEW_VERSION + "_"
+                    + foto.getId() + "_" + versao + ".jpg");
                 caminhos.add(pasta + "/thumb_protegido_" + foto.getId() + "_" + versao + ".jpg");
                 caminhos.add(pasta + "/orig/hero_" + foto.getId() + "_" + versao + ".jpg");
             }

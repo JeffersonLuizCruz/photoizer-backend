@@ -35,7 +35,7 @@ import java.util.stream.Stream;
  * Expurgo dos arquivos de uma galeria finalizada.
  *
  * <p>Apaga original, marca d'água, thumbnail, prévia, versão editada e os
- * caches derivados ({@code preview_v3_*}, {@code thumb_protegido_*},
+ * caches derivados ({@code preview_v<versão>_*}, {@code thumb_protegido_*},
  * {@code hero_*}), preservando <b>todos</b> os registros de {@link FotoEnsaio}.
  * Comprovantes de pagamento e contratos assinados ficam intocados: a remoção é
  * feita por lista explícita de caminhos das fotos, nunca pela pasta inteira.
@@ -55,11 +55,11 @@ public class ExpurgoGaleriaService {
 
     /**
      * Caches derivados carregam o id da foto no nome:
-     * {@code preview_v3_<fotoId>_<versão>.jpg}, {@code thumb_protegido_<fotoId>_<versão>.jpg},
+     * {@code preview_v<N>_<fotoId>_<versão>.jpg}, {@code thumb_protegido_<fotoId>_<versão>.jpg},
      * {@code hero_<fotoId>_<versão>.jpg} e {@code preview_legacy_<fotoId>_*}.
      */
     private static final Pattern CACHE_DA_FOTO = Pattern.compile(
-        "^(preview_v3_|thumb_protegido_|hero_|preview_legacy_)([0-9a-fA-F-]{36})_.*");
+        "^(preview_v\\d+_|thumb_protegido_|hero_|preview_legacy_)([0-9a-fA-F-]{36})_.*");
 
     private final FotoEnsaioRepository fotoEnsaioRepository;
     private final AgendamentoArmazenamentoReadService agendamentoReadService;
