@@ -6,6 +6,7 @@ import com.photoizer.crm.ecommerce.repository.GaleriaEnsaioRepository;
 import com.photoizer.crm.ecommerce.repository.ItemCarrinhoRepository;
 import com.photoizer.crm.ecommerce.service.GaleriaCapaService;
 import com.photoizer.crm.foto.event.FotosRemovidasEvent;
+import com.photoizer.crm.foto.event.GaleriaArquivadaEvent;
 import com.photoizer.crm.foto.service.FotoPreviewService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,9 +14,12 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.UUID;
+
 /**
- * Limpa referências do ecommerce quando fotos são removidas, evitando
- * carrinhos, favoritos e comentários órfãos.
+ * Limpa referências do ecommerce quando fotos são removidas ou quando uma
+ * galeria é arquivada, evitando carrinhos, favoritos e comentários órfãos.
  */
 @Component
 public class FotosRemovidasListener {
@@ -46,29 +50,39 @@ public class FotosRemovidasListener {
     @EventListener
     @Transactional
     public void handle(FotosRemovidasEvent event) {
-        if (event.fotoIds().isEmpty()) {
+        limpar(event.agendamentoId(), event.fotoIds(), "ecommerce.referencias_fotos_removidas");
+    }
+
+    @EventListener
+    @Transactional
+    public void handleArquivada(GaleriaArquivadaEvent event) {
+        limpar(event.agendamentoId(), event.fotoIds(), "ecommerce.referencias_galeria_arquivada");
+    }
+
+    private void limpar(UUID agendamentoId, List<UUID> fotoIds, String acao) {
+        if (fotoIds == null || fotoIds.isEmpty()) {
             return;
         }
-        favoritoRepository.deleteByFotoIdIn(event.fotoIds());
-        itemCarrinhoRepository.deleteByFotoIdIn(event.fotoIds());
-        fotoComentarioRepository.deleteByFotoIdIn(event.fotoIds());
+        favoritoRepository.deleteByFotoIdIn(fotoIds);
+        itemCarrinhoRepository.deleteByFotoIdIn(fotoIds);
+        fotoComentarioRepository.deleteByFotoIdIn(fotoIds);
 
-        galeriaRepository.findById(event.agendamentoId()).ifPresent(galeria -> {
+        galeriaRepository.findById(agendamentoId).ifPresent(galeria -> {
             var capaRemovida = galeria.getCapaFotoId() != null
-                && event.fotoIds().contains(galeria.getCapaFotoId());
+                && fotoIds.contains(galeria.getCapaFotoId());
             if (capaRemovida || (galeria.getCapaFotoId() == null && galeria.getCapaVersao() != null)) {
                 galeria.setCapaFotoId(null);
                 galeria.setCapaVersao(null);
                 galeriaRepository.save(galeria);
             }
         });
-        capaService.removerHeroes(event.agendamentoId(), event.fotoIds());
-        fotoPreviewService.removerLegados(event.agendamentoId(), event.fotoIds());
+        capaService.removerHeroes(agendamentoId, fotoIds);
+        fotoPreviewService.removerLegados(agendamentoId, fotoIds);
 
         log.atInfo()
-            .addKeyValue("event_action", "ecommerce.referencias_fotos_removidas")
-            .addKeyValue("agendamento_id", event.agendamentoId())
-            .addKeyValue("quantidade", event.fotoIds().size())
-            .log("Referências de fotos removidas limpas no ecommerce");
+            .addKeyValue("event_action", acao)
+            .addKeyValue("agendamento_id", agendamentoId)
+            .addKeyValue("quantidade", fotoIds.size())
+            .log("Referências de fotos limpas no ecommerce");
     }
 }

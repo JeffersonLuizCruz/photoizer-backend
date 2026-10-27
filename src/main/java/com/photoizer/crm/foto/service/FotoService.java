@@ -4,6 +4,7 @@ import com.photoizer.crm.foto.event.FotoEditadaEvent;
 import com.photoizer.crm.foto.event.FotosRemovidasEvent;
 import com.photoizer.crm.foto.exception.AgendamentoNaoPermitidoParaUploadException;
 import com.photoizer.crm.foto.exception.ArquivoDeImagemInvalidoException;
+import com.photoizer.crm.foto.exception.ArquivoExpurgadoException;
 import com.photoizer.crm.foto.exception.FotoEnsaioNaoEncontradaException;
 import com.photoizer.crm.foto.exception.FotoNaoEditavelException;
 import com.photoizer.crm.foto.exception.FotoNaoPertenceAoAgendamentoException;
@@ -12,6 +13,7 @@ import com.photoizer.crm.foto.exception.RenumeracaoNaoPermitidaException;
 import com.photoizer.crm.foto.model.FotoEnsaio;
 import com.photoizer.crm.foto.model.StatusFoto;
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
+import com.photoizer.crm.shared.security.CurrentUser;
 import com.photoizer.crm.shared.storage.FileStorageService;
 import com.photoizer.crm.shared.storage.FileValidator;
 import com.photoizer.crm.shared.storage.StoragePathResolver;
@@ -88,13 +90,31 @@ public class FotoService {
 
     @Transactional(readOnly = true)
     public List<FotoEnsaio> listarTodas() {
-        return fotoEnsaioRepository.findAll();
+        return fotoEnsaioRepository.findAll().stream()
+            .filter(foto -> !foto.isArquivosRemovidos())
+            .toList();
     }
 
     @Transactional(readOnly = true)
     public FotoEnsaio buscarPorId(UUID id) {
         return fotoEnsaioRepository.findById(id)
             .orElseThrow(() -> new FotoEnsaioNaoEncontradaException(id));
+    }
+
+    /**
+     * Carrega a foto para servir um arquivo ao staff: valida a propriedade e
+     * rejeita fotos cujos arquivos foram expurgados (410).
+     */
+    @Transactional(readOnly = true)
+    public FotoEnsaio buscarParaArquivo(UUID agendamentoId, UUID fotoId) {
+        var foto = buscarPorId(fotoId);
+        if (!foto.getAgendamentoId().equals(agendamentoId)) {
+            throw new FotoNaoPertenceAoAgendamentoException(fotoId, agendamentoId);
+        }
+        if (foto.isArquivosRemovidos()) {
+            throw new ArquivoExpurgadoException();
+        }
+        return foto;
     }
 
     public List<FotoEnsaio> uploadFotos(UUID agendamentoId, List<MultipartFile> arquivos) {
@@ -433,6 +453,9 @@ public class FotoService {
         if (!foto.getAgendamentoId().equals(agendamentoId)) {
             throw new FotoNaoPertenceAoAgendamentoException(fotoId, agendamentoId);
         }
+        if (foto.isArquivosRemovidos()) {
+            throw new ArquivoExpurgadoException();
+        }
         if (estaVinculadaACompra(foto)
             || foto.getVersaoAtual() == com.photoizer.crm.foto.model.VersaoFoto.EDITADA) {
             throw new FotoNaoEditavelException("foto vinculada a seleção, edição, compra ou download");
@@ -475,6 +498,9 @@ public class FotoService {
      */
     public FotoEnsaio regerarMarcaDagua(UUID fotoId) {
         var foto = buscarPorId(fotoId);
+        if (foto.isArquivosRemovidos()) {
+            throw new ArquivoExpurgadoException();
+        }
         var original = pathResolver.resolver(foto.getOriginalPath());
         if (original == null || !Files.exists(original)) {
             throw new ArquivoDeImagemInvalidoException(foto.getFileName(),
@@ -530,6 +556,9 @@ public class FotoService {
         if (!foto.getAgendamentoId().equals(agendamentoId)) {
             throw new FotoNaoPertenceAoAgendamentoException(fotoId, agendamentoId);
         }
+        if (foto.isArquivosRemovidos()) {
+            throw new ArquivoExpurgadoException();
+        }
         if (foto.getStatus() != StatusFoto.PUBLICADA) {
             throw new FotoNaoEditavelException("status atual " + foto.getStatus());
         }
@@ -563,6 +592,9 @@ public class FotoService {
         if (!foto.getAgendamentoId().equals(agendamentoId)) {
             throw new FotoNaoPertenceAoAgendamentoException(fotoId, agendamentoId);
         }
+        if (foto.isArquivosRemovidos()) {
+            throw new ArquivoExpurgadoException();
+        }
         if (foto.getCompraExtraId() == null) {
             throw new FotoNaoEditavelException("foto não pertence a uma compra extra");
         }
@@ -584,6 +616,9 @@ public class FotoService {
         var foto = buscarPorId(fotoId);
         if (!foto.getAgendamentoId().equals(agendamentoId)) {
             throw new FotoNaoPertenceAoAgendamentoException(fotoId, agendamentoId);
+        }
+        if (foto.isArquivosRemovidos()) {
+            throw new ArquivoExpurgadoException();
         }
         if (foto.getCompraExtraId() == null) {
             throw new FotoNaoEditavelException("foto não pertence a uma compra extra");
@@ -641,7 +676,7 @@ public class FotoService {
                 : pathResolver.relativo(Path.of(processada.previewPath())));
             foto.setEditadaFileName(fileValidator.sanitizeFilename(arquivo.getOriginalFilename()));
             foto.setEditadaEm(LocalDateTime.now());
-            foto.setEditadaPor(usuarioAtual());
+            foto.setEditadaPor(CurrentUser.name());
             var salva = fotoEnsaioRepository.save(foto);
 
             // Remove as versões editadas anteriores somente depois que a nova
@@ -659,14 +694,6 @@ public class FotoService {
             limparArquivos(arquivosNovos);
             throw e;
         }
-    }
-
-    private String usuarioAtual() {
-        var authentication = org.springframework.security.core.context.SecurityContextHolder
-            .getContext().getAuthentication();
-        return authentication != null && authentication.getName() != null
-            ? authentication.getName()
-            : "SYSTEM";
     }
 
     private boolean temSelecaoAtiva(UUID agendamentoId) {

@@ -453,6 +453,7 @@ public class EcommerceController {
 
     private boolean podeServirPublicamente(FotoEnsaio foto) {
         return foto.isVisivel()
+            && !foto.isArquivosRemovidos()
             && (foto.getStatus() == StatusFoto.PUBLICADA || foto.getStatus() == StatusFoto.PAGA);
     }
 }

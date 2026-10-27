@@ -1,5 +1,6 @@
 package com.photoizer.crm.ecommerce.api;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 public record GaleriaEnsaioResponse(
@@ -11,5 +12,8 @@ public record GaleriaEnsaioResponse(
     String capaVersao,
     String tituloHero,
     boolean requerEdicao,
-    boolean podeAlterarModo
+    boolean podeAlterarModo,
+    boolean arquivada,
+    LocalDateTime arquivadaEm,
+    long bytesLiberados
 ) {}

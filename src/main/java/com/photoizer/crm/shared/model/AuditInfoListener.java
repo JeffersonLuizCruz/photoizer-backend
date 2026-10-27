@@ -1,8 +1,8 @@
 package com.photoizer.crm.shared.model;
 
+import com.photoizer.crm.shared.security.CurrentUser;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
-import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.time.LocalDateTime;
 
@@ -25,24 +25,11 @@ public class AuditInfoListener {
     void onCreate(AuditInfo auditInfo) {
         auditInfo.setCreatedAt(LocalDateTime.now());
         auditInfo.setUpdatedAt(LocalDateTime.now());
-        auditInfo.setCreatedBy(resolveCurrentUser());
+        auditInfo.setCreatedBy(CurrentUser.name());
     }
 
     @PreUpdate
     void onUpdate(AuditInfo auditInfo) {
         auditInfo.setUpdatedAt(LocalDateTime.now());
-    }
-
-    private String resolveCurrentUser() {
-        try {
-            var auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth != null && auth.isAuthenticated()
-                && !"anonymousUser".equals(auth.getPrincipal())) {
-                return auth.getName();
-            }
-        } catch (Exception ignored) {
-            // SecurityContextHolder pode não estar disponível em contexto de teste ou async
-        }
-        return "SYSTEM";
     }
 }

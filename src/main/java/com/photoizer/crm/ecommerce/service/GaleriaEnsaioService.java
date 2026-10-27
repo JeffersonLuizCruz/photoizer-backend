@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -106,6 +107,25 @@ public class GaleriaEnsaioService {
             return false;
         }
         return !temVendaOuDownload(agendamentoId) && !temEdicaoRealizada(agendamentoId);
+    }
+
+    public record EstadoArquivamento(boolean arquivada, LocalDateTime arquivadaEm, long bytesLiberados) {}
+
+    /**
+     * Estado de arquivamento derivado das fotos: a galeria está arquivada
+     * quando tem fotos e todas já tiveram os arquivos expurgados.
+     */
+    @Transactional(readOnly = true)
+    public EstadoArquivamento estadoArquivamento(UUID agendamentoId) {
+        var total = fotoRepository.countByAgendamentoId(agendamentoId);
+        var arquivadas = fotoRepository.countByAgendamentoIdAndArquivosRemovidosTrue(agendamentoId);
+        if (total == 0 || arquivadas < total) {
+            return new EstadoArquivamento(false, null, 0);
+        }
+        return new EstadoArquivamento(
+            true,
+            fotoRepository.buscarDataArquivamento(agendamentoId),
+            fotoRepository.somarBytesLiberados(agendamentoId));
     }
 
     public GaleriaEnsaio alterarModo(UUID agendamentoId, ModoGaleria novoModo) {

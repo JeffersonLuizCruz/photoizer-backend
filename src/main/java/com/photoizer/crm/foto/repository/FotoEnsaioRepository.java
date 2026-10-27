@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -75,4 +76,90 @@ public interface FotoEnsaioRepository extends JpaRepository<FotoEnsaio, UUID> {
 
     @Query("SELECT COALESCE(MAX(f.ordem), -1) FROM FotoEnsaio f WHERE f.agendamentoId = :agendamentoId")
     int findMaxOrdemByAgendamentoId(@Param("agendamentoId") UUID agendamentoId);
+
+    int countByAgendamentoIdAndArquivosRemovidosTrue(UUID agendamentoId);
+
+    @Query("""
+        SELECT MAX(f.arquivosRemovidosEm)
+        FROM FotoEnsaio f
+        WHERE f.agendamentoId = :agendamentoId AND f.arquivosRemovidos = true
+        """)
+    java.time.LocalDateTime buscarDataArquivamento(@Param("agendamentoId") UUID agendamentoId);
+
+    @Query("""
+        SELECT COALESCE(SUM(f.bytesLiberados), 0)
+        FROM FotoEnsaio f
+        WHERE f.agendamentoId = :agendamentoId AND f.arquivosRemovidos = true
+        """)
+    long somarBytesLiberados(@Param("agendamentoId") UUID agendamentoId);
+
+    // ─── Agregações para o painel de armazenamento ────────────────────────
+
+    interface ContagemFotos {
+        UUID getAgendamentoId();
+
+        long getTotal();
+
+        long getArquivadas();
+    }
+
+    interface UltimoDownload {
+        UUID getAgendamentoId();
+
+        java.time.LocalDateTime getUltimoDownload();
+    }
+
+    interface Arquivamento {
+        UUID getAgendamentoId();
+
+        java.time.LocalDateTime getArquivadaEm();
+
+        long getBytesLiberados();
+    }
+
+    interface PendenciaFotos {
+        UUID getAgendamentoId();
+
+        long getPendencias();
+    }
+
+    @Query("""
+        SELECT f.agendamentoId AS agendamentoId,
+               COUNT(f) AS total,
+               SUM(CASE WHEN f.arquivosRemovidos = true THEN 1 ELSE 0 END) AS arquivadas
+        FROM FotoEnsaio f
+        GROUP BY f.agendamentoId
+        """)
+    List<ContagemFotos> contarPorAgendamento();
+
+    @Query("""
+        SELECT f.agendamentoId AS agendamentoId,
+               MAX(f.dataDownload) AS ultimoDownload
+        FROM FotoEnsaio f
+        GROUP BY f.agendamentoId
+        """)
+    List<UltimoDownload> ultimoDownloadPorAgendamento();
+
+    @Query("""
+        SELECT f.agendamentoId AS agendamentoId,
+               MAX(f.arquivosRemovidosEm) AS arquivadaEm,
+               COALESCE(SUM(f.bytesLiberados), 0) AS bytesLiberados
+        FROM FotoEnsaio f
+        WHERE f.arquivosRemovidos = true
+        GROUP BY f.agendamentoId
+        """)
+    List<Arquivamento> arquivamentoPorAgendamento();
+
+    /**
+     * Fotos que ainda impedem o expurgo: em seleção ativa ou com compra
+     * aguardando comprovante/confirmação.
+     */
+    @Query("""
+        SELECT f.agendamentoId AS agendamentoId,
+               COUNT(f) AS pendencias
+        FROM FotoEnsaio f
+        WHERE f.emSelecaoEdicao = true OR f.status IN :statuses
+        GROUP BY f.agendamentoId
+        """)
+    List<PendenciaFotos> pendenciasPorAgendamento(@Param("statuses") Collection<StatusFoto> statuses);
 }

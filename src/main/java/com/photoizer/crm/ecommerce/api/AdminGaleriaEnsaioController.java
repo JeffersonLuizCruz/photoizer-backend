@@ -71,6 +71,7 @@ public class AdminGaleriaEnsaioController {
     }
 
     private GaleriaEnsaioResponse toResponse(com.photoizer.crm.ecommerce.model.GaleriaEnsaio galeria) {
+        var estado = galeriaService.estadoArquivamento(galeria.getAgendamentoId());
         return new GaleriaEnsaioResponse(
             galeria.getAgendamentoId(),
             galeria.getModo().name(),
@@ -80,6 +81,9 @@ public class AdminGaleriaEnsaioController {
             galeria.getCapaVersao() != null ? galeria.getCapaVersao().name() : null,
             galeria.getTituloHero(),
             galeria.getModo().requerEdicao(),
-            galeriaService.podeAlterarModo(galeria.getAgendamentoId()));
+            galeriaService.podeAlterarModo(galeria.getAgendamentoId()),
+            estado.arquivada(),
+            estado.arquivadaEm(),
+            estado.bytesLiberados());
     }
 }

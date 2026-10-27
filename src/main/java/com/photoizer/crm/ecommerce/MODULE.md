@@ -251,3 +251,15 @@ Staff:
 19. O texto do hero fica em `galerias_ensaio.titulo_hero` (até 120 caracteres). Nulo/vazio faz o hero exibir o nome do cliente; a customização é independente do modo/fase e pode ser alterada a qualquer momento.
 20. Ao reabrir uma seleção, o snapshot vira `CANCELADA` e a galeria volta para `SELECAO`, mas `selecionadaPacote` é preservado: as fotos escolhidas anteriormente continuam como rascunho editável. A resposta pública expõe `selecaoReaberta` para o cliente ser avisado.
 21. `DELETE /galeria/{token}/rascunho` desmarca apenas as fotos do pacote (`selecionadaPacote = false`). Extras no carrinho não são removidos.
+
+## 8. Galeria arquivada (V17)
+
+Quando o expurgo de uma galeria finalizada remove os arquivos das fotos:
+
+1. O estado é **derivado** de `foto.arquivosRemovidos` (galeria com fotos e todas arquivadas). Não há coluna em `galerias_ensaio`.
+2. `GaleriaQueryService.buscarAgendamentoPorToken` responde **410 `GALERIA_ARQUIVADA`** para qualquer endpoint público da galeria (fotos, seleção, carrinho, compras, download e capa).
+3. `GET /ecommerce/fotos/{fotoId}/watermarked|thumb` deixa de servir fotos arquivadas (`podeServirPublicamente`).
+4. `DownloadService` valida a existência do arquivo e responde 410 quando ele foi expurgado.
+5. `AdminGaleriaEnsaioController` expõe `arquivada`, `arquivadaEm` e `bytesLiberados`; o workspace mostra o selo/aviso e o link para o painel de armazenamento.
+6. O frontend (`GaleriaClientePage`) trata o 410 e renderiza a tela "Esta galeria foi arquivada".
+7. Comprovantes, contratos assinados (`uploads/propostas/*.pdf`) e todo o histórico comercial permanecem intactos.

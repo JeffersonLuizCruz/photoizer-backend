@@ -7697,6 +7697,79 @@
         } ]
       }
     },
+    "/api/v1/admin/armazenamento/galerias/{agendamentoId}/expurgar" : {
+      "post" : {
+        "tags" : [ "Armazenamento" ],
+        "summary" : "Expurgar os arquivos de uma galeria finalizada",
+        "description" : "Remove original, derivados, versões editadas e caches de TODAS as fotos da galeria escolhida. Os registros e o histórico comercial são preservados; comprovantes e contratos não são afetados. A ação é irreversível.",
+        "operationId" : "expurgar",
+        "parameters" : [ {
+          "name" : "agendamentoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Arquivos expurgados",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExpurgarGaleriaResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Agendamento não encontrado"
+          },
+          "422" : {
+            "description" : "Expurgo não permitido no estado atual"
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/admin/agendamentos/{agendamentoId}/selecoes/{selecaoId}/reabrir" : {
       "post" : {
         "tags" : [ "Admin Seleções" ],
@@ -13871,6 +13944,259 @@
         } ]
       }
     },
+    "/api/v1/admin/armazenamento/resumo" : {
+      "get" : {
+        "tags" : [ "Armazenamento" ],
+        "summary" : "Resumo do consumo de disco",
+        "description" : "Total do diretório de uploads por tipo de arquivo, espaço livre do volume e totais de fotos/galerias arquivadas.",
+        "operationId" : "resumo",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ArmazenamentoResumoResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/admin/armazenamento/galerias" : {
+      "get" : {
+        "tags" : [ "Armazenamento" ],
+        "summary" : "Listar galerias por consumo de disco",
+        "description" : "Retorna as galerias com fotos ou arquivos em disco, ordenadas do maior para o menor consumo, com a elegibilidade do expurgo.",
+        "operationId" : "galerias",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/GaleriaArmazenamentoResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/admin/armazenamento/galerias/{agendamentoId}" : {
+      "get" : {
+        "tags" : [ "Armazenamento" ],
+        "summary" : "Consultar o consumo de uma galeria",
+        "operationId" : "galeria",
+        "parameters" : [ {
+          "name" : "agendamentoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/GaleriaArmazenamentoResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/admin/armazenamento/galerias/{agendamentoId}/manifesto" : {
+      "get" : {
+        "tags" : [ "Armazenamento" ],
+        "summary" : "Baixar o manifesto da galeria em CSV",
+        "description" : "Lista número, id, nome, status e bytes liberados das fotos. Use antes do expurgo para guardar a referência do que será removido.",
+        "operationId" : "manifesto",
+        "parameters" : [ {
+          "name" : "agendamentoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "string",
+                  "format" : "byte"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/admin/agendamentos/{agendamentoId}/selecoes" : {
       "get" : {
         "tags" : [ "Admin Seleções" ],
@@ -15848,6 +16174,13 @@
           },
           "visivel" : {
             "type" : "boolean"
+          },
+          "arquivosRemovidos" : {
+            "type" : "boolean"
+          },
+          "arquivosRemovidosEm" : {
+            "type" : "string",
+            "format" : "date-time"
           }
         }
       },
@@ -16083,6 +16416,17 @@
           },
           "podeAlterarModo" : {
             "type" : "boolean"
+          },
+          "arquivada" : {
+            "type" : "boolean"
+          },
+          "arquivadaEm" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "bytesLiberados" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         }
       },
@@ -17109,6 +17453,19 @@
           }
         },
         "required" : [ "dataHoraEnsaio", "fotografoId", "localEnsaio", "pacoteId" ]
+      },
+      "ExpurgarGaleriaResponse" : {
+        "type" : "object",
+        "properties" : {
+          "fotos" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "bytesLiberados" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
       },
       "SelecionarRequest" : {
         "type" : "object",
@@ -19206,6 +19563,128 @@
           },
           "vendidaExtra" : {
             "type" : "boolean"
+          }
+        }
+      },
+      "ArmazenamentoResumoResponse" : {
+        "type" : "object",
+        "properties" : {
+          "bytesFotos" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "bytesDerivados" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "bytesEditadas" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "bytesDocumentos" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "bytesPropostas" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "bytesOutros" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "bytesTotal" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "volumeTotal" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "volumeLivre" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "percentualUso" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "totalGalerias" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "totalFotos" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "galeriasArquivadas" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "bytesLiberados" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "GaleriaArmazenamentoResponse" : {
+        "type" : "object",
+        "properties" : {
+          "agendamentoId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "clienteNome" : {
+            "type" : "string"
+          },
+          "dataHoraEnsaio" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "quantidadeFotos" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "quantidadeArquivadas" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "bytes" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "bytesFotos" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "bytesDocumentos" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "ultimoDownload" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "arquivada" : {
+            "type" : "boolean"
+          },
+          "arquivadaEm" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "bytesLiberados" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "expurgavel" : {
+            "type" : "boolean"
+          },
+          "motivoBloqueio" : {
+            "type" : "string",
+            "enum" : [ "NAO_FINALIZADO", "JA_ARQUIVADA", "PENDENCIA", "SEM_FOTOS" ]
           }
         }
       },

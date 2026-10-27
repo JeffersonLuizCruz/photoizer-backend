@@ -169,3 +169,17 @@ foto/
 7. **Downloads**: ZIP e download individual usam `numeroGaleria` + nome; quando `versaoAtual = EDITADA`, servem o arquivo editado. Fotos ocultas ou não publicadas não são baixáveis.
 8. **Eventos consumidos**: `SelecaoEnviadaEvent`, `SelecaoCanceladaEvent`, `EdicaoPublicadaEvent`.
 9. **Evento publicado**: `FotoEditadaEvent`.
+
+## 9. Expurgo de arquivos da galeria (V17)
+
+O expurgo libera espaço em disco **sem apagar registros**.
+
+- **Elegibilidade**: agendamento `FINALIZADO`, galeria com fotos ainda não arquivadas, sem seleção ativa (`emSelecaoEdicao`) e sem compra `AGUARDANDO_COMPROVANTE`/`AGUARDANDO_CONFIRMACAO`.
+- **Serviço**: `ExpurgoGaleriaService.expurgar(agendamentoId)` apaga os 8 paths de cada foto (original, watermark, thumb, preview e os 4 da versão editada) mais os caches `preview_v3_<fotoId>_*`, `thumb_protegido_<fotoId>_*`, `hero_<fotoId>_*` e `preview_legacy_<fotoId>_*`.
+- **Preservado**: registros de `FotoEnsaio`, `numeroGaleria`, seleção, compras, histórico de download, comprovantes (`comprovante_*`) e contratos (`propostas/*.pdf`). A remoção é por lista explícita de caminhos, nunca pela pasta inteira.
+- **Flags**: `arquivosRemovidos`, `arquivosRemovidosEm`, `arquivosRemovidosPor`, `bytesLiberados`. O estado de "galeria arquivada" é derivado quando todas as fotos estão arquivadas.
+- **Evento**: `GaleriaArquivadaEvent` → `ecommerce.FotosRemovidasListener` limpa carrinho, favoritos, comentários, capa/hero e caches.
+- **Leitores**: `buscarParaArquivo` (staff) responde 410 `ARQUIVO_EXPURGADO`; `listarTodas` omite fotos arquivadas da manutenção de marca d'água; `substituirImagem`, uploads/publicação de editadas e `regerarMarcaDagua` também rejeitam.
+- **Painel**: `GET /api/v1/admin/armazenamento/{resumo,galerias}` mede o disco; `POST .../galerias/{id}/expurgar` executa; `GET .../manifesto` baixa o CSV antes da remoção.
+- **Idempotência**: uma execução interrompida pode ser retomada; fotos já arquivadas são ignoradas e a segunda chamada completa responde 422 "já foi arquivada".
+

@@ -69,6 +69,7 @@ public enum ErrorCode {
     FOTOS_EDITADAS_INCOMPLETAS,
     GALERIA_EM_EDICAO,
     MODO_GALERIA_INVALIDO,
+    GALERIA_ARQUIVADA,
 
     // ─── Proposta / Termo ──────────────────────────────────────
     PROPOSTA_NAO_ENCONTRADA,
@@ -86,6 +87,8 @@ public enum ErrorCode {
     RENUMERACAO_NAO_PERMITIDA,
     STATUS_FOTO_INVALIDO,
     ARQUIVO_DE_IMAGEM_INVALIDO,
+    ARQUIVO_EXPURGADO,
+    EXPURGO_NAO_PERMITIDO,
 
     // ─── Financeiro ────────────────────────────────────────────
     AGENDAMENTO_NAO_ENCONTRADO_PARA_FINANCEIRO,

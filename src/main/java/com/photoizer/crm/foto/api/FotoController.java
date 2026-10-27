@@ -77,7 +77,7 @@ public class FotoController {
     public ResponseEntity<Resource> servirOriginal(
             @PathVariable UUID agendamentoId,
             @PathVariable UUID fotoId) {
-        var foto = buscarEValidarPropriedade(agendamentoId, fotoId);
+        var foto = fotoService.buscarParaArquivo(agendamentoId, fotoId);
         var file = new FileSystemResource(pathResolver.resolver(foto.getOriginalPath()));
         return ResponseEntity.ok()
             .contentType(resolverMediaType(foto.getFileName()))
@@ -89,7 +89,7 @@ public class FotoController {
     public ResponseEntity<Resource> servirWatermarked(
             @PathVariable UUID agendamentoId,
             @PathVariable UUID fotoId) {
-        var foto = buscarEValidarPropriedade(agendamentoId, fotoId);
+        var foto = fotoService.buscarParaArquivo(agendamentoId, fotoId);
         var caminho = foto.getEditadaWatermarkedPath() != null
             ? foto.getEditadaWatermarkedPath()
             : foto.getWatermarkedPath();
@@ -104,7 +104,7 @@ public class FotoController {
     public ResponseEntity<Resource> servirThumb(
             @PathVariable UUID agendamentoId,
             @PathVariable UUID fotoId) {
-        var foto = buscarEValidarPropriedade(agendamentoId, fotoId);
+        var foto = fotoService.buscarParaArquivo(agendamentoId, fotoId);
         var caminho = foto.getEditadaThumbPath() != null
             ? foto.getEditadaThumbPath()
             : foto.getThumbPath();

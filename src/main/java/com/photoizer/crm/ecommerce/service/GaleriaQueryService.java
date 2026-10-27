@@ -4,6 +4,7 @@ import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.config.model.ConfigKey;
 import com.photoizer.crm.config.service.ConfiguracaoService;
+import com.photoizer.crm.ecommerce.exception.GaleriaArquivadaException;
 import com.photoizer.crm.ecommerce.exception.GaleriaNaoEncontradaException;
 import com.photoizer.crm.ecommerce.exception.TokenExpiradoException;
 import com.photoizer.crm.ecommerce.exception.FotoNaoEncontradaException;
@@ -62,7 +63,22 @@ public class GaleriaQueryService {
         if (agendamento.getTokenExpiracao() != null && agendamento.getTokenExpiracao().isBefore(LocalDateTime.now())) {
             throw new TokenExpiradoException("O link da galeria expirou. Solicite um novo link ao fotógrafo.");
         }
+        if (isGaleriaArquivada(agendamento.getId())) {
+            throw new GaleriaArquivadaException();
+        }
         return agendamento;
+    }
+
+    /**
+     * Galeria arquivada = tem fotos e todas já tiveram os arquivos expurgados.
+     * Uma galeria sem fotos não é considerada arquivada.
+     */
+    public boolean isGaleriaArquivada(UUID agendamentoId) {
+        var total = fotoEnsaioRepository.countByAgendamentoId(agendamentoId);
+        if (total == 0) {
+            return false;
+        }
+        return fotoEnsaioRepository.countByAgendamentoIdAndArquivosRemovidosTrue(agendamentoId) >= total;
     }
 
     public BigDecimal getValorUnitarioFotoExtra() {

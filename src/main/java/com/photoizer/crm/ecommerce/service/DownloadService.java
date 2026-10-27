@@ -3,6 +3,7 @@ package com.photoizer.crm.ecommerce.service;
 import com.photoizer.crm.ecommerce.event.FotoDownloadEvent;
 import com.photoizer.crm.ecommerce.exception.FotoIndisponivelException;
 import com.photoizer.crm.ecommerce.exception.FotoNaoEncontradaException;
+import com.photoizer.crm.ecommerce.exception.GaleriaArquivadaException;
 import com.photoizer.crm.ecommerce.exception.GaleriaNaoEncontradaException;
 import com.photoizer.crm.foto.model.FotoEnsaio;
 import com.photoizer.crm.foto.model.VersaoFoto;
@@ -59,11 +60,16 @@ public class DownloadService {
             throw new FotoIndisponivelException("Foto não está disponível para download");
         }
 
+        var caminho = caminhoDownload(foto);
+        if (caminho == null || !Files.exists(caminho)) {
+            throw new GaleriaArquivadaException();
+        }
+
         eventPublisher.publishEvent(new FotoDownloadEvent(
             agendamento.getId(), List.of(fotoId)));
 
         return new ArquivoDownload(
-            caminhoDownload(foto),
+            caminho,
             nomeArquivoGaleria(foto));
     }
 

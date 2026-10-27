@@ -10,6 +10,7 @@ import com.photoizer.crm.ecommerce.model.SelecaoEnsaio
 import com.photoizer.crm.ecommerce.model.SelecaoEnsaioItem
 import com.photoizer.crm.ecommerce.model.StatusSelecao
 import com.photoizer.crm.ecommerce.model.TipoItemSelecao
+import com.photoizer.crm.ecommerce.exception.GaleriaArquivadaException
 import com.photoizer.crm.ecommerce.repository.SelecaoEnsaioItemRepository
 import com.photoizer.crm.ecommerce.repository.SelecaoEnsaioRepository
 import com.photoizer.crm.foto.model.FotoEnsaio
@@ -165,8 +166,38 @@ class GaleriaQueryServiceSpec extends Specification {
         service.getValorUnitarioExtra(agendamentoId, foto.id) == new BigDecimal("37.50")
     }
 
-    private FotoEnsaio foto(VersaoFoto versao) {
-        return FotoEnsaio.builder()
+    def "galeria com todas as fotos arquivadas responde 410 pelo token"() {
+        given:
+        agendamentoRepository.findByTokenGaleria(token) >> Optional.of(agendamento())
+        fotoRepository.countByAgendamentoId(agendamentoId) >> 3
+        fotoRepository.countByAgendamentoIdAndArquivosRemovidosTrue(agendamentoId) >> 3
+
+        when:
+        service.buscarAgendamentoPorToken(token)
+
+        then:
+        thrown(GaleriaArquivadaException)
+    }
+
+    def "galeria parcialmente arquivada continua acessível"() {
+        given:
+        agendamentoRepository.findByTokenGaleria(token) >> Optional.of(agendamento())
+        fotoRepository.countByAgendamentoId(agendamentoId) >> 3
+        fotoRepository.countByAgendamentoIdAndArquivosRemovidosTrue(agendamentoId) >> 1
+
+        expect:
+        service.buscarAgendamentoPorToken(token) != null
+    }
+
+    def "galeria sem fotos não é considerada arquivada"() {
+        given:
+        fotoRepository.countByAgendamentoId(agendamentoId) >> 0
+
+        expect:
+        !service.isGaleriaArquivada(agendamentoId)
+    }
+
+    private FotoEnsaio foto(VersaoFoto versao) {        return FotoEnsaio.builder()
             .id(UUID.randomUUID())
             .agendamentoId(agendamentoId)
             .fileName("IMG_1.jpg")

@@ -17,6 +17,14 @@ import java.util.UUID;
 
 public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID>, JpaSpecificationExecutor<Agendamento> {
 
+    /**
+     * Lista todos os agendamentos com o cliente carregado, para o painel de
+     * armazenamento (evita N+1 ao montar a lista de galerias).
+     */
+    @EntityGraph(attributePaths = "cliente")
+    @Query("SELECT a FROM Agendamento a")
+    List<Agendamento> findAllComCliente();
+
     boolean existsByDataHoraEnsaioBetweenAndStatusNotIn(
         LocalDateTime start, LocalDateTime end, List<StatusAgendamento> statusesIgnorados);
 

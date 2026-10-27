@@ -36,5 +36,7 @@ public record FotoEnsaioResponse(
     String metadataExif,
     boolean destaque,
     UUID fotoEdicaoId,
-    boolean visivel
+    boolean visivel,
+    boolean arquivosRemovidos,
+    LocalDateTime arquivosRemovidosEm
 ) {}

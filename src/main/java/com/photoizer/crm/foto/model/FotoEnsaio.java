@@ -164,4 +164,24 @@ public class FotoEnsaio {
 
     @Column
     private boolean visivel = true;
+
+    /**
+     * Indica que os arquivos desta foto foram apagados do disco no expurgo da
+     * galeria. O registro e os metadados permanecem para preservar numeração,
+     * seleção, compras e histórico de download.
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean arquivosRemovidos = false;
+
+    @Column
+    private LocalDateTime arquivosRemovidosEm;
+
+    @Size(max = 255)
+    @Column(length = 255)
+    private String arquivosRemovidosPor;
+
+    /** Bytes efetivamente liberados ao apagar os arquivos desta foto. */
+    @Column
+    private Long bytesLiberados;
 }
