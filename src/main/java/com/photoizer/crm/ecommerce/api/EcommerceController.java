@@ -144,6 +144,8 @@ public class EcommerceController {
         var fotos = ecommerceService.listarFotosPublicadas(token);
         var galeria = galeriaEnsaioService.obter(agendamento.getId());
         var selecaoAtual = selecaoEnsaioService.obterAtiva(token).orElse(null);
+        var selecaoReaberta = galeria.getFase() == com.photoizer.crm.ecommerce.model.FaseGaleria.SELECAO
+            && selecaoEnsaioService.temSelecaoReaberta(agendamento.getId());
         var valoresExtras = galeriaQueryService.getValoresExtras(
             agendamento.getId(), fotos.stream().map(com.photoizer.crm.foto.model.FotoEnsaio::getId).toList());
         var capa = galeriaCapaService.resolver(galeria, fotos);
@@ -169,6 +171,7 @@ public class EcommerceController {
             galeria.permiteComercializar(),
             galeria.permiteComercializar(),
             selecaoAtual,
+            selecaoReaberta,
             valoresExtras
         );
         return ResponseEntity.ok()
@@ -200,6 +203,13 @@ public class EcommerceController {
             @RequestBody SelecionarRequest request) {
         var fotos = ecommerceService.selecionarFotos(token, request.fotoIds(), request.selecionada());
         return ResponseEntity.ok(fotos.stream().map(fotoMapper::toPublicResponse).toList());
+    }
+
+    @DeleteMapping("/galeria/{token}/rascunho")
+    @Operation(summary = "Limpar o rascunho de fotos do pacote, mantendo os extras do carrinho")
+    public ResponseEntity<Void> limparRascunho(@PathVariable UUID token) {
+        ecommerceService.limparRascunhoSelecao(token);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/galeria/{token}/selecao")

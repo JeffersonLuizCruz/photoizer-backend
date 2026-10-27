@@ -1,9 +1,12 @@
 package com.photoizer.crm.ecommerce.service
 
 import com.photoizer.crm.agenda.model.Agendamento
+import com.photoizer.crm.ecommerce.event.FotosSelecionadasEvent
 import com.photoizer.crm.ecommerce.exception.FotoJaSelecionadaException
 import com.photoizer.crm.ecommerce.exception.LimitePacoteExcedidoException
+import com.photoizer.crm.ecommerce.model.FaseGaleria
 import com.photoizer.crm.ecommerce.model.GaleriaEnsaio
+import com.photoizer.crm.ecommerce.model.ModoGaleria
 import com.photoizer.crm.foto.model.FotoEnsaio
 import com.photoizer.crm.foto.model.StatusFoto
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository
@@ -16,6 +19,7 @@ import java.time.LocalDateTime
 
 class SelecaoFotosServiceSpec extends Specification {
 
+    def token = UUID.randomUUID()
     def agendamentoId = UUID.randomUUID()
     def fotoId = UUID.randomUUID()
     def fotoRepository = Mock(FotoEnsaioRepository)
@@ -63,6 +67,46 @@ class SelecaoFotosServiceSpec extends Specification {
 
         then:
         thrown(FotoJaSelecionadaException)
+        0 * eventPublisher.publishEvent(_)
+    }
+
+    def "limpa o rascunho apenas das fotos do pacote"() {
+        given:
+        def primeira = foto(selecionada: true).tap { it.id = UUID.randomUUID() }
+        def segunda = foto(selecionada: true).tap { it.id = UUID.randomUUID() }
+        def foraDoPacote = foto(selecionada: false).tap { it.id = UUID.randomUUID() }
+        galeriaQueryService.buscarAgendamentoPorToken(token) >> agendamento()
+        galeriaEnsaioService.obter(agendamentoId) >> GaleriaEnsaio.builder()
+            .modo(ModoGaleria.COM_EDICAO)
+            .fase(FaseGaleria.SELECAO)
+            .build()
+        fotoRepository.findByAgendamentoIdOrderByOrdemAsc(agendamentoId) >>
+            [primeira, segunda, foraDoPacote]
+
+        when:
+        service.limparRascunho(token)
+
+        then:
+        1 * eventPublisher.publishEvent({ it instanceof FotosSelecionadasEvent
+            && it.agendamentoId() == agendamentoId
+            && it.fotoIds() == [primeira.id, segunda.id]
+            && !it.selecionada() })
+    }
+
+    def "nao publica evento ao limpar um rascunho vazio"() {
+        given:
+        galeriaQueryService.buscarAgendamentoPorToken(token) >> agendamento()
+        galeriaEnsaioService.obter(agendamentoId) >> GaleriaEnsaio.builder()
+            .modo(ModoGaleria.COM_EDICAO)
+            .fase(FaseGaleria.SELECAO)
+            .build()
+        fotoRepository.findByAgendamentoIdOrderByOrdemAsc(agendamentoId) >>
+            [foto(selecionada: false)]
+
+        when:
+        service.limparRascunho(token)
+
+        then:
         0 * eventPublisher.publishEvent(_)
     }
 

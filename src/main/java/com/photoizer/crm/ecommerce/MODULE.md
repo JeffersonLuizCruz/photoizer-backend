@@ -178,6 +178,7 @@ O ecommerce passou a suportar três modos por galeria:
 Públicos:
 - `POST /api/v1/ecommerce/galeria/{token}/selecao`
 - `GET /api/v1/ecommerce/galeria/{token}/selecao`
+- `DELETE /api/v1/ecommerce/galeria/{token}/rascunho` (limpa só as fotos do pacote; extras do carrinho permanecem)
 
 Staff:
 - `GET /api/v1/admin/selecoes/pendentes` (inclui `requerEdicao`)
@@ -247,3 +248,5 @@ Staff:
 17. O override manual do staff (`PATCH /admin/agendamentos/{id}/fotos/{fotoId}/selecao`) passa pelas mesmas regras do cliente: valida limite do pacote, foto publicada/visível/numerada e bloqueia remoção de foto baixada/editada/comprada. Cada override gera log estruturado com agendamento, foto, usuário e total do pacote.
 18. O resumo admin (`GET /admin/agendamentos/{id}/ecommerce`) expõe `pacoteQuantidadeFotos` para a UI desabilitar “Incluir no pacote” quando o limite já foi atingido.
 19. O texto do hero fica em `galerias_ensaio.titulo_hero` (até 120 caracteres). Nulo/vazio faz o hero exibir o nome do cliente; a customização é independente do modo/fase e pode ser alterada a qualquer momento.
+20. Ao reabrir uma seleção, o snapshot vira `CANCELADA` e a galeria volta para `SELECAO`, mas `selecionadaPacote` é preservado: as fotos escolhidas anteriormente continuam como rascunho editável. A resposta pública expõe `selecaoReaberta` para o cliente ser avisado.
+21. `DELETE /galeria/{token}/rascunho` desmarca apenas as fotos do pacote (`selecionadaPacote = false`). Extras no carrinho não são removidos.

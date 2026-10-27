@@ -14101,6 +14101,38 @@
         } ]
       }
     },
+    "/api/v1/ecommerce/galeria/{token}/rascunho" : {
+      "delete" : {
+        "tags" : [ "Ecommerce" ],
+        "summary" : "Limpar o rascunho de fotos do pacote, mantendo os extras do carrinho",
+        "operationId" : "limparRascunho",
+        "parameters" : [ {
+          "name" : "token",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/ecommerce/galeria/{token}/carrinho/{fotoId}" : {
       "delete" : {
         "tags" : [ "Ecommerce" ],
@@ -18241,6 +18273,9 @@
           },
           "selecaoAtual" : {
             "$ref" : "#/components/schemas/SelecaoEnsaioResponse"
+          },
+          "selecaoReaberta" : {
+            "type" : "boolean"
           },
           "valoresExtras" : {
             "type" : "object",

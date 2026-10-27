@@ -315,6 +315,18 @@ public class SelecaoEnsaioService {
             .toList();
     }
 
+    /**
+     * A ultima selecao do ensaio foi cancelada por uma reabertura e ainda nao
+     * foi substituida. Nesse estado o cliente continua com o rascunho anterior
+     * ({@code selecionadaPacote}) e pode ajusta-lo antes de enviar de novo.
+     */
+    @Transactional(readOnly = true)
+    public boolean temSelecaoReaberta(UUID agendamentoId) {
+        return selecaoRepository.findFirstByAgendamentoIdOrderByNumeroDesc(agendamentoId)
+            .map(selecao -> selecao.getStatus() == StatusSelecao.CANCELADA)
+            .orElse(false);
+    }
+
     public List<SelecaoPendenteResponse> listarPendentes() {
         return selecaoRepository.findByStatusInOrderByEnviadaEmAsc(STATUS_ATIVOS).stream()
             .map(selecao -> {

@@ -434,6 +434,33 @@ class SelecaoEnsaioServiceSpec extends Specification {
         0 * eventPublisher.publishEvent(_)
     }
 
+    def "identifica rascunho reaberto quando a última seleção foi cancelada"() {
+        given:
+        selecaoRepository.findFirstByAgendamentoIdOrderByNumeroDesc(agendamentoId) >>
+            Optional.of(selecao(StatusSelecao.CANCELADA))
+
+        expect:
+        service.temSelecaoReaberta(agendamentoId)
+    }
+
+    def "não identifica rascunho reaberto quando a última seleção está ativa"() {
+        given:
+        selecaoRepository.findFirstByAgendamentoIdOrderByNumeroDesc(agendamentoId) >>
+            Optional.of(selecao(StatusSelecao.ENVIADA))
+
+        expect:
+        !service.temSelecaoReaberta(agendamentoId)
+    }
+
+    def "não identifica rascunho reaberto quando não há seleções"() {
+        given:
+        selecaoRepository.findFirstByAgendamentoIdOrderByNumeroDesc(agendamentoId) >>
+            Optional.empty()
+
+        expect:
+        !service.temSelecaoReaberta(agendamentoId)
+    }
+
     private SelecaoEnsaioItem itemExtra(UUID selecaoId, boolean editada) {
         return SelecaoEnsaioItem.builder()
             .id(UUID.randomUUID())

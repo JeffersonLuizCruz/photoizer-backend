@@ -27,5 +27,6 @@ public record GaleriaResponse(
     boolean podeComprar,
     boolean podeBaixar,
     SelecaoEnsaioResponse selecaoAtual,
+    boolean selecaoReaberta,
     Map<UUID, BigDecimal> valoresExtras
 ) {}

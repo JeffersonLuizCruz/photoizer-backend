@@ -110,6 +110,17 @@ public class EcommerceService {
         return fotos;
     }
 
+    /**
+     * Limpa apenas o rascunho de fotos do pacote. Os extras no carrinho
+     * permanecem intactos.
+     */
+    public void limparRascunhoSelecao(UUID token) {
+        selecaoFotosService.limparRascunho(token);
+        log.atInfo()
+            .addKeyValue("event_action", "ecommerce.rascunho_limpo")
+            .log("Rascunho de seleção limpo");
+    }
+
     // ==================== Checkout ====================
 
     public CompraExtra checkout(UUID token, UUID sessionId, MetodoPagamento metodoPagamento) {

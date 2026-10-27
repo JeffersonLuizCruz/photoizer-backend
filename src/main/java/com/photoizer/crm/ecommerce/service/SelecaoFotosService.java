@@ -77,6 +77,37 @@ public class SelecaoFotosService {
         return fotoEnsaioRepository.findByAgendamentoIdOrderByOrdemAsc(agendamento.getId());
     }
 
+    /**
+     * Limpa somente o rascunho de fotos do pacote, mantendo os extras que o
+     * cliente ja colocou no carrinho. Usado quando a selecao e reaberta e o
+     * cliente quer recomecar a escolha do pacote.
+     */
+    public void limparRascunho(UUID token) {
+        var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
+        galeriaEnsaioService.validarSelecaoPermitida(
+            galeriaEnsaioService.obter(agendamento.getId()));
+
+        var fotosNoRascunho = fotoEnsaioRepository
+            .findByAgendamentoIdOrderByOrdemAsc(agendamento.getId()).stream()
+            .filter(FotoEnsaio::isSelecionadaPacote)
+            .map(FotoEnsaio::getId)
+            .toList();
+        if (fotosNoRascunho.isEmpty()) {
+            return;
+        }
+
+        // O evento e sincrono: o listener do modulo foto atualiza
+        // selecionadaPacote antes desta transacao terminar.
+        eventPublisher.publishEvent(new FotosSelecionadasEvent(
+            agendamento.getId(), fotosNoRascunho, false));
+
+        log.atInfo()
+            .addKeyValue("event_action", "foto.rascunho_limpo")
+            .addKeyValue("agendamento_id", agendamento.getId())
+            .addKeyValue("quantidade", fotosNoRascunho.size())
+            .log("Rascunho de fotos do pacote limpo pelo cliente");
+    }
+
     public FotoEnsaio overrideSelecao(UUID agendamentoId, UUID fotoId, boolean selecionada) {
         var agendamento = galeriaQueryService.buscarAgendamentoPorId(agendamentoId);
         galeriaEnsaioService.validarSelecaoPermitida(
