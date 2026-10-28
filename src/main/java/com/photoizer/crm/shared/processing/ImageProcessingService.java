@@ -7,11 +7,14 @@ import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
 import java.awt.Color;
-import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.UUID;
 
 /**
  * PATTERN: Shared Infrastructure
@@ -30,17 +33,31 @@ public class ImageProcessingService {
     public static final float WATERMARK_QUALITY = 0.85f;
 
     /**
-     * Prévia pública protegida: resolução reduzida em relação ao original para
-     * dificultar impressão, mantendo nitidez suficiente na galeria do cliente.
+     * Prévia pública protegida: usa a resolução original para preservar a
+     * experiência do cliente. Zero significa "não redimensionar".
      */
-    public static final int PREVIEW_MAX_DIM = 800;
-    public static final float PREVIEW_QUALITY = 0.60f;
+    public static final int PREVIEW_MAX_DIM = 0;
+    public static final float PREVIEW_QUALITY = 0.92f;
 
     /**
      * Versão do cache da prévia pública. Ao mudar tamanho/qualidade, incremente
      * este valor para que os arquivos antigos deixem de ser usados.
      */
-    public static final String PREVIEW_VERSION = "v4";
+    public static final String PREVIEW_VERSION = "v5";
+
+    /**
+     * Thumbnail público do grid: maior que o thumb interno para ficar nítido em
+     * telas retina sem obrigar o download da prévia em resolução original.
+     */
+    public static final int PUBLIC_THUMB_WIDTH = 600;
+    public static final int PUBLIC_THUMB_HEIGHT = 400;
+    public static final float PUBLIC_THUMB_QUALITY = 0.82f;
+
+    /**
+     * Versão do cache do thumb protegido. Ao mudar tamanho/qualidade,
+     * incremente para que os arquivos antigos deixem de ser usados.
+     */
+    public static final String PUBLIC_THUMB_VERSION = "v2";
 
     /** Capa/hero: alta qualidade para a experiência emocional. */
     public static final int HERO_MAX_DIM = 2560;
@@ -57,11 +74,17 @@ public class ImageProcessingService {
      */
     public Path gerarThumbnailProtegido(Path source, Path target, int width, int height, float quality)
         throws IOException {
-        Thumbnails.of(source.toFile())
-            .size(width, height)
-            .outputQuality(quality)
-            .toFile(target.toFile());
-        return target;
+        var temporario = temporarioPara(target);
+        try {
+            Thumbnails.of(source.toFile())
+                .size(width, height)
+                .outputQuality(quality)
+                .toFile(temporario.toFile());
+            moverAtomicamente(temporario, target);
+            return target;
+        } finally {
+            Files.deleteIfExists(temporario);
+        }
     }
 
     public Path aplicarMarcaDagua(Path source, Path targetDir, String texto, float opacidade) throws IOException {
@@ -76,35 +99,37 @@ public class ImageProcessingService {
 
     public Path aplicarMarcaDaguaEm(Path source, Path target, String texto, float opacidade,
                                     int maxDim, float quality) throws IOException {
-        var original = ImageIO.read(source.toFile());
-        if (original == null) {
+        var imagem = ImageIO.read(source.toFile());
+        if (imagem == null) {
             throw new IllegalArgumentException(
                 "Não foi possível decodificar a imagem: " + source.getFileName());
         }
 
-        int width = original.getWidth();
-        int height = original.getHeight();
+        int width = imagem.getWidth();
+        int height = imagem.getHeight();
+        BufferedImage canvas;
 
-        if (Math.max(width, height) > maxDim) {
+        if (maxDim > 0 && Math.max(width, height) > maxDim) {
             double scale = (double) maxDim / Math.max(width, height);
             width = (int) (width * scale);
             height = (int) (height * scale);
-            var scaled = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-            var g = scaled.createGraphics();
+            canvas = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+            var g = canvas.createGraphics();
             g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g.drawImage(original, 0, 0, width, height, null);
+            g.drawImage(imagem, 0, 0, width, height, null);
             g.dispose();
-            original = scaled;
+        } else {
+            // Sem redimensionar: desenha direto na imagem carregada para não
+            // duplicar um buffer full-res em memória. Tipos sem suporte a
+            // Graphics2D (ex.: PNG com alfa) são convertidos para RGB.
+            canvas = podeDesenharDiretamente(imagem) ? imagem : converterParaRgb(imagem);
         }
 
-        var watermarked = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-        var g2d = watermarked.createGraphics();
+        var g2d = canvas.createGraphics();
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g2d.drawImage(original, 0, 0, null);
-
         g2d.setColor(new Color(255, 255, 255, (int) (opacidade * 255)));
-        // A fonte acompanha a largura para continuar legível em 1024, 1600 e 2560px.
+        // A fonte acompanha a largura para continuar legível em qualquer resolução.
         float fontSize = Math.max(22f, width / 24f);
         var font = g2d.getFont().deriveFont(fontSize);
         g2d.setFont(font);
@@ -122,8 +147,23 @@ public class ImageProcessingService {
         }
 
         g2d.dispose();
-        writeJpeg(watermarked, target, quality);
+        writeJpeg(canvas, target, quality);
         return target;
+    }
+
+    private boolean podeDesenharDiretamente(BufferedImage imagem) {
+        return imagem.getType() == BufferedImage.TYPE_INT_RGB
+            || imagem.getType() == BufferedImage.TYPE_3BYTE_BGR
+            || imagem.getType() == BufferedImage.TYPE_INT_BGR;
+    }
+
+    private BufferedImage converterParaRgb(BufferedImage imagem) {
+        var rgb = new BufferedImage(imagem.getWidth(), imagem.getHeight(), BufferedImage.TYPE_INT_RGB);
+        var g = rgb.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        g.drawImage(imagem, 0, 0, Color.WHITE, null);
+        g.dispose();
+        return rgb;
     }
 
     /**
@@ -138,32 +178,66 @@ public class ImageProcessingService {
                 "Não foi possível decodificar a imagem: " + source.getFileName());
         }
         var builder = Thumbnails.of(source.toFile());
-        if (Math.max(imagem.getWidth(), imagem.getHeight()) > maxDim) {
+        if (maxDim > 0 && Math.max(imagem.getWidth(), imagem.getHeight()) > maxDim) {
             builder.size(maxDim, maxDim);
         } else {
             builder.scale(1.0);
         }
-        builder.outputQuality(quality).toFile(target.toFile());
-        return target;
+        var temporario = temporarioPara(target);
+        try {
+            builder.outputQuality(quality).toFile(temporario.toFile());
+            moverAtomicamente(temporario, target);
+            return target;
+        } finally {
+            Files.deleteIfExists(temporario);
+        }
     }
 
     private void writeJpeg(BufferedImage image, Path target, float quality) throws IOException {
-        var writers = ImageIO.getImageWritersByFormatName("jpg");
-        if (!writers.hasNext()) {
-            ImageIO.write(image, "jpg", target.toFile());
-            return;
-        }
-        var writer = writers.next();
+        var temporario = temporarioPara(target);
         try {
-            var param = writer.getDefaultWriteParam();
-            param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-            param.setCompressionQuality(quality);
-            try (var output = ImageIO.createImageOutputStream(target.toFile())) {
-                writer.setOutput(output);
-                writer.write(null, new IIOImage(image, null, null), param);
+            var writers = ImageIO.getImageWritersByFormatName("jpg");
+            if (!writers.hasNext()) {
+                ImageIO.write(image, "jpg", temporario.toFile());
+            } else {
+                var writer = writers.next();
+                try {
+                    var param = writer.getDefaultWriteParam();
+                    param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+                    param.setCompressionQuality(quality);
+                    try (var output = ImageIO.createImageOutputStream(temporario.toFile())) {
+                        writer.setOutput(output);
+                        writer.write(null, new IIOImage(image, null, null), param);
+                    }
+                } finally {
+                    writer.dispose();
+                }
             }
+            moverAtomicamente(temporario, target);
         } finally {
-            writer.dispose();
+            Files.deleteIfExists(temporario);
+        }
+    }
+
+    private Path temporarioPara(Path target) {
+        var fileName = target.getFileName().toString();
+        int ponto = fileName.lastIndexOf('.');
+        var base = ponto > 0 ? fileName.substring(0, ponto) : fileName;
+        var extensao = ponto > 0 ? fileName.substring(ponto) : ".jpg";
+        // Mantém a extensão para o Thumbnailator inferir o formato de saída.
+        return target.resolveSibling(base + "." + UUID.randomUUID() + ".tmp" + extensao);
+    }
+
+    /**
+     * Substitui o arquivo final de uma vez. Evita que duas requisições
+     * concorrentes sirvam um JPEG parcialmente escrito.
+     */
+    private void moverAtomicamente(Path origem, Path destino) throws IOException {
+        try {
+            Files.move(origem, destino,
+                StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } catch (AtomicMoveNotSupportedException e) {
+            Files.move(origem, destino, StandardCopyOption.REPLACE_EXISTING);
         }
     }
 }

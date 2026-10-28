@@ -39,10 +39,16 @@ public class FotoArquivosReferenciadosProvider implements ArquivosReferenciadosP
 
             var pasta = foto.getAgendamentoId().toString();
             for (var versao : VERSOES) {
-                caminhos.add(pasta + "/preview_" + ImageProcessingService.PREVIEW_VERSION + "_"
+                // Cada versão fica ao lado do arquivo que a originou: orig/ ou editadas/.
+                var pastaBase = "EDITADA".equals(versao)
+                    ? pasta + "/editadas/"
+                    : pasta + "/orig/";
+                caminhos.add(pastaBase + "preview_" + ImageProcessingService.PREVIEW_VERSION + "_"
                     + foto.getId() + "_" + versao + ".jpg");
-                caminhos.add(pasta + "/thumb_protegido_" + foto.getId() + "_" + versao + ".jpg");
-                caminhos.add(pasta + "/orig/hero_" + foto.getId() + "_" + versao + ".jpg");
+                caminhos.add(pastaBase + "thumb_protegido_"
+                    + ImageProcessingService.PUBLIC_THUMB_VERSION + "_"
+                    + foto.getId() + "_" + versao + ".jpg");
+                caminhos.add(pastaBase + "hero_" + foto.getId() + "_" + versao + ".jpg");
             }
         }
         return caminhos;

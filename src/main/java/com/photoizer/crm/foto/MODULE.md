@@ -81,7 +81,7 @@ foto/
 ### Fluxo 1: Upload de Fotos (Admin)
 `POST /api/v1/agendamentos/{agendamentoId}/fotos` → `FotoService.uploadFotos()`:
 1. Valida status via `AgendamentoReadService.isStatusPermitidoParaUpload()` (ACL): permitido apenas **após o pagamento final** (`EM_EDICAO`, `FINALIZADO`).
-2. Para cada arquivo: valida o formato (`ImageIO.getImageReaders` → 422 com o nome do arquivo se ilegível), salva em `uploads/{agendamentoId}/orig/`, processa via `FotoProcessingHelper` (watermark com o nome da contratada + thumbnail 300×200 + prévia pública 1024px) com fallback.
+2. Para cada arquivo: valida o formato (`ImageIO.getImageReaders` → 422 com o nome do arquivo se ilegível), salva em `uploads/{agendamentoId}/orig/`, processa via `FotoProcessingHelper` (watermark com o nome da contratada + thumbnail 300×200 + prévia pública na resolução original) com fallback.
 3. Cria `FotoEnsaio` `INEDITA`, `visivel=true`, `ordem = count + i`.
 4. Se a requisição falhar, a transação sofre rollback e **os arquivos gravados nesta chamada são removidos** (sem órfãos no volume).
 
@@ -117,15 +117,16 @@ foto/
 ## 6. Regras Específicas
 1. **Upload e publicação liberados após o pagamento final** (`EM_EDICAO`…`FINALIZADO`), validado via porta ACL tanto no upload quanto na publicação.
 2. **Publicação manual**: botão "Publicar Galeria" (`PATCH /publicar`); sem publicação automática.
-3. **Versões por foto** (`originalPath`, `watermarkedPath` 1600px, `thumbPath` 300×200 e `previewPath` para o cliente, em 800px).
+3. **Versões por foto** (`originalPath`, `watermarkedPath` 1600px, `thumbPath` 300×200 e `previewPath` para o cliente, na resolução original e JPEG ~0.92).
 4. **Fallback com log**: falha em watermark/thumbnail usa o path original e registra `log.warn`.
 5. **`FotoEnsaioResponse`** não contém métodos estáticos — mapeamento via `FotoMapper`.
 6. **StatusFoto** com transições validadas via State Pattern.
 7. **Tags `@ElementCollection`** sem `orphanRemoval` (limitação JPA).
 8. **Fotos protegidas**: remoção, alteração de status, ocultação e substituição de imagem bloqueadas (409) para fotos com `compraExtraId`, `selecionadaPacote`, `emSelecaoEdicao`, `editadaPath`, `dataDownload` ou status `PAGA`/`AGUARDANDO_*`; a remoção em lote é atômica e não apaga nada se houver foto protegida.
-9. **Prévia pública protegida**: o endpoint público de watermark serve `preview_v4_*` em **800px e JPEG ~0.60**, resolução reduzida em relação ao original para dificultar impressão sem prejudicar a nitidez na galeria do cliente. O thumbnail público também é gerado a partir da versão com watermark (`thumb_protegido_*`). Fotos antigas (ou com cache de uma versão anterior) têm uma versão reduzida gerada sob demanda a partir do watermark já gravado (`preview_v4_{fotoId}_{versao}.jpg`), preservando a marca antiga. Ao mudar tamanho/qualidade, incremente `ImageProcessingService.PREVIEW_VERSION`.
+9. **Prévia pública protegida**: o endpoint público de watermark serve `preview_v5_*` na **resolução original e JPEG ~0.92**, com a marca d'água aplicada. O thumbnail público é gerado a partir da versão com watermark (`thumb_protegido_v2_*`, 600×400, JPEG ~0.82) para o grid ficar nítido sem baixar a prévia grande. Fotos antigas (ou com cache de uma versão anterior) têm a prévia gerada sob demanda **a partir do original/editada**, e o watermark existente é usado apenas como fallback quando o original não está disponível. Ao mudar tamanho/qualidade, incremente `PREVIEW_VERSION`/`PUBLIC_THUMB_VERSION`.
 10. **Marca d'água**: novas fotos/edições usam `© {nomeContratada}` (fallback `nomeFotografo` → `Estúdio`). O texto da marca é escalado com a largura da imagem.
 11. **Regeneração**: `POST /api/v1/admin/galerias/marca-dagua/fotos/{fotoId}/regerar` reprocessa original e versão editada com o nome atual, limpa caches de prévia/thumb e não altera o original nem o download final.
+12. **Pré-aquecimento**: `POST /api/v1/admin/agendamentos/{id}/galeria/previews/aquecer` (ADMIN) gera as prévias `v5` e os thumbs `v2` das fotos publicadas/pagas, grava os novos caminhos no banco e remove os caches `preview_v*` anteriores. Serve para eliminar a primeira abertura lenta de galerias antigas; sem ele, a geração é lazy.
 
 ## 7. Dívidas Técnicas — Status (pós-refactor)
 

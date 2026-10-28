@@ -447,6 +447,36 @@ class FotoServiceSpec extends Specification {
         0 * fotoRepository.save(_)
     }
 
+    def "pré-aquece prévias antigas e remove o cache da versão anterior"() {
+        given:
+        def foto = FotoEnsaio.builder()
+            .id(UUID.randomUUID())
+            .agendamentoId(agendamentoId)
+            .fileName("IMG_1.jpg")
+            .originalPath("ag/orig.jpg")
+            .watermarkedPath("ag/wm.jpg")
+            .thumbPath("ag/thumb.jpg")
+            .previewPath("ag/preview_v4_orig.jpg")
+            .status(StatusFoto.PUBLICADA)
+            .visivel(true)
+            .build()
+        def novo = "ag/preview_v5_${foto.id}_ORIGINAL.jpg".toString()
+        fotoRepository.findByAgendamentoIdOrderByOrdemAsc(agendamentoId) >> [foto]
+
+        when:
+        def resultado = service.aquecerPrevias(agendamentoId)
+
+        then:
+        1 * previewService.regenerarPreview(foto) >> Optional.of(novo)
+        1 * previewService.caminhoThumb(foto) >> "ag/thumb_protegido_v2_${foto.id}_ORIGINAL.jpg"
+        1 * fotoRepository.save(foto) >> foto
+        1 * previewService.removerPreviewAntiga("ag/preview_v4_orig.jpg")
+        resultado.total() == 1
+        resultado.geradas() == 1
+        resultado.falhas() == 0
+        foto.previewPath == novo
+    }
+
     def "regenera a marca d'água do original e da versão editada"() {
         given:
         def tmp = Files.createTempDirectory("foto-regerar-spec")
@@ -456,10 +486,10 @@ class FotoServiceSpec extends Specification {
         Files.write(editada, novoArquivoPng("editada_1.png").bytes)
         def wmOriginal = tmp.resolve("wm_orig_1.jpg")
         def thumbOriginal = tmp.resolve("thumb_orig_1.jpg")
-        def previewOriginal = tmp.resolve("preview_v4_orig_1.jpg")
+        def previewOriginal = tmp.resolve("preview_v5_orig_1.jpg")
         def wmEditada = tmp.resolve("wm_editada_1.jpg")
         def thumbEditada = tmp.resolve("thumb_editada_1.jpg")
-        def previewEditada = tmp.resolve("preview_v4_editada_1.jpg")
+        def previewEditada = tmp.resolve("preview_v5_editada_1.jpg")
         def foto = FotoEnsaio.builder()
             .id(UUID.randomUUID())
             .agendamentoId(agendamentoId)
@@ -484,10 +514,10 @@ class FotoServiceSpec extends Specification {
                 wmEditada.toString(), thumbEditada.toString(), previewEditada.toString())
         pathResolver.relativo(Path.of(wmOriginal.toString())) >> "orig/wm_orig_1.jpg"
         pathResolver.relativo(Path.of(thumbOriginal.toString())) >> "orig/thumb_orig_1.jpg"
-        pathResolver.relativo(Path.of(previewOriginal.toString())) >> "orig/preview_v4_orig_1.jpg"
+        pathResolver.relativo(Path.of(previewOriginal.toString())) >> "orig/preview_v5_orig_1.jpg"
         pathResolver.relativo(Path.of(wmEditada.toString())) >> "editadas/wm_editada_1.jpg"
         pathResolver.relativo(Path.of(thumbEditada.toString())) >> "editadas/thumb_editada_1.jpg"
-        pathResolver.relativo(Path.of(previewEditada.toString())) >> "editadas/preview_v4_editada_1.jpg"
+        pathResolver.relativo(Path.of(previewEditada.toString())) >> "editadas/preview_v5_editada_1.jpg"
 
         when:
         def salva = service.regerarMarcaDagua(foto.id)
@@ -495,10 +525,10 @@ class FotoServiceSpec extends Specification {
         then:
         salva.watermarkedPath == "orig/wm_orig_1.jpg"
         salva.thumbPath == "orig/thumb_orig_1.jpg"
-        salva.previewPath == "orig/preview_v4_orig_1.jpg"
+        salva.previewPath == "orig/preview_v5_orig_1.jpg"
         salva.editadaWatermarkedPath == "editadas/wm_editada_1.jpg"
         salva.editadaThumbPath == "editadas/thumb_editada_1.jpg"
-        salva.editadaPreviewPath == "editadas/preview_v4_editada_1.jpg"
+        salva.editadaPreviewPath == "editadas/preview_v5_editada_1.jpg"
         1 * previewService.removerLegados(foto)
         1 * fotoRepository.save(foto) >> foto
 

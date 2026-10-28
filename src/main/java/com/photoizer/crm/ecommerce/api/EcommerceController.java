@@ -46,6 +46,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.FileInputStream;
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 
@@ -430,8 +431,10 @@ public class EcommerceController {
     }
 
     @GetMapping("/fotos/{fotoId}/watermarked")
-    @Operation(summary = "Servir prévia protegida da foto (baixa resolução)")
-    public ResponseEntity<Resource> servirWatermarked(@PathVariable UUID fotoId) {
+    @Operation(summary = "Servir prévia protegida da foto em alta resolução")
+    public ResponseEntity<Resource> servirWatermarked(
+            @PathVariable UUID fotoId,
+            @RequestParam(value = "v", required = false) String versao) {
         var foto = fotoService.buscarPorId(fotoId);
         if (!podeServirPublicamente(foto)) {
             return ResponseEntity.notFound().build();
@@ -442,14 +445,16 @@ public class EcommerceController {
         }
         var file = new FileSystemResource(pathResolver.resolver(preview));
         return ResponseEntity.ok()
-            .cacheControl(CacheControl.noStore())
+            .cacheControl(cacheImagem(versao))
             .contentType(MediaType.IMAGE_JPEG)
             .body(file);
     }
 
     @GetMapping("/fotos/{fotoId}/thumb")
     @Operation(summary = "Servir thumbnail público protegido")
-    public ResponseEntity<Resource> servirThumb(@PathVariable UUID fotoId) {
+    public ResponseEntity<Resource> servirThumb(
+            @PathVariable UUID fotoId,
+            @RequestParam(value = "v", required = false) String versao) {
         var foto = fotoService.buscarPorId(fotoId);
         if (!podeServirPublicamente(foto)) {
             return ResponseEntity.notFound().build();
@@ -460,9 +465,20 @@ public class EcommerceController {
         }
         var file = new FileSystemResource(pathResolver.resolver(thumb));
         return ResponseEntity.ok()
-            .cacheControl(CacheControl.noStore())
+            .cacheControl(cacheImagem(versao))
             .contentType(MediaType.IMAGE_JPEG)
             .body(file);
+    }
+
+    /**
+     * Só habilita cache quando a URL veio versionada. Frontends antigos (sem
+     * {@code ?v=}) continuam com {@code no-store} para não exibir imagem
+     * desatualizada depois de uma edição/substituição.
+     */
+    private CacheControl cacheImagem(String versao) {
+        return versao == null || versao.isBlank()
+            ? CacheControl.noStore()
+            : CacheControl.maxAge(Duration.ofDays(7)).cachePrivate();
     }
 
     private boolean podeServirPublicamente(FotoEnsaio foto) {

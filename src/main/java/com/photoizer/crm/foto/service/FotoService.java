@@ -1,5 +1,6 @@
 package com.photoizer.crm.foto.service;
 
+import com.photoizer.crm.foto.api.AquecerPreviasResponse;
 import com.photoizer.crm.foto.event.FotoEditadaEvent;
 import com.photoizer.crm.foto.event.FotosGaleriaPublicadasEvent;
 import com.photoizer.crm.foto.event.FotosRemovidasEvent;
@@ -23,6 +24,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
@@ -100,6 +103,66 @@ public class FotoService {
     public FotoEnsaio buscarPorId(UUID id) {
         return fotoEnsaioRepository.findById(id)
             .orElseThrow(() -> new FotoEnsaioNaoEncontradaException(id));
+    }
+
+    /**
+     * Pré-gera as prévias protegidas em alta resolução de uma galeria.
+     *
+     * <p>É uma operação de manutenção para fotos antigas: cada foto tem sua
+     * prévia gerada a partir do original/editada e o caminho novo é gravado no
+     * banco. As entidades permanecem gerenciadas durante o processamento para
+     * preservar as coleções lazy (tags) no merge.
+     */
+    public AquecerPreviasResponse aquecerPrevias(UUID agendamentoId) {
+        var fotos = fotoEnsaioRepository.findByAgendamentoIdOrderByOrdemAsc(agendamentoId);
+        int geradas = 0;
+        int reaproveitadas = 0;
+        int falhas = 0;
+        int ignoradas = 0;
+
+        for (var foto : fotos) {
+            if (foto.isArquivosRemovidos()
+                || !foto.isVisivel()
+                || (foto.getStatus() != StatusFoto.PUBLICADA && foto.getStatus() != StatusFoto.PAGA)) {
+                ignoradas++;
+                continue;
+            }
+
+            var editada = foto.getVersaoAtual() == com.photoizer.crm.foto.model.VersaoFoto.EDITADA;
+            var anterior = editada ? foto.getEditadaPreviewPath() : foto.getPreviewPath();
+            var novo = fotoPreviewService.regenerarPreview(foto).orElse(null);
+            if (novo == null) {
+                falhas++;
+                continue;
+            }
+
+            fotoPreviewService.caminhoThumb(foto);
+            if (novo.equals(anterior)) {
+                reaproveitadas++;
+                continue;
+            }
+
+            if (editada) {
+                foto.setEditadaPreviewPath(novo);
+            } else {
+                foto.setPreviewPath(novo);
+            }
+            fotoEnsaioRepository.save(foto);
+            removerPreviewAntigaAposCommit(anterior);
+            geradas++;
+        }
+
+        log.atInfo()
+            .addKeyValue("event_action", "foto.previas_aquecidas")
+            .addKeyValue("agendamento_id", agendamentoId)
+            .addKeyValue("total", fotos.size())
+            .addKeyValue("geradas", geradas)
+            .addKeyValue("reaproveitadas", reaproveitadas)
+            .addKeyValue("falhas", falhas)
+            .addKeyValue("ignoradas", ignoradas)
+            .log("Pré-aquecimento das prévias protegidas concluído");
+
+        return new AquecerPreviasResponse(fotos.size(), geradas, reaproveitadas, falhas, ignoradas);
     }
 
     /**
@@ -740,6 +803,26 @@ public class FotoService {
             || foto.getStatus() == StatusFoto.PAGA
             || foto.getStatus() == StatusFoto.AGUARDANDO_COMPROVANTE
             || foto.getStatus() == StatusFoto.AGUARDANDO_CONFIRMACAO;
+    }
+
+    /**
+     * Só apaga o cache antigo depois que o banco confirmar o novo caminho.
+     * Em execução sem transação (testes/chamadas diretas), apaga na hora.
+     */
+    private void removerPreviewAntigaAposCommit(String caminho) {
+        if (caminho == null || caminho.isBlank()) {
+            return;
+        }
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    fotoPreviewService.removerPreviewAntiga(caminho);
+                }
+            });
+            return;
+        }
+        fotoPreviewService.removerPreviewAntiga(caminho);
     }
 
     private void deletarArquivo(String caminho) {

@@ -12,7 +12,9 @@ import java.util.UUID;
 /**
  * PATTERN: Template Method + DRY
  * Centraliza processamento de imagem (watermark + thumbnail + prévia pública)
- * com fallback e log.
+ * com fallback e log. A prévia pública mantém a resolução original e usa JPEG
+ * de alta qualidade; o thumbnail público maior é gerado sob demanda pelo
+ * {@link FotoPreviewService}.
  */
 @Component
 public class FotoProcessingHelper {
@@ -77,8 +79,9 @@ public class FotoProcessingHelper {
     }
 
     /**
-     * Prévia pública de baixa resolução. Em caso de falha, retorna null para
-     * que o serviço de prévia gere uma versão reduzida do watermark existente.
+     * Prévia pública protegida em resolução original. Em caso de falha,
+     * retorna null para que o serviço de prévia gere a versão sob demanda a
+     * partir do original (ou do watermark, como último recurso).
      */
     private String processarPreview(Path original, Path targetDir, UUID fotoId,
                                     String texto, float opacidade) {

@@ -8111,6 +8111,72 @@
         } ]
       }
     },
+    "/api/v1/admin/agendamentos/{agendamentoId}/galeria/previews/aquecer" : {
+      "post" : {
+        "tags" : [ "Admin Galeria" ],
+        "summary" : "Pré-gerar as prévias protegidas em alta resolução das fotos publicadas",
+        "operationId" : "aquecerPrevias",
+        "parameters" : [ {
+          "name" : "agendamentoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AquecerPreviasResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/admin/agendamentos/{agendamentoId}/ecommerce/regen-token" : {
       "post" : {
         "tags" : [ "Admin Ecommerce" ],
@@ -12179,7 +12245,7 @@
     "/api/v1/ecommerce/fotos/{fotoId}/watermarked" : {
       "get" : {
         "tags" : [ "Ecommerce" ],
-        "summary" : "Servir prévia protegida da foto (baixa resolução)",
+        "summary" : "Servir prévia protegida da foto em alta resolução",
         "operationId" : "servirWatermarked",
         "parameters" : [ {
           "name" : "fotoId",
@@ -12188,6 +12254,13 @@
           "schema" : {
             "type" : "string",
             "format" : "uuid"
+          }
+        }, {
+          "name" : "v",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
           }
         } ],
         "responses" : {
@@ -12228,6 +12301,13 @@
           "schema" : {
             "type" : "string",
             "format" : "uuid"
+          }
+        }, {
+          "name" : "v",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
           }
         } ],
         "responses" : {
@@ -18199,6 +18279,31 @@
           "bytesLiberados" : {
             "type" : "integer",
             "format" : "int64"
+          }
+        }
+      },
+      "AquecerPreviasResponse" : {
+        "type" : "object",
+        "properties" : {
+          "total" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "geradas" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "reaproveitadas" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "falhas" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "ignoradas" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         }
       },

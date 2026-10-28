@@ -242,8 +242,10 @@ Staff:
     `EDITADA`). Antes da liberação o download permanece bloqueado.
 15. A capa manual fica em `galerias_ensaio.capa_foto_id` + `capa_versao`; a versão é congelada e não muda sozinha após edição/publicação.
 12. `PUT /api/v1/admin/agendamentos/{id}/galeria/capa` define/remove a capa (ADMIN/FOTOGRAFO/EDITOR). `GET /api/v1/ecommerce/galeria/{token}/capa` serve o hero em até 2560px; `capaUrl` já sai com `?v={fotoId}-{versao}` e as respostas usam `no-store`.
-13. O endpoint público `GET /api/v1/ecommerce/fotos/{fotoId}/watermarked` serve a **prévia protegida de 800px e JPEG ~0.60** (`preview_v4_*`). Fotos antigas são reduzidas sob demanda a partir do watermark existente, em cache versionado.
+13. O endpoint público `GET /api/v1/ecommerce/fotos/{fotoId}/watermarked` serve a **prévia protegida na resolução original e JPEG ~0.92** (`preview_v5_*`). Fotos antigas são geradas sob demanda a partir do original/editada, com o watermark existente como fallback quando o original não está disponível. O grid usa `GET /fotos/{fotoId}/thumb` com `thumb_protegido_v2_*` (600×400, ~0.82).
 14. A marca d'água das novas prévias usa `© {nomeContratada}` (fallback `nomeFotografo` → `Estúdio`). Arquivos finais de download continuam sem marca e em alta qualidade.
+15. As URLs de imagem incluem `?v={versao}-{updatedAt}`; quando o parâmetro está presente, os endpoints `/watermarked` e `/thumb` respondem com `Cache-Control: private, max-age=7d`. Sem `?v`, continuam `no-store` para não servir conteúdo antigo a frontends desatualizados.
+16. `POST /api/v1/admin/agendamentos/{id}/galeria/previews/aquecer` (ADMIN) pré-gera as prévias em alta resolução das fotos publicadas/pagas e remove os caches da versão anterior.
 15. A resposta pública da galeria inclui `valoresExtras` com o preço congelado por foto.
 16. Ao enviar a seleção, fotos do pacote são removidas do carrinho para não serem cobradas como extra.
 17. O override manual do staff (`PATCH /admin/agendamentos/{id}/fotos/{fotoId}/selecao`) passa pelas mesmas regras do cliente: valida limite do pacote, foto publicada/visível/numerada e bloqueia remoção de foto baixada/editada/comprada. Cada override gera log estruturado com agendamento, foto, usuário e total do pacote.

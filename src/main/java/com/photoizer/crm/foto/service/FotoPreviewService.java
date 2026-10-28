@@ -1,5 +1,6 @@
 package com.photoizer.crm.foto.service;
 
+import com.photoizer.crm.config.service.MarcaDaguaService;
 import com.photoizer.crm.foto.model.FotoEnsaio;
 import com.photoizer.crm.foto.model.VersaoFoto;
 import com.photoizer.crm.shared.processing.ImageProcessingService;
@@ -12,28 +13,40 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
  * Resolve a prévia pública protegida.
  *
- * <p>A prévia é sempre derivada do arquivo que já contém marca d'água. Fotos
- * novas usam a prévia versionada gerada no upload; fotos antigas (ou prévias de
- * uma versão anterior) são reduzidas sob demanda, preservando a marca gravada.
+ * <p>A prévia mantém a resolução original da foto publicada pelo staff. Fotos
+ * novas usam o arquivo versionado gerado no upload; fotos antigas (ou prévias
+ * de uma versão anterior) são geradas sob demanda a partir do original, com a
+ * marca d'água atual. Se o original não estiver disponível, o watermark
+ * existente é usado como último recurso.
  */
 @Service
 public class FotoPreviewService {
 
     private static final Logger log = LoggerFactory.getLogger(FotoPreviewService.class);
-    private static final String PREFIXO_PREVIEW = "preview_" + ImageProcessingService.PREVIEW_VERSION + "_";
+
+    private static final String PREFIXO_PREVIEW =
+        "preview_" + ImageProcessingService.PREVIEW_VERSION + "_";
+    private static final String PREFIXO_THUMB_PROTEGIDO =
+        "thumb_protegido_" + ImageProcessingService.PUBLIC_THUMB_VERSION + "_";
+    private static final String PREFIXO_THUMB_LEGADO = "thumb_protegido_";
+    private static final String PREFIXO_PREVIEW_LEGADO = "preview_legacy_";
 
     private final StoragePathResolver pathResolver;
     private final ImageProcessingService imageProcessingService;
+    private final MarcaDaguaService marcaDaguaService;
 
     public FotoPreviewService(StoragePathResolver pathResolver,
-                              ImageProcessingService imageProcessingService) {
+                              ImageProcessingService imageProcessingService,
+                              MarcaDaguaService marcaDaguaService) {
         this.pathResolver = pathResolver;
         this.imageProcessingService = imageProcessingService;
+        this.marcaDaguaService = marcaDaguaService;
     }
 
     /**
@@ -44,15 +57,21 @@ public class FotoPreviewService {
         var editada = versao == VersaoFoto.EDITADA;
         var salva = editada ? foto.getEditadaPreviewPath() : foto.getPreviewPath();
 
-        if (salva != null && nomeArquivo(salva).startsWith(PREFIXO_PREVIEW)) {
+        if (ehCacheAtual(salva)) {
             return salva;
         }
 
-        var watermarkRelativo = editada && foto.getEditadaWatermarkedPath() != null
-            ? foto.getEditadaWatermarkedPath()
-            : foto.getWatermarkedPath();
+        var fonte = fontePreview(foto, editada);
+        if (fonte != null) {
+            var derivada = gerarPreviewDaFonte(foto, fonte, versao.name());
+            if (derivada != null) {
+                return derivada;
+            }
+        }
+
+        var watermarkRelativo = watermarkRelativo(foto, editada);
         if (watermarkRelativo != null) {
-            var derivada = gerarPreview(foto, watermarkRelativo, versao.name());
+            var derivada = gerarPreviewDoWatermark(foto, watermarkRelativo, versao.name());
             if (derivada != null) {
                 return derivada;
             }
@@ -62,9 +81,23 @@ public class FotoPreviewService {
         return salva;
     }
 
-    private String nomeArquivo(String caminho) {
-        var nome = Path.of(caminho).getFileName();
-        return nome == null ? "" : nome.toString();
+    /**
+     * Garante a prévia da versão atual a partir do original/editada. Usado pelo
+     * pré-aquecimento administrativo; retorna vazio quando o original não está
+     * disponível ou o processamento falha.
+     */
+    public Optional<String> regenerarPreview(FotoEnsaio foto) {
+        var versao = foto.getVersaoAtual();
+        var editada = versao == VersaoFoto.EDITADA;
+        var salva = editada ? foto.getEditadaPreviewPath() : foto.getPreviewPath();
+        if (ehCacheAtual(salva)) {
+            return Optional.of(salva);
+        }
+        var fonte = fontePreview(foto, editada);
+        if (fonte == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(gerarPreviewDaFonte(foto, fonte, versao.name()));
     }
 
     /**
@@ -73,10 +106,7 @@ public class FotoPreviewService {
      */
     public String caminhoThumb(FotoEnsaio foto) {
         var versao = foto.getVersaoAtual();
-        var watermarkRelativo = versao == VersaoFoto.EDITADA
-            && foto.getEditadaWatermarkedPath() != null
-            ? foto.getEditadaWatermarkedPath()
-            : foto.getWatermarkedPath();
+        var watermarkRelativo = watermarkRelativo(foto, versao == VersaoFoto.EDITADA);
         var fallback = versao == VersaoFoto.EDITADA && foto.getEditadaThumbPath() != null
             ? foto.getEditadaThumbPath()
             : foto.getThumbPath();
@@ -85,21 +115,24 @@ public class FotoPreviewService {
             return fallback;
         }
         var watermark = pathResolver.resolver(watermarkRelativo);
-        if (watermark == null || !Files.exists(watermark)) {
+        if (watermark == null) {
             return fallback;
         }
 
         var target = watermark.getParent()
-            .resolve("thumb_protegido_" + foto.getId() + "_" + versao.name() + ".jpg");
+            .resolve(PREFIXO_THUMB_PROTEGIDO + foto.getId() + "_" + versao.name() + ".jpg");
         if (Files.exists(target)) {
             return pathResolver.relativo(target);
+        }
+        if (!Files.exists(watermark)) {
+            return fallback;
         }
         try {
             imageProcessingService.gerarThumbnailProtegido(
                 watermark, target,
-                ImageProcessingService.THUMB_WIDTH,
-                ImageProcessingService.THUMB_HEIGHT,
-                0.7f);
+                ImageProcessingService.PUBLIC_THUMB_WIDTH,
+                ImageProcessingService.PUBLIC_THUMB_HEIGHT,
+                ImageProcessingService.PUBLIC_THUMB_QUALITY);
             return pathResolver.relativo(target);
         } catch (IOException | RuntimeException e) {
             log.atWarn()
@@ -111,19 +144,64 @@ public class FotoPreviewService {
         }
     }
 
-    private String gerarPreview(FotoEnsaio foto, String watermarkRelativo, String versao) {
-        var watermark = pathResolver.resolver(watermarkRelativo);
-        if (watermark == null || !Files.exists(watermark)) {
+    /**
+     * Remove o cache de prévia de uma versão anterior depois que o caminho novo
+     * foi gravado no banco. Não toca no caminho atual nem em arquivos fora do
+     * padrão versionado.
+     */
+    public void removerPreviewAntiga(String caminho) {
+        if (caminho == null || caminho.isBlank()) {
+            return;
+        }
+        var nome = nomeArquivo(caminho);
+        if (nome.startsWith(PREFIXO_PREVIEW) || !nome.startsWith("preview_v")) {
+            return;
+        }
+        deletar(pathResolver.resolver(caminho));
+    }
+
+    private String fontePreview(FotoEnsaio foto, boolean editada) {
+        if (editada && foto.getEditadaPath() != null) {
+            return foto.getEditadaPath();
+        }
+        return foto.getOriginalPath();
+    }
+
+    private String watermarkRelativo(FotoEnsaio foto, boolean editada) {
+        return editada && foto.getEditadaWatermarkedPath() != null
+            ? foto.getEditadaWatermarkedPath()
+            : foto.getWatermarkedPath();
+    }
+
+    private boolean ehCacheAtual(String caminho) {
+        return caminho != null
+            && nomeArquivo(caminho).startsWith(PREFIXO_PREVIEW);
+    }
+
+    private String nomeArquivo(String caminho) {
+        var nome = Path.of(caminho).getFileName();
+        return nome == null ? "" : nome.toString();
+    }
+
+    private String gerarPreviewDaFonte(FotoEnsaio foto, String fonteRelativa, String versao) {
+        var fonte = pathResolver.resolver(fonteRelativa);
+        if (fonte == null) {
             return null;
         }
-        var target = watermark.getParent()
+        var target = fonte.getParent()
             .resolve(PREFIXO_PREVIEW + foto.getId() + "_" + versao + ".jpg");
+        // O cache vale mesmo que o original tenha sido movido/removido depois.
         if (Files.exists(target)) {
             return pathResolver.relativo(target);
         }
+        if (!Files.exists(fonte)) {
+            return null;
+        }
         try {
-            imageProcessingService.redimensionarComMarcaExistente(
-                watermark, target,
+            imageProcessingService.aplicarMarcaDaguaEm(
+                fonte, target,
+                marcaDaguaService.texto(),
+                marcaDaguaService.opacidade(),
                 ImageProcessingService.PREVIEW_MAX_DIM,
                 ImageProcessingService.PREVIEW_QUALITY);
             return pathResolver.relativo(target);
@@ -132,8 +210,43 @@ public class FotoPreviewService {
                 .addKeyValue("event_action", "foto.preview_geracao_falhou")
                 .addKeyValue("foto_id", foto.getId())
                 .addKeyValue("versao", versao)
+                .addKeyValue("fonte", fonteRelativa)
                 .setCause(e)
-                .log("Falha ao gerar prévia reduzida do watermark existente");
+                .log("Falha ao gerar prévia em alta resolução a partir do original");
+            return null;
+        }
+    }
+
+    /**
+     * Fallback para fotos antigas cujo original não está mais disponível.
+     * Reaproveita a marca já gravada, limitada à resolução do watermark.
+     */
+    private String gerarPreviewDoWatermark(FotoEnsaio foto, String watermarkRelativo, String versao) {
+        var watermark = pathResolver.resolver(watermarkRelativo);
+        if (watermark == null) {
+            return null;
+        }
+        var target = watermark.getParent()
+            .resolve(PREFIXO_PREVIEW + foto.getId() + "_" + versao + ".jpg");
+        if (Files.exists(target)) {
+            return pathResolver.relativo(target);
+        }
+        if (!Files.exists(watermark)) {
+            return null;
+        }
+        try {
+            imageProcessingService.redimensionarComMarcaExistente(
+                watermark, target,
+                ImageProcessingService.WATERMARK_MAX_DIM,
+                ImageProcessingService.PREVIEW_QUALITY);
+            return pathResolver.relativo(target);
+        } catch (IOException | RuntimeException e) {
+            log.atWarn()
+                .addKeyValue("event_action", "foto.preview_fallback_falhou")
+                .addKeyValue("foto_id", foto.getId())
+                .addKeyValue("versao", versao)
+                .setCause(e)
+                .log("Falha ao gerar prévia a partir do watermark existente");
             return null;
         }
     }
@@ -145,23 +258,30 @@ public class FotoPreviewService {
     public void removerLegados(UUID agendamentoId, Collection<UUID> fotoIds) {
         if (fotoIds == null || fotoIds.isEmpty()) return;
         var dir = pathResolver.getUploadDir().resolve(agendamentoId.toString());
-        if (!Files.isDirectory(dir)) return;
+        var diretorios = java.util.List.of(dir, dir.resolve("orig"), dir.resolve("editadas"));
 
-        try (var arquivos = Files.list(dir)) {
-            arquivos.filter(Files::isRegularFile)
-                .filter(path -> fotoIds.stream().anyMatch(id -> {
-                    var nome = path.getFileName().toString();
-                    return nome.startsWith(PREFIXO_PREVIEW + id + "_")
-                        || nome.startsWith("preview_legacy_" + id + "_")
-                        || nome.startsWith("thumb_protegido_" + id + "_");
-                }))
-                .forEach(this::deletar);
-        } catch (IOException e) {
-            log.atWarn()
-                .addKeyValue("event_action", "foto.preview_limpeza_falhou")
-                .addKeyValue("agendamento_id", agendamentoId)
-                .setCause(e)
-                .log("Falha ao limpar prévias legadas");
+        for (var diretorio : diretorios) {
+            if (!Files.isDirectory(diretorio)) {
+                continue;
+            }
+            try (var arquivos = Files.list(diretorio)) {
+                arquivos.filter(Files::isRegularFile)
+                    .filter(path -> fotoIds.stream().anyMatch(id -> {
+                        var nome = path.getFileName().toString();
+                        return nome.startsWith(PREFIXO_PREVIEW + id + "_")
+                            || nome.startsWith(PREFIXO_PREVIEW_LEGADO + id + "_")
+                            || nome.startsWith(PREFIXO_THUMB_PROTEGIDO + id + "_")
+                            || nome.startsWith(PREFIXO_THUMB_LEGADO + id + "_");
+                    }))
+                    .forEach(this::deletar);
+            } catch (IOException e) {
+                log.atWarn()
+                    .addKeyValue("event_action", "foto.preview_limpeza_falhou")
+                    .addKeyValue("agendamento_id", agendamentoId)
+                    .addKeyValue("diretorio", diretorio.toString())
+                    .setCause(e)
+                    .log("Falha ao limpar prévias legadas");
+            }
         }
     }
 
@@ -170,6 +290,9 @@ public class FotoPreviewService {
     }
 
     private void deletar(Path path) {
+        if (path == null) {
+            return;
+        }
         try {
             Files.deleteIfExists(path);
         } catch (IOException e) {

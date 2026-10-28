@@ -2,6 +2,8 @@ package com.photoizer.crm.ecommerce.api;
 
 import com.photoizer.crm.ecommerce.service.GaleriaCapaService;
 import com.photoizer.crm.ecommerce.service.GaleriaEnsaioService;
+import com.photoizer.crm.foto.api.AquecerPreviasResponse;
+import com.photoizer.crm.foto.service.FotoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.security.RolesAllowed;
@@ -9,6 +11,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,11 +27,14 @@ public class AdminGaleriaEnsaioController {
 
     private final GaleriaEnsaioService galeriaService;
     private final GaleriaCapaService capaService;
+    private final FotoService fotoService;
 
     public AdminGaleriaEnsaioController(GaleriaEnsaioService galeriaService,
-                                        GaleriaCapaService capaService) {
+                                        GaleriaCapaService capaService,
+                                        FotoService fotoService) {
         this.galeriaService = galeriaService;
         this.capaService = capaService;
+        this.fotoService = fotoService;
     }
 
     @GetMapping
@@ -68,6 +74,13 @@ public class AdminGaleriaEnsaioController {
             @Valid @RequestBody AtualizarTituloHeroRequest request) {
         return ResponseEntity.ok(toResponse(
             galeriaService.definirTituloHero(agendamentoId, request.tituloHero())));
+    }
+
+    @PostMapping("/previews/aquecer")
+    @RolesAllowed("ADMIN")
+    @Operation(summary = "Pré-gerar as prévias protegidas em alta resolução das fotos publicadas")
+    public ResponseEntity<AquecerPreviasResponse> aquecerPrevias(@PathVariable UUID agendamentoId) {
+        return ResponseEntity.ok(fotoService.aquecerPrevias(agendamentoId));
     }
 
     private GaleriaEnsaioResponse toResponse(com.photoizer.crm.ecommerce.model.GaleriaEnsaio galeria) {

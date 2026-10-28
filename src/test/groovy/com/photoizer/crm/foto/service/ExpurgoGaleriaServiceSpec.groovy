@@ -64,6 +64,9 @@ class ExpurgoGaleriaServiceSpec extends Specification {
         !Files.exists(uploadDir.resolve(foto.originalPath))
         !Files.exists(uploadDir.resolve(foto.editadaPath))
         !Files.exists(uploadDir.resolve("${agendamentoId}/preview_v3_${foto.id}_ORIGINAL.jpg"))
+        !Files.exists(uploadDir.resolve("${agendamentoId}/preview_v5_${foto.id}_ORIGINAL.jpg"))
+        !Files.exists(uploadDir.resolve("${agendamentoId}/thumb_protegido_${foto.id}_ORIGINAL.jpg"))
+        !Files.exists(uploadDir.resolve("${agendamentoId}/thumb_protegido_v2_${foto.id}_ORIGINAL.jpg"))
         !Files.exists(uploadDir.resolve("${agendamentoId}/orig/hero_${foto.id}_ORIGINAL.jpg"))
         Files.exists(uploadDir.resolve(comprovante))
         Files.exists(uploadDir.resolve(proposta))
@@ -167,7 +170,9 @@ class ExpurgoGaleriaServiceSpec extends Specification {
         ]
         caminhos.values().each { escrever(it, 10) }
         escrever("${agendamentoId}/preview_v3_${id}_ORIGINAL.jpg", 5)
+        escrever("${agendamentoId}/preview_v5_${id}_ORIGINAL.jpg", 6)
         escrever("${agendamentoId}/thumb_protegido_${id}_ORIGINAL.jpg", 4)
+        escrever("${agendamentoId}/thumb_protegido_v2_${id}_ORIGINAL.jpg", 4)
         escrever("${agendamentoId}/orig/hero_${id}_ORIGINAL.jpg", 3)
 
         FotoEnsaio.builder()
@@ -188,7 +193,7 @@ class ExpurgoGaleriaServiceSpec extends Specification {
     }
 
     private static long bytesDaFoto() {
-        return 8 * 10 + 5 + 4 + 3
+        return 8 * 10 + 5 + 6 + 4 + 4 + 3
     }
 
     private Path escrever(String relativo, int bytes) {
