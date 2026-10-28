@@ -2,6 +2,7 @@ package com.photoizer.crm.foto.service;
 
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
 import com.photoizer.crm.shared.processing.ImageProcessingService;
+import com.photoizer.crm.shared.processing.QualidadePreview;
 import com.photoizer.crm.shared.storage.ArquivosReferenciadosProvider;
 import org.springframework.stereotype.Component;
 
@@ -43,8 +44,10 @@ public class FotoArquivosReferenciadosProvider implements ArquivosReferenciadosP
                 var pastaBase = "EDITADA".equals(versao)
                     ? pasta + "/editadas/"
                     : pasta + "/orig/";
-                caminhos.add(pastaBase + "preview_" + ImageProcessingService.PREVIEW_VERSION + "_"
-                    + foto.getId() + "_" + versao + ".jpg");
+                for (var qualidade : QualidadePreview.values()) {
+                    caminhos.add(pastaBase + qualidade.getPrefixoCache()
+                        + foto.getId() + "_" + versao + ".jpg");
+                }
                 caminhos.add(pastaBase + "thumb_protegido_"
                     + ImageProcessingService.PUBLIC_THUMB_VERSION + "_"
                     + foto.getId() + "_" + versao + ".jpg");

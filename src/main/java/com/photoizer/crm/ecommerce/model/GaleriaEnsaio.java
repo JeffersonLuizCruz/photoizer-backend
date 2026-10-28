@@ -2,6 +2,7 @@ package com.photoizer.crm.ecommerce.model;
 
 import com.photoizer.crm.shared.model.AuditInfo;
 import com.photoizer.crm.foto.model.VersaoFoto;
+import com.photoizer.crm.shared.processing.QualidadePreview;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
@@ -48,6 +49,15 @@ public class GaleriaEnsaio {
     @Column(nullable = false, length = 30)
     private FaseGaleria fase;
 
+    /**
+     * Qualidade das prévias públicas. O padrão é ORIGINAL para preservar a
+     * experiência do cliente; o staff pode reduzir conscientemente por galeria.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "qualidade_preview", nullable = false, length = 20)
+    @Builder.Default
+    private QualidadePreview qualidadePreview = QualidadePreview.ORIGINAL;
+
     @Column(name = "selecao_atual_id")
     private UUID selecaoAtualId;
 
@@ -71,6 +81,10 @@ public class GaleriaEnsaio {
      */
     @Column(name = "publicada_em")
     private LocalDateTime publicadaEm;
+
+    public QualidadePreview qualidadePreviewEfetiva() {
+        return qualidadePreview == null ? QualidadePreview.padrao() : qualidadePreview;
+    }
 
     public boolean permiteSelecionar() {
         return modo == ModoGaleria.DIRETO || fase.permiteSelecionar();

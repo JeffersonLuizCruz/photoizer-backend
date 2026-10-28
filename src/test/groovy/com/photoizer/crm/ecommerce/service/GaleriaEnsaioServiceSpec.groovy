@@ -15,6 +15,7 @@ import com.photoizer.crm.foto.model.StatusFoto
 import com.photoizer.crm.foto.model.VersaoFoto
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository
 import com.photoizer.crm.shared.exception.UnprocessableException
+import com.photoizer.crm.shared.processing.QualidadePreview
 import spock.lang.Specification
 import spock.lang.Subject
 
@@ -69,6 +70,25 @@ class GaleriaEnsaioServiceSpec extends Specification {
         then:
         galeria.modo == ModoGaleria.COM_EDICAO
         galeria.fase == FaseGaleria.SELECAO
+    }
+
+    def "galeria usa qualidade original por padrão e permite alterar para protegida"() {
+        given:
+        def galeria = galeria(ModoGaleria.COM_EDICAO, FaseGaleria.SELECAO)
+        galeriaRepository.findById(agendamentoId) >> Optional.of(galeria)
+        galeriaRepository.findByIdForUpdate(agendamentoId) >> Optional.of(galeria)
+        fotoRepository.countByAgendamentoId(agendamentoId) >> 0
+        fotoRepository.countByAgendamentoIdAndArquivosRemovidosTrue(agendamentoId) >> 0
+        galeriaRepository.save(galeria) >> galeria
+
+        expect:
+        galeria.qualidadePreviewEfetiva() == QualidadePreview.ORIGINAL
+
+        when:
+        def salva = service.alterarQualidadePreview(agendamentoId, QualidadePreview.PROTEGIDA)
+
+        then:
+        salva.qualidadePreview == QualidadePreview.PROTEGIDA
     }
 
     def "permite ativar seleção e edição em galeria limpa"() {

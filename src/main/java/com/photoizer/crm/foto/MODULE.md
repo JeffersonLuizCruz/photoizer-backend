@@ -117,16 +117,16 @@ foto/
 ## 6. Regras Específicas
 1. **Upload e publicação liberados após o pagamento final** (`EM_EDICAO`…`FINALIZADO`), validado via porta ACL tanto no upload quanto na publicação.
 2. **Publicação manual**: botão "Publicar Galeria" (`PATCH /publicar`); sem publicação automática.
-3. **Versões por foto** (`originalPath`, `watermarkedPath` 1600px, `thumbPath` 300×200 e `previewPath` para o cliente, na resolução original e JPEG ~0.92).
+3. **Versões por foto** (`originalPath`, `watermarkedPath` 1600px, `thumbPath` 300×200 e `previewPath` para o cliente, na qualidade configurada na galeria: 800px, 1600px ou original).
 4. **Fallback com log**: falha em watermark/thumbnail usa o path original e registra `log.warn`.
 5. **`FotoEnsaioResponse`** não contém métodos estáticos — mapeamento via `FotoMapper`.
 6. **StatusFoto** com transições validadas via State Pattern.
 7. **Tags `@ElementCollection`** sem `orphanRemoval` (limitação JPA).
 8. **Fotos protegidas**: remoção, alteração de status, ocultação e substituição de imagem bloqueadas (409) para fotos com `compraExtraId`, `selecionadaPacote`, `emSelecaoEdicao`, `editadaPath`, `dataDownload` ou status `PAGA`/`AGUARDANDO_*`; a remoção em lote é atômica e não apaga nada se houver foto protegida.
-9. **Prévia pública protegida**: o endpoint público de watermark serve `preview_v5_*` na **resolução original e JPEG ~0.92**, com a marca d'água aplicada. O thumbnail público é gerado a partir da versão com watermark (`thumb_protegido_v2_*`, 600×400, JPEG ~0.82) para o grid ficar nítido sem baixar a prévia grande. Fotos antigas (ou com cache de uma versão anterior) têm a prévia gerada sob demanda **a partir do original/editada**, e o watermark existente é usado apenas como fallback quando o original não está disponível. Ao mudar tamanho/qualidade, incremente `PREVIEW_VERSION`/`PUBLIC_THUMB_VERSION`.
+9. **Prévia pública protegida**: o endpoint público de watermark serve a prévia na qualidade configurada por galeria (`PROTEGIDA` 800px/~0.60, `EQUILIBRADA` 1600px/~0.90 ou `ORIGINAL` full-res/~0.92), sempre com marca d'água. O padrão é `ORIGINAL`. O thumbnail público é gerado a partir da versão com watermark (`thumb_protegido_v2_*`, 600×400, JPEG ~0.82) para o grid ficar nítido sem baixar a prévia grande. Fotos antigas (ou com cache de outra qualidade) têm a prévia gerada sob demanda **a partir do original/editada**, e o watermark existente é usado apenas como fallback quando o original não está disponível. O cache `ORIGINAL` mantém o prefixo `preview_v5_` para reaproveitar as prévias já geradas; os demais usam `preview_v6_*`.
 10. **Marca d'água**: novas fotos/edições usam `© {nomeContratada}` (fallback `nomeFotografo` → `Estúdio`). O texto da marca é escalado com a largura da imagem.
 11. **Regeneração**: `POST /api/v1/admin/galerias/marca-dagua/fotos/{fotoId}/regerar` reprocessa original e versão editada com o nome atual, limpa caches de prévia/thumb e não altera o original nem o download final.
-12. **Pré-aquecimento**: `POST /api/v1/admin/agendamentos/{id}/galeria/previews/aquecer` (ADMIN) gera as prévias `v5` e os thumbs `v2` das fotos publicadas/pagas, grava os novos caminhos no banco e remove os caches `preview_v*` anteriores. Serve para eliminar a primeira abertura lenta de galerias antigas; sem ele, a geração é lazy.
+12. **Qualidade da prévia**: `PUT /api/v1/admin/agendamentos/{id}/galeria/qualidade` (ADMIN) grava a qualidade escolhida e aplica em todas as fotos publicadas/pagas, gerando/reaproveitando as prévias na qualidade atual e removendo os caches das outras qualidades. O download final continua sempre em `originalPath`/`editadaPath`, nunca na prévia.
 
 ## 7. Dívidas Técnicas — Status (pós-refactor)
 

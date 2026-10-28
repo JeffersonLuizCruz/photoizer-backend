@@ -1,10 +1,12 @@
 package com.photoizer.crm.foto.service
 
 import com.photoizer.crm.config.service.MarcaDaguaService
+import com.photoizer.crm.foto.acl.GaleriaQualidadePreviewReadService
 import com.photoizer.crm.foto.model.FotoEnsaio
 import com.photoizer.crm.foto.model.StatusFoto
 import com.photoizer.crm.foto.model.VersaoFoto
 import com.photoizer.crm.shared.processing.ImageProcessingService
+import com.photoizer.crm.shared.processing.QualidadePreview
 import com.photoizer.crm.shared.storage.StoragePathResolver
 import spock.lang.Specification
 import spock.lang.Subject
@@ -17,9 +19,11 @@ class FotoPreviewServiceSpec extends Specification {
     def pathResolver = Mock(StoragePathResolver)
     def imageProcessingService = Mock(ImageProcessingService)
     def marcaDaguaService = Mock(MarcaDaguaService)
+    def qualidadeReadService = Mock(GaleriaQualidadePreviewReadService)
 
     @Subject
-    def service = new FotoPreviewService(pathResolver, imageProcessingService, marcaDaguaService)
+    def service = new FotoPreviewService(
+        pathResolver, imageProcessingService, marcaDaguaService, qualidadeReadService)
 
     def agendamentoId = UUID.randomUUID()
     Path dir
@@ -28,6 +32,7 @@ class FotoPreviewServiceSpec extends Specification {
         dir = Files.createTempDirectory("foto-preview-spec")
         marcaDaguaService.texto() >> "© Estúdio"
         marcaDaguaService.opacidade() >> 0.35f
+        qualidadeReadService.qualidadePreview(agendamentoId) >> QualidadePreview.ORIGINAL
     }
 
     def cleanup() {
@@ -47,7 +52,7 @@ class FotoPreviewServiceSpec extends Specification {
         0 * imageProcessingService.redimensionarComMarcaExistente(_, _, _, _)
     }
 
-    def "gera prévia full-res a partir do original quando disponível"() {
+    def "gera prévia full-res a partir do original na qualidade original"() {
         given:
         def original = arquivo("orig_1.jpg")
         def foto = foto()
@@ -59,13 +64,36 @@ class FotoPreviewServiceSpec extends Specification {
         def caminho = service.caminhoPreview(foto)
 
         then:
-        caminho.endsWith("preview_v5_${foto.id}_ORIGINAL.jpg")
+        caminho.endsWith("${QualidadePreview.ORIGINAL.prefixoCache}${foto.id}_ORIGINAL.jpg")
         1 * imageProcessingService.aplicarMarcaDaguaEm(
             original, _ as Path,
             "© Estúdio",
             0.35f,
-            ImageProcessingService.PREVIEW_MAX_DIM,
-            ImageProcessingService.PREVIEW_QUALITY)
+            QualidadePreview.ORIGINAL.maxDim,
+            QualidadePreview.ORIGINAL.qualidade)
+    }
+
+    def "gera prévia 800px quando a galeria usa a qualidade protegida"() {
+        given:
+        def outroAgendamento = UUID.randomUUID()
+        qualidadeReadService.qualidadePreview(outroAgendamento) >> QualidadePreview.PROTEGIDA
+        def original = arquivo("orig_1.jpg")
+        def foto = foto(agendamentoId: outroAgendamento)
+        pathResolver.resolver("ag/orig.jpg") >> original
+        pathResolver.relativo(_) >> { Path p -> p.toString() }
+        imageProcessingService.aplicarMarcaDaguaEm(_, _, _, _, _, _) >> { args -> args[1] }
+
+        when:
+        def caminho = service.caminhoPreview(foto)
+
+        then:
+        caminho.endsWith("${QualidadePreview.PROTEGIDA.prefixoCache}${foto.id}_ORIGINAL.jpg")
+        1 * imageProcessingService.aplicarMarcaDaguaEm(
+            original, _ as Path,
+            "© Estúdio",
+            0.35f,
+            QualidadePreview.PROTEGIDA.maxDim,
+            QualidadePreview.PROTEGIDA.qualidade)
     }
 
     def "usa o watermark como fallback quando o original não está disponível"() {
@@ -80,11 +108,11 @@ class FotoPreviewServiceSpec extends Specification {
         def caminho = service.caminhoPreview(foto)
 
         then:
-        caminho.endsWith("preview_v5_${foto.id}_ORIGINAL.jpg")
+        caminho.endsWith("${QualidadePreview.ORIGINAL.prefixoCache}${foto.id}_ORIGINAL.jpg")
         1 * imageProcessingService.redimensionarComMarcaExistente(
             wm, _ as Path,
-            ImageProcessingService.WATERMARK_MAX_DIM,
-            ImageProcessingService.PREVIEW_QUALITY)
+            QualidadePreview.ORIGINAL.maxDim,
+            QualidadePreview.ORIGINAL.qualidade)
     }
 
     def "usa o watermark da edição quando a versão atual é editada"() {
@@ -102,18 +130,18 @@ class FotoPreviewServiceSpec extends Specification {
         def caminho = service.caminhoPreview(foto)
 
         then:
-        caminho.endsWith("preview_v5_${foto.id}_EDITADA.jpg")
+        caminho.endsWith("${QualidadePreview.ORIGINAL.prefixoCache}${foto.id}_EDITADA.jpg")
         1 * imageProcessingService.redimensionarComMarcaExistente(
             wm, _ as Path,
-            ImageProcessingService.WATERMARK_MAX_DIM,
-            ImageProcessingService.PREVIEW_QUALITY)
+            QualidadePreview.ORIGINAL.maxDim,
+            QualidadePreview.ORIGINAL.qualidade)
     }
 
     def "reaproveita a prévia versionada já gerada sob demanda"() {
         given:
         def wm = arquivo("wm.jpg")
         def foto = foto()
-        def alvo = wm.parent.resolve("preview_v5_${foto.id}_ORIGINAL.jpg")
+        def alvo = wm.parent.resolve("${QualidadePreview.ORIGINAL.prefixoCache}${foto.id}_ORIGINAL.jpg".toString())
         Files.write(alvo, [1, 2, 3] as byte[])
         pathResolver.resolver("ag/orig.jpg") >> wm.parent.resolve("orig_1.jpg")
         pathResolver.relativo(alvo) >> alvo.toString()
@@ -161,14 +189,15 @@ class FotoPreviewServiceSpec extends Specification {
         0 * imageProcessingService.redimensionarComMarcaExistente(_, _, _, _)
     }
 
-    def "prévia pública usa resolução original e qualidade alta"() {
+    def "presets de qualidade mantêm a resolução e a qualidade esperadas"() {
         expect:
-        ImageProcessingService.PREVIEW_MAX_DIM == 0
-        ImageProcessingService.PREVIEW_QUALITY == 0.92f
-        ImageProcessingService.PREVIEW_VERSION == "v5"
-        ImageProcessingService.PUBLIC_THUMB_WIDTH == 600
-        ImageProcessingService.PUBLIC_THUMB_HEIGHT == 400
-        ImageProcessingService.PUBLIC_THUMB_VERSION == "v2"
+        QualidadePreview.PROTEGIDA.maxDim == 800
+        QualidadePreview.PROTEGIDA.qualidade == 0.60f
+        QualidadePreview.EQUILIBRADA.maxDim == 1600
+        QualidadePreview.EQUILIBRADA.qualidade == 0.90f
+        QualidadePreview.ORIGINAL.maxDim == 0
+        QualidadePreview.ORIGINAL.qualidade == 0.92f
+        QualidadePreview.padrao() == QualidadePreview.ORIGINAL
     }
 
     def "remove caches versionados na raiz e nos subdiretórios orig/editadas"() {
@@ -189,6 +218,25 @@ class FotoPreviewServiceSpec extends Specification {
         then:
         !Files.exists(previewOrig)
         !Files.exists(thumbEditada)
+    }
+
+    def "remove caches das outras qualidades e preserva a atual"() {
+        given:
+        def foto = foto()
+        def orig = Files.createDirectories(dir.resolve(agendamentoId.toString()).resolve("orig"))
+        def antiga = orig.resolve("preview_v6_protegida_${foto.id}_ORIGINAL.jpg".toString())
+        def atual = orig.resolve("preview_v5_${foto.id}_ORIGINAL.jpg".toString())
+        Files.write(antiga, [1, 2, 3] as byte[])
+        Files.write(atual, [1, 2, 3] as byte[])
+        pathResolver.getUploadDir() >> dir
+
+        when:
+        service.removerCachesDeOutrasQualidades(
+            agendamentoId, foto.id, VersaoFoto.ORIGINAL, QualidadePreview.ORIGINAL)
+
+        then:
+        !Files.exists(antiga)
+        Files.exists(atual)
     }
 
     def "remove o cache de prévia de versão anterior"() {

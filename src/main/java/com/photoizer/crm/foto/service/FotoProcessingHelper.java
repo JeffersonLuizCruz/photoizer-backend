@@ -2,6 +2,7 @@ package com.photoizer.crm.foto.service;
 
 import com.photoizer.crm.config.service.MarcaDaguaService;
 import com.photoizer.crm.shared.processing.ImageProcessingService;
+import com.photoizer.crm.shared.processing.QualidadePreview;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -12,9 +13,8 @@ import java.util.UUID;
 /**
  * PATTERN: Template Method + DRY
  * Centraliza processamento de imagem (watermark + thumbnail + prévia pública)
- * com fallback e log. A prévia pública mantém a resolução original e usa JPEG
- * de alta qualidade; o thumbnail público maior é gerado sob demanda pelo
- * {@link FotoPreviewService}.
+ * com fallback e log. A prévia pública usa a qualidade configurada na galeria;
+ * o thumbnail público maior é gerado sob demanda pelo {@link FotoPreviewService}.
  */
 @Component
 public class FotoProcessingHelper {
@@ -32,12 +32,13 @@ public class FotoProcessingHelper {
 
     public record ProcessedImages(String watermarkedPath, String thumbPath, String previewPath) {}
 
-    public ProcessedImages processar(Path original, Path targetDir, UUID fotoId) {
+    public ProcessedImages processar(Path original, Path targetDir, UUID fotoId,
+                                     QualidadePreview qualidade) {
         var texto = marcaDaguaService.texto();
         var opacidade = marcaDaguaService.opacidade();
         String watermarkedPath = processarMarcaDagua(original, targetDir, fotoId, texto, opacidade);
         String thumbPath = processarThumb(original, targetDir, fotoId, watermarkedPath);
-        String previewPath = processarPreview(original, targetDir, fotoId, texto, opacidade);
+        String previewPath = processarPreview(original, targetDir, fotoId, texto, opacidade, qualidade);
         return new ProcessedImages(watermarkedPath, thumbPath, previewPath);
     }
 
@@ -84,9 +85,10 @@ public class FotoProcessingHelper {
      * partir do original (ou do watermark, como último recurso).
      */
     private String processarPreview(Path original, Path targetDir, UUID fotoId,
-                                    String texto, float opacidade) {
+                                    String texto, float opacidade, QualidadePreview qualidade) {
         try {
-            return imageProcessingService.aplicarMarcaDaguaPreview(original, targetDir, texto, opacidade)
+            return imageProcessingService.aplicarMarcaDaguaPreview(
+                    original, targetDir, texto, opacidade, qualidade)
                 .toString();
         } catch (Exception e) {
             log.atWarn()

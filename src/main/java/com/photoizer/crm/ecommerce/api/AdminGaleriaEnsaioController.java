@@ -2,7 +2,7 @@ package com.photoizer.crm.ecommerce.api;
 
 import com.photoizer.crm.ecommerce.service.GaleriaCapaService;
 import com.photoizer.crm.ecommerce.service.GaleriaEnsaioService;
-import com.photoizer.crm.foto.api.AquecerPreviasResponse;
+import com.photoizer.crm.foto.api.AplicarQualidadePreviewResponse;
 import com.photoizer.crm.foto.service.FotoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -11,7 +11,6 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -76,11 +75,14 @@ public class AdminGaleriaEnsaioController {
             galeriaService.definirTituloHero(agendamentoId, request.tituloHero())));
     }
 
-    @PostMapping("/previews/aquecer")
+    @PutMapping("/qualidade")
     @RolesAllowed("ADMIN")
-    @Operation(summary = "Pré-gerar as prévias protegidas em alta resolução das fotos publicadas")
-    public ResponseEntity<AquecerPreviasResponse> aquecerPrevias(@PathVariable UUID agendamentoId) {
-        return ResponseEntity.ok(fotoService.aquecerPrevias(agendamentoId));
+    @Operation(summary = "Definir e aplicar a qualidade das prévias da galeria")
+    public ResponseEntity<AplicarQualidadePreviewResponse> alterarQualidade(
+            @PathVariable UUID agendamentoId,
+            @Valid @RequestBody AlterarQualidadePreviewRequest request) {
+        galeriaService.alterarQualidadePreview(agendamentoId, request.qualidade());
+        return ResponseEntity.ok(fotoService.aplicarQualidadePreview(agendamentoId));
     }
 
     private GaleriaEnsaioResponse toResponse(com.photoizer.crm.ecommerce.model.GaleriaEnsaio galeria) {
@@ -89,6 +91,7 @@ public class AdminGaleriaEnsaioController {
             galeria.getAgendamentoId(),
             galeria.getModo().name(),
             galeria.getFase().name(),
+            galeria.qualidadePreviewEfetiva().name(),
             galeria.getSelecaoAtualId(),
             galeria.getCapaFotoId(),
             galeria.getCapaVersao() != null ? galeria.getCapaVersao().name() : null,

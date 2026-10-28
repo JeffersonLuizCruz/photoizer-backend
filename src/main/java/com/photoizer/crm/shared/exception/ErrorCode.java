@@ -69,6 +69,7 @@ public enum ErrorCode {
     FOTOS_EDITADAS_INCOMPLETAS,
     GALERIA_EM_EDICAO,
     MODO_GALERIA_INVALIDO,
+    QUALIDADE_PREVIEW_INVALIDA,
     GALERIA_ARQUIVADA,
 
     // ─── Proposta / Termo ──────────────────────────────────────

@@ -1,6 +1,7 @@
 package com.photoizer.crm.foto.service
 
 import com.photoizer.crm.foto.acl.AgendamentoReadService
+import com.photoizer.crm.foto.acl.GaleriaQualidadePreviewReadService
 import com.photoizer.crm.foto.event.FotosRemovidasEvent
 import com.photoizer.crm.foto.exception.ArquivoDeImagemInvalidoException
 import com.photoizer.crm.foto.exception.FotoEnsaioNaoEncontradaException
@@ -11,6 +12,7 @@ import com.photoizer.crm.foto.model.FotoEnsaio
 import com.photoizer.crm.foto.model.StatusFoto
 import com.photoizer.crm.foto.model.VersaoFoto
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository
+import com.photoizer.crm.shared.processing.QualidadePreview
 import com.photoizer.crm.shared.storage.FileStorageService
 import com.photoizer.crm.shared.storage.FileValidator
 import com.photoizer.crm.shared.storage.StoragePathResolver
@@ -33,6 +35,7 @@ class FotoServiceSpec extends Specification {
     def processingHelper = Mock(FotoProcessingHelper)
     def previewService = Mock(FotoPreviewService)
     def agendamentoReadService = Mock(AgendamentoReadService)
+    def qualidadeReadService = Mock(GaleriaQualidadePreviewReadService)
     def fileValidator = Mock(FileValidator)
     def pathResolver = Mock(StoragePathResolver)
     def eventPublisher = Mock(ApplicationEventPublisher)
@@ -44,10 +47,15 @@ class FotoServiceSpec extends Specification {
         processingHelper,
         previewService,
         agendamentoReadService,
+        qualidadeReadService,
         fileValidator,
         pathResolver,
         eventPublisher
     )
+
+    def setup() {
+        qualidadeReadService.qualidadePreview(agendamentoId) >> QualidadePreview.ORIGINAL
+    }
 
     def "rejeita imagem ilegivel e remove o arquivo gravado"() {
         given:
@@ -100,7 +108,7 @@ class FotoServiceSpec extends Specification {
         fotoRepository.findById(foto.id) >> Optional.of(foto)
         fileStorageService.salvarEmSubdiretorio(_, agendamentoId, "editadas") >> editada.toString()
         pathResolver.resolver(editada.toString()) >> editada
-        processingHelper.processar(editada, editada.parent, foto.id) >>
+        processingHelper.processar(editada, editada.parent, foto.id, QualidadePreview.ORIGINAL) >>
             new FotoProcessingHelper.ProcessedImages(watermarked.toString(), thumb.toString(), preview.toString())
         pathResolver.relativo(Path.of(watermarked.toString())) >> "editadas/wm.jpg"
         pathResolver.relativo(Path.of(thumb.toString())) >> "editadas/thumb.jpg"
@@ -130,7 +138,7 @@ class FotoServiceSpec extends Specification {
         fotoRepository.findMaxOrdemByAgendamentoId(agendamentoId) >> -1
         fileStorageService.salvarEmSubdiretorio(_, agendamentoId, "orig") >> original.toString()
         pathResolver.resolver(original.toString()) >> original
-        processingHelper.processar(original, original.parent, _ as UUID) >> {
+        processingHelper.processar(original, original.parent, _ as UUID, QualidadePreview.ORIGINAL) >> {
             throw new IllegalStateException("falha no processamento")
         }
 
@@ -154,7 +162,7 @@ class FotoServiceSpec extends Specification {
         fotoRepository.findMaxOrdemByAgendamentoId(agendamentoId) >> -1
         fileStorageService.salvarEmSubdiretorio(_, agendamentoId, "orig") >> original.toString()
         pathResolver.resolver(original.toString()) >> original
-        processingHelper.processar(original, original.parent, _ as UUID) >> {
+        processingHelper.processar(original, original.parent, _ as UUID, QualidadePreview.ORIGINAL) >> {
             throw new IllegalArgumentException("Não foi possível decodificar a imagem")
         }
 
@@ -189,9 +197,9 @@ class FotoServiceSpec extends Specification {
         pathResolver.resolver(_ as String) >> { String caminho ->
             tmp.originais.find { it.toString() == caminho }
         }
-        processingHelper.processar(primeira, tmp.dir, _ as UUID) >>
+        processingHelper.processar(primeira, tmp.dir, _ as UUID, QualidadePreview.ORIGINAL) >>
             new FotoProcessingHelper.ProcessedImages(watermark.toString(), thumb.toString(), preview.toString())
-        processingHelper.processar(segunda, tmp.dir, _ as UUID) >>
+        processingHelper.processar(segunda, tmp.dir, _ as UUID, QualidadePreview.ORIGINAL) >>
             new FotoProcessingHelper.ProcessedImages(watermark.toString(), thumb.toString(), preview.toString())
         pathResolver.relativo(_ as Path) >> "agendamento/foto.jpg"
 
@@ -354,7 +362,7 @@ class FotoServiceSpec extends Specification {
         fotoRepository.findById(foto.id) >> Optional.of(foto)
         fileStorageService.salvarEmSubdiretorio(_, agendamentoId, "editadas") >> editada.toString()
         pathResolver.resolver(editada.toString()) >> editada
-        processingHelper.processar(editada, editada.parent, foto.id) >>
+        processingHelper.processar(editada, editada.parent, foto.id, QualidadePreview.ORIGINAL) >>
             new FotoProcessingHelper.ProcessedImages(watermarked.toString(), thumb.toString(), preview.toString())
         pathResolver.relativo(Path.of(watermarked.toString())) >> "editadas/wm.jpg"
         pathResolver.relativo(Path.of(thumb.toString())) >> "editadas/thumb.jpg"
@@ -447,7 +455,7 @@ class FotoServiceSpec extends Specification {
         0 * fotoRepository.save(_)
     }
 
-    def "pré-aquece prévias antigas e remove o cache da versão anterior"() {
+    def "aplica a qualidade da prévia e remove os caches antigos"() {
         given:
         def foto = FotoEnsaio.builder()
             .id(UUID.randomUUID())
@@ -464,13 +472,16 @@ class FotoServiceSpec extends Specification {
         fotoRepository.findByAgendamentoIdOrderByOrdemAsc(agendamentoId) >> [foto]
 
         when:
-        def resultado = service.aquecerPrevias(agendamentoId)
+        def resultado = service.aplicarQualidadePreview(agendamentoId)
 
         then:
-        1 * previewService.regenerarPreview(foto) >> Optional.of(novo)
+        1 * previewService.regenerarPreview(foto, QualidadePreview.ORIGINAL) >> Optional.of(novo)
         1 * previewService.caminhoThumb(foto) >> "ag/thumb_protegido_v2_${foto.id}_ORIGINAL.jpg"
         1 * fotoRepository.save(foto) >> foto
         1 * previewService.removerPreviewAntiga("ag/preview_v4_orig.jpg")
+        1 * previewService.removerCachesDeOutrasQualidades(
+            agendamentoId, foto.id, VersaoFoto.ORIGINAL, QualidadePreview.ORIGINAL)
+        resultado.qualidade() == "ORIGINAL"
         resultado.total() == 1
         resultado.geradas() == 1
         resultado.falhas() == 0
@@ -506,10 +517,10 @@ class FotoServiceSpec extends Specification {
         fotoRepository.findById(foto.id) >> Optional.of(foto)
         pathResolver.resolver(foto.originalPath) >> original
         pathResolver.resolver(foto.editadaPath) >> editada
-        processingHelper.processar(original, original.parent, foto.id) >>
+        processingHelper.processar(original, original.parent, foto.id, QualidadePreview.ORIGINAL) >>
             new FotoProcessingHelper.ProcessedImages(
                 wmOriginal.toString(), thumbOriginal.toString(), previewOriginal.toString())
-        processingHelper.processar(editada, editada.parent, foto.id) >>
+        processingHelper.processar(editada, editada.parent, foto.id, QualidadePreview.ORIGINAL) >>
             new FotoProcessingHelper.ProcessedImages(
                 wmEditada.toString(), thumbEditada.toString(), previewEditada.toString())
         pathResolver.relativo(Path.of(wmOriginal.toString())) >> "orig/wm_orig_1.jpg"
@@ -556,7 +567,7 @@ class FotoServiceSpec extends Specification {
 
         then:
         thrown(ArquivoDeImagemInvalidoException)
-        0 * processingHelper.processar(_, _, _)
+        0 * processingHelper.processar(_, _, _, _)
         0 * fotoRepository.save(_)
     }
 

@@ -1,6 +1,7 @@
 package com.photoizer.crm.foto.service
 
 import com.photoizer.crm.foto.acl.AgendamentoReadService
+import com.photoizer.crm.foto.acl.GaleriaQualidadePreviewReadService
 import com.photoizer.crm.foto.exception.FotoNaoEditavelException
 import com.photoizer.crm.foto.exception.RenumeracaoNaoPermitidaException
 import com.photoizer.crm.foto.model.FotoEnsaio
@@ -26,6 +27,7 @@ class FotoNumeracaoSpec extends Specification {
         Mock(FotoProcessingHelper),
         Mock(FotoPreviewService),
         agendamentoReadService,
+        Mock(GaleriaQualidadePreviewReadService),
         Mock(FileValidator),
         Mock(StoragePathResolver),
         Mock(ApplicationEventPublisher)

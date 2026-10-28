@@ -7,6 +7,7 @@ public record GaleriaEnsaioResponse(
     UUID agendamentoId,
     String modo,
     String fase,
+    String qualidadePreview,
     UUID selecaoAtualId,
     UUID capaFotoId,
     String capaVersao,

@@ -2,6 +2,7 @@ package com.photoizer.crm.ecommerce.service;
 
 import com.photoizer.crm.config.model.ConfigKey;
 import com.photoizer.crm.config.service.ConfiguracaoService;
+import com.photoizer.crm.ecommerce.exception.GaleriaArquivadaException;
 import com.photoizer.crm.ecommerce.exception.GaleriaEmEdicaoException;
 import com.photoizer.crm.ecommerce.model.FaseGaleria;
 import com.photoizer.crm.ecommerce.model.GaleriaEnsaio;
@@ -16,6 +17,7 @@ import com.photoizer.crm.foto.model.VersaoFoto;
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
 import com.photoizer.crm.shared.exception.ErrorCode;
 import com.photoizer.crm.shared.exception.UnprocessableException;
+import com.photoizer.crm.shared.processing.QualidadePreview;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -205,6 +207,30 @@ public class GaleriaEnsaioService {
             .addKeyValue("agendamento_id", agendamentoId)
             .addKeyValue("modo", novoModo)
             .log("Modo da galeria alterado");
+        return galeriaRepository.save(galeria);
+    }
+
+    /**
+     * Define a qualidade das prévias públicas da galeria.
+     *
+     * <p>A aplicação nas fotos existentes é feita pelo {@code FotoService};
+     * aqui apenas validamos e persistimos a escolha do staff.
+     */
+    public GaleriaEnsaio alterarQualidadePreview(UUID agendamentoId, QualidadePreview qualidade) {
+        if (qualidade == null) {
+            throw new UnprocessableException(ErrorCode.QUALIDADE_PREVIEW_INVALIDA,
+                "Informe a qualidade da prévia.");
+        }
+        if (estadoArquivamento(agendamentoId).arquivada()) {
+            throw new GaleriaArquivadaException();
+        }
+        var galeria = obterParaAtualizacao(agendamentoId);
+        galeria.setQualidadePreview(qualidade);
+        log.atInfo()
+            .addKeyValue("event_action", "galeria.qualidade_preview_alterada")
+            .addKeyValue("agendamento_id", agendamentoId)
+            .addKeyValue("qualidade_preview", qualidade.name())
+            .log("Qualidade da prévia da galeria alterada");
         return galeriaRepository.save(galeria);
     }
 

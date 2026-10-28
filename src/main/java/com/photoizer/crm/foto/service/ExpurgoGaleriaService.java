@@ -59,7 +59,8 @@ public class ExpurgoGaleriaService {
      * {@code hero_<fotoId>_<versão>.jpg} e {@code preview_legacy_<fotoId>_*}.
      */
     private static final Pattern CACHE_DA_FOTO = Pattern.compile(
-        "^(preview_v\\d+_|thumb_protegido(?:_v\\d+)?_|hero_|preview_legacy_)([0-9a-fA-F-]{36})_.*");
+        "^(preview_v\\d+_(?:protegida_|equilibrada_)?|thumb_protegido(?:_v\\d+)?_|hero_|preview_legacy_)"
+            + "([0-9a-fA-F-]{36})_.*");
 
     private final FotoEnsaioRepository fotoEnsaioRepository;
     private final AgendamentoArmazenamentoReadService agendamentoReadService;

@@ -3088,6 +3088,93 @@
         } ]
       }
     },
+    "/api/v1/admin/agendamentos/{agendamentoId}/galeria/qualidade" : {
+      "put" : {
+        "tags" : [ "Admin Galeria" ],
+        "summary" : "Definir e aplicar a qualidade das prévias da galeria",
+        "operationId" : "alterarQualidade",
+        "parameters" : [ {
+          "name" : "agendamentoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AlterarQualidadePreviewRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AplicarQualidadePreviewResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Um ou mais campos estão inválidos",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/admin/agendamentos/{agendamentoId}/galeria/modo" : {
       "put" : {
         "tags" : [ "Admin Galeria" ],
@@ -8066,72 +8153,6 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/SelecaoEnsaioResponse"
-                }
-              }
-            }
-          },
-          "401" : {
-            "description" : "Não autenticado",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "type" : "object",
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403" : {
-            "description" : "Acesso negado ao recurso",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "type" : "object",
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500" : {
-            "description" : "Erro interno do servidor",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "type" : "object",
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        }, {
-          "cookieAuth" : [ ]
-        } ]
-      }
-    },
-    "/api/v1/admin/agendamentos/{agendamentoId}/galeria/previews/aquecer" : {
-      "post" : {
-        "tags" : [ "Admin Galeria" ],
-        "summary" : "Pré-gerar as prévias protegidas em alta resolução das fotos publicadas",
-        "operationId" : "aquecerPrevias",
-        "parameters" : [ {
-          "name" : "agendamentoId",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/AquecerPreviasResponse"
                 }
               }
             }
@@ -17126,6 +17147,9 @@
           "fase" : {
             "type" : "string"
           },
+          "qualidadePreview" : {
+            "type" : "string"
+          },
           "selecaoAtualId" : {
             "type" : "string",
             "format" : "uuid"
@@ -17160,6 +17184,44 @@
           "publicadaEm" : {
             "type" : "string",
             "format" : "date-time"
+          }
+        }
+      },
+      "AlterarQualidadePreviewRequest" : {
+        "type" : "object",
+        "properties" : {
+          "qualidade" : {
+            "type" : "string",
+            "enum" : [ "PROTEGIDA", "EQUILIBRADA", "ORIGINAL" ]
+          }
+        },
+        "required" : [ "qualidade" ]
+      },
+      "AplicarQualidadePreviewResponse" : {
+        "type" : "object",
+        "properties" : {
+          "qualidade" : {
+            "type" : "string"
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "geradas" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "reaproveitadas" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "falhas" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "ignoradas" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         }
       },
@@ -18279,31 +18341,6 @@
           "bytesLiberados" : {
             "type" : "integer",
             "format" : "int64"
-          }
-        }
-      },
-      "AquecerPreviasResponse" : {
-        "type" : "object",
-        "properties" : {
-          "total" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "geradas" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "reaproveitadas" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "falhas" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "ignoradas" : {
-            "type" : "integer",
-            "format" : "int32"
           }
         }
       },

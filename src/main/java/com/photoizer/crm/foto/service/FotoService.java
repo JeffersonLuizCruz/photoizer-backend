@@ -1,6 +1,7 @@
 package com.photoizer.crm.foto.service;
 
-import com.photoizer.crm.foto.api.AquecerPreviasResponse;
+import com.photoizer.crm.foto.api.AplicarQualidadePreviewResponse;
+import com.photoizer.crm.foto.acl.GaleriaQualidadePreviewReadService;
 import com.photoizer.crm.foto.event.FotoEditadaEvent;
 import com.photoizer.crm.foto.event.FotosGaleriaPublicadasEvent;
 import com.photoizer.crm.foto.event.FotosRemovidasEvent;
@@ -14,7 +15,9 @@ import com.photoizer.crm.foto.exception.FotoVinculadaACompraException;
 import com.photoizer.crm.foto.exception.RenumeracaoNaoPermitidaException;
 import com.photoizer.crm.foto.model.FotoEnsaio;
 import com.photoizer.crm.foto.model.StatusFoto;
+import com.photoizer.crm.foto.model.VersaoFoto;
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository;
+import com.photoizer.crm.shared.processing.QualidadePreview;
 import com.photoizer.crm.shared.security.CurrentUser;
 import com.photoizer.crm.shared.storage.FileStorageService;
 import com.photoizer.crm.shared.storage.FileValidator;
@@ -55,6 +58,7 @@ public class FotoService {
     private final FotoProcessingHelper fotoProcessingHelper;
     private final FotoPreviewService fotoPreviewService;
     private final com.photoizer.crm.foto.acl.AgendamentoReadService agendamentoReadService;
+    private final GaleriaQualidadePreviewReadService qualidadePreviewReadService;
     private final FileValidator fileValidator;
     private final StoragePathResolver pathResolver;
     private final ApplicationEventPublisher eventPublisher;
@@ -64,6 +68,7 @@ public class FotoService {
                        FotoProcessingHelper fotoProcessingHelper,
                        FotoPreviewService fotoPreviewService,
                        com.photoizer.crm.foto.acl.AgendamentoReadService agendamentoReadService,
+                       GaleriaQualidadePreviewReadService qualidadePreviewReadService,
                        FileValidator fileValidator,
                        StoragePathResolver pathResolver,
                        ApplicationEventPublisher eventPublisher) {
@@ -72,6 +77,7 @@ public class FotoService {
         this.fotoProcessingHelper = fotoProcessingHelper;
         this.fotoPreviewService = fotoPreviewService;
         this.agendamentoReadService = agendamentoReadService;
+        this.qualidadePreviewReadService = qualidadePreviewReadService;
         this.fileValidator = fileValidator;
         this.pathResolver = pathResolver;
         this.eventPublisher = eventPublisher;
@@ -106,14 +112,16 @@ public class FotoService {
     }
 
     /**
-     * Pré-gera as prévias protegidas em alta resolução de uma galeria.
+     * Aplica a qualidade de prévia configurada na galeria a todas as fotos
+     * publicadas/pagas.
      *
-     * <p>É uma operação de manutenção para fotos antigas: cada foto tem sua
-     * prévia gerada a partir do original/editada e o caminho novo é gravado no
-     * banco. As entidades permanecem gerenciadas durante o processamento para
-     * preservar as coleções lazy (tags) no merge.
+     * <p>Cada foto tem sua prévia gerada/reaproveitada a partir do
+     * original/editada e o caminho novo é gravado no banco. As entidades
+     * permanecem gerenciadas durante o processamento para preservar as coleções
+     * lazy (tags) no merge.
      */
-    public AquecerPreviasResponse aquecerPrevias(UUID agendamentoId) {
+    public AplicarQualidadePreviewResponse aplicarQualidadePreview(UUID agendamentoId) {
+        var qualidade = qualidadePreviewReadService.qualidadePreview(agendamentoId);
         var fotos = fotoEnsaioRepository.findByAgendamentoIdOrderByOrdemAsc(agendamentoId);
         int geradas = 0;
         int reaproveitadas = 0;
@@ -128,9 +136,10 @@ public class FotoService {
                 continue;
             }
 
-            var editada = foto.getVersaoAtual() == com.photoizer.crm.foto.model.VersaoFoto.EDITADA;
+            var versao = foto.getVersaoAtual();
+            var editada = versao == VersaoFoto.EDITADA;
             var anterior = editada ? foto.getEditadaPreviewPath() : foto.getPreviewPath();
-            var novo = fotoPreviewService.regenerarPreview(foto).orElse(null);
+            var novo = fotoPreviewService.regenerarPreview(foto, qualidade).orElse(null);
             if (novo == null) {
                 falhas++;
                 continue;
@@ -148,21 +157,23 @@ public class FotoService {
                 foto.setPreviewPath(novo);
             }
             fotoEnsaioRepository.save(foto);
-            removerPreviewAntigaAposCommit(anterior);
+            agendarLimpezaCaches(agendamentoId, foto.getId(), versao, qualidade, anterior);
             geradas++;
         }
 
         log.atInfo()
-            .addKeyValue("event_action", "foto.previas_aquecidas")
+            .addKeyValue("event_action", "foto.qualidade_preview_aplicada")
             .addKeyValue("agendamento_id", agendamentoId)
+            .addKeyValue("qualidade", qualidade.name())
             .addKeyValue("total", fotos.size())
             .addKeyValue("geradas", geradas)
             .addKeyValue("reaproveitadas", reaproveitadas)
             .addKeyValue("falhas", falhas)
             .addKeyValue("ignoradas", ignoradas)
-            .log("Pré-aquecimento das prévias protegidas concluído");
+            .log("Qualidade da prévia aplicada à galeria");
 
-        return new AquecerPreviasResponse(fotos.size(), geradas, reaproveitadas, falhas, ignoradas);
+        return new AplicarQualidadePreviewResponse(
+            qualidade.name(), fotos.size(), geradas, reaproveitadas, falhas, ignoradas);
     }
 
     /**
@@ -192,6 +203,7 @@ public class FotoService {
         var fotos = new ArrayList<FotoEnsaio>();
         var arquivosGravados = new ArrayList<Path>();
         var count = fotoEnsaioRepository.findMaxOrdemByAgendamentoId(agendamentoId) + 1;
+        var qualidade = qualidadePreviewReadService.qualidadePreview(agendamentoId);
 
         try {
             for (int i = 0; i < arquivos.size(); i++) {
@@ -207,7 +219,8 @@ public class FotoService {
 
                 FotoProcessingHelper.ProcessedImages processada;
                 try {
-                    processada = fotoProcessingHelper.processar(original, targetDir, UUID.randomUUID());
+                    processada = fotoProcessingHelper.processar(
+                        original, targetDir, UUID.randomUUID(), qualidade);
                 } catch (IllegalArgumentException e) {
                     // Arquivo com cabeçalho de imagem mas conteúdo corrompido.
                     throw new ArquivoDeImagemInvalidoException(arquivo.getOriginalFilename(), e);
@@ -538,8 +551,9 @@ public class FotoService {
         var originalPath = fileStorageService.salvarEmSubdiretorio(arquivo, agendamentoId, "orig");
         var original = pathResolver.resolver(originalPath);
         var targetDir = original.getParent();
+        var qualidade = qualidadePreviewReadService.qualidadePreview(agendamentoId);
 
-        var processada = fotoProcessingHelper.processar(original, targetDir, fotoId);
+        var processada = fotoProcessingHelper.processar(original, targetDir, fotoId, qualidade);
 
         deletarArquivo(foto.getOriginalPath());
         deletarArquivo(foto.getWatermarkedPath());
@@ -579,8 +593,10 @@ public class FotoService {
             throw new ArquivoDeImagemInvalidoException(foto.getFileName(),
                 new IllegalStateException("arquivo original não encontrado"));
         }
+        var qualidade = qualidadePreviewReadService.qualidadePreview(foto.getAgendamentoId());
 
-        var processada = fotoProcessingHelper.processar(original, original.getParent(), foto.getId());
+        var processada = fotoProcessingHelper.processar(
+            original, original.getParent(), foto.getId(), qualidade);
         foto.setWatermarkedPath(pathResolver.relativo(Path.of(processada.watermarkedPath())));
         foto.setThumbPath(pathResolver.relativo(Path.of(processada.thumbPath())));
         foto.setPreviewPath(processada.previewPath() == null
@@ -594,7 +610,7 @@ public class FotoService {
                     new IllegalStateException("arquivo editado não encontrado"));
             }
             var processadaEditada = fotoProcessingHelper.processar(
-                editada, editada.getParent(), foto.getId());
+                editada, editada.getParent(), foto.getId(), qualidade);
             foto.setEditadaWatermarkedPath(
                 pathResolver.relativo(Path.of(processadaEditada.watermarkedPath())));
             foto.setEditadaThumbPath(
@@ -719,6 +735,7 @@ public class FotoService {
     private FotoEnsaio salvarVersaoEditada(FotoEnsaio foto, UUID agendamentoId,
                                            org.springframework.web.multipart.MultipartFile arquivo) {
         fileValidator.validate(arquivo, "image");
+        var qualidade = qualidadePreviewReadService.qualidadePreview(agendamentoId);
         var arquivosNovos = new ArrayList<Path>();
         var caminhosAntigos = java.util.stream.Stream.of(
                 foto.getEditadaPath(),
@@ -734,7 +751,8 @@ public class FotoService {
             arquivosNovos.add(editada);
             validarImagemLegivel(editada, arquivo.getOriginalFilename());
 
-            var processada = fotoProcessingHelper.processar(editada, editada.getParent(), foto.getId());
+            var processada = fotoProcessingHelper.processar(
+                editada, editada.getParent(), foto.getId(), qualidade);
             arquivosNovos.add(Path.of(processada.watermarkedPath()));
             arquivosNovos.add(Path.of(processada.thumbPath()));
             if (processada.previewPath() != null) {
@@ -806,23 +824,26 @@ public class FotoService {
     }
 
     /**
-     * Só apaga o cache antigo depois que o banco confirmar o novo caminho.
+     * Só apaga os caches antigos depois que o banco confirmar o novo caminho.
      * Em execução sem transação (testes/chamadas diretas), apaga na hora.
      */
-    private void removerPreviewAntigaAposCommit(String caminho) {
-        if (caminho == null || caminho.isBlank()) {
-            return;
-        }
+    private void agendarLimpezaCaches(UUID agendamentoId, UUID fotoId, VersaoFoto versao,
+                                      QualidadePreview qualidade, String caminhoAnterior) {
+        Runnable limpeza = () -> {
+            fotoPreviewService.removerPreviewAntiga(caminhoAnterior);
+            fotoPreviewService.removerCachesDeOutrasQualidades(
+                agendamentoId, fotoId, versao, qualidade);
+        };
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    fotoPreviewService.removerPreviewAntiga(caminho);
+                    limpeza.run();
                 }
             });
             return;
         }
-        fotoPreviewService.removerPreviewAntiga(caminho);
+        limpeza.run();
     }
 
     private void deletarArquivo(String caminho) {

@@ -1,13 +1,14 @@
 package com.photoizer.crm.foto.api;
 
 /**
- * Resultado do pré-aquecimento das prévias protegidas de uma galeria.
+ * Resultado da aplicação da qualidade de prévia em uma galeria.
  *
  * <p>{@code geradas} são fotos que passaram a usar um cache novo,
- * {@code reaproveitadas} já estavam na versão atual e {@code ignoradas} são
+ * {@code reaproveitadas} já estavam na qualidade atual e {@code ignoradas} são
  * fotos não publicadas, invisíveis ou arquivadas.
  */
-public record AquecerPreviasResponse(
+public record AplicarQualidadePreviewResponse(
+    String qualidade,
     int total,
     int geradas,
     int reaproveitadas,

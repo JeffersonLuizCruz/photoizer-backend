@@ -31,7 +31,7 @@ class ImageProcessingServiceSpec extends Specification {
 
         when:
         service.aplicarMarcaDaguaEm(original, alvo, "© Estúdio", 0.35f,
-            ImageProcessingService.PREVIEW_MAX_DIM, ImageProcessingService.PREVIEW_QUALITY)
+            QualidadePreview.ORIGINAL.maxDim, QualidadePreview.ORIGINAL.qualidade)
 
         then:
         def gerada = ImageIO.read(alvo.toFile())

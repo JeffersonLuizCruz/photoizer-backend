@@ -33,19 +33,6 @@ public class ImageProcessingService {
     public static final float WATERMARK_QUALITY = 0.85f;
 
     /**
-     * Prévia pública protegida: usa a resolução original para preservar a
-     * experiência do cliente. Zero significa "não redimensionar".
-     */
-    public static final int PREVIEW_MAX_DIM = 0;
-    public static final float PREVIEW_QUALITY = 0.92f;
-
-    /**
-     * Versão do cache da prévia pública. Ao mudar tamanho/qualidade, incremente
-     * este valor para que os arquivos antigos deixem de ser usados.
-     */
-    public static final String PREVIEW_VERSION = "v5";
-
-    /**
      * Thumbnail público do grid: maior que o thumb interno para ficar nítido em
      * telas retina sem obrigar o download da prévia em resolução original.
      */
@@ -92,9 +79,11 @@ public class ImageProcessingService {
         return aplicarMarcaDaguaEm(source, target, texto, opacidade, WATERMARK_MAX_DIM, WATERMARK_QUALITY);
     }
 
-    public Path aplicarMarcaDaguaPreview(Path source, Path targetDir, String texto, float opacidade) throws IOException {
-        var target = targetDir.resolve("preview_" + PREVIEW_VERSION + "_" + source.getFileName());
-        return aplicarMarcaDaguaEm(source, target, texto, opacidade, PREVIEW_MAX_DIM, PREVIEW_QUALITY);
+    public Path aplicarMarcaDaguaPreview(Path source, Path targetDir, String texto, float opacidade,
+                                         QualidadePreview qualidade) throws IOException {
+        var target = targetDir.resolve(qualidade.getPrefixoCache() + source.getFileName());
+        return aplicarMarcaDaguaEm(source, target, texto, opacidade,
+            qualidade.getMaxDim(), qualidade.getQualidade());
     }
 
     public Path aplicarMarcaDaguaEm(Path source, Path target, String texto, float opacidade,
