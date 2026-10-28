@@ -1,12 +1,16 @@
 package com.photoizer.crm.agenda.api
 
 import com.photoizer.crm.agenda.repository.AgendamentoRepository
+import com.photoizer.crm.auth.model.Papel
+import com.photoizer.crm.auth.model.User
 import com.photoizer.crm.auth.repository.UserRepository
 import com.photoizer.crm.pacote.repository.PacoteRepository
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.transaction.annotation.Transactional
 import spock.lang.Specification
@@ -16,6 +20,7 @@ import java.time.LocalDateTime
 import static com.photoizer.crm.agenda.support.AgendaFixtures.novoFotografo
 import static com.photoizer.crm.agenda.support.AgendaFixtures.pacote
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
@@ -283,6 +288,40 @@ class AgendamentoControllerIntegrationSpec extends Specification {
 
         then: "o fluxo normal continua rejeitando data passada"
         resultado.andExpect(status().isUnprocessableEntity())
+    }
+
+    def "lista fotógrafos e usa o fotógrafo logado como padrão"() {
+        given: "dois fotógrafos ativos cadastrados"
+        def ana = userRepository.save(novoFotografo("Ana Fotógrafa"))
+        userRepository.save(novoFotografo("Bia Fotógrafa"))
+
+        when: "a fotógrafa Ana consulta as opções"
+        def resultado = mockMvc.perform(get("/api/v1/agendamentos/fotografos")
+            .with(authentication(new UsernamePasswordAuthenticationToken(
+                ana.id.toString(), null, [new SimpleGrantedAuthority("ROLE_FOTOGRAFO")]))))
+
+        then: "ela vem como responsável padrão"
+        resultado.andExpect(status().isOk())
+            .andExpect(jsonPath('$.fotografoPadraoId').value(ana.id.toString()))
+            .andExpect(jsonPath('$.fotografos.length()').value(2))
+    }
+
+    def "usa o fotógrafo configurado como padrão para staff que não é fotógrafo"() {
+        given: "um fotógrafo provisionado pela configuração e um staff agendador"
+        def configurado = novoFotografo("Fotógrafo do Estúdio")
+        configurado.setEmail(User.EMAIL_FOTOGRAFO_CONFIGURADO)
+        configurado = userRepository.save(configurado)
+        def agendador = userRepository.save(new User(
+            "agendador-${UUID.randomUUID()}@teste.com", "hash", "Agendador", Papel.AGENDADOR))
+
+        when: "o agendador consulta as opções"
+        def resultado = mockMvc.perform(get("/api/v1/agendamentos/fotografos")
+            .with(authentication(new UsernamePasswordAuthenticationToken(
+                agendador.id.toString(), null, [new SimpleGrantedAuthority("ROLE_AGENDADOR")]))))
+
+        then: "o fotógrafo configurado é o padrão"
+        resultado.andExpect(status().isOk())
+            .andExpect(jsonPath('$.fotografoPadraoId').value(configurado.id.toString()))
     }
 
     def "retorna 404 para token de proposta pública inexistente"() {

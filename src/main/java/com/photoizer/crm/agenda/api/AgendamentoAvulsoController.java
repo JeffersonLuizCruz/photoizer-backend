@@ -10,6 +10,7 @@ import jakarta.annotation.security.RolesAllowed;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -35,9 +36,11 @@ public class AgendamentoAvulsoController {
 
     @GetMapping("/opcoes")
     @Operation(operationId = "opcoesAgendamentoAvulso", summary = "Opções do agendamento avulso",
-        description = "Lista fotógrafos, editores e valores padrão sem expor a configuração completa.")
-    public ResponseEntity<OpcoesAgendamentoAvulsoResponse> opcoes() {
-        return ResponseEntity.ok(agendamentoAvulsoService.opcoes());
+        description = "Lista fotógrafos, editores e valores padrão sem expor a configuração completa. "
+            + "Inclui o fotógrafo responsável pré-selecionado (usuário logado ou fotógrafo de Configurações).")
+    public ResponseEntity<OpcoesAgendamentoAvulsoResponse> opcoes(
+            @AuthenticationPrincipal String userIdStr) {
+        return ResponseEntity.ok(agendamentoAvulsoService.opcoes(parseUserId(userIdStr)));
     }
 
     @PostMapping
@@ -98,5 +101,9 @@ public class AgendamentoAvulsoController {
             .map(org.springframework.security.core.GrantedAuthority::getAuthority)
             .anyMatch("ROLE_AGENDADOR"::equals);
         return semMetricas ? response.ocultarDadosInternos() : response;
+    }
+
+    private UUID parseUserId(String userIdStr) {
+        return userIdStr != null && !userIdStr.isBlank() ? UUID.fromString(userIdStr) : null;
     }
 }

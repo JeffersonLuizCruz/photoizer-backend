@@ -1,6 +1,7 @@
 package com.photoizer.crm.agenda.service
 
 import com.photoizer.crm.agenda.api.AgendamentoMapper
+import com.photoizer.crm.agenda.api.OpcoesFotografoResponse
 import com.photoizer.crm.agenda.model.Agendamento
 import com.photoizer.crm.agenda.model.OrigemAgendamento
 import com.photoizer.crm.agenda.model.StatusAgendamento
@@ -32,6 +33,7 @@ class AgendamentoAvulsoServiceSpec extends Specification {
     def pagamentoService = Mock(PagamentoService)
     def agendamentoMapper = Mock(AgendamentoMapper)
     def agendamentoService = Mock(AgendamentoService)
+    def fotografoOpcoesService = Mock(FotografoOpcoesService)
 
     @Subject
     def service = new AgendamentoAvulsoService(
@@ -42,7 +44,8 @@ class AgendamentoAvulsoServiceSpec extends Specification {
         configuracaoService,
         pagamentoService,
         agendamentoMapper,
-        agendamentoService)
+        agendamentoService,
+        fotografoOpcoesService)
 
     def pacote
     def fotografo
@@ -206,6 +209,23 @@ class AgendamentoAvulsoServiceSpec extends Specification {
         then: "o papel é validado"
         def exception = thrown(BadRequestException)
         exception.message.contains("não é um fotógrafo")
+    }
+
+    def "opcoes expõe fotógrafos ativos e o responsável padrão resolvido"() {
+        given: "o serviço de opções já resolveu o responsável padrão"
+        def padraoId = UUID.randomUUID()
+        fotografoOpcoesService.opcoes(_) >> new OpcoesFotografoResponse(
+            [new OpcoesFotografoResponse.FotografoOpcao(fotografo.id, fotografo.nome)], padraoId)
+
+        when: "as opções do avulso são consultadas"
+        def opcoes = service.opcoes(UUID.randomUUID())
+
+        then: "a lista e o padrão são repassados, junto dos valores configurados"
+        opcoes.fotografos.size() == 1
+        opcoes.fotografos.first().id == fotografo.id
+        opcoes.fotografoPadraoId == padraoId
+        opcoes.percentualEntrada == new BigDecimal("30.00")
+        opcoes.taxaDeslocamentoPadrao == new BigDecimal("50.00")
     }
 
     private CriarAgendamentoAvulsoCommand command(Map<String, Object> overrides = [:]) {

@@ -10,7 +10,6 @@ import com.photoizer.crm.agenda.model.OrigemAgendamento;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.repository.AgendamentoRepository;
 import com.photoizer.crm.auth.model.Papel;
-import com.photoizer.crm.auth.model.User;
 import com.photoizer.crm.auth.repository.UserRepository;
 import com.photoizer.crm.config.model.ConfigKey;
 import com.photoizer.crm.config.service.ConfiguracaoService;
@@ -44,6 +43,7 @@ public class AgendamentoAvulsoService {
     private final PagamentoService pagamentoService;
     private final AgendamentoMapper agendamentoMapper;
     private final AgendamentoService agendamentoService;
+    private final FotografoOpcoesService fotografoOpcoesService;
 
     public AgendamentoAvulsoService(PacoteQueryService pacoteQueryService,
                                     UserRepository userRepository,
@@ -52,7 +52,8 @@ public class AgendamentoAvulsoService {
                                     ConfiguracaoService configuracaoService,
                                     PagamentoService pagamentoService,
                                     AgendamentoMapper agendamentoMapper,
-                                    AgendamentoService agendamentoService) {
+                                    AgendamentoService agendamentoService,
+                                    FotografoOpcoesService fotografoOpcoesService) {
         this.pacoteQueryService = pacoteQueryService;
         this.userRepository = userRepository;
         this.agendamentoRepository = agendamentoRepository;
@@ -61,6 +62,7 @@ public class AgendamentoAvulsoService {
         this.pagamentoService = pagamentoService;
         this.agendamentoMapper = agendamentoMapper;
         this.agendamentoService = agendamentoService;
+        this.fotografoOpcoesService = fotografoOpcoesService;
     }
 
     public Agendamento criar(CriarAgendamentoAvulsoCommand command) {
@@ -193,13 +195,14 @@ public class AgendamentoAvulsoService {
     }
 
     @Transactional(readOnly = true)
-    public OpcoesAgendamentoAvulsoResponse opcoes() {
-        var fotografos = userRepository.findByPapel(Papel.FOTOGRAFO).stream()
-            .filter(User::isAtivo)
-            .map(u -> new OpcoesAgendamentoAvulsoResponse.ProfissionalOpcao(u.getId(), u.getNome()))
+    public OpcoesAgendamentoAvulsoResponse opcoes(UUID usuarioLogadoId) {
+        var opcoesFotografo = fotografoOpcoesService.opcoes(usuarioLogadoId);
+        var fotografos = opcoesFotografo.fotografos().stream()
+            .map(f -> new OpcoesAgendamentoAvulsoResponse.ProfissionalOpcao(f.id(), f.nome()))
             .toList();
         return new OpcoesAgendamentoAvulsoResponse(
             fotografos,
+            opcoesFotografo.fotografoPadraoId(),
             configuracaoService.getValorDecimal(ConfigKey.PERCENTUAL_ENTRADA),
             configuracaoService.getValorDecimal(ConfigKey.TAXA_DESLOCAMENTO)
         );

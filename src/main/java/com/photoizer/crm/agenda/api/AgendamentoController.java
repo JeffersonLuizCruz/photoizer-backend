@@ -7,6 +7,7 @@ import com.photoizer.crm.agenda.service.AgendamentoService;
 import com.photoizer.crm.agenda.service.AgendamentoStatusLifecycle;
 import com.photoizer.crm.agenda.service.CriarPropostaCommand;
 import com.photoizer.crm.agenda.service.DisponibilidadeService;
+import com.photoizer.crm.agenda.service.FotografoOpcoesService;
 import com.photoizer.crm.comissao.repository.IndicacaoRepository;
 import com.photoizer.crm.shared.exception.BadRequestException;
 import com.photoizer.crm.shared.model.FormaPagamento;
@@ -54,6 +55,7 @@ public class AgendamentoController {
     private final IndicacaoRepository indicacaoRepository;
     private final AgendamentoFotografoRepository agendamentoFotografoRepository;
     private final FileServeHelper fileServeHelper;
+    private final FotografoOpcoesService fotografoOpcoesService;
 
     public AgendamentoController(AgendamentoService agendamentoService,
                                   AgendamentoStatusLifecycle agendamentoStatusLifecycle,
@@ -61,7 +63,8 @@ public class AgendamentoController {
                                   AgendamentoMapper agendamentoMapper,
                                   IndicacaoRepository indicacaoRepository,
                                   AgendamentoFotografoRepository agendamentoFotografoRepository,
-                                  FileServeHelper fileServeHelper) {
+                                  FileServeHelper fileServeHelper,
+                                  FotografoOpcoesService fotografoOpcoesService) {
         this.agendamentoService = agendamentoService;
         this.agendamentoStatusLifecycle = agendamentoStatusLifecycle;
         this.disponibilidadeService = disponibilidadeService;
@@ -69,6 +72,7 @@ public class AgendamentoController {
         this.indicacaoRepository = indicacaoRepository;
         this.agendamentoFotografoRepository = agendamentoFotografoRepository;
         this.fileServeHelper = fileServeHelper;
+        this.fotografoOpcoesService = fotografoOpcoesService;
     }
 
     @PostMapping("/proposta")
@@ -182,6 +186,18 @@ public class AgendamentoController {
         var autorId = userIdStr != null && !userIdStr.isBlank() ? UUID.fromString(userIdStr) : null;
         var agendamento = agendamentoService.recusar(id, request.motivo(), autorId);
         return ResponseEntity.ok(respostaPara(agendamentoMapper.toResponse(agendamento, null, null, null, null)));
+    }
+
+    @GetMapping("/fotografos")
+    @Operation(operationId = "listarFotografosOpcoes",
+        summary = "Listar fotógrafos e o responsável padrão",
+        description = "Retorna os fotógrafos ativos e o responsável pré-selecionado para novos agendamentos: "
+            + "o próprio usuário logado quando ele é fotógrafo; caso contrário, o fotógrafo definido em Configurações.")
+    @ApiResponse(responseCode = "200", description = "Fotógrafos disponíveis e responsável padrão")
+    public ResponseEntity<OpcoesFotografoResponse> listarFotografos(
+            @AuthenticationPrincipal String userIdStr) {
+        var usuarioId = userIdStr != null && !userIdStr.isBlank() ? UUID.fromString(userIdStr) : null;
+        return ResponseEntity.ok(fotografoOpcoesService.opcoes(usuarioId));
     }
 
     @GetMapping

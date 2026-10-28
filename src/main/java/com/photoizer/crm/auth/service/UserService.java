@@ -19,13 +19,6 @@ import java.util.UUID;
 @Transactional
 public class UserService {
 
-    /**
-     * Email sintético que identifica o usuário FOTOGRAFO provisionado a partir
-     * do nome configurado na tela de Configuração. Fixo e único para permitir
-     * upsert idempotente (renomear em vez de duplicar).
-     */
-    private static final String EMAIL_FOTOGRAFO_CONFIGURADO = "fotografo.configurado@photoizer.local";
-
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
@@ -103,7 +96,7 @@ public class UserService {
             return;
         }
         var nomeLimpo = nome.trim();
-        var existente = userRepository.findByEmail(EMAIL_FOTOGRAFO_CONFIGURADO);
+        var existente = userRepository.findByEmail(User.EMAIL_FOTOGRAFO_CONFIGURADO);
         if (existente.isPresent()) {
             var user = existente.get();
             user.setNome(nomeLimpo);
@@ -113,7 +106,7 @@ public class UserService {
             return;
         }
         var user = new User(
-            EMAIL_FOTOGRAFO_CONFIGURADO,
+            User.EMAIL_FOTOGRAFO_CONFIGURADO,
             passwordEncoder.encode(UUID.randomUUID().toString()),
             nomeLimpo,
             Papel.FOTOGRAFO

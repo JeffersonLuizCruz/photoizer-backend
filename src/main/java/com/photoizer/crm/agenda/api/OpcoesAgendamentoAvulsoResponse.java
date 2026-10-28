@@ -6,6 +6,7 @@ import java.util.UUID;
 
 public record OpcoesAgendamentoAvulsoResponse(
     List<ProfissionalOpcao> fotografos,
+    UUID fotografoPadraoId,
     BigDecimal percentualEntrada,
     BigDecimal taxaDeslocamentoPadrao
 ) {

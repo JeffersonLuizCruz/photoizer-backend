@@ -26,6 +26,13 @@ import java.util.UUID;
 @NoArgsConstructor
 public class User {
 
+    /**
+     * E-mail sintético do usuário FOTOGRAFO provisionado a partir do nome
+     * configurado em Configurações → Fotógrafo Responsável. Fixo e único para
+     * permitir upsert idempotente e para identificar o responsável padrão.
+     */
+    public static final String EMAIL_FOTOGRAFO_CONFIGURADO = "fotografo.configurado@photoizer.local";
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;

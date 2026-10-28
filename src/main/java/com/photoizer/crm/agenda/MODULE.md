@@ -1,7 +1,7 @@
 # Módulo: Agenda
 
 > **ATUALIZAÇÃO (consolidação do fluxo de agendamento)** — o módulo `contrato` foi removido e o fluxo manual (wizard) foi substituído por um **fluxo único de proposta/pré-reserva**:
-> 1. Staff cria uma proposta a partir de uma data (`POST /api/v1/agendamentos/proposta`) → `Agendamento` em `PRE_RESERVA` (cliente ainda nulo), com `tokenProposta` do link público. O `fotografoId` é **obrigatório** e deve ter `Papel.FOTOGRAFO` (não há mais fallback para o usuário logado). A criação **também valida conflito** por responsável contra agendamentos que já ocupam a agenda (`CONFIRMADO`+). O campo opcional `valorEntradaPago` permite registrar uma **entrada já paga pelo cliente**: quando maior que zero, ele substitui o `PERCENTUAL_ENTRADA` configurado, vira a própria entrada exigida e dispensa o comprovante no link público.
+> 1. Staff cria uma proposta a partir de uma data (`POST /api/v1/agendamentos/proposta`) → `Agendamento` em `PRE_RESERVA` (cliente ainda nulo), com `tokenProposta` do link público. O `fotografoId` é **obrigatório** e deve ter `Papel.FOTOGRAFO`; a UI pré-seleciona o **responsável padrão** (`GET /api/v1/agendamentos/fotografos`): o próprio usuário logado quando é fotógrafo ativo; caso contrário, o fotógrafo provisionado a partir de Configurações (`Nome do Fotógrafo`). Sem padrão, a seleção continua manual. A criação **também valida conflito** por responsável contra agendamentos que já ocupam a agenda (`CONFIRMADO`+). O campo opcional `valorEntradaPago` permite registrar uma **entrada já paga pelo cliente**: quando maior que zero, ele substitui o `PERCENTUAL_ENTRADA` configurado, vira a própria entrada exigida e dispensa o comprovante no link público.
 > 2. O cliente preenche os próprios dados, autoriza uso de imagem e assina no link público (`/api/v1/propostas/publico/{token}`) → `AGUARDANDO_APROVACAO`. Anexa comprovante da reserva apenas quando ainda há entrada a pagar (proposta sem `valorEntradaPago` informado e origem não `AVULSO`).
 > 3. Staff `confirmar-pagamento` → `PAGAMENTO_CONFIRMADO`; `aprovar` → `CONFIRMADO` (aqui valida conflito e ocupa a agenda); `recusar` (com motivo obrigatório) → `CANCELADO`. Quando a entrada já está quitada, `aprovar` executa a confirmação de pagamento internamente, permitindo aprovação direta a partir de `AGUARDANDO_APROVACAO`.
 >     - **Alterar proposta** (`PUT /api/v1/agendamentos/{id}/proposta`, ADMIN/FOTOGRAFO): permitido **apenas em `PRE_RESERVA`** (antes da assinatura), para preservar a integridade do snapshot/termo assinado. Recalcula valores, revalida conflito e sincroniza repasses; o token do link público é preservado. Bloqueia com 422 (`PropostaNaoEditavelException`) fora da pré-reserva.
@@ -31,6 +31,7 @@ agenda/
 ├── service/
 │   ├── AgendamentoService.java       # ~532 linhas: criação, listagem, atualização, resolução de cliente, materialização via contrato
 │   ├── AgendamentoStatusLifecycle.java# ~125 linhas: máquina de estados (status, reagendar, destaque, pagamento final) + eventos [Fase 2]
+│   ├── FotografoOpcoesService.java   # Lista fotógrafos ativos e resolve o responsável padrão (logado ou Configurações)
 │   ├── AgendamentoValoresCalculator.java # ~69 linhas: cálculo financeiro único (novo/atualização) + valorRepasseEfetivo [Fase 2]
 │   ├── PartilhaService.java          # ~79 linhas: calcular/validar partilha de fotógrafos (usa DespesaService) [Fase 2]
 │   ├── DisponibilidadeService.java   # verificarDisponibilidade + validarConflitoAgenda + bloqueios de agenda (porta shared) [Fase 2]
@@ -38,7 +39,7 @@ agenda/
 │   ├── RascunhoAgendamentoService.java  # ~92 linhas: salvar/buscar/deletar rascunho por usuário
 │   └── CriarAgendamentoCommand.java      # Record com 27 campos (inclui MultipartFile)
 ├── api/
-│   ├── AgendamentoController.java     # REST: POST /proposta, PUT /{id}/proposta, DELETE /{id}/proposta, GET, PUT, PATCH /status, PATCH /confirmar-pagamento, PATCH /aprovar, PATCH /recusar, PATCH /reagendar, PATCH /destaque, POST /pagamento-final, GET /verificar-disponibilidade
+│   ├── AgendamentoController.java     # REST: POST /proposta, PUT /{id}/proposta, DELETE /{id}/proposta, GET, GET /fotografos, PUT, PATCH /status, PATCH /confirmar-pagamento, PATCH /aprovar, PATCH /recusar, PATCH /reagendar, PATCH /destaque, POST /pagamento-final, GET /verificar-disponibilidade
 │   ├── AgendamentoFotografoController.java # REST de repasses
 │   ├── RascunhoAgendamentoController.java  # REST de rascunhos
 │   ├── AgendamentoMapper.java         # MapStruct multi-source: agendamento + fotografos + valorComissao + indicador + statusComissao [Fase 2]

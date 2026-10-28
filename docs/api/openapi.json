@@ -13868,11 +13868,42 @@
         }
       }
     },
+    "/api/v1/agendamentos/fotografos" : {
+      "get" : {
+        "tags" : [ "Agendamentos" ],
+        "summary" : "Listar fotógrafos e o responsável padrão",
+        "description" : "Retorna os fotógrafos ativos e o responsável pré-selecionado para novos agendamentos: o próprio usuário logado quando ele é fotógrafo; caso contrário, o fotógrafo definido em Configurações.",
+        "operationId" : "listarFotografosOpcoes",
+        "responses" : {
+          "200" : {
+            "description" : "Fotógrafos disponíveis e responsável padrão",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OpcoesFotografoResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/agendamentos/avulso/opcoes" : {
       "get" : {
         "tags" : [ "Agendamentos" ],
         "summary" : "Opções do agendamento avulso",
-        "description" : "Lista fotógrafos, editores e valores padrão sem expor a configuração completa.",
+        "description" : "Lista fotógrafos, editores e valores padrão sem expor a configuração completa. Inclui o fotógrafo responsável pré-selecionado (usuário logado ou fotógrafo de Configurações).",
         "operationId" : "opcoesAgendamentoAvulso",
         "responses" : {
           "200" : {
@@ -20625,6 +20656,37 @@
           }
         }
       },
+      "FotografoOpcao" : {
+        "type" : "object",
+        "description" : "Fotógrafo disponível para seleção.",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "nome" : {
+            "type" : "string"
+          }
+        }
+      },
+      "OpcoesFotografoResponse" : {
+        "type" : "object",
+        "description" : "Fotógrafos ativos e o responsável pré-selecionado para novos agendamentos.",
+        "properties" : {
+          "fotografos" : {
+            "type" : "array",
+            "description" : "Fotógrafos ativos disponíveis para seleção",
+            "items" : {
+              "$ref" : "#/components/schemas/FotografoOpcao"
+            }
+          },
+          "fotografoPadraoId" : {
+            "type" : [ "string", "null" ],
+            "format" : "uuid",
+            "description" : "Fotógrafo pré-selecionado; null quando não há padrão definido"
+          }
+        }
+      },
       "OpcoesAgendamentoAvulsoResponse" : {
         "type" : "object",
         "properties" : {
@@ -20633,6 +20695,10 @@
             "items" : {
               "$ref" : "#/components/schemas/ProfissionalOpcao"
             }
+          },
+          "fotografoPadraoId" : {
+            "type" : "string",
+            "format" : "uuid"
           },
           "percentualEntrada" : {
             "type" : "number"
