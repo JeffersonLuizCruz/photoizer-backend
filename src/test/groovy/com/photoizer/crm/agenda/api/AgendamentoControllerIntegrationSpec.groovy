@@ -1,5 +1,6 @@
 package com.photoizer.crm.agenda.api
 
+import com.photoizer.crm.agenda.repository.AgendamentoRepository
 import com.photoizer.crm.auth.repository.UserRepository
 import com.photoizer.crm.pacote.repository.PacoteRepository
 import org.springframework.beans.factory.annotation.Autowired
@@ -17,6 +18,7 @@ import static com.photoizer.crm.agenda.support.AgendaFixtures.pacote
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
@@ -34,6 +36,9 @@ class AgendamentoControllerIntegrationSpec extends Specification {
 
     @Autowired
     UserRepository userRepository
+
+    @Autowired
+    AgendamentoRepository agendamentoRepository
 
     def "cria proposta via endpoint e retorna o link público"() {
         given: "pacote e fotógrafo cadastrados"
@@ -140,6 +145,144 @@ class AgendamentoControllerIntegrationSpec extends Specification {
 
         then: "o acesso é negado"
         resultado.andExpect(status().isForbidden())
+    }
+
+    def "registra agendamento avulso com data passada via endpoint"() {
+        given: "pacote e fotógrafo cadastrados"
+        def pacote = pacoteRepository.save(pacote(id: null))
+        def fotografo = userRepository.save(novoFotografo())
+        def corpo = """
+            {
+              "pacoteId": "${pacote.id}",
+              "fotografoId": "${fotografo.id}",
+              "dataHoraEnsaio": "${LocalDateTime.now().minusDays(2)}",
+              "duracaoMinutos": 60,
+              "localEnsaio": "Praia"
+            }
+        """
+
+        when: "o endpoint de agendamento avulso recebe uma data passada"
+        def resultado = mockMvc.perform(post("/api/v1/agendamentos/avulso")
+            .contentType(MediaType.APPLICATION_JSON)
+            .with(user("staff").roles("AGENDADOR"))
+            .content(corpo))
+
+        then: "o ensaio é registrado como confirmado"
+        resultado.andExpect(status().isCreated())
+            .andExpect(jsonPath('$.status').value("CONFIRMADO"))
+            .andExpect(jsonPath('$.origem').value("AVULSO"))
+    }
+
+    def "rejeita proposta com data passada via endpoint"() {
+        given: "pacote e fotógrafo cadastrados"
+        def pacote = pacoteRepository.save(pacote(id: null))
+        def fotografo = userRepository.save(novoFotografo())
+        def corpo = """
+            {
+              "pacoteId": "${pacote.id}",
+              "fotografoId": "${fotografo.id}",
+              "dataHoraEnsaio": "${LocalDateTime.now().minusDays(2)}",
+              "duracaoMinutos": 60,
+              "localEnsaio": "Estúdio"
+            }
+        """
+
+        when: "o endpoint de proposta recebe uma data passada"
+        def resultado = mockMvc.perform(post("/api/v1/agendamentos/proposta")
+            .contentType(MediaType.APPLICATION_JSON)
+            .with(user("staff").roles("ADMIN"))
+            .content(corpo))
+
+        then: "a regra da proposta normal continua bloqueando"
+        resultado.andExpect(status().isUnprocessableEntity())
+    }
+
+    def "corrige agendamento avulso retroativo via endpoint dedicado"() {
+        given: "um avulso retroativo já criado"
+        def pacote = pacoteRepository.save(pacote(id: null))
+        def fotografo = userRepository.save(novoFotografo())
+        def criacao = """
+            {
+              "pacoteId": "${pacote.id}",
+              "fotografoId": "${fotografo.id}",
+              "dataHoraEnsaio": "${LocalDateTime.now().minusDays(2)}",
+              "duracaoMinutos": 60,
+              "localEnsaio": "Praia"
+            }
+        """
+        mockMvc.perform(post("/api/v1/agendamentos/avulso")
+            .contentType(MediaType.APPLICATION_JSON)
+            .with(user("staff").roles("AGENDADOR"))
+            .content(criacao))
+            .andExpect(status().isCreated())
+        def agendamento = agendamentoRepository.findAll().first()
+        def atualizacao = """
+            {
+              "pacoteId": "${pacote.id}",
+              "fotografoId": "${fotografo.id}",
+              "dataHoraEnsaio": "${LocalDateTime.now().minusDays(2)}",
+              "localEnsaio": "Estúdio corrigido",
+              "custoDeslocamento": 0,
+              "repassarDeslocamento": true,
+              "autorizaUsoImagem": false,
+              "observacoes": "Correção retroativa",
+              "fotografos": []
+            }
+        """
+
+        when: "o endpoint dedicado corrige o avulso com data passada"
+        def resultado = mockMvc.perform(put("/api/v1/agendamentos/avulso/${agendamento.id}")
+            .contentType(MediaType.APPLICATION_JSON)
+            .with(user("staff").roles("ADMIN"))
+            .content(atualizacao))
+
+        then: "a correção é aceita"
+        resultado.andExpect(status().isOk())
+            .andExpect(jsonPath('$.localEnsaio').value("Estúdio corrigido"))
+            .andExpect(jsonPath('$.observacoes').value("Correção retroativa"))
+    }
+
+    def "mantém regra de data futura na atualização normal de agendamento"() {
+        given: "uma proposta criada com data futura"
+        def pacote = pacoteRepository.save(pacote(id: null))
+        def fotografo = userRepository.save(novoFotografo())
+        def criacao = """
+            {
+              "pacoteId": "${pacote.id}",
+              "fotografoId": "${fotografo.id}",
+              "dataHoraEnsaio": "${LocalDateTime.now().plusDays(10)}",
+              "duracaoMinutos": 60,
+              "localEnsaio": "Estúdio"
+            }
+        """
+        mockMvc.perform(post("/api/v1/agendamentos/proposta")
+            .contentType(MediaType.APPLICATION_JSON)
+            .with(user("staff").roles("ADMIN"))
+            .content(criacao))
+            .andExpect(status().isCreated())
+        def agendamento = agendamentoRepository.findAll().first()
+        def atualizacao = """
+            {
+              "pacoteId": "${pacote.id}",
+              "fotografoId": "${fotografo.id}",
+              "dataHoraEnsaio": "${LocalDateTime.now().minusDays(1)}",
+              "localEnsaio": "Estúdio",
+              "custoDeslocamento": 0,
+              "repassarDeslocamento": true,
+              "autorizaUsoImagem": false,
+              "observacoes": "Tentativa",
+              "fotografos": []
+            }
+        """
+
+        when: "a atualização normal recebe uma data passada"
+        def resultado = mockMvc.perform(put("/api/v1/agendamentos/${agendamento.id}")
+            .contentType(MediaType.APPLICATION_JSON)
+            .with(user("staff").roles("ADMIN"))
+            .content(atualizacao))
+
+        then: "o fluxo normal continua rejeitando data passada"
+        resultado.andExpect(status().isUnprocessableEntity())
     }
 
     def "retorna 404 para token de proposta pública inexistente"() {

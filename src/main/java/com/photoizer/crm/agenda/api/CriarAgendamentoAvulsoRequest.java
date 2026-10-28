@@ -2,7 +2,6 @@ package com.photoizer.crm.agenda.api;
 
 import com.photoizer.crm.shared.model.FormaPagamento;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -19,7 +18,8 @@ import java.util.UUID;
 public record CriarAgendamentoAvulsoRequest(
     @Schema(description = "ID do pacote") @NotNull UUID pacoteId,
     @Schema(description = "ID do fotógrafo responsável") @NotNull UUID fotografoId,
-    @Schema(description = "Data/hora do ensaio") @NotNull @Future LocalDateTime dataHoraEnsaio,
+    @Schema(description = "Data/hora do ensaio. Aceita datas passadas para registrar um ensaio já realizado.")
+    @NotNull LocalDateTime dataHoraEnsaio,
     @Schema(description = "Duração em minutos", nullable = true) Integer duracaoMinutos,
     @Schema(description = "Local do ensaio") @NotBlank @Size(max = 255) String localEnsaio,
     @Schema(description = "Percentual de entrada sobre o total (pacote + deslocamento); "

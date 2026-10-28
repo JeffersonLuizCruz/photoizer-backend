@@ -11,6 +11,7 @@ import com.photoizer.crm.agenda.exception.FotografoNaoEncontradoException;
 import com.photoizer.crm.agenda.exception.PropostaNaoEditavelException;
 import com.photoizer.crm.agenda.exception.PropostaNaoRemovivelException;
 import com.photoizer.crm.agenda.model.Agendamento;
+import com.photoizer.crm.agenda.model.OrigemAgendamento;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.agenda.model.AgendamentoFotografo;
 import com.photoizer.crm.agenda.model.ReatribuicaoAgendamento;
@@ -39,6 +40,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.photoizer.crm.agenda.api.AtualizarAgendamentoRequest;
+import com.photoizer.crm.agenda.api.AtualizarAgendamentoAvulsoRequest;
 import com.photoizer.crm.agenda.api.AgendamentoMapper;
 import com.photoizer.crm.agenda.api.AgendamentoResponse;
 import com.photoizer.crm.agenda.api.AgendamentoClienteResponse;
@@ -431,7 +433,25 @@ public class AgendamentoService {
     }
 
     public AgendamentoResponse atualizar(UUID id, AtualizarAgendamentoRequest request) {
+        return atualizar(id, request, false, false);
+    }
+
+    /**
+     * Correção exclusiva de agendamento avulso. Permite data passada (registro
+     * retroativo) e, nesse caso, não revalida conflito de agenda. O fluxo normal
+     * continua usando {@link #atualizar(UUID, AtualizarAgendamentoRequest)}.
+     */
+    public AgendamentoResponse atualizarAvulso(UUID id, AtualizarAgendamentoAvulsoRequest request) {
+        return atualizar(id, request.toRequest(), true, true);
+    }
+
+    private AgendamentoResponse atualizar(UUID id, AtualizarAgendamentoRequest request,
+                                          boolean permitirDataPassada, boolean exigirAvulso) {
         var agendamento = buscarPorId(id);
+
+        if (exigirAvulso && agendamento.getOrigem() != OrigemAgendamento.AVULSO) {
+            throw new BadRequestException("Este endpoint é exclusivo para agendamentos avulsos.");
+        }
 
         var pacote = pacoteQueryService.buscarEntityPorId(request.pacoteId());
         if (!pacote.getAtivo()) {
@@ -447,14 +467,17 @@ public class AgendamentoService {
             ? userRepository.findById(request.fotografoId()).orElse(null)
             : null;
 
-        if (request.dataHoraEnsaio().isBefore(LocalDateTime.now())) {
+        var ensaioNoPassado = request.dataHoraEnsaio().isBefore(LocalDateTime.now());
+        if (ensaioNoPassado && !permitirDataPassada) {
             throw new AgendamentoNoPassadoException();
         }
 
         var duracao = agendamento.getDuracaoMinutos();
-        disponibilidadeService.validarConflitoAgenda(
-            pacote, request.dataHoraEnsaio(), duracao, request.localEnsaio(),
-            ConflitoAgendaParams.paraAtualizacao(fotografo != null ? fotografo.getId() : null, agendamento.getId()));
+        if (!ensaioNoPassado) {
+            disponibilidadeService.validarConflitoAgenda(
+                pacote, request.dataHoraEnsaio(), duracao, request.localEnsaio(),
+                ConflitoAgendaParams.paraAtualizacao(fotografo != null ? fotografo.getId() : null, agendamento.getId()));
+        }
 
         var taxaDeslocamentoPadrao = configuracaoService.getValorDecimal("taxaDeslocamentoPadrao", BigDecimal.ZERO);
         var custoDeslocamento = request.custoDeslocamento() != null ? request.custoDeslocamento() : taxaDeslocamentoPadrao;

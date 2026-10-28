@@ -12,10 +12,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/agendamentos/avulso")
@@ -66,6 +70,23 @@ public class AgendamentoAvulsoController {
         var agendamento = agendamentoAvulsoService.criar(command);
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(respostaPara(agendamentoAvulsoService.toResponse(agendamento)));
+    }
+
+    @PutMapping("/{id}")
+    @Operation(operationId = "atualizarAgendamentoAvulso",
+        summary = "Atualizar agendamento avulso",
+        description = "Corrige um agendamento avulso, inclusive ensaios já realizados com data passada. "
+            + "Datas passadas não revalidam conflito de agenda.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Agendamento atualizado"),
+        @ApiResponse(responseCode = "404", description = "Agendamento não encontrado"),
+        @ApiResponse(responseCode = "409", description = "Conflito de agenda"),
+        @ApiResponse(responseCode = "422", description = "Dados inválidos")
+    })
+    public ResponseEntity<AgendamentoResponse> atualizar(
+            @PathVariable UUID id,
+            @Valid @RequestBody AtualizarAgendamentoAvulsoRequest request) {
+        return ResponseEntity.ok(respostaPara(agendamentoAvulsoService.atualizar(id, request)));
     }
 
     private AgendamentoResponse respostaPara(AgendamentoResponse response) {

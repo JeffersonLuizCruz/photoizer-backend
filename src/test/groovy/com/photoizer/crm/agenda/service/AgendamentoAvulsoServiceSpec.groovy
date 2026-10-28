@@ -1,7 +1,6 @@
 package com.photoizer.crm.agenda.service
 
 import com.photoizer.crm.agenda.api.AgendamentoMapper
-import com.photoizer.crm.agenda.exception.AgendamentoNoPassadoException
 import com.photoizer.crm.agenda.model.Agendamento
 import com.photoizer.crm.agenda.model.OrigemAgendamento
 import com.photoizer.crm.agenda.model.StatusAgendamento
@@ -32,6 +31,7 @@ class AgendamentoAvulsoServiceSpec extends Specification {
     def configuracaoService = Mock(ConfiguracaoService)
     def pagamentoService = Mock(PagamentoService)
     def agendamentoMapper = Mock(AgendamentoMapper)
+    def agendamentoService = Mock(AgendamentoService)
 
     @Subject
     def service = new AgendamentoAvulsoService(
@@ -41,7 +41,8 @@ class AgendamentoAvulsoServiceSpec extends Specification {
         disponibilidadeService,
         configuracaoService,
         pagamentoService,
-        agendamentoMapper)
+        agendamentoMapper,
+        agendamentoService)
 
     def pacote
     def fotografo
@@ -155,15 +156,40 @@ class AgendamentoAvulsoServiceSpec extends Specification {
         0 * agendamentoRepository.save(_)
     }
 
-    def "rejeita data passada"() {
+    def "registra ensaio no passado como confirmado sem validar conflito de agenda"() {
         given: "um comando com data no passado"
         def command = command(dataHoraEnsaio: LocalDateTime.now().minusDays(1))
+
+        when: "o agendamento avulso é criado"
+        def agendamento = service.criar(command)
+
+        then: "o ensaio é registrado como confirmado e o horário histórico não ocupa a agenda"
+        agendamento.status == StatusAgendamento.CONFIRMADO
+        agendamento.origem == OrigemAgendamento.AVULSO
+        0 * disponibilidadeService.validarConflitoAgenda(_, _, _, _, _)
+    }
+
+    def "valida conflito de agenda ao criar ensaio avulso futuro"() {
+        given: "um comando com data futura"
+        def command = command()
+
+        when: "o agendamento avulso é criado"
+        service.criar(command)
+
+        then: "o conflito é validado normalmente"
+        1 * disponibilidadeService.validarConflitoAgenda(_, _, _, _, _)
+    }
+
+    def "rejeita comando sem data do ensaio"() {
+        given: "um comando sem data"
+        def command = command(dataHoraEnsaio: null)
 
         when: "o agendamento avulso é criado"
         service.criar(command)
 
         then: "a criação é bloqueada antes de salvar"
-        thrown(AgendamentoNoPassadoException)
+        def exception = thrown(BadRequestException)
+        exception.message.contains("data e hora")
         0 * agendamentoRepository.save(_)
     }
 

@@ -137,6 +137,8 @@ CONFIRMADO ──realizar──▶ AGUARDANDO_PAGAMENTO_FINAL ──pagarFinal�
 
 ### Fluxo 6: Agendamento avulso com contrato público
 - `POST /api/v1/agendamentos/avulso` (ADMIN/AGENDADOR) cria um `Agendamento` **CONFIRMADO** com `origem=AVULSO`, sem cliente vinculado.
+- Aceita **data/hora no passado** para registrar um ensaio que já aconteceu (registro retroativo). Nesse caso o agendamento **não valida conflito** de agenda; para datas futuras a validação continua normal.
+- `PUT /api/v1/agendamentos/avulso/{id}` (ADMIN/AGENDADOR) corrige o avulso, inclusive com data passada, também sem revalidar conflito. O fluxo normal (`PUT /api/v1/agendamentos/{id}`) permanece exigindo data futura.
 - A reserva é definida por **um dos dois modos**: `percentualEntrada` (calculado sobre pacote + deslocamento) **ou** `valorJaRecebido` (entrada exigida = valor recebido, registrado como pagamento histórico).
 - O token público (`tokenProposta`) é gerado na criação e o staff envia o link ao cliente.
 - No link público (`/propostas/publico/{token}`), o cliente preenche os próprios dados, escolhe uso de imagem e assina. O avulso **não exige comprovante** e **permanece CONFIRMADO**; o aceite é registrado sem transição de status.

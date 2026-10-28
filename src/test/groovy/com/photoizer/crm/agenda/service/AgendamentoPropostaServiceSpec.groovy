@@ -1,8 +1,10 @@
 package com.photoizer.crm.agenda.service
 
 import com.photoizer.crm.agenda.api.AgendamentoMapper
+import com.photoizer.crm.agenda.api.AtualizarAgendamentoAvulsoRequest
 import com.photoizer.crm.agenda.api.AtualizarAgendamentoRequest
 import com.photoizer.crm.agenda.event.AgendamentoCanceladoEvent
+import com.photoizer.crm.agenda.exception.AgendamentoNoPassadoException
 import com.photoizer.crm.agenda.exception.PropostaNaoEditavelException
 import com.photoizer.crm.agenda.exception.PropostaNaoRemovivelException
 import com.photoizer.crm.agenda.model.OrigemAgendamento
@@ -17,6 +19,7 @@ import com.photoizer.crm.config.model.ConfigKey
 import com.photoizer.crm.config.service.ConfiguracaoService
 import com.photoizer.crm.foto.repository.FotoEnsaioRepository
 import com.photoizer.crm.pacote.service.PacoteQueryService
+import com.photoizer.crm.shared.exception.BadRequestException
 import org.springframework.context.ApplicationEventPublisher
 import spock.lang.Specification
 import spock.lang.Subject
@@ -308,6 +311,108 @@ class AgendamentoPropostaServiceSpec extends Specification {
         then: "a remoção é bloqueada e nenhum evento é publicado"
         thrown(PropostaNaoRemovivelException)
         0 * eventPublisher.publishEvent(_)
+    }
+
+    def "rejeita atualização normal para data no passado"() {
+        given: "um agendamento confirmado e um pedido de alteração para ontem"
+        def agendamento = agendamento(status: StatusAgendamento.CONFIRMADO)
+        def pacote = pacote(valorBase: new BigDecimal("2000.00"))
+        def fotografo = fotografo()
+        agendamentoRepository.findById(agendamento.id) >> Optional.of(agendamento)
+        pacoteQueryService.buscarEntityPorId(pacote.id) >> pacote
+        userRepository.findById(fotografo.id) >> Optional.of(fotografo)
+        def request = new AtualizarAgendamentoRequest(
+            pacote.id, LocalDateTime.now().minusDays(1), "Praia", null, fotografo.id,
+            new BigDecimal("100.00"), true, true, "Tentativa", [])
+
+        when: "a atualização é solicitada pelo fluxo normal"
+        service.atualizar(agendamento.id, request)
+
+        then: "a regra de data futura continua valendo"
+        thrown(AgendamentoNoPassadoException)
+        0 * disponibilidadeService.validarConflitoAgenda(_, _, _, _, _)
+        0 * agendamentoRepository.save(_)
+    }
+
+    def "atualiza avulso retroativo sem revalidar conflito de agenda"() {
+        given: "um avulso confirmado com data passada e valores personalizados"
+        def dataPassada = LocalDateTime.now().minusDays(2)
+        def agendamento = agendamento(
+            status: StatusAgendamento.CONFIRMADO,
+            origem: OrigemAgendamento.AVULSO,
+            dataHoraEnsaio: dataPassada,
+            valoresPersonalizados: true,
+            valorTotal: new BigDecimal("1500.00"),
+            valorEntradaExigido: new BigDecimal("500.00"),
+            valorEntradaPago: new BigDecimal("200.00"),
+            valorTotalFinal: new BigDecimal("1500.00"),
+            valorRestante: new BigDecimal("1300.00"))
+        def pacote = pacote(valorBase: new BigDecimal("2000.00"))
+        def fotografo = fotografo()
+
+        agendamentoRepository.findById(agendamento.id) >> Optional.of(agendamento)
+        agendamentoRepository.save(_) >> { args -> args[0] }
+        pacoteQueryService.buscarEntityPorId(pacote.id) >> pacote
+        userRepository.findById(fotografo.id) >> Optional.of(fotografo)
+        configuracaoService.getValorDecimal("taxaDeslocamentoPadrao", BigDecimal.ZERO) >> new BigDecimal("100.00")
+        agendamentoFotografoRepository.findByAgendamentoId(agendamento.id) >> []
+        agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(agendamento.id) >> []
+
+        def request = new AtualizarAgendamentoAvulsoRequest(
+            pacote.id, dataPassada, "Praia", null, fotografo.id,
+            new BigDecimal("100.00"), true, true, "Correção retroativa", [])
+
+        when: "o avulso é corrigido pelo endpoint dedicado"
+        service.atualizarAvulso(agendamento.id, request)
+
+        then: "a data histórica é preservada e o conflito não é revalidado"
+        agendamento.dataHoraEnsaio == dataPassada
+        agendamento.localEnsaio == "Praia"
+        agendamento.observacoes == "Correção retroativa"
+        0 * disponibilidadeService.validarConflitoAgenda(_, _, _, _, _)
+    }
+
+    def "valida conflito ao atualizar avulso com data futura"() {
+        given: "um avulso confirmado com data futura"
+        def agendamento = agendamento(status: StatusAgendamento.CONFIRMADO, origem: OrigemAgendamento.AVULSO)
+        def pacote = pacote(valorBase: new BigDecimal("2000.00"))
+        def fotografo = fotografo()
+
+        agendamentoRepository.findById(agendamento.id) >> Optional.of(agendamento)
+        agendamentoRepository.save(_) >> { args -> args[0] }
+        pacoteQueryService.buscarEntityPorId(pacote.id) >> pacote
+        userRepository.findById(fotografo.id) >> Optional.of(fotografo)
+        configuracaoService.getValorDecimal("taxaDeslocamentoPadrao", BigDecimal.ZERO) >> BigDecimal.ZERO
+        configuracaoService.getValorDecimal("percentualEntrada", new BigDecimal("30.00")) >> new BigDecimal("30.00")
+        agendamentoFotografoRepository.findByAgendamentoId(agendamento.id) >> []
+        agendamentoFotografoRepository.findByAgendamentoIdWithFotografo(agendamento.id) >> []
+
+        def request = new AtualizarAgendamentoAvulsoRequest(
+            pacote.id, LocalDateTime.now().plusDays(5), "Praia", null, fotografo.id,
+            BigDecimal.ZERO, true, true, null, [])
+
+        when: "o avulso é atualizado"
+        service.atualizarAvulso(agendamento.id, request)
+
+        then: "o conflito de agenda é revalidado"
+        1 * disponibilidadeService.validarConflitoAgenda(_, _, _, _, _)
+    }
+
+    def "rejeita correção de avulso para agendamento de origem normal"() {
+        given: "um agendamento confirmado de origem PROPOSTA"
+        def agendamento = agendamento(status: StatusAgendamento.CONFIRMADO, origem: OrigemAgendamento.PROPOSTA)
+        agendamentoRepository.findById(agendamento.id) >> Optional.of(agendamento)
+        def request = new AtualizarAgendamentoAvulsoRequest(
+            UUID.randomUUID(), LocalDateTime.now().plusDays(1), "Praia", null, UUID.randomUUID(),
+            BigDecimal.ZERO, true, true, null, [])
+
+        when: "a correção é solicitada pelo endpoint de avulso"
+        service.atualizarAvulso(agendamento.id, request)
+
+        then: "a operação é bloqueada antes de carregar o pacote"
+        def exception = thrown(BadRequestException)
+        exception.message.contains("exclusivo")
+        0 * pacoteQueryService._
     }
 
     private CriarPropostaCommand command() {

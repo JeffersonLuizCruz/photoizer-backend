@@ -1,8 +1,9 @@
 package com.photoizer.crm.agenda.service;
 
 import com.photoizer.crm.agenda.api.AgendamentoMapper;
+import com.photoizer.crm.agenda.api.AgendamentoResponse;
+import com.photoizer.crm.agenda.api.AtualizarAgendamentoAvulsoRequest;
 import com.photoizer.crm.agenda.api.OpcoesAgendamentoAvulsoResponse;
-import com.photoizer.crm.agenda.exception.AgendamentoNoPassadoException;
 import com.photoizer.crm.agenda.exception.FotografoNaoEncontradoException;
 import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.OrigemAgendamento;
@@ -42,6 +43,7 @@ public class AgendamentoAvulsoService {
     private final ConfiguracaoService configuracaoService;
     private final PagamentoService pagamentoService;
     private final AgendamentoMapper agendamentoMapper;
+    private final AgendamentoService agendamentoService;
 
     public AgendamentoAvulsoService(PacoteQueryService pacoteQueryService,
                                     UserRepository userRepository,
@@ -49,7 +51,8 @@ public class AgendamentoAvulsoService {
                                     DisponibilidadeService disponibilidadeService,
                                     ConfiguracaoService configuracaoService,
                                     PagamentoService pagamentoService,
-                                    AgendamentoMapper agendamentoMapper) {
+                                    AgendamentoMapper agendamentoMapper,
+                                    AgendamentoService agendamentoService) {
         this.pacoteQueryService = pacoteQueryService;
         this.userRepository = userRepository;
         this.agendamentoRepository = agendamentoRepository;
@@ -57,13 +60,17 @@ public class AgendamentoAvulsoService {
         this.configuracaoService = configuracaoService;
         this.pagamentoService = pagamentoService;
         this.agendamentoMapper = agendamentoMapper;
+        this.agendamentoService = agendamentoService;
     }
 
     public Agendamento criar(CriarAgendamentoAvulsoCommand command) {
         var dataHoraEnsaio = command.dataHoraEnsaio();
-        if (dataHoraEnsaio == null || dataHoraEnsaio.isBefore(LocalDateTime.now())) {
-            throw new AgendamentoNoPassadoException();
+        if (dataHoraEnsaio == null) {
+            throw new BadRequestException("Informe a data e hora do ensaio.");
         }
+
+        var agora = LocalDateTime.now();
+        var ensaioNoPassado = dataHoraEnsaio.isBefore(agora);
 
         var pacote = pacoteQueryService.buscarEntityPorId(command.pacoteId());
         if (!pacote.getAtivo()) {
@@ -123,11 +130,12 @@ public class AgendamentoAvulsoService {
             ? command.duracaoMinutos()
             : 60;
 
-        disponibilidadeService.validarConflitoAgenda(
-            pacote, dataHoraEnsaio, duracao, command.localEnsaio(),
-            ConflitoAgendaParams.paraCriacao(fotografo.getId()));
+        if (!ensaioNoPassado) {
+            disponibilidadeService.validarConflitoAgenda(
+                pacote, dataHoraEnsaio, duracao, command.localEnsaio(),
+                ConflitoAgendaParams.paraCriacao(fotografo.getId()));
+        }
 
-        var agora = LocalDateTime.now();
         var valoresPersonalizados = informouValorRecebido
             || (informouPercentual && percentualEntrada.compareTo(percentualConfigurado) != 0);
 
@@ -180,6 +188,10 @@ public class AgendamentoAvulsoService {
         return agendamento;
     }
 
+    public AgendamentoResponse atualizar(UUID id, AtualizarAgendamentoAvulsoRequest request) {
+        return agendamentoService.atualizarAvulso(id, request);
+    }
+
     @Transactional(readOnly = true)
     public OpcoesAgendamentoAvulsoResponse opcoes() {
         var fotografos = userRepository.findByPapel(Papel.FOTOGRAFO).stream()
@@ -193,7 +205,7 @@ public class AgendamentoAvulsoService {
         );
     }
 
-    public com.photoizer.crm.agenda.api.AgendamentoResponse toResponse(Agendamento agendamento) {
+    public AgendamentoResponse toResponse(Agendamento agendamento) {
         return agendamentoMapper.toResponse(agendamento, null, null, null, null);
     }
 
