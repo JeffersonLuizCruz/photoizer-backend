@@ -127,6 +127,7 @@ foto/
 10. **Marca d'água**: novas fotos/edições usam `© {nomeContratada}` (fallback `nomeFotografo` → `Estúdio`). O texto da marca é escalado com a largura da imagem.
 11. **Regeneração**: `POST /api/v1/admin/galerias/marca-dagua/fotos/{fotoId}/regerar` reprocessa original e versão editada com o nome atual, limpa caches de prévia/thumb e não altera o original nem o download final.
 12. **Qualidade da prévia**: `PUT /api/v1/admin/agendamentos/{id}/galeria/qualidade` (ADMIN) grava a qualidade escolhida e aplica em todas as fotos publicadas/pagas, gerando/reaproveitando as prévias na qualidade atual e removendo os caches das outras qualidades. O download final continua sempre em `originalPath`/`editadaPath`, nunca na prévia.
+13. **Reedição de foto entregue**: `PUT /api/v1/agendamentos/{id}/fotos/{fotoId}/reedicao` (ADMIN/FOTOGRAFO/EDITOR) substitui a edição de uma foto já publicada/paga, sem alterar `versaoAtual`, o original, o número ou o nome. Serve para ajustes pedidos pelo cliente depois do download; a nova versão fica disponível imediatamente. A foto precisa estar em `versaoAtual = EDITADA`, status `PUBLICADA`/`PAGA`, fora de seleção ativa e com arquivos no disco. O `FotoReeditadaEvent` atualiza a data da edição no item da seleção publicada.
 
 ## 7. Dívidas Técnicas — Status (pós-refactor)
 

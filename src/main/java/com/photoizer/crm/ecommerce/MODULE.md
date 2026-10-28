@@ -192,6 +192,7 @@ Staff:
 - `GET /api/v1/admin/ecommerce/extras/pendentes-edicao?agendamentoId=` (ADMIN/FOTOGRAFO/EDITOR)
 - `PUT /api/v1/agendamentos/{id}/fotos/{fotoId}/editada-compra` (upload da edição sob demanda)
 - `POST /api/v1/agendamentos/{id}/fotos/{fotoId}/editada-compra/publicar` (libera o download)
+- `PUT /api/v1/agendamentos/{id}/fotos/{fotoId}/reedicao` (reenvia a edição de uma foto já entregue; o cliente pode baixar a nova versão imediatamente)
 
 ### Regras
 
@@ -253,6 +254,7 @@ Staff:
 19. O texto do hero fica em `galerias_ensaio.titulo_hero` (até 120 caracteres). Nulo/vazio faz o hero exibir o nome do cliente; a customização é independente do modo/fase e pode ser alterada a qualquer momento.
 20. Ao reabrir uma seleção, o snapshot vira `CANCELADA` e a galeria volta para `SELECAO`, mas `selecionadaPacote` é preservado: as fotos escolhidas anteriormente continuam como rascunho editável. A resposta pública expõe `selecaoReaberta` para o cliente ser avisado.
 21. `DELETE /galeria/{token}/rascunho` desmarca apenas as fotos do pacote (`selecionadaPacote = false`). Extras no carrinho não são removidos.
+22. Depois da publicação, o staff pode reenviar a edição de uma foto já entregue em `PUT /api/v1/agendamentos/{id}/fotos/{fotoId}/reedicao`. A seleção continua `PUBLICADA` e **não é reaberta**; o `SelecaoEnsaioItem.editadaEm` é atualizado via `FotoReeditadaEvent`, a versão anterior é substituída e o cliente pode baixar a nova versão imediatamente. Vale para fotos do pacote (`PUBLICADA`) e extras (`PAGA`), desde que a galeria não esteja arquivada e a foto não esteja em seleção ativa.
 
 ## 8. Galeria arquivada (V17)
 

@@ -461,6 +461,24 @@ class SelecaoEnsaioServiceSpec extends Specification {
         !service.temSelecaoReaberta(agendamentoId)
     }
 
+    def "atualiza a data da edição na seleção publicada ao reeditar"() {
+        given:
+        def selecao = selecao(StatusSelecao.PUBLICADA)
+        def item = item(1, true)
+        item.editadaEm = LocalDateTime.now().minusDays(2)
+        def novaData = LocalDateTime.now()
+        selecaoRepository.findFirstByAgendamentoIdAndStatusInOrderByNumeroDesc(
+            agendamentoId, [StatusSelecao.PUBLICADA]) >> Optional.of(selecao)
+        itemRepository.findBySelecaoIdAndFotoId(selecao.id, item.fotoId) >> Optional.of(item)
+
+        when:
+        service.registrarReedicao(agendamentoId, item.fotoId, novaData)
+
+        then:
+        item.editadaEm == novaData
+        1 * itemRepository.save(item)
+    }
+
     private SelecaoEnsaioItem itemExtra(UUID selecaoId, boolean editada) {
         return SelecaoEnsaioItem.builder()
             .id(UUID.randomUUID())

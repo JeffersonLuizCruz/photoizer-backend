@@ -3,6 +3,7 @@ package com.photoizer.crm.foto.service;
 import com.photoizer.crm.foto.api.AplicarQualidadePreviewResponse;
 import com.photoizer.crm.foto.acl.GaleriaQualidadePreviewReadService;
 import com.photoizer.crm.foto.event.FotoEditadaEvent;
+import com.photoizer.crm.foto.event.FotoReeditadaEvent;
 import com.photoizer.crm.foto.event.FotosGaleriaPublicadasEvent;
 import com.photoizer.crm.foto.event.FotosRemovidasEvent;
 import com.photoizer.crm.foto.exception.AgendamentoNaoPermitidoParaUploadException;
@@ -662,6 +663,48 @@ public class FotoService {
 
         var salva = salvarVersaoEditada(foto, agendamentoId, arquivo);
         eventPublisher.publishEvent(new FotoEditadaEvent(agendamentoId, fotoId));
+        return salva;
+    }
+
+    /**
+     * Reenvia a edição de uma foto já entregue ao cliente.
+     *
+     * <p>É o fluxo de ajuste solicitado depois da publicação: a foto continua
+     * com {@code versaoAtual = EDITADA} e o cliente pode baixar novamente a
+     * versão mais recente. O RAW, o número de galeria, o nome e a seleção
+     * original não são alterados.
+     */
+    public FotoEnsaio reeditarFotoPublicada(UUID agendamentoId, UUID fotoId,
+                                            MultipartFile arquivo) {
+        if (!agendamentoReadService.isStatusPermitidoParaUpload(agendamentoId)) {
+            throw new AgendamentoNaoPermitidoParaUploadException();
+        }
+
+        var foto = buscarPorId(fotoId);
+        if (!foto.getAgendamentoId().equals(agendamentoId)) {
+            throw new FotoNaoPertenceAoAgendamentoException(fotoId, agendamentoId);
+        }
+        if (foto.isArquivosRemovidos()) {
+            throw new ArquivoExpurgadoException();
+        }
+        if (foto.getVersaoAtual() != VersaoFoto.EDITADA || foto.getEditadaPath() == null) {
+            throw new FotoNaoEditavelException("a foto ainda não foi entregue em versão editada");
+        }
+        if (foto.getStatus() != StatusFoto.PUBLICADA && foto.getStatus() != StatusFoto.PAGA) {
+            throw new FotoNaoEditavelException("status atual " + foto.getStatus());
+        }
+        if (foto.isEmSelecaoEdicao()) {
+            throw new FotoNaoEditavelException("foto está em uma seleção ativa");
+        }
+
+        var salva = salvarVersaoEditada(foto, agendamentoId, arquivo);
+        eventPublisher.publishEvent(new FotoReeditadaEvent(
+            agendamentoId, fotoId, salva.getEditadaEm()));
+        log.atInfo()
+            .addKeyValue("event_action", "foto.reedicao_enviada")
+            .addKeyValue("agendamento_id", agendamentoId)
+            .addKeyValue("foto_id", fotoId)
+            .log("Nova edição enviada para foto entregue");
         return salva;
     }
 

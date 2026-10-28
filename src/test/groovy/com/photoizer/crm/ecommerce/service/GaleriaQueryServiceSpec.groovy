@@ -64,6 +64,23 @@ class GaleriaQueryServiceSpec extends Specification {
         service.isDownloadPermitido(paga)
     }
 
+    def "foto editada já baixada continua disponível para novo download"() {
+        given:
+        def selecao = selecaoPublicada()
+        def foto = foto(VersaoFoto.EDITADA)
+        foto.selecionadaPacote = true
+        foto.dataDownload = java.time.LocalDateTime.now().minusDays(3)
+        galeriaEnsaioService.obter(agendamentoId) >>
+            galeria(ModoGaleria.COM_EDICAO, FaseGaleria.COMERCIALIZACAO)
+        selecaoRepository.findFirstByAgendamentoIdAndStatusInOrderByNumeroDesc(
+            agendamentoId, [StatusSelecao.PUBLICADA]) >> Optional.of(selecao)
+        selecaoItemRepository.findBySelecaoIdAndFotoId(selecao.id, foto.id) >>
+            Optional.of(item(selecao.id, foto.id))
+
+        expect:
+        service.isDownloadPermitido(foto)
+    }
+
     def "nada é baixável antes da aprovação em galeria sem edição"() {
         given:
         def foto = foto(VersaoFoto.ORIGINAL)

@@ -240,6 +240,24 @@ public class FotoController {
         return ResponseEntity.ok(fotoMapper.toResponse(foto));
     }
 
+    @PutMapping("/{fotoId}/reedicao")
+    @RolesAllowed({"ADMIN", "FOTOGRAFO", "EDITOR"})
+    @Operation(
+        summary = "Reenviar a edição publicada de uma foto",
+        description = "Usado quando o cliente pede um ajuste depois de receber a foto. "
+            + "Substitui a versão editada e libera imediatamente o novo download, "
+            + "sem alterar o original, o número de galeria ou o nome.")
+    public ResponseEntity<FotoEnsaioResponse> reeditar(
+            @PathVariable UUID agendamentoId,
+            @PathVariable UUID fotoId,
+            @RequestParam("arquivo") MultipartFile arquivo) {
+        if (arquivo == null || arquivo.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+        var foto = fotoService.reeditarFotoPublicada(agendamentoId, fotoId, arquivo);
+        return ResponseEntity.ok(fotoMapper.toResponse(foto));
+    }
+
     @PutMapping("/{fotoId}/editada-compra")
     @RolesAllowed({"ADMIN", "FOTOGRAFO", "EDITOR"})
     @Operation(

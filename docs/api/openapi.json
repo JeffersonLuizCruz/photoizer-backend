@@ -2431,6 +2431,97 @@
         } ]
       }
     },
+    "/api/v1/agendamentos/{agendamentoId}/fotos/{fotoId}/reedicao" : {
+      "put" : {
+        "tags" : [ "Fotos" ],
+        "summary" : "Reenviar a edição publicada de uma foto",
+        "description" : "Usado quando o cliente pede um ajuste depois de receber a foto. Substitui a versão editada e libera imediatamente o novo download, sem alterar o original, o número de galeria ou o nome.",
+        "operationId" : "reeditar",
+        "parameters" : [ {
+          "name" : "agendamentoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "fotoId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "arquivo" : {
+                    "type" : "string",
+                    "format" : "binary"
+                  }
+                },
+                "required" : [ "arquivo" ]
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FotoEnsaioResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/agendamentos/{agendamentoId}/fotos/{fotoId}/imagem" : {
       "put" : {
         "tags" : [ "Fotos" ],

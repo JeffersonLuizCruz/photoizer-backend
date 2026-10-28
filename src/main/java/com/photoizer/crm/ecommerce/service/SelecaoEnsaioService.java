@@ -509,6 +509,26 @@ public class SelecaoEnsaioService {
                 }));
     }
 
+    /**
+     * Consumido pelo listener de {@code FotoReeditadaEvent}: atualiza a data da
+     * edição no snapshot da última seleção publicada, sem reabrir a seleção.
+     */
+    public void registrarReedicao(UUID agendamentoId, UUID fotoId, LocalDateTime editadaEm) {
+        selecaoRepository.findFirstByAgendamentoIdAndStatusInOrderByNumeroDesc(
+                agendamentoId, List.of(StatusSelecao.PUBLICADA))
+            .ifPresent(selecao -> itemRepository.findBySelecaoIdAndFotoId(selecao.getId(), fotoId)
+                .ifPresent(item -> {
+                    item.registrarReedicao(editadaEm);
+                    itemRepository.save(item);
+                    log.atInfo()
+                        .addKeyValue("event_action", "selecao.foto_reeditada")
+                        .addKeyValue("agendamento_id", agendamentoId)
+                        .addKeyValue("selecao_id", selecao.getId())
+                        .addKeyValue("foto_id", fotoId)
+                        .log("Data da edição atualizada na seleção publicada");
+                }));
+    }
+
     private SelecaoEnsaio buscarSelecao(UUID agendamentoId, UUID selecaoId) {
         var selecao = selecaoRepository.findById(selecaoId)
             .orElseThrow(() -> new SelecaoNaoEncontradaException(selecaoId));

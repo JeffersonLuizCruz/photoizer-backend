@@ -2,8 +2,10 @@ package com.photoizer.crm.foto.service
 
 import com.photoizer.crm.foto.acl.AgendamentoReadService
 import com.photoizer.crm.foto.acl.GaleriaQualidadePreviewReadService
+import com.photoizer.crm.foto.event.FotoReeditadaEvent
 import com.photoizer.crm.foto.event.FotosRemovidasEvent
 import com.photoizer.crm.foto.exception.ArquivoDeImagemInvalidoException
+import com.photoizer.crm.foto.exception.ArquivoExpurgadoException
 import com.photoizer.crm.foto.exception.FotoEnsaioNaoEncontradaException
 import com.photoizer.crm.foto.exception.FotoNaoEditavelException
 import com.photoizer.crm.foto.exception.FotoNaoPertenceAoAgendamentoException
@@ -26,6 +28,7 @@ import javax.imageio.ImageIO
 import java.awt.image.BufferedImage
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.LocalDateTime
 
 class FotoServiceSpec extends Specification {
 
@@ -569,6 +572,142 @@ class FotoServiceSpec extends Specification {
         thrown(ArquivoDeImagemInvalidoException)
         0 * processingHelper.processar(_, _, _, _)
         0 * fotoRepository.save(_)
+    }
+
+    @Unroll
+    def "reenvia a edição de foto já entregue com status #status"() {
+        given:
+        def tmp = Files.createTempDirectory("foto-reedicao-spec")
+        def editada = tmp.resolve("nova-editada.png")
+        def bytes = novoArquivoPng("nova-editada.png").bytes
+        Files.write(editada, bytes)
+        def watermarked = tmp.resolve("wm_editada.jpg")
+        def thumb = tmp.resolve("thumb_editada.jpg")
+        def preview = tmp.resolve("preview_editada.jpg")
+        Files.write(watermarked, bytes)
+        Files.write(thumb, bytes)
+        Files.write(preview, bytes)
+        def foto = FotoEnsaio.builder()
+            .id(UUID.randomUUID())
+            .agendamentoId(agendamentoId)
+            .fileName("IMG_1.png")
+            .originalPath("orig/1.png")
+            .watermarkedPath("wm/1.png")
+            .thumbPath("thumb/1.png")
+            .editadaPath("editadas/antiga.jpg")
+            .editadaEm(LocalDateTime.now().minusDays(1))
+            .dataDownload(LocalDateTime.now().minusHours(2))
+            .status(status)
+            .compraExtraId(compraExtraId)
+            .versaoAtual(VersaoFoto.EDITADA)
+            .visivel(true)
+            .build()
+        agendamentoReadService.isStatusPermitidoParaUpload(agendamentoId) >> true
+        fotoRepository.findById(foto.id) >> Optional.of(foto)
+        fileStorageService.salvarEmSubdiretorio(_, agendamentoId, "editadas") >> editada.toString()
+        pathResolver.resolver(editada.toString()) >> editada
+        processingHelper.processar(editada, editada.parent, foto.id, QualidadePreview.ORIGINAL) >>
+            new FotoProcessingHelper.ProcessedImages(watermarked.toString(), thumb.toString(), preview.toString())
+        pathResolver.relativo(Path.of(watermarked.toString())) >> "editadas/wm.jpg"
+        pathResolver.relativo(Path.of(thumb.toString())) >> "editadas/thumb.jpg"
+        pathResolver.relativo(Path.of(preview.toString())) >> "editadas/preview.jpg"
+        fileValidator.sanitizeFilename("nova-editada.png") >> "nova-editada.png"
+        fotoRepository.save(_ as FotoEnsaio) >> { args -> args[0] }
+
+        when:
+        def salva = service.reeditarFotoPublicada(
+            agendamentoId, foto.id, novoArquivoPng("nova-editada.png"))
+
+        then:
+        salva.editadaPath == editada.toString()
+        salva.versaoAtual == VersaoFoto.EDITADA
+        salva.dataDownload != null
+        1 * eventPublisher.publishEvent(_ as FotoReeditadaEvent)
+
+        cleanup:
+        tmp.toFile().deleteDir()
+
+        where:
+        status               | compraExtraId
+        StatusFoto.PUBLICADA | null
+        StatusFoto.PAGA      | UUID.randomUUID()
+    }
+
+    def "não reedita foto que ainda não foi entregue em versão editada"() {
+        given:
+        def foto = FotoEnsaio.builder()
+            .id(UUID.randomUUID())
+            .agendamentoId(agendamentoId)
+            .fileName("IMG_1.png")
+            .originalPath("orig/1.png")
+            .watermarkedPath("wm/1.png")
+            .thumbPath("thumb/1.png")
+            .status(StatusFoto.PUBLICADA)
+            .versaoAtual(VersaoFoto.ORIGINAL)
+            .visivel(true)
+            .build()
+        agendamentoReadService.isStatusPermitidoParaUpload(agendamentoId) >> true
+        fotoRepository.findById(foto.id) >> Optional.of(foto)
+
+        when:
+        service.reeditarFotoPublicada(agendamentoId, foto.id, novoArquivoPng("nova.png"))
+
+        then:
+        thrown(FotoNaoEditavelException)
+        0 * fileStorageService.salvarEmSubdiretorio(_, _, _)
+        0 * eventPublisher.publishEvent(_)
+    }
+
+    def "não reedita foto reservada para uma seleção ativa"() {
+        given:
+        def foto = FotoEnsaio.builder()
+            .id(UUID.randomUUID())
+            .agendamentoId(agendamentoId)
+            .fileName("IMG_1.png")
+            .originalPath("orig/1.png")
+            .watermarkedPath("wm/1.png")
+            .thumbPath("thumb/1.png")
+            .editadaPath("editadas/1.png")
+            .status(StatusFoto.PUBLICADA)
+            .versaoAtual(VersaoFoto.EDITADA)
+            .emSelecaoEdicao(true)
+            .visivel(true)
+            .build()
+        agendamentoReadService.isStatusPermitidoParaUpload(agendamentoId) >> true
+        fotoRepository.findById(foto.id) >> Optional.of(foto)
+
+        when:
+        service.reeditarFotoPublicada(agendamentoId, foto.id, novoArquivoPng("nova.png"))
+
+        then:
+        thrown(FotoNaoEditavelException)
+        0 * fileStorageService.salvarEmSubdiretorio(_, _, _)
+    }
+
+    def "não reedita foto com arquivos expurgados"() {
+        given:
+        def foto = FotoEnsaio.builder()
+            .id(UUID.randomUUID())
+            .agendamentoId(agendamentoId)
+            .fileName("IMG_1.png")
+            .originalPath("orig/1.png")
+            .watermarkedPath("wm/1.png")
+            .thumbPath("thumb/1.png")
+            .editadaPath("editadas/1.png")
+            .status(StatusFoto.PUBLICADA)
+            .versaoAtual(VersaoFoto.EDITADA)
+            .arquivosRemovidos(true)
+            .visivel(true)
+            .build()
+        agendamentoReadService.isStatusPermitidoParaUpload(agendamentoId) >> true
+        fotoRepository.findById(foto.id) >> Optional.of(foto)
+
+        when:
+        service.reeditarFotoPublicada(agendamentoId, foto.id, novoArquivoPng("nova.png"))
+
+        then:
+        thrown(ArquivoExpurgadoException)
+        0 * fileStorageService.salvarEmSubdiretorio(_, _, _)
     }
 
     private FotoEnsaio fotoComArquivos(Path dir,

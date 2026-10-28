@@ -76,4 +76,10 @@ public class SelecaoEnsaioItem {
             editadaEm = LocalDateTime.now();
         }
     }
+
+    /** Atualiza a data da edição quando a foto já entregue é reeditada. */
+    public void registrarReedicao(LocalDateTime em) {
+        editada = true;
+        editadaEm = em;
+    }
 }
