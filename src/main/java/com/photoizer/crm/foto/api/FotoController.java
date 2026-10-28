@@ -3,6 +3,7 @@ package com.photoizer.crm.foto.api;
 import com.photoizer.crm.foto.exception.FotoNaoPertenceAoAgendamentoException;
 import com.photoizer.crm.foto.model.FotoEnsaio;
 import com.photoizer.crm.foto.model.StatusFoto;
+import com.photoizer.crm.foto.service.FotoPreviewService;
 import com.photoizer.crm.foto.service.FotoService;
 import com.photoizer.crm.shared.exception.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -43,12 +44,15 @@ public class FotoController {
 
     private final FotoService fotoService;
     private final FotoMapper fotoMapper;
+    private final FotoPreviewService fotoPreviewService;
     private final com.photoizer.crm.shared.storage.StoragePathResolver pathResolver;
 
     public FotoController(FotoService fotoService, FotoMapper fotoMapper,
+                          FotoPreviewService fotoPreviewService,
                           com.photoizer.crm.shared.storage.StoragePathResolver pathResolver) {
         this.fotoService = fotoService;
         this.fotoMapper = fotoMapper;
+        this.fotoPreviewService = fotoPreviewService;
         this.pathResolver = pathResolver;
     }
 
@@ -100,17 +104,26 @@ public class FotoController {
     }
 
     @GetMapping("/{fotoId}/thumb")
-    @Operation(summary = "Servir thumbnail")
+    @Operation(summary = "Servir thumbnail protegido para o staff")
     public ResponseEntity<Resource> servirThumb(
             @PathVariable UUID agendamentoId,
             @PathVariable UUID fotoId) {
         var foto = fotoService.buscarParaArquivo(agendamentoId, fotoId);
-        var caminho = foto.getEditadaThumbPath() != null
-            ? foto.getEditadaThumbPath()
-            : foto.getThumbPath();
+        // O workspace do staff precisa exibir também fotos INEDITA. O endpoint
+        // público só serve PUBLICADA/PAGA; aqui usamos o mesmo thumb protegido
+        // da galeria (600x400), que também mantém o visual do cliente.
+        var caminho = fotoPreviewService.caminhoThumb(foto);
+        if (caminho == null) {
+            caminho = foto.getEditadaThumbPath() != null
+                ? foto.getEditadaThumbPath()
+                : foto.getThumbPath();
+        }
+        if (caminho == null) {
+            return ResponseEntity.notFound().build();
+        }
         var file = new FileSystemResource(pathResolver.resolver(caminho));
         return ResponseEntity.ok()
-            .contentType(resolverMediaType(foto.getFileName()))
+            .contentType(resolverMediaType(caminho))
             .body(file);
     }
 

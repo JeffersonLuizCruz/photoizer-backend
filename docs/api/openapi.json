@@ -13438,7 +13438,7 @@
     "/api/v1/agendamentos/{agendamentoId}/fotos/{fotoId}/thumb" : {
       "get" : {
         "tags" : [ "Fotos" ],
-        "summary" : "Servir thumbnail",
+        "summary" : "Servir thumbnail protegido para o staff",
         "operationId" : "servirThumb",
         "parameters" : [ {
           "name" : "agendamentoId",
