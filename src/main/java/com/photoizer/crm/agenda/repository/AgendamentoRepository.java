@@ -49,6 +49,9 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID>,
     @Query("SELECT a FROM Agendamento a")
     List<Agendamento> findAllComCliente();
 
+    @EntityGraph(attributePaths = {"cliente", "pacote"})
+    List<Agendamento> findByStatus(StatusAgendamento status);
+
     boolean existsByDataHoraEnsaioBetweenAndStatusNotIn(
         LocalDateTime start, LocalDateTime end, List<StatusAgendamento> statusesIgnorados);
 

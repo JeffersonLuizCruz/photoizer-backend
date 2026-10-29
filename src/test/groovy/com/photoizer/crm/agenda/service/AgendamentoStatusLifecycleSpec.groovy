@@ -3,6 +3,7 @@ package com.photoizer.crm.agenda.service
 import com.photoizer.crm.agenda.event.AgendamentoCanceladoEvent
 import com.photoizer.crm.agenda.event.AgendamentoConfirmadoEvent
 import com.photoizer.crm.agenda.event.AgendamentoRealizadoEvent
+import com.photoizer.crm.agenda.event.EntregaPendenteEvent
 import com.photoizer.crm.agenda.event.PagamentoFinalRegistradoEvent
 import com.photoizer.crm.agenda.exception.StatusAgendamentoInvalidoException
 import com.photoizer.crm.agenda.model.StatusAgendamento
@@ -122,9 +123,11 @@ class AgendamentoStatusLifecycleSpec extends Specification {
         given: "um agendamento aguardando pagamento final"
         def agendamento = agendamento(
             status: StatusAgendamento.AGUARDANDO_PAGAMENTO_FINAL,
+            cliente: com.photoizer.crm.agenda.support.AgendaFixtures.cliente(),
             valorTotalFinal: new BigDecimal("1000.00"),
             valorRestante: new BigDecimal("700.00"))
         stubPersistencia(agendamento)
+        EntregaPendenteEvent eventoEntrega = null
 
         when: "o pagamento final é registrado sem anexo"
         def resultado = service.registrarPagamentoFinal(agendamento.id, null, FormaPagamento.PIX)
@@ -135,6 +138,33 @@ class AgendamentoStatusLifecycleSpec extends Specification {
         resultado.valorRestante == BigDecimal.ZERO
         0 * fileStorageService.salvar(_)
         1 * eventPublisher.publishEvent(_ as PagamentoFinalRegistradoEvent)
+        1 * eventPublisher.publishEvent(_ as EntregaPendenteEvent) >> { EntregaPendenteEvent e ->
+            eventoEntrega = e
+        }
+        eventoEntrega.agendamentoId == agendamento.id
+        eventoEntrega.clienteNome == "Maria Souza"
+        !eventoEntrega.lembreteDiario
+    }
+
+    def "publica evento de entrega pendente ao entrar em edição por mudança de status"() {
+        given: "um agendamento aguardando pagamento final"
+        def agendamento = agendamento(
+            status: StatusAgendamento.AGUARDANDO_PAGAMENTO_FINAL,
+            cliente: com.photoizer.crm.agenda.support.AgendaFixtures.cliente())
+        stubPersistencia(agendamento)
+        EntregaPendenteEvent eventoEntrega = null
+
+        when: "o status é alterado para EM_EDICAO"
+        service.atualizarStatus(agendamento.id, "EM_EDICAO")
+
+        then: "o evento de entrega pendente é publicado com os dados do cliente"
+        1 * eventPublisher.publishEvent(_ as EntregaPendenteEvent) >> { EntregaPendenteEvent e ->
+            eventoEntrega = e
+        }
+        eventoEntrega.agendamentoId == agendamento.id
+        eventoEntrega.clienteNome == "Maria Souza"
+        eventoEntrega.pacoteNome == "Pacote Ensaio"
+        !eventoEntrega.lembreteDiario
     }
 
     def "registra pagamento final com comprovante e mantém a URL"() {

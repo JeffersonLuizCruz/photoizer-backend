@@ -8,13 +8,13 @@ Cria e gerencia notificações do sistema para usuários (fotógrafos/equipe). �
 notificacao/
 ├── model/
 │   ├── Notificacao.java       # Entidade (NÃO estende BaseEntity): userId, titulo, mensagem, link, tipo (enum), lida, createdAt — usa Lombok @Getter/@Setter
-│   └── TipoNotificacao.java   # Enum: NOVO_ENSAIO, ENSAIO_REALIZADO, PAGAMENTO_FINAL
+│   └── TipoNotificacao.java   # Enum: NOVO_ENSAIO, ENSAIO_REALIZADO, PAGAMENTO_FINAL, ENSAIO_REATRIBUIDO, SELECAO_ENVIADA, ENTREGA_PENDENTE
 ├── repository/
 │   └── NotificacaoRepository.java # JpaRepository + findByUserIdOrderByCreatedAtDesc, countByUserIdAndLidaFalse
 ├── service/
 │   └── NotificacaoService.java    # criar, listar, contarNaoLidas, marcarComoLida (com ownership), marcarTodasComoLidas, limpar
 ├── event/
-│   └── NotificacaoEventListener.java # Consome 3 eventos enriquecidos de agenda e cria notificações por fotógrafo
+│   └── NotificacaoEventListener.java # Consome eventos de agenda/ecommerce e cria notificações (fotógrafos e staff)
 ├── exception/
 │   ├── NotificacaoBusinessException.java          # Base para exceções do módulo (Exception Hierarchy)
 │   ├── NotificacaoNaoEncontradaException.java       # 404
@@ -30,7 +30,9 @@ notificacao/
 ### Módulos internos importados
 | Módulo | Onde | Uso |
 |--------|------|-----|
-| **agenda** | `NotificacaoEventListener` | eventos `AgendamentoCriadoEvent`, `AgendamentoRealizadoEvent`, `PagamentoFinalRegistradoEvent` (uso correto — dados enriquecidos pelo publisher) |
+| **agenda** | `NotificacaoEventListener` | eventos `AgendamentoCriadoEvent`, `AgendamentoRealizadoEvent`, `PagamentoFinalRegistradoEvent`, `EntregaPendenteEvent` (uso correto — dados enriquecidos pelo publisher) |
+| **ecommerce** | `NotificacaoEventListener` | evento `SelecaoEnviadaEvent` |
+| **shared** | `NotificacaoEventListener` | porta `UsuarioStaffPort` para resolver destinatários staff sem acoplar ao módulo auth |
 
 > Nenhum módulo importa `notificacao` — é terminal **para os outros módulos**. A violação Modulith anterior (acesso a repositórios do agenda) foi resolvida via **Event Enrichment**.
 
@@ -40,6 +42,8 @@ notificacao/
 | `AgendamentoCriadoEvent` | `clienteNome`, `fotografoIds`, `dataHoraEnsaio` | Para cada fotógrafo cria "Novo Ensaio Agendado" (`NOVO_ENSAIO`) |
 | `AgendamentoRealizadoEvent` | `clienteNome`, `fotografoIds` | Para cada fotógrafo cria "Ensaio Realizado" (`ENSAIO_REALIZADO`) |
 | `PagamentoFinalRegistradoEvent` | `clienteNome`, `fotografoIds` | Para cada fotógrafo cria "Pagamento Final Recebido" (`PAGAMENTO_FINAL`) |
+| `SelecaoEnviadaEvent` | `clienteNome`, `editorId`, `fotografoId`, quantidades | Cria notificação de seleção para edição/aprovação (`SELECAO_ENVIADA`) |
+| `EntregaPendenteEvent` | `agendamentoId`, `clienteNome`, `pacoteNome`, `dataHoraEnsaio`, `lembreteDiario` | Cria "Entrega pendente"/"Lembrete de entrega pendente" para todo o staff ativo (`ENTREGA_PENDENTE`), deduplicado por dia |
 
 ### Eventos publicados
 Nenhum.
@@ -62,15 +66,24 @@ Nenhum.
 - `PATCH /api/v1/notificacoes/ler-todas` → marca todas como lidas do usuário autenticado.
 - `PATCH /api/v1/notificacoes/limpar` → limpa notificações do usuário autenticado.
 
+### Fluxo 5: Lembrete de entrega pendente
+1. `agenda` publica `EntregaPendenteEvent` ao entrar em `EM_EDICAO` e no job diário das 09:00 (`America/Sao_Paulo`).
+2. `NotificacaoEventListener.onEntregaPendente` resolve os destinatários via `UsuarioStaffPort.listarStaffAtivos()` (ADMIN, EDITOR e AGENDADOR ativos).
+3. Para cada destinatário, verifica se já existe notificação `ENTREGA_PENDENTE` com o mesmo link desde o início do dia; se não, cria.
+4. Link da notificação: `/agenda/{agendamentoId}`, onde o staff finaliza a entrega.
+
 ## 5. Regras Específicas
 1. **Identificador por `@AuthenticationPrincipal`** — o controller extrai o userId do JWT (`SecurityContext`), não aceita parâmetro externo. Cada usuário só acessa suas próprias notificações.
 2. **Ownership check em `marcarComoLida`** — valida que a notificação pertence ao usuário autenticado; caso contrário, lança `NotificacaoNaoPertenceAoUsuarioException` (403).
 3. **Entidade sem `BaseEntity`**: `Notificacao` tem `id`/`createdAt` próprios, sem `updatedAt`/`createdBy` — única entidade fora do padrão (documentado no AGENTS.md).
 4. **Paginação com limite**: `size` máximo de 100 para prevenir abuso.
 5. **Transactional por método**: `@Transactional` explícito em cada método de escrita, `readOnly=true` em leituras.
+6. **Deduplicação diária**: `ENTREGA_PENDENTE` é limitada a uma notificação por usuário/agendamento/dia (`NotificacaoRepository.existsByUserIdAndTipoAndLinkAndCreatedAtGreaterThanEqual`). Evento imediato e job diário não geram duplicata no mesmo dia.
+7. **Staff como destinatário**: os lembretes operacionais usam `UsuarioStaffPort.listarStaffAtivos()`; o módulo não importa `auth` diretamente.
 
 ## 6. Testes
-Nenhum teste específico. Apenas `CrmApplicationTests` (smoke de contexto).
+- `NotificacaoControllerSpec` (Spock) cobre listagem e paginação.
+- `NotificacaoEventListenerSpec` (Spock) cobre criação de `ENTREGA_PENDENTE` para staff, deduplicação e ausência de destinatários.
 
 ## 7. Dívidas Técnicas e Melhorias Recomendadas
 

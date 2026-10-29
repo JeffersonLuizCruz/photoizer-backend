@@ -3,6 +3,7 @@ package com.photoizer.crm.agenda.service;
 import com.photoizer.crm.agenda.event.AgendamentoCanceladoEvent;
 import com.photoizer.crm.agenda.event.AgendamentoConfirmadoEvent;
 import com.photoizer.crm.agenda.event.AgendamentoRealizadoEvent;
+import com.photoizer.crm.agenda.event.EntregaPendenteEvent;
 import com.photoizer.crm.agenda.event.PagamentoFinalRegistradoEvent;
 import com.photoizer.crm.agenda.exception.AgendamentoNaoEncontradoException;
 import com.photoizer.crm.agenda.model.Agendamento;
@@ -78,6 +79,10 @@ public class AgendamentoStatusLifecycle {
 
         if (status == StatusAgendamento.CANCELADO || status == StatusAgendamento.NO_SHOW) {
             eventPublisher.publishEvent(new AgendamentoCanceladoEvent(agendamento.getId()));
+        }
+
+        if (status == StatusAgendamento.EM_EDICAO) {
+            publicarEntregaPendente(agendamento, false);
         }
 
         log.atInfo()
@@ -160,6 +165,8 @@ public class AgendamentoStatusLifecycle {
             fotografoIds
         ));
 
+        publicarEntregaPendente(agendamento, false);
+
         log.atInfo()
             .addKeyValue("event_action", "agendamento.pagamento_final_registrado")
             .addKeyValue("agendamento_id", agendamento.getId())
@@ -174,5 +181,19 @@ public class AgendamentoStatusLifecycle {
     private Agendamento buscarPorId(UUID id) {
         return agendamentoRepository.findByIdWithLock(id)
             .orElseThrow(() -> new AgendamentoNaoEncontradoException(id));
+    }
+
+    private void publicarEntregaPendente(Agendamento agendamento, boolean lembreteDiario) {
+        var clienteNome = agendamento.getCliente() != null
+            ? agendamento.nomeCliente() : "Cliente não informado";
+        var pacoteNome = agendamento.getPacote() != null
+            ? agendamento.getPacote().getNome() : "Pacote";
+        eventPublisher.publishEvent(new EntregaPendenteEvent(
+            agendamento.getId(),
+            clienteNome,
+            pacoteNome,
+            agendamento.getDataHoraEnsaio(),
+            lembreteDiario
+        ));
     }
 }

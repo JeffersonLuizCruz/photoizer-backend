@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
@@ -40,6 +41,16 @@ public class NotificacaoService {
     @Transactional(readOnly = true)
     public long contarNaoLidas(UUID userId) {
         return repository.countByUserIdAndLidaFalse(userId);
+    }
+
+    /**
+     * Verifica se já existe uma notificação do mesmo tipo/link criada a partir
+     * do início do dia. Usada para deduplicar lembretes diários.
+     */
+    @Transactional(readOnly = true)
+    public boolean existeNoDia(UUID userId, TipoNotificacao tipo, String link, LocalDateTime inicioDoDia) {
+        return repository.existsByUserIdAndTipoAndLinkAndCreatedAtGreaterThanEqual(
+            userId, tipo, link, inicioDoDia);
     }
 
     /**

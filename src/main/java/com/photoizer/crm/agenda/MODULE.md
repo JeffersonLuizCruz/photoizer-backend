@@ -37,6 +37,7 @@ agenda/
 │   ├── DisponibilidadeService.java   # verificarDisponibilidade + validarConflitoAgenda + bloqueios de agenda (porta shared) [Fase 2]
 │   ├── AgendamentoFotografoService.java # ~177 linhas: repasses (pagar, cancelar, lote) + partilha
 │   ├── RascunhoAgendamentoService.java  # ~92 linhas: salvar/buscar/deletar rascunho por usuário
+│   ├── EntregaPendenteReminderService.java # Job diário 09:00: publica EntregaPendenteEvent para cada agendamento em EM_EDICAO
 │   └── CriarAgendamentoCommand.java      # Record com 27 campos (inclui MultipartFile)
 ├── api/
 │   ├── AgendamentoController.java     # REST: POST /proposta, PUT /{id}/proposta, DELETE /{id}/proposta, GET, GET /fotografos, PUT, PATCH /status, PATCH /confirmar-pagamento, PATCH /aprovar, PATCH /recusar, PATCH /reagendar, PATCH /destaque, POST /pagamento-final, GET /verificar-disponibilidade
@@ -94,6 +95,7 @@ agenda/
 | AgendamentoRealizadoEvent | FinanceiroEventListener |
 | AgendamentoCanceladoEvent | IndicacaoListener |
 | PagamentoFinalRegistradoEvent | EdicaoListener, IndicacaoListener |
+| EntregaPendenteEvent | NotificacaoEventListener (lembrete de entrega pendente para o staff) |
 
 ### Eventos consumidos
 | Evento | Origem | Handler |
@@ -124,6 +126,7 @@ CONFIRMADO ──realizar──▶ AGUARDANDO_PAGAMENTO_FINAL ──pagarFinal�
 ```
 - `atualizarStatus(id, String novoStatus)` → delegado a `AgendamentoStatusLifecycle.atualizarStatus` → `agendamento.transicionarPara(status)`: `valueOf` direto, **sem validação de transição válida** (aceita qualquer enum; ex.: `FINALIZADO → CONFIRMADO`). Eventos publicados **após o `save`** (consistência em caso de rollback/falha de persistência). Apenas dispara eventos para `REALIZADO`/`CANCELADO`/`NO_SHOW` — comportamento mantido (decisão: encapsular sem bloquear).
 - `registrarPagamentoFinal` → `AgendamentoStatusLifecycle.registrarPagamentoFinal(id, comprovante, formaPagamento)` → `agendamento.aplicarPagamentoFinal(url, formaPagamento)`: valida status ∈ {REALIZADO, AGUARDANDO_PAGAMENTO_FINAL}, zera `valorRestante`, `EM_EDICAO`, publica evento. O comprovante é **obrigatório exceto quando `formaPagamento == DINHEIRO`** (dinheiro vivo não tem comprovante); grava `formaPagamentoFinal` (`shared.model.FormaPagamento`). Endpoint `POST /api/v1/agendamentos/{id}/pagamento-final` (multipart: `comprovanteFinal?`, `formaPagamento?`).
+- **Entrega pendente**: ao entrar em `EM_EDICAO` (por `atualizarStatus` ou `registrarPagamentoFinal`), o lifecycle publica `EntregaPendenteEvent` com cliente/pacote e `lembreteDiario=false`. O `EntregaPendenteReminderService` repete o evento diariamente às 09:00 (`app.entrega-pendente.lembrete.cron`) com `lembreteDiario=true` para todo agendamento que continuar em `EM_EDICAO`.
 
 ### Fluxo 3: Repasses de Fotógrafos (partilha)
 - `AgendamentoFotografoService`: adicionar/atualizar/remover/pagar/cancelar repasse, delegando validação de partilha e método de domínio agrupados (`atualizarRepasse`/`pagar`/`cancelar` em `AgendamentoFotografo`) a `PartilhaService.calcularPartilhaFotografo/validarPartilha` (soma custos via `DespesaService` e repasses ativos, garantindo que a soma não exceda a partilha).

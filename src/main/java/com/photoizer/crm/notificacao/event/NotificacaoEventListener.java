@@ -3,16 +3,20 @@ package com.photoizer.crm.notificacao.event;
 import com.photoizer.crm.agenda.event.AgendamentoCriadoEvent;
 import com.photoizer.crm.agenda.event.AgendamentoRealizadoEvent;
 import com.photoizer.crm.agenda.event.AgendamentoReatribuidoEvent;
+import com.photoizer.crm.agenda.event.EntregaPendenteEvent;
 import com.photoizer.crm.agenda.event.PagamentoFinalRegistradoEvent;
 import com.photoizer.crm.ecommerce.event.SelecaoEnviadaEvent;
 import com.photoizer.crm.notificacao.model.TipoNotificacao;
 import com.photoizer.crm.notificacao.service.NotificacaoService;
+import com.photoizer.crm.shared.port.UsuarioStaffPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
@@ -33,11 +37,15 @@ public class NotificacaoEventListener {
 
     private static final Logger log = LoggerFactory.getLogger(NotificacaoEventListener.class);
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy 'às' HH:mm");
+    private static final ZoneId ZONE = ZoneId.of("America/Sao_Paulo");
 
     private final NotificacaoService notificacaoService;
+    private final UsuarioStaffPort usuarioStaffPort;
 
-    public NotificacaoEventListener(NotificacaoService notificacaoService) {
+    public NotificacaoEventListener(NotificacaoService notificacaoService,
+                                    UsuarioStaffPort usuarioStaffPort) {
         this.notificacaoService = notificacaoService;
+        this.usuarioStaffPort = usuarioStaffPort;
     }
 
     @EventListener
@@ -136,6 +144,38 @@ public class NotificacaoEventListener {
             .addKeyValue("event_action", "notificacao.reatribuicao")
             .addKeyValue("agendamento_id", event.agendamentoId())
             .log("Notificações de reatribuição criadas");
+    }
+
+    @EventListener
+    @Transactional
+    public void onEntregaPendente(EntregaPendenteEvent event) {
+        var destinatarios = usuarioStaffPort.listarStaffAtivos();
+        if (destinatarios.isEmpty()) return;
+
+        var link = "/agenda/" + event.agendamentoId();
+        var inicioDoDia = LocalDate.now(ZONE).atStartOfDay();
+        var dataStr = event.dataHoraEnsaio() != null ? event.dataHoraEnsaio().format(DATE_FMT) : "";
+        var titulo = event.lembreteDiario() ? "Lembrete de entrega pendente" : "Entrega pendente";
+        var mensagem = "A entrega do ensaio de " + event.clienteNome()
+            + " (" + event.pacoteNome() + ")"
+            + (dataStr.isBlank() ? "" : " em " + dataStr)
+            + " está pendente. Finalize a edição e marque o agendamento como finalizado.";
+
+        var criadas = 0;
+        for (UUID userId : destinatarios) {
+            if (notificacaoService.existeNoDia(userId, TipoNotificacao.ENTREGA_PENDENTE, link, inicioDoDia)) {
+                continue;
+            }
+            notificacaoService.criar(userId, titulo, mensagem, link, TipoNotificacao.ENTREGA_PENDENTE);
+            criadas++;
+        }
+
+        log.atInfo()
+            .addKeyValue("event_action", "notificacao.entrega_pendente")
+            .addKeyValue("agendamento_id", event.agendamentoId())
+            .addKeyValue("destinatarios", criadas)
+            .addKeyValue("lembrete_diario", event.lembreteDiario())
+            .log("Notificações de entrega pendente criadas");
     }
 
     /**
