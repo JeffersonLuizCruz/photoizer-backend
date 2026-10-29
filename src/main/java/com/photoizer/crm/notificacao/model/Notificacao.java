@@ -52,7 +52,7 @@ public class Notificacao {
     @NotNull
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
-    @Column(nullable = false, length = 30)
+    @Column(nullable = false, length = 60)
     private TipoNotificacao tipo;
 
     @Column(nullable = false)

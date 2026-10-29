@@ -8,7 +8,7 @@ Cria e gerencia notificações do sistema para usuários (fotógrafos/equipe). �
 notificacao/
 ├── model/
 │   ├── Notificacao.java       # Entidade (NÃO estende BaseEntity): userId, titulo, mensagem, link, tipo (enum), lida, createdAt — usa Lombok @Getter/@Setter
-│   └── TipoNotificacao.java   # Enum: NOVO_ENSAIO, ENSAIO_REALIZADO, PAGAMENTO_FINAL, ENSAIO_REATRIBUIDO, SELECAO_ENVIADA, ENTREGA_PENDENTE
+│   └── TipoNotificacao.java   # Enum: NOVO_ENSAIO, ENSAIO_REALIZADO, PAGAMENTO_FINAL, ENSAIO_REATRIBUIDO, SELECAO_ENVIADA, ENTREGA_PENDENTE, COMPRA_EXTRA_SOLICITADA, COMPRA_EXTRA_COMPROVANTE_ENVIADO
 ├── repository/
 │   └── NotificacaoRepository.java # JpaRepository + findByUserIdOrderByCreatedAtDesc, countByUserIdAndLidaFalse
 ├── service/
@@ -31,8 +31,8 @@ notificacao/
 | Módulo | Onde | Uso |
 |--------|------|-----|
 | **agenda** | `NotificacaoEventListener` | eventos `AgendamentoCriadoEvent`, `AgendamentoRealizadoEvent`, `PagamentoFinalRegistradoEvent`, `EntregaPendenteEvent` (uso correto — dados enriquecidos pelo publisher) |
-| **ecommerce** | `NotificacaoEventListener` | evento `SelecaoEnviadaEvent` |
-| **shared** | `NotificacaoEventListener` | porta `UsuarioStaffPort` para resolver destinatários staff sem acoplar ao módulo auth |
+| **ecommerce** | `NotificacaoEventListener` | eventos `SelecaoEnviadaEvent`, `CompraExtraSolicitadaEvent`, `ComprovanteCompraEnviadoEvent` |
+| **shared** | `NotificacaoEventListener` | porta `UsuarioStaffPort` para resolver destinatários staff sem acoplar ao módulo auth (`listarStaffAtivos` e `listarAprovadoresCompras`) |
 
 > Nenhum módulo importa `notificacao` — é terminal **para os outros módulos**. A violação Modulith anterior (acesso a repositórios do agenda) foi resolvida via **Event Enrichment**.
 
@@ -44,6 +44,8 @@ notificacao/
 | `PagamentoFinalRegistradoEvent` | `clienteNome`, `fotografoIds` | Para cada fotógrafo cria "Pagamento Final Recebido" (`PAGAMENTO_FINAL`) |
 | `SelecaoEnviadaEvent` | `clienteNome`, `editorId`, `fotografoId`, quantidades | Cria notificação de seleção para edição/aprovação (`SELECAO_ENVIADA`) |
 | `EntregaPendenteEvent` | `agendamentoId`, `clienteNome`, `pacoteNome`, `dataHoraEnsaio`, `lembreteDiario` | Cria "Entrega pendente"/"Lembrete de entrega pendente" para todo o staff ativo (`ENTREGA_PENDENTE`), deduplicado por dia |
+| `CompraExtraSolicitadaEvent` | `agendamentoId`, `compraId`, `clienteNome`, `fotografoId`, `quantidadeFotos`, `valorTotal` | Notifica fotógrafo responsável + ADMIN/FOTOGRAFO ativos (`UsuarioStaffPort.listarAprovadoresCompras`), pois a mensagem contém valor (`COMPRA_EXTRA_SOLICITADA`) |
+| `ComprovanteCompraEnviadoEvent` | idem | Notifica que o comprovante chegou e a compra precisa de aprovação (`COMPRA_EXTRA_COMPROVANTE_ENVIADO`); publicado só na primeira transição para `AGUARDANDO_CONFIRMACAO` |
 
 ### Eventos publicados
 Nenhum.

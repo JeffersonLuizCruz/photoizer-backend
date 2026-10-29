@@ -1,8 +1,11 @@
 package com.photoizer.crm.ecommerce.service;
 
+import com.photoizer.crm.agenda.model.Agendamento;
 import com.photoizer.crm.agenda.model.StatusAgendamento;
 import com.photoizer.crm.ecommerce.event.CompraExtraCriadaEvent;
 import com.photoizer.crm.ecommerce.event.CompraExtraFotosAssociadasEvent;
+import com.photoizer.crm.ecommerce.event.CompraExtraSolicitadaEvent;
+import com.photoizer.crm.ecommerce.event.ComprovanteCompraEnviadoEvent;
 import com.photoizer.crm.ecommerce.event.TokenGaleriaRegeneradoEvent;
 import com.photoizer.crm.ecommerce.exception.CarrinhoVazioException;
 import com.photoizer.crm.ecommerce.exception.CompraNaoEncontradaException;
@@ -178,6 +181,10 @@ public class EcommerceService {
         eventPublisher.publishEvent(new CompraExtraCriadaEvent(
             agendamento.getId(), compra.getId(), valorTotal, fotos.size()));
 
+        eventPublisher.publishEvent(new CompraExtraSolicitadaEvent(
+            agendamento.getId(), compra.getId(), agendamento.nomeCliente(),
+            fotografoId(agendamento), fotos.size(), valorTotal));
+
         log.atInfo()
             .addKeyValue("event_action", "ecommerce.checkout_criado")
             .addKeyValue("compra_id", compra.getId())
@@ -202,10 +209,20 @@ public class EcommerceService {
 
         fileValidator.validate(comprovante, "receipt");
         var caminho = fileStorageService.salvarEmSubdiretorio(comprovante, agendamento.getId(), "comprovante_extra");
+        var statusAnterior = compra.getStatus();
         compra.setUrlComprovante(caminho);
         compra.setStatus(StatusCompraExtra.AGUARDANDO_CONFIRMACAO);
 
         compra = compraExtraRepository.save(compra);
+
+        if (statusAnterior == StatusCompraExtra.AGUARDANDO_COMPROVANTE) {
+            eventPublisher.publishEvent(new ComprovanteCompraEnviadoEvent(
+                agendamento.getId(), compra.getId(), agendamento.nomeCliente(),
+                fotografoId(agendamento),
+                compra.getQuantidadeFotos() != null ? compra.getQuantidadeFotos() : 0,
+                compra.getValorTotal()));
+        }
+
         log.atInfo()
             .addKeyValue("event_action", "ecommerce.comprovante_enviado")
             .addKeyValue("compra_id", compra.getId())
@@ -216,6 +233,14 @@ public class EcommerceService {
 
     public FotoEnsaio overrideSelecao(UUID agendamentoId, UUID fotoId, boolean selecionada) {
         return selecaoFotosService.overrideSelecao(agendamentoId, fotoId, selecionada);
+    }
+
+    /**
+     * Fotógrafo responsável pelo ensaio, usado para direcionar a notificação de
+     * compra de extras. Pode ser nulo em agendamentos antigos.
+     */
+    private UUID fotografoId(Agendamento agendamento) {
+        return agendamento.getFotografo() != null ? agendamento.getFotografo().getId() : null;
     }
 
     public UUID regerarToken(UUID agendamentoId) {

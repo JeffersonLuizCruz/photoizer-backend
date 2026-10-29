@@ -17,4 +17,11 @@ public interface UsuarioStaffPort {
      * operacionais (ADMIN, EDITOR e AGENDADOR).
      */
     List<UUID> listarStaffAtivos();
+
+    /**
+     * Identificadores dos usuarios ativos que podem aprovar compras de extras
+     * (ADMIN e FOTOGRAFO). Usado para direcionar notificacoes que contem valor
+     * financeiro sem expor o dado a papeis sem essa permissao.
+     */
+    List<UUID> listarAprovadoresCompras();
 }

@@ -5,6 +5,8 @@ import com.photoizer.crm.agenda.event.AgendamentoRealizadoEvent;
 import com.photoizer.crm.agenda.event.AgendamentoReatribuidoEvent;
 import com.photoizer.crm.agenda.event.EntregaPendenteEvent;
 import com.photoizer.crm.agenda.event.PagamentoFinalRegistradoEvent;
+import com.photoizer.crm.ecommerce.event.CompraExtraSolicitadaEvent;
+import com.photoizer.crm.ecommerce.event.ComprovanteCompraEnviadoEvent;
 import com.photoizer.crm.ecommerce.event.SelecaoEnviadaEvent;
 import com.photoizer.crm.notificacao.model.TipoNotificacao;
 import com.photoizer.crm.notificacao.service.NotificacaoService;
@@ -15,9 +17,12 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.UUID;
 
@@ -116,6 +121,35 @@ public class NotificacaoEventListener {
 
     @EventListener
     @Transactional
+    public void onCompraExtraSolicitada(CompraExtraSolicitadaEvent event) {
+        notificarCompraExtra(
+            event.agendamentoId(),
+            event.fotografoId(),
+            "Nova solicitação de compra de extra",
+            "O cliente " + event.clienteNome() + " solicitou a compra de "
+                + event.quantidadeFotos() + " foto(s) extra(s) no valor de "
+                + formatarValor(event.valorTotal()) + ". Aguardando o comprovante.",
+            TipoNotificacao.COMPRA_EXTRA_SOLICITADA
+        );
+    }
+
+    @EventListener
+    @Transactional
+    public void onComprovanteCompraEnviado(ComprovanteCompraEnviadoEvent event) {
+        notificarCompraExtra(
+            event.agendamentoId(),
+            event.fotografoId(),
+            "Comprovante de compra de extra enviado",
+            "O cliente " + event.clienteNome() + " enviou o comprovante de "
+                + event.quantidadeFotos() + " foto(s) extra(s) ("
+                + formatarValor(event.valorTotal())
+                + "). Aprove a compra para liberar o download.",
+            TipoNotificacao.COMPRA_EXTRA_COMPROVANTE_ENVIADO
+        );
+    }
+
+    @EventListener
+    @Transactional
     public void onAgendamentoReatribuido(AgendamentoReatribuidoEvent event) {
         var dataStr = event.dataHoraEnsaio() != null ? event.dataHoraEnsaio().format(DATE_FMT) : "";
 
@@ -193,5 +227,40 @@ public class NotificacaoEventListener {
             .addKeyValue("tipo", tipo)
             .addKeyValue("destinatarios", fotografoIds.size())
             .log("Notificações criadas");
+    }
+
+    /**
+     * Notifica o fotógrafo responsável e os usuários que podem aprovar compras
+     * de extras (ADMIN/FOTOGRAFO). O fotógrafo é incluído explicitamente mesmo
+     * que não esteja na lista de aprovadores ativos.
+     */
+    private void notificarCompraExtra(UUID agendamentoId, UUID fotografoId,
+                                      String titulo, String mensagem, TipoNotificacao tipo) {
+        var destinatarios = new LinkedHashSet<UUID>();
+        if (fotografoId != null) {
+            destinatarios.add(fotografoId);
+        }
+        destinatarios.addAll(usuarioStaffPort.listarAprovadoresCompras());
+        if (destinatarios.isEmpty()) return;
+
+        var link = "/agenda/" + agendamentoId + "/fotos?tab=compras";
+        for (UUID userId : destinatarios) {
+            notificacaoService.criar(userId, titulo, mensagem, link, tipo);
+        }
+        log.atInfo()
+            .addKeyValue("event_action", "notificacao.compra_extra")
+            .addKeyValue("tipo", tipo)
+            .addKeyValue("agendamento_id", agendamentoId)
+            .addKeyValue("destinatarios", destinatarios.size())
+            .log("Notificações de compra de extra criadas");
+    }
+
+    private static String formatarValor(BigDecimal valor) {
+        if (valor == null) {
+            return "R$ 0,00";
+        }
+        return "R$ " + valor.setScale(2, RoundingMode.HALF_UP)
+            .toPlainString()
+            .replace('.', ',');
     }
 }

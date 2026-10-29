@@ -73,4 +73,69 @@ class NotificacaoEventListenerSpec extends Specification {
         then:
         0 * notificacaoService.criar(_, _, _, _, _)
     }
+
+    def "notifica fotógrafo e staff quando o cliente solicita compra de extras"() {
+        given:
+        def agendamentoId = UUID.randomUUID()
+        def fotografo = UUID.randomUUID()
+        def admin = UUID.randomUUID()
+        def event = new com.photoizer.crm.ecommerce.event.CompraExtraSolicitadaEvent(
+            agendamentoId, UUID.randomUUID(), "Maria Souza", fotografo, 3,
+            new BigDecimal("45.00"))
+        usuarioStaffPort.listarAprovadoresCompras() >> [admin]
+
+        when:
+        listener.onCompraExtraSolicitada(event)
+
+        then:
+        1 * notificacaoService.criar(
+            fotografo,
+            "Nova solicitação de compra de extra",
+            { it.contains("Maria Souza") && it.contains("3 foto") && it.contains('R$ 45,00') },
+            "/agenda/${agendamentoId}/fotos?tab=compras",
+            TipoNotificacao.COMPRA_EXTRA_SOLICITADA)
+        1 * notificacaoService.criar(
+            admin,
+            "Nova solicitação de compra de extra",
+            _,
+            _,
+            TipoNotificacao.COMPRA_EXTRA_SOLICITADA)
+    }
+
+    def "notifica o staff quando o comprovante da compra de extra é enviado"() {
+        given:
+        def agendamentoId = UUID.randomUUID()
+        def admin = UUID.randomUUID()
+        def event = new com.photoizer.crm.ecommerce.event.ComprovanteCompraEnviadoEvent(
+            agendamentoId, UUID.randomUUID(), "Maria Souza", null, 2,
+            new BigDecimal("30.00"))
+        usuarioStaffPort.listarAprovadoresCompras() >> [admin]
+
+        when:
+        listener.onComprovanteCompraEnviado(event)
+
+        then:
+        1 * notificacaoService.criar(
+            admin,
+            "Comprovante de compra de extra enviado",
+            { it.contains('R$ 30,00') && it.contains("Aprove a compra") },
+            "/agenda/${agendamentoId}/fotos?tab=compras",
+            TipoNotificacao.COMPRA_EXTRA_COMPROVANTE_ENVIADO)
+    }
+
+    def "não duplica a notificação quando o fotógrafo também é staff ativo"() {
+        given:
+        def agendamentoId = UUID.randomUUID()
+        def fotografo = UUID.randomUUID()
+        def event = new com.photoizer.crm.ecommerce.event.CompraExtraSolicitadaEvent(
+            agendamentoId, UUID.randomUUID(), "Maria Souza", fotografo, 1,
+            new BigDecimal("15.00"))
+        usuarioStaffPort.listarAprovadoresCompras() >> [fotografo]
+
+        when:
+        listener.onCompraExtraSolicitada(event)
+
+        then:
+        1 * notificacaoService.criar(fotografo, _, _, _, TipoNotificacao.COMPRA_EXTRA_SOLICITADA)
+    }
 }
