@@ -14028,7 +14028,7 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "enum" : [ "AGUARDANDO_UPLOAD", "FOTOS_NAO_PUBLICADAS", "SELECAO_EM_EDICAO", "SELECAO_AGUARDANDO_APROVACAO", "AGUARDANDO_SELECAO", "AGUARDANDO_DOWNLOAD", "CONCLUIDA", "ARQUIVADA" ]
+            "enum" : [ "AGUARDANDO_UPLOAD", "FOTOS_NAO_PUBLICADAS", "COMPRA_EXTRA_PENDENTE", "SELECAO_EM_EDICAO", "SELECAO_AGUARDANDO_APROVACAO", "AGUARDANDO_SELECAO", "AGUARDANDO_DOWNLOAD", "CLIENTE_BAIXOU", "CONCLUIDA", "ARQUIVADA" ]
           }
         }, {
           "name" : "busca",
@@ -14039,6 +14039,14 @@
           }
         }, {
           "name" : "atrasadas",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
+        }, {
+          "name" : "semFotos",
           "in" : "query",
           "required" : false,
           "schema" : {
@@ -14184,7 +14192,7 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "enum" : [ "AGUARDANDO_UPLOAD", "FOTOS_NAO_PUBLICADAS", "SELECAO_EM_EDICAO", "SELECAO_AGUARDANDO_APROVACAO", "AGUARDANDO_SELECAO", "AGUARDANDO_DOWNLOAD", "CONCLUIDA", "ARQUIVADA" ]
+            "enum" : [ "AGUARDANDO_UPLOAD", "FOTOS_NAO_PUBLICADAS", "COMPRA_EXTRA_PENDENTE", "SELECAO_EM_EDICAO", "SELECAO_AGUARDANDO_APROVACAO", "AGUARDANDO_SELECAO", "AGUARDANDO_DOWNLOAD", "CLIENTE_BAIXOU", "CONCLUIDA", "ARQUIVADA" ]
           }
         }, {
           "name" : "busca",
@@ -14195,6 +14203,14 @@
           }
         }, {
           "name" : "atrasadas",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
+        }, {
+          "name" : "semFotos",
           "in" : "query",
           "required" : false,
           "schema" : {
@@ -19951,7 +19967,7 @@
         "properties" : {
           "etapa" : {
             "type" : "string",
-            "enum" : [ "AGUARDANDO_UPLOAD", "FOTOS_NAO_PUBLICADAS", "SELECAO_EM_EDICAO", "SELECAO_AGUARDANDO_APROVACAO", "AGUARDANDO_SELECAO", "AGUARDANDO_DOWNLOAD", "CONCLUIDA", "ARQUIVADA" ]
+            "enum" : [ "AGUARDANDO_UPLOAD", "FOTOS_NAO_PUBLICADAS", "COMPRA_EXTRA_PENDENTE", "SELECAO_EM_EDICAO", "SELECAO_AGUARDANDO_APROVACAO", "AGUARDANDO_SELECAO", "AGUARDANDO_DOWNLOAD", "CLIENTE_BAIXOU", "CONCLUIDA", "ARQUIVADA" ]
           },
           "etapaLabel" : {
             "type" : "string"
@@ -19989,6 +20005,13 @@
             "type" : "string"
           },
           "dataHoraEnsaio" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "clienteBaixou" : {
+            "type" : "boolean"
+          },
+          "clienteBaixouEm" : {
             "type" : "string",
             "format" : "date-time"
           }
@@ -20813,6 +20836,22 @@
             "format" : "int32"
           },
           "extrasPendentesEdicao" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "semFotosNoCrm" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "clientesBaixaram" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "comprasAguardandoComprovante" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "comprasAguardandoConfirmacao" : {
             "type" : "integer",
             "format" : "int32"
           }

@@ -10,8 +10,9 @@ import com.photoizer.crm.ecommerce.model.StatusSelecao;
  * Resolve a etapa operacional de uma galeria a partir dos fatos do ensaio.
  *
  * <p>Regra pura e sem dependencia de banco para ser testada isoladamente. A
- * precedencia e: arquivamento, selecao ativa, ausencia de fotos, ausencia de
- * publicacao, comercializacao e, por fim, aguardando escolha do cliente.
+ * precedencia e: arquivamento, compra de extra pendente, selecao ativa, ausencia
+ * de fotos, ausencia de publicacao, comercializacao (com download do cliente) e,
+ * por fim, aguardando escolha do cliente.
  */
 public final class GaleriaPipelineEtapaResolver {
 
@@ -25,13 +26,20 @@ public final class GaleriaPipelineEtapaResolver {
         long totalFotos,
         long fotosPublicadas,
         long fotosArquivadas,
-        StatusSelecao selecaoStatus
+        StatusSelecao selecaoStatus,
+        long fotosPacote,
+        long fotosPacoteBaixadas,
+        long comprasPendentes
     ) {
     }
 
     public static EtapaGaleria resolver(DadosEtapa dados) {
         if (dados.totalFotos() > 0 && dados.fotosArquivadas() >= dados.totalFotos()) {
             return EtapaGaleria.ARQUIVADA;
+        }
+
+        if (dados.comprasPendentes() > 0) {
+            return EtapaGaleria.COMPRA_EXTRA_PENDENTE;
         }
 
         if (dados.selecaoStatus() != null && dados.selecaoStatus().estaAtiva()) {
@@ -52,6 +60,10 @@ public final class GaleriaPipelineEtapaResolver {
 
         if (dados.fase() == FaseGaleria.COMERCIALIZACAO
             || dados.selecaoStatus() == StatusSelecao.PUBLICADA) {
+            if (dados.fotosPacote() > 0
+                && dados.fotosPacoteBaixadas() >= dados.fotosPacote()) {
+                return EtapaGaleria.CLIENTE_BAIXOU;
+            }
             return dados.statusAgendamento() == StatusAgendamento.FINALIZADO
                 ? EtapaGaleria.CONCLUIDA
                 : EtapaGaleria.AGUARDANDO_DOWNLOAD;

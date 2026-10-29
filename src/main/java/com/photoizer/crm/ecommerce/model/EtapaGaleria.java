@@ -14,10 +14,12 @@ public enum EtapaGaleria {
 
     AGUARDANDO_UPLOAD(10, "Aguardando envio de fotos"),
     FOTOS_NAO_PUBLICADAS(20, "Fotos aguardando publicação"),
+    COMPRA_EXTRA_PENDENTE(25, "Compra de extra aguardando aprovação"),
     SELECAO_EM_EDICAO(30, "Seleção em edição"),
     SELECAO_AGUARDANDO_APROVACAO(35, "Seleção aguardando aprovação"),
     AGUARDANDO_SELECAO(40, "Aguardando escolha do cliente"),
     AGUARDANDO_DOWNLOAD(50, "Publicada, aguardando download"),
+    CLIENTE_BAIXOU(55, "Cliente baixou as fotos"),
     CONCLUIDA(60, "Concluída"),
     ARQUIVADA(70, "Arquivada");
 
@@ -38,6 +40,6 @@ public enum EtapaGaleria {
     }
 
     public boolean isTerminal() {
-        return this == CONCLUIDA || this == ARQUIVADA;
+        return this == CONCLUIDA || this == ARQUIVADA || this == CLIENTE_BAIXOU;
     }
 }

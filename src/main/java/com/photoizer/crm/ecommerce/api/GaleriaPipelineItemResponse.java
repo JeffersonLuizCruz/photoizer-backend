@@ -39,6 +39,12 @@ public record GaleriaPipelineItemResponse(
     long diasNaEtapa,
     boolean atrasada,
     boolean tokenExpirado,
-    LocalDateTime tokenExpiracao
+    LocalDateTime tokenExpiracao,
+    int fotosPacote,
+    int fotosPacoteBaixadas,
+    LocalDateTime downloadPacoteEm,
+    boolean clienteBaixou,
+    int comprasAguardandoComprovante,
+    int comprasAguardandoConfirmacao
 ) {
 }

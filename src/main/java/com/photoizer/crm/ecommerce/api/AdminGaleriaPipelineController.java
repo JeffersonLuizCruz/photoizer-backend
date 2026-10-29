@@ -37,11 +37,12 @@ public class AdminGaleriaPipelineController {
             @RequestParam(required = false) EtapaGaleria etapa,
             @RequestParam(required = false) String busca,
             @RequestParam(defaultValue = "false") boolean atrasadas,
+            @RequestParam(defaultValue = "false") boolean semFotos,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int perPage,
             Authentication authentication) {
         return ResponseEntity.ok(pipelineQueryService.listar(
-            etapa, busca, atrasadas, page, perPage, incluirFinanceiro(authentication)));
+            etapa, busca, atrasadas, page, perPage, incluirFinanceiro(authentication), semFotos));
     }
 
     @GetMapping("/pipeline/resumo")
@@ -64,9 +65,10 @@ public class AdminGaleriaPipelineController {
             @RequestParam(required = false) EtapaGaleria etapa,
             @RequestParam(required = false) String busca,
             @RequestParam(defaultValue = "false") boolean atrasadas,
+            @RequestParam(defaultValue = "false") boolean semFotos,
             Authentication authentication) {
         var conteudo = "\uFEFF" + pipelineQueryService.gerarCsv(
-            etapa, busca, atrasadas, incluirFinanceiro(authentication));
+            etapa, busca, atrasadas, incluirFinanceiro(authentication), semFotos);
         var nomeArquivo = "galerias-" + LocalDate.now() + ".csv";
         return ResponseEntity.ok()
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nomeArquivo + "\"")

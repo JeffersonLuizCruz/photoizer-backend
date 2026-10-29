@@ -97,8 +97,8 @@ public class GaleriaPipelineQueryService {
 
     public PageResponse<GaleriaPipelineItemResponse> listar(
             EtapaGaleria etapa, String busca, boolean atrasadas, int page, int perPage,
-            boolean incluirFinanceiro) {
-        var filtrados = listarTodos(etapa, busca, atrasadas, incluirFinanceiro);
+            boolean incluirFinanceiro, boolean semFotos) {
+        var filtrados = listarTodos(etapa, busca, atrasadas, incluirFinanceiro, semFotos);
 
         var pagina = Math.max(1, page);
         var tamanho = Math.min(Math.max(1, perPage), 100);
@@ -114,9 +114,18 @@ public class GaleriaPipelineQueryService {
             totalPaginas);
     }
 
+    /**
+     * Lista a fila operacional. Galerias sem fotos no CRM ficam fora da fila
+     * por padrao (`semFotos=false`), porque as fotos podem ter sido entregues
+     * por outro canal. Elas continuam acessiveis pelo link de conferencia, e o
+     * filtro explicito por `AGUARDANDO_UPLOAD` tambem as inclui.
+     */
     public List<GaleriaPipelineItemResponse> listarTodos(
-            EtapaGaleria etapa, String busca, boolean atrasadas, boolean incluirFinanceiro) {
+            EtapaGaleria etapa, String busca, boolean atrasadas, boolean incluirFinanceiro,
+            boolean semFotos) {
+        var incluirSemFotos = semFotos || etapa == EtapaGaleria.AGUARDANDO_UPLOAD;
         return carregarItens(busca, incluirFinanceiro).stream()
+            .filter(item -> incluirSemFotos || item.etapa() != EtapaGaleria.AGUARDANDO_UPLOAD)
             .filter(item -> etapa == null || item.etapa() == etapa)
             .filter(item -> !atrasadas || item.atrasada())
             .toList();
@@ -124,19 +133,27 @@ public class GaleriaPipelineQueryService {
 
     public GaleriaPipelineResumoResponse resumo(boolean incluirFinanceiro) {
         var itens = carregarItens(null, incluirFinanceiro);
+        var semFotosNoCrm = contar(itens, EtapaGaleria.AGUARDANDO_UPLOAD);
+        var fila = itens.stream()
+            .filter(item -> item.etapa() != EtapaGaleria.AGUARDANDO_UPLOAD)
+            .toList();
         return new GaleriaPipelineResumoResponse(
-            itens.size(),
-            contar(itens, EtapaGaleria.AGUARDANDO_UPLOAD),
-            contar(itens, EtapaGaleria.FOTOS_NAO_PUBLICADAS),
-            contar(itens, EtapaGaleria.AGUARDANDO_SELECAO),
-            contar(itens, EtapaGaleria.SELECAO_EM_EDICAO),
-            contar(itens, EtapaGaleria.SELECAO_AGUARDANDO_APROVACAO),
-            contar(itens, EtapaGaleria.AGUARDANDO_DOWNLOAD),
-            contar(itens, EtapaGaleria.CONCLUIDA),
-            contar(itens, EtapaGaleria.ARQUIVADA),
-            (int) itens.stream().filter(GaleriaPipelineItemResponse::atrasada).count(),
-            itens.stream().mapToInt(GaleriaPipelineItemResponse::comprasPendentes).sum(),
-            itens.stream().mapToInt(GaleriaPipelineItemResponse::extrasPendentesEdicao).sum());
+            fila.size(),
+            0,
+            contar(fila, EtapaGaleria.FOTOS_NAO_PUBLICADAS),
+            contar(fila, EtapaGaleria.AGUARDANDO_SELECAO),
+            contar(fila, EtapaGaleria.SELECAO_EM_EDICAO),
+            contar(fila, EtapaGaleria.SELECAO_AGUARDANDO_APROVACAO),
+            contar(fila, EtapaGaleria.AGUARDANDO_DOWNLOAD),
+            contar(fila, EtapaGaleria.CONCLUIDA),
+            contar(fila, EtapaGaleria.ARQUIVADA),
+            (int) fila.stream().filter(GaleriaPipelineItemResponse::atrasada).count(),
+            fila.stream().mapToInt(GaleriaPipelineItemResponse::comprasPendentes).sum(),
+            fila.stream().mapToInt(GaleriaPipelineItemResponse::extrasPendentesEdicao).sum(),
+            semFotosNoCrm,
+            contar(fila, EtapaGaleria.CLIENTE_BAIXOU),
+            fila.stream().mapToInt(GaleriaPipelineItemResponse::comprasAguardandoComprovante).sum(),
+            fila.stream().mapToInt(GaleriaPipelineItemResponse::comprasAguardandoConfirmacao).sum());
     }
 
     /**
@@ -159,7 +176,9 @@ public class GaleriaPipelineQueryService {
             item.tokenExpiracao(),
             galeria.getModo().requerEdicao(),
             agendamento.getPacote() != null ? agendamento.getPacote().getNome() : null,
-            agendamento.getDataHoraEnsaio());
+            agendamento.getDataHoraEnsaio(),
+            item.clienteBaixou(),
+            item.downloadPacoteEm());
     }
 
     /**
@@ -193,7 +212,10 @@ public class GaleriaPipelineQueryService {
                 totalFotos,
                 publicadas,
                 arquivadas,
-                selecao != null ? selecao.getStatus() : null));
+                selecao != null ? selecao.getStatus() : null,
+                fotos != null ? fotos.getSelecionadas() : 0,
+                fotos != null ? fotos.getSelecionadasBaixadas() : 0,
+                compras != null ? compras.getPendentes() : 0));
             var prazoEntrega = calcularPrazo(agendamento);
             var dataEnsaio = agendamento.getDataRealizacao() != null
                 ? agendamento.getDataRealizacao()
@@ -227,12 +249,14 @@ public class GaleriaPipelineQueryService {
      * follow-up fora do sistema. Nao altera nenhum dado.
      */
     public String gerarCsv(
-            EtapaGaleria etapa, String busca, boolean atrasadas, boolean incluirFinanceiro) {
-        var itens = listarTodos(etapa, busca, atrasadas, incluirFinanceiro);
+            EtapaGaleria etapa, String busca, boolean atrasadas, boolean incluirFinanceiro,
+            boolean semFotos) {
+        var itens = listarTodos(etapa, busca, atrasadas, incluirFinanceiro, semFotos);
         var csv = new StringBuilder();
         csv.append("Cliente;Pacote;Data do ensaio;Etapa;Prazo de entrega;Dias na etapa;")
             .append("Atrasada;Link expirado;Total de fotos;Publicadas;Selecionadas;Baixadas;")
-            .append("Extras a editar;");
+            .append("Extras a editar;Fotos do pacote;Baixadas do pacote;Cliente baixou;")
+            .append("Compras aguardando comprovante;Compras aguardando aprovacao;");
         if (incluirFinanceiro) {
             csv.append("Pagamentos pendentes;Valor extras;");
         }
@@ -252,7 +276,12 @@ public class GaleriaPipelineQueryService {
                 .append(item.fotosPublicadas()).append(';')
                 .append(item.fotosSelecionadas()).append(';')
                 .append(item.fotosBaixadas()).append(';')
-                .append(item.extrasPendentesEdicao()).append(';');
+                .append(item.extrasPendentesEdicao()).append(';')
+                .append(item.fotosPacote()).append(';')
+                .append(item.fotosPacoteBaixadas()).append(';')
+                .append(item.clienteBaixou() ? "Sim" : "Nao").append(';')
+                .append(item.comprasAguardandoComprovante()).append(';')
+                .append(item.comprasAguardandoConfirmacao()).append(';');
             if (incluirFinanceiro) {
                 csv.append(item.comprasPendentes()).append(';')
                     .append(formatarValorCsv(item.valorExtras())).append(';');
@@ -332,11 +361,27 @@ public class GaleriaPipelineQueryService {
             var fotosPublicadas = agregadoFotos != null ? (int) agregadoFotos.getPublicadas() : 0;
             var arquivadas = agregadoFotos != null ? agregadoFotos.getArquivadas() : 0;
             var selecionadas = agregadoFotos != null ? (int) agregadoFotos.getSelecionadas() : 0;
+            var selecionadasBaixadas = agregadoFotos != null
+                ? (int) agregadoFotos.getSelecionadasBaixadas()
+                : 0;
+            var downloadPacoteEm = agregadoFotos != null
+                ? agregadoFotos.getDownloadPacoteEm()
+                : null;
             var baixadas = agregadoFotos != null ? (int) agregadoFotos.getBaixadas() : 0;
             var extrasPendentes = agregadoFotos != null ? (int) agregadoFotos.getExtrasPendentesEdicao() : 0;
-            var comprasPendentes = incluirFinanceiro && agregadoCompras != null
+            var comprasPendentesTotais = agregadoCompras != null
                 ? (int) agregadoCompras.getPendentes()
                 : 0;
+            var comprasAguardandoComprovante = agregadoCompras != null
+                ? (int) agregadoCompras.getAguardandoComprovante()
+                : 0;
+            var comprasAguardandoConfirmacao = agregadoCompras != null
+                ? (int) agregadoCompras.getAguardandoConfirmacao()
+                : 0;
+            var primeiraCompraPendenteEm = agregadoCompras != null
+                ? agregadoCompras.getPrimeiraPendenteEm()
+                : null;
+            var comprasPendentes = incluirFinanceiro ? comprasPendentesTotais : 0;
             var valorExtras = incluirFinanceiro
                 && agregadoCompras != null
                 && agregadoCompras.getValorPago() != null
@@ -350,12 +395,16 @@ public class GaleriaPipelineQueryService {
                 totalFotos,
                 fotosPublicadas,
                 arquivadas,
-                selecao != null ? selecao.getStatus() : null));
+                selecao != null ? selecao.getStatus() : null,
+                selecionadas,
+                selecionadasBaixadas,
+                comprasPendentesTotais));
             var acao = resolverAcao(agendamento.getId(), etapa, selecao != null ? selecao.getStatus() : null);
             var prazoEntrega = calcularPrazo(agendamento);
             var tokenExpirado = agendamento.getTokenExpiracao() != null
                 && agendamento.getTokenExpiracao().isBefore(agora);
-            var referencia = referenciaEtapa(etapa, agendamento, galeria, selecao);
+            var referencia = referenciaEtapa(
+                etapa, agendamento, galeria, selecao, downloadPacoteEm, primeiraCompraPendenteEm);
             var diasNaEtapa = referencia == null
                 ? 0
                 : Math.max(0, ChronoUnit.DAYS.between(referencia.toLocalDate(), hoje));
@@ -386,7 +435,13 @@ public class GaleriaPipelineQueryService {
                 diasNaEtapa,
                 prazoEntrega != null && hoje.isAfter(prazoEntrega) && !etapa.isTerminal(),
                 tokenExpirado,
-                agendamento.getTokenExpiracao()));
+                agendamento.getTokenExpiracao(),
+                selecionadas,
+                selecionadasBaixadas,
+                downloadPacoteEm,
+                etapa == EtapaGaleria.CLIENTE_BAIXOU,
+                comprasAguardandoComprovante,
+                comprasAguardandoConfirmacao));
         }
 
         return itens.stream()
@@ -401,12 +456,14 @@ public class GaleriaPipelineQueryService {
 
     private LocalDateTime referenciaEtapa(
             EtapaGaleria etapa, Agendamento agendamento,
-            GaleriaEnsaio galeria, SelecaoEnsaio selecao) {
+            GaleriaEnsaio galeria, SelecaoEnsaio selecao,
+            LocalDateTime downloadPacoteEm, LocalDateTime primeiraCompraPendenteEm) {
         var realizado = agendamento.getDataRealizacao() != null
             ? agendamento.getDataRealizacao()
             : agendamento.getDataHoraEnsaio();
         return switch (etapa) {
             case AGUARDANDO_UPLOAD, FOTOS_NAO_PUBLICADAS -> realizado;
+            case COMPRA_EXTRA_PENDENTE -> primeiraCompraPendenteEm;
             case AGUARDANDO_SELECAO -> galeria.getPublicadaEm() != null
                 ? galeria.getPublicadaEm()
                 : realizado;
@@ -416,6 +473,7 @@ public class GaleriaPipelineQueryService {
             case AGUARDANDO_DOWNLOAD -> selecao != null && selecao.getPublicadaEm() != null
                 ? selecao.getPublicadaEm()
                 : galeria.getPublicadaEm();
+            case CLIENTE_BAIXOU -> downloadPacoteEm;
             case CONCLUIDA, ARQUIVADA -> null;
         };
     }
@@ -436,10 +494,12 @@ public class GaleriaPipelineQueryService {
         return switch (etapa) {
             case AGUARDANDO_UPLOAD -> new Acao("Enviar fotos", galeriaUrl + "?tab=fotos");
             case FOTOS_NAO_PUBLICADAS -> new Acao("Publicar fotos", galeriaUrl + "?tab=fotos");
+            case COMPRA_EXTRA_PENDENTE -> new Acao("Aprovar compra", galeriaUrl + "?tab=compras");
             case SELECAO_EM_EDICAO -> new Acao(rotuloEdicao(selecaoStatus), galeriaUrl + "?tab=selecao");
             case SELECAO_AGUARDANDO_APROVACAO -> new Acao("Aprovar seleção", galeriaUrl + "?tab=selecao");
             case AGUARDANDO_SELECAO -> new Acao("Acompanhar seleção", galeriaUrl + "?tab=visao");
             case AGUARDANDO_DOWNLOAD -> new Acao("Acompanhar entrega", galeriaUrl + "?tab=visao");
+            case CLIENTE_BAIXOU -> new Acao("Ver entrega", galeriaUrl + "?tab=visao");
             case CONCLUIDA -> new Acao("Ver galeria", galeriaUrl + "?tab=visao");
             case ARQUIVADA -> new Acao("Ver armazenamento", "/admin/armazenamento");
         };
@@ -459,10 +519,12 @@ public class GaleriaPipelineQueryService {
         return switch (etapa) {
             case AGUARDANDO_UPLOAD -> "Preparando seu ensaio";
             case FOTOS_NAO_PUBLICADAS -> "Fotos em revisão";
+            case COMPRA_EXTRA_PENDENTE -> "Compra de fotos extras";
             case AGUARDANDO_SELECAO -> "Escolha suas fotos";
             case SELECAO_EM_EDICAO -> "Em edição";
             case SELECAO_AGUARDANDO_APROVACAO -> "Em revisão final";
             case AGUARDANDO_DOWNLOAD -> "Pronta para baixar";
+            case CLIENTE_BAIXOU -> "Fotos baixadas";
             case CONCLUIDA -> "Entregue";
             case ARQUIVADA -> "Galeria arquivada";
         };
@@ -473,6 +535,8 @@ public class GaleriaPipelineQueryService {
             case AGUARDANDO_UPLOAD -> "Estamos organizando as fotos do seu ensaio.";
             case FOTOS_NAO_PUBLICADAS ->
                 "As fotos do seu ensaio estão em revisão. Em breve a galeria será liberada.";
+            case COMPRA_EXTRA_PENDENTE ->
+                "Sua compra de fotos extras está aguardando a aprovação do estúdio.";
             case AGUARDANDO_SELECAO ->
                 "Sua galeria está pronta. Escolha as fotos do seu pacote.";
             case SELECAO_EM_EDICAO ->
@@ -481,6 +545,8 @@ public class GaleriaPipelineQueryService {
                 "Recebemos sua seleção. Estamos na revisão final para liberar o seu pacote.";
             case AGUARDANDO_DOWNLOAD ->
                 "Sua galeria está liberada. Você já pode baixar as fotos do pacote e comprar extras.";
+            case CLIENTE_BAIXOU ->
+                "Você já baixou as fotos do seu pacote. A galeria continua disponível para consulta.";
             case CONCLUIDA ->
                 "Seu ensaio foi entregue. A galeria continua disponível para consulta.";
             case ARQUIVADA ->

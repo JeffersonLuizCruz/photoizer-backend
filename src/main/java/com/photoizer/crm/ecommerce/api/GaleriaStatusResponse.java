@@ -21,6 +21,8 @@ public record GaleriaStatusResponse(
     LocalDateTime tokenExpiracao,
     boolean requerEdicao,
     String pacoteNome,
-    LocalDateTime dataHoraEnsaio
+    LocalDateTime dataHoraEnsaio,
+    boolean clienteBaixou,
+    LocalDateTime clienteBaixouEm
 ) {
 }

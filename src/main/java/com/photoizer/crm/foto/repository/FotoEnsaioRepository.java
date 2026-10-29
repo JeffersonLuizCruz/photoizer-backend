@@ -150,6 +150,10 @@ public interface FotoEnsaioRepository extends JpaRepository<FotoEnsaio, UUID> {
 
         long getSelecionadas();
 
+        long getSelecionadasBaixadas();
+
+        java.time.LocalDateTime getDownloadPacoteEm();
+
         long getPagas();
 
         long getExtrasPendentesEdicao();
@@ -163,6 +167,10 @@ public interface FotoEnsaioRepository extends JpaRepository<FotoEnsaio, UUID> {
                SUM(CASE WHEN f.status <> 'INEDITA' THEN 1 ELSE 0 END) AS publicadas,
                SUM(CASE WHEN f.dataDownload IS NOT NULL THEN 1 ELSE 0 END) AS baixadas,
                SUM(CASE WHEN f.selecionadaPacote = true THEN 1 ELSE 0 END) AS selecionadas,
+               SUM(CASE WHEN f.selecionadaPacote = true
+                         AND f.dataDownload IS NOT NULL THEN 1 ELSE 0 END) AS selecionadasBaixadas,
+               MAX(CASE WHEN f.selecionadaPacote = true
+                        THEN f.dataDownload END) AS downloadPacoteEm,
                SUM(CASE WHEN f.status = 'PAGA' THEN 1 ELSE 0 END) AS pagas,
                SUM(CASE WHEN f.compraExtraId IS NOT NULL
                          AND f.status = 'PAGA'

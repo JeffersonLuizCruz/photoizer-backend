@@ -64,9 +64,16 @@ class GaleriaPipelineRepositorySpec extends Specification {
         fotos[0].extrasPendentesEdicao == 1
         fotos[0].arquivadas == 1
 
+        and: "o download do pacote é rastreado separadamente"
+        fotos[0].selecionadasBaixadas == 1
+        fotos[0].downloadPacoteEm != null
+
         and: "somente compras pagas entram no valor e no contador de pagas"
         compras.size() == 1
         compras[0].pendentes == 1
+        compras[0].aguardandoComprovante == 0
+        compras[0].aguardandoConfirmacao == 1
+        compras[0].primeiraPendenteEm != null
         compras[0].pagas == 1
         compras[0].valorPago == new BigDecimal("150.00")
     }

@@ -275,7 +275,16 @@ O módulo passou a expor uma **fila operacional** do pós-ensaio, além da venda
 ### Modelo
 
 - `EtapaGaleria` (`ecommerce/model`) é uma etapa **derivada**, nunca persistida, com precedência:
-  arquivada → seleção ativa → sem fotos → fotos não publicadas → comercialização → aguardando seleção.
+  arquivada → compra de extra pendente → seleção ativa → sem fotos → fotos não publicadas →
+  comercialização (cliente baixou / concluída / aguardando download) → aguardando seleção.
+- `COMPRA_EXTRA_PENDENTE` e `CLIENTE_BAIXOU` são etapas próprias desde a V22:
+  - `COMPRA_EXTRA_PENDENTE` significa compra em `AGUARDANDO_COMPROVANTE` ou
+    `AGUARDANDO_CONFIRMACAO` (o staff precisa aprovar para liberar o download). O contador que
+    alimenta a etapa é calculado mesmo sem permissão financeira; `incluirFinanceiro` gateia apenas
+    `valorExtras`/valores.
+  - `CLIENTE_BAIXOU` exige que **todas** as fotos do pacote (`selecionadaPacote = true`) tenham
+    `dataDownload`, e é terminal (não entra em atrasadas). O download tem precedência sobre
+    `FINALIZADO`, senão o status nunca apareceria no fluxo real.
 - `GaleriaPipelineEtapaResolver` concentra a regra pura (testada em `GaleriaPipelineEtapaResolverSpec`).
 - `GaleriaPipelineQueryService` compõe `Agendamento`, `FotoEnsaio`, `SelecaoEnsaio`, `CompraExtra` e
   `GaleriaEnsaio` com queries agregadas por agendamento (sem `findAll()` e sem N+1).
@@ -285,9 +294,13 @@ O módulo passou a expor uma **fila operacional** do pós-ensaio, além da venda
 ### Endpoints
 
 Staff (`ADMIN/FOTOGRAFO/EDITOR`):
-- `GET /api/v1/admin/galerias/pipeline?etapa=&busca=&atrasadas=&page=&perPage=`
+- `GET /api/v1/admin/galerias/pipeline?etapa=&busca=&atrasadas=&semFotos=&page=&perPage=`
 - `GET /api/v1/admin/galerias/pipeline/resumo`
-- `GET /api/v1/admin/galerias/pipeline/export.csv?etapa=&busca=&atrasadas=` (CSV com BOM UTF-8 e separador `;`)
+- `GET /api/v1/admin/galerias/pipeline/export.csv?etapa=&busca=&atrasadas=&semFotos=` (CSV com BOM UTF-8 e separador `;`)
+
+Galerias sem fotos no CRM ficam **fora da fila por padrão** (`semFotos=false`), porque as fotos podem
+ter sido entregues por outro canal. O resumo expõe `semFotosNoCrm` para o link de conferência e o
+filtro explícito por `AGUARDANDO_UPLOAD` também as inclui.
 
 Staff (`ADMIN/FOTOGRAFO`):
 - `GET /api/v1/admin/galerias/desempenho?meses=6` — SLA, funil, extras e série mensal
@@ -315,12 +328,15 @@ Cliente autenticado:
 2. `diasNaEtapa` usa a data de realização, a publicação ou o envio da seleção, conforme a etapa.
 3. `prazoEntrega` = (data de realização, ou data do ensaio) + `pacote.diasParaEntrega`; `atrasada`
    quando o prazo vence e a etapa não é terminal.
-4. Pagamentos pendentes e extras aguardando edição são **pendências** (badges), não etapas: uma
-   galeria pode estar “em edição” e ter uma compra aguardando confirmação ao mesmo tempo.
+4. Compra de extra pendente e download do cliente são **etapas**; extras aguardando edição são
+   pendência (badge). Uma galeria pode estar “em edição” e ter uma compra aguardando confirmação ao
+   mesmo tempo — nesse caso a etapa exibida é `COMPRA_EXTRA_PENDENTE`.
 5. O endpoint público não expõe SLA interno, pagamentos ou dados do staff.
 6. Dados financeiros do pipeline (`valorExtras`/`comprasPendentes`) só são preenchidos para
    `ADMIN`/`FOTOGRAFO`; `EDITOR` recebe a fila operacional com esses campos zerados e CSV sem as
-   colunas financeiras.
+   colunas financeiras. Os contadores operacionais de compra
+   (`comprasAguardandoComprovante`/`comprasAguardandoConfirmacao`) e a etapa são iguais para todos os
+   papéis.
 7. CSV usa BOM UTF-8, separador `;`, decimal com vírgula e neutraliza fórmulas (`=`, `+`, `-`, `@`)
    e quebras de linha em campos livres.
 

@@ -46,6 +46,12 @@ public interface CompraExtraRepository extends JpaRepository<CompraExtra, UUID> 
 
         long getPendentes();
 
+        long getAguardandoComprovante();
+
+        long getAguardandoConfirmacao();
+
+        java.time.LocalDateTime getPrimeiraPendenteEm();
+
         BigDecimal getValorPago();
 
         long getPagas();
@@ -58,6 +64,10 @@ public interface CompraExtraRepository extends JpaRepository<CompraExtra, UUID> 
     @Query("""
         SELECT c.agendamentoId AS agendamentoId,
                SUM(CASE WHEN c.status IN :statusesPendentes THEN 1 ELSE 0 END) AS pendentes,
+               SUM(CASE WHEN c.status = 'AGUARDANDO_COMPROVANTE' THEN 1 ELSE 0 END) AS aguardandoComprovante,
+               SUM(CASE WHEN c.status = 'AGUARDANDO_CONFIRMACAO' THEN 1 ELSE 0 END) AS aguardandoConfirmacao,
+               MIN(CASE WHEN c.status IN :statusesPendentes
+                        THEN c.auditInfo.createdAt END) AS primeiraPendenteEm,
                COALESCE(SUM(CASE WHEN c.status = 'PAGA' THEN c.valorTotal ELSE 0 END), 0) AS valorPago,
                SUM(CASE WHEN c.status = 'PAGA' THEN 1 ELSE 0 END) AS pagas
         FROM CompraExtra c
