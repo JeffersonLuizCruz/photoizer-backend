@@ -120,10 +120,10 @@ class GaleriaEnsaioServiceSpec extends Specification {
         galeriaRepository.save(galeria) >> galeria
 
         when:
-        service.alterarModo(agendamentoId, ModoGaleria.SEM_EDICAO)
+        service.alterarModo(agendamentoId, ModoGaleria.ENTREGA_DIRETA)
 
         then:
-        galeria.modo == ModoGaleria.SEM_EDICAO
+        galeria.modo == ModoGaleria.ENTREGA_DIRETA
         galeria.fase == FaseGaleria.SELECAO
     }
 
@@ -138,7 +138,7 @@ class GaleriaEnsaioServiceSpec extends Specification {
             [foto(VersaoFoto.EDITADA, "editadas/1.jpg")]
 
         when:
-        service.alterarModo(agendamentoId, ModoGaleria.SEM_EDICAO)
+        service.alterarModo(agendamentoId, ModoGaleria.ENTREGA_DIRETA)
 
         then:
         def erro = thrown(GaleriaEmEdicaoException)
@@ -149,13 +149,13 @@ class GaleriaEnsaioServiceSpec extends Specification {
     def "respeita o modo padrão sem edição da configuração"() {
         given:
         galeriaRepository.findById(agendamentoId) >> Optional.empty()
-        configuracaoService.getValor(ConfigKey.GALERIA_MODO_PADRAO) >> "SEM_EDICAO"
+        configuracaoService.getValor(ConfigKey.GALERIA_MODO_PADRAO) >> "ENTREGA_DIRETA"
 
         when:
         def galeria = service.obter(agendamentoId)
 
         then:
-        galeria.modo == ModoGaleria.SEM_EDICAO
+        galeria.modo == ModoGaleria.ENTREGA_DIRETA
         galeria.fase == FaseGaleria.SELECAO
     }
 

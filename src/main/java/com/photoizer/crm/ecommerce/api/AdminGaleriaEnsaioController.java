@@ -44,7 +44,7 @@ public class AdminGaleriaEnsaioController {
 
     @PutMapping("/modo")
     @RolesAllowed({"ADMIN"})
-    @Operation(summary = "Alterar o modo da galeria (COM_EDICAO ou SEM_EDICAO; DIRETO foi desativado)")
+    @Operation(summary = "Alterar o modo da galeria (COM_EDICAO ou ENTREGA_DIRETA; DIRETO foi desativado)")
     public ResponseEntity<GaleriaEnsaioResponse> alterarModo(
             @PathVariable UUID agendamentoId,
             @Valid @RequestBody AlterarModoGaleriaRequest request) {

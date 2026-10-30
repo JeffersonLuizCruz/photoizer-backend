@@ -152,7 +152,7 @@ class SelecaoEnsaioServiceSpec extends Specification {
         def selecao = selecao(StatusSelecao.ENVIADA)
         def itens = [item(1, false), item(2, false)]
         def fotos = [foto(1), foto(2)]
-        def galeria = galeria(ModoGaleria.SEM_EDICAO)
+        def galeria = galeria(ModoGaleria.ENTREGA_DIRETA)
         galeriaService.obterParaAtualizacao(agendamentoId) >> galeria
         galeriaService.obter(agendamentoId) >> galeria
         galeriaService.podeReabrirSelecao(agendamentoId) >> true
@@ -178,7 +178,7 @@ class SelecaoEnsaioServiceSpec extends Specification {
         given:
         def selecao = selecao(StatusSelecao.ENVIADA)
         def itens = [item(1, false)]
-        def galeria = galeria(ModoGaleria.SEM_EDICAO)
+        def galeria = galeria(ModoGaleria.ENTREGA_DIRETA)
         galeriaService.obterParaAtualizacao(agendamentoId) >> galeria
         galeriaService.obter(agendamentoId) >> galeria
         galeriaService.podeReabrirSelecao(agendamentoId) >> true
@@ -199,7 +199,7 @@ class SelecaoEnsaioServiceSpec extends Specification {
 
     def "bloqueia início de edição em galeria sem edição"() {
         given:
-        galeriaService.obterParaAtualizacao(agendamentoId) >> galeria(ModoGaleria.SEM_EDICAO)
+        galeriaService.obterParaAtualizacao(agendamentoId) >> galeria(ModoGaleria.ENTREGA_DIRETA)
         def selecao = selecao(StatusSelecao.ENVIADA)
         selecaoRepository.findById(selecao.id) >> Optional.of(selecao)
 
@@ -213,7 +213,7 @@ class SelecaoEnsaioServiceSpec extends Specification {
 
     def "bloqueia download de originais em galeria sem edição"() {
         given:
-        galeriaService.obterParaAtualizacao(agendamentoId) >> galeria(ModoGaleria.SEM_EDICAO)
+        galeriaService.obterParaAtualizacao(agendamentoId) >> galeria(ModoGaleria.ENTREGA_DIRETA)
         def selecao = selecao(StatusSelecao.ENVIADA)
         selecaoRepository.findById(selecao.id) >> Optional.of(selecao)
 
@@ -240,10 +240,10 @@ class SelecaoEnsaioServiceSpec extends Specification {
         0 * selecaoRepository.save(_)
     }
 
-    def "reabre seleção SEM_EDICAO aprovada sem download ou venda"() {
+    def "reabre seleção ENTREGA_DIRETA aprovada sem download ou venda"() {
         given:
         def selecao = selecao(StatusSelecao.PUBLICADA)
-        def galeria = galeria(ModoGaleria.SEM_EDICAO)
+        def galeria = galeria(ModoGaleria.ENTREGA_DIRETA)
         galeria.fase = FaseGaleria.COMERCIALIZACAO
         galeriaService.obterParaAtualizacao(agendamentoId) >> galeria
         galeriaService.podeReabrirSelecao(agendamentoId) >> true
@@ -264,10 +264,10 @@ class SelecaoEnsaioServiceSpec extends Specification {
             && it.fotoIds().size() == 1 })
     }
 
-    def "bloqueia reabertura SEM_EDICAO após download ou venda"() {
+    def "bloqueia reabertura ENTREGA_DIRETA após download ou venda"() {
         given:
         def selecao = selecao(StatusSelecao.PUBLICADA)
-        def galeria = galeria(ModoGaleria.SEM_EDICAO)
+        def galeria = galeria(ModoGaleria.ENTREGA_DIRETA)
         galeria.fase = FaseGaleria.COMERCIALIZACAO
         galeriaService.obterParaAtualizacao(agendamentoId) >> galeria
         galeriaService.podeReabrirSelecao(agendamentoId) >> false

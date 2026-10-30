@@ -38,7 +38,7 @@ class GaleriaPipelineEtapaResolverSpec extends Specification {
         StatusAgendamento.EM_EDICAO | ModoGaleria.COM_EDICAO | FaseGaleria.SELECAO_ENVIADA | 10 | 10 | 0 | StatusSelecao.ENVIADA | 10 | 0 | 0 || EtapaGaleria.SELECAO_EM_EDICAO
         StatusAgendamento.EM_EDICAO | ModoGaleria.COM_EDICAO | FaseGaleria.EM_EDICAO | 10 | 10 | 0 | StatusSelecao.EM_EDICAO | 10 | 0 | 0 || EtapaGaleria.SELECAO_EM_EDICAO
         StatusAgendamento.EM_EDICAO | ModoGaleria.COM_EDICAO | FaseGaleria.EM_EDICAO | 10 | 10 | 0 | StatusSelecao.CONCLUIDA | 10 | 0 | 0 || EtapaGaleria.SELECAO_EM_EDICAO
-        StatusAgendamento.EM_EDICAO | ModoGaleria.SEM_EDICAO | FaseGaleria.SELECAO_ENVIADA | 10 | 10 | 0 | StatusSelecao.ENVIADA | 10 | 0 | 0 || EtapaGaleria.SELECAO_AGUARDANDO_APROVACAO
+        StatusAgendamento.EM_EDICAO | ModoGaleria.ENTREGA_DIRETA | FaseGaleria.SELECAO_ENVIADA | 10 | 10 | 0 | StatusSelecao.ENVIADA | 10 | 0 | 0 || EtapaGaleria.SELECAO_AGUARDANDO_APROVACAO
 
         // Comercialização: aguardando download, parcialmente baixado e totalmente baixado.
         StatusAgendamento.EM_EDICAO | ModoGaleria.COM_EDICAO | FaseGaleria.COMERCIALIZACAO | 10 | 10 | 0 | StatusSelecao.PUBLICADA | 10 | 0  | 0 || EtapaGaleria.AGUARDANDO_DOWNLOAD

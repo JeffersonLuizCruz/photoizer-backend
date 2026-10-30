@@ -389,7 +389,7 @@ public class SelecaoEnsaioService {
         var itens = itemRepository.findBySelecaoIdOrderByNumeroGaleriaAsc(selecaoId);
 
         if (selecao.getStatus() == StatusSelecao.PUBLICADA) {
-            if (!galeria.getModo().entregaOriginal()) {
+            if (!galeria.getModo().entregaArquivoPublicado()) {
                 throw new SelecaoNaoEditavelException(
                     "Seleção já publicada não pode ser reaberta. Crie uma nova seleção.");
             }
@@ -621,7 +621,7 @@ public class SelecaoEnsaioService {
             || status == StatusSelecao.CONCLUIDA;
         if (status == StatusSelecao.PUBLICADA) {
             var galeria = galeriaService.obter(selecao.getAgendamentoId());
-            podeReabrir = galeria.getModo().entregaOriginal()
+            podeReabrir = galeria.getModo().entregaArquivoPublicado()
                 && galeriaService.podeReabrirSelecao(selecao.getAgendamentoId());
         }
 

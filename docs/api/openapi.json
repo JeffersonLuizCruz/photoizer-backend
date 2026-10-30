@@ -2616,7 +2616,7 @@
       "put" : {
         "tags" : [ "Fotos" ],
         "summary" : "Enviar a versão editada de uma foto",
-        "description" : "Preserva o RAW, o número de galeria e o nome de exibição. A versão só é exibida ao cliente quando a seleção é publicada.",
+        "description" : "Preserva o arquivo base, o número de galeria e o nome de exibição. A versão só é exibida ao cliente quando a seleção é publicada.",
         "operationId" : "uploadEditada",
         "parameters" : [ {
           "name" : "agendamentoId",
@@ -3376,7 +3376,7 @@
     "/api/v1/admin/agendamentos/{agendamentoId}/galeria/modo" : {
       "put" : {
         "tags" : [ "Admin Galeria" ],
-        "summary" : "Alterar o modo da galeria (COM_EDICAO ou SEM_EDICAO; DIRETO foi desativado)",
+        "summary" : "Alterar o modo da galeria (COM_EDICAO ou ENTREGA_DIRETA; DIRETO foi desativado)",
         "operationId" : "alterarModo",
         "parameters" : [ {
           "name" : "agendamentoId",
@@ -17554,7 +17554,7 @@
         "properties" : {
           "modo" : {
             "type" : "string",
-            "enum" : [ "DIRETO", "COM_EDICAO", "SEM_EDICAO" ]
+            "enum" : [ "DIRETO", "COM_EDICAO", "ENTREGA_DIRETA" ]
           }
         },
         "required" : [ "modo" ]

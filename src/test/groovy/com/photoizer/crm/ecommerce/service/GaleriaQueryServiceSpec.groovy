@@ -45,7 +45,7 @@ class GaleriaQueryServiceSpec extends Specification {
         def foto = foto(VersaoFoto.ORIGINAL)
         foto.selecionadaPacote = true
         galeriaEnsaioService.obter(agendamentoId) >>
-            galeria(ModoGaleria.SEM_EDICAO, FaseGaleria.COMERCIALIZACAO)
+            galeria(ModoGaleria.ENTREGA_DIRETA, FaseGaleria.COMERCIALIZACAO)
 
         expect:
         service.isDownloadPermitido(foto)
@@ -57,7 +57,7 @@ class GaleriaQueryServiceSpec extends Specification {
         def paga = foto(VersaoFoto.ORIGINAL)
         paga.status = StatusFoto.PAGA
         galeriaEnsaioService.obter(agendamentoId) >>
-            galeria(ModoGaleria.SEM_EDICAO, FaseGaleria.COMERCIALIZACAO)
+            galeria(ModoGaleria.ENTREGA_DIRETA, FaseGaleria.COMERCIALIZACAO)
 
         expect:
         !service.isDownloadPermitido(publicada)
@@ -86,7 +86,7 @@ class GaleriaQueryServiceSpec extends Specification {
         def foto = foto(VersaoFoto.ORIGINAL)
         foto.selecionadaPacote = true
         galeriaEnsaioService.obter(agendamentoId) >>
-            galeria(ModoGaleria.SEM_EDICAO, FaseGaleria.SELECAO_ENVIADA)
+            galeria(ModoGaleria.ENTREGA_DIRETA, FaseGaleria.SELECAO_ENVIADA)
 
         expect:
         !service.isDownloadPermitido(foto)
@@ -96,7 +96,7 @@ class GaleriaQueryServiceSpec extends Specification {
         given:
         def foto = foto(VersaoFoto.ORIGINAL)
         galeriaEnsaioService.obter(agendamentoId) >>
-            galeria(ModoGaleria.SEM_EDICAO, FaseGaleria.COMERCIALIZACAO)
+            galeria(ModoGaleria.ENTREGA_DIRETA, FaseGaleria.COMERCIALIZACAO)
 
         expect:
         service.isFotoComercializavel(foto)

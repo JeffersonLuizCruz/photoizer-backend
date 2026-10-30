@@ -129,7 +129,7 @@ public class CompraQueryService {
         var fotosPendentes = fotoService.listarPendentesEdicao().stream()
             .filter(foto -> agendamentoId == null || foto.getAgendamentoId().equals(agendamentoId))
             // Edição sob demanda só existe em galerias que exigem edição.
-            // Galerias SEM_EDICAO/DIRETO entregam o próprio arquivo original e
+            // Galerias ENTREGA_DIRETA/DIRETO entregam o próprio arquivo publicado e
             // não entram nesta fila.
             .filter(foto -> galeriaEnsaioService.obter(foto.getAgendamentoId()).getModo()
                 .requerEdicao())

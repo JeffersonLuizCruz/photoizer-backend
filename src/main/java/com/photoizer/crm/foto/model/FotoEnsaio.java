@@ -92,6 +92,13 @@ public class FotoEnsaio {
     @Column(nullable = false, length = 25)
     private StatusFoto status;
 
+    /**
+     * Versao atual entregue ao cliente.
+     *
+     * <p>ORIGINAL = arquivo base publicado na galeria, que pode ja ter sido
+     * editado antes do upload; nao significa "foto nao editada". EDITADA =
+     * versao produzida pelo estudio depois da selecao (modo COM_EDICAO).
+     */
     @NotNull
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)

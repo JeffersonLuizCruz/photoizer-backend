@@ -227,7 +227,7 @@ public class FotoController {
     @RolesAllowed({"ADMIN", "FOTOGRAFO", "EDITOR"})
     @Operation(
         summary = "Enviar a versão editada de uma foto",
-        description = "Preserva o RAW, o número de galeria e o nome de exibição. "
+        description = "Preserva o arquivo base, o número de galeria e o nome de exibição. "
             + "A versão só é exibida ao cliente quando a seleção é publicada.")
     public ResponseEntity<FotoEnsaioResponse> uploadEditada(
             @PathVariable UUID agendamentoId,

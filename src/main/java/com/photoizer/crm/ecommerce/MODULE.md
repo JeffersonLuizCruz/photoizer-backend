@@ -158,18 +158,18 @@ ecommerce/
 | 5 | **Optimistic locking** (`@Version`): ausente em todas as entidades | P2 |
 | 6 | **`SessaoResponse.of()`**: único DTO com `static of()` restante (legado) | P3 |
 
-## 7. Galeria com seleção e edição (V8/V9/V13/V15)
+## 7. Galeria com seleção e edição (V8/V9/V13/V15/V23)
 
 O ecommerce passou a suportar três modos por galeria:
 
 - `DIRETO`: fluxo legado **desativado**. Permanece apenas como leitura para linhas antigas que não puderam ser migradas.
 - `COM_EDICAO`: cliente envia a seleção, o staff baixa os originais, edita, sobe as versões editadas e publica antes da comercialização.
-- `SEM_EDICAO`: cliente envia a seleção, o staff apenas a **aprova** e o pacote é entregue em versão original. Extras continuam sendo liberados somente após a confirmação do pagamento e não entram na fila de edição sob demanda.
+- `ENTREGA_DIRETA`: cliente envia a seleção, o staff apenas a **aprova** e o pacote é entregue com o **arquivo já publicado na galeria**. Não existe uma etapa de edição depois da seleção; o arquivo publicado pode ter sido editado antes do upload (portanto, "original" não significa "foto não editada"). Extras continuam sendo liberados somente após a confirmação do pagamento e não entram na fila de edição sob demanda.
 
 ### Modelo
 
-- `GaleriaEnsaio` (`galerias_ensaio`): modo e fase (`SELECAO`, `SELECAO_ENVIADA`, `EM_EDICAO`, `COMERCIALIZACAO`). `SEM_EDICAO` pula `EM_EDICAO` e vai de `SELECAO_ENVIADA` para `COMERCIALIZACAO`.
-- `SelecaoEnsaio` (`selecoes_ensaio`): snapshot imutável da seleção, com número e status. Em `SEM_EDICAO` a aprovação leva `ENVIADA` direto para `PUBLICADA`, sem marcar itens como editados.
+- `GaleriaEnsaio` (`galerias_ensaio`): modo e fase (`SELECAO`, `SELECAO_ENVIADA`, `EM_EDICAO`, `COMERCIALIZACAO`). `ENTREGA_DIRETA` pula `EM_EDICAO` e vai de `SELECAO_ENVIADA` para `COMERCIALIZACAO`.
+- `SelecaoEnsaio` (`selecoes_ensaio`): snapshot imutável da seleção, com número e status. Em `ENTREGA_DIRETA` a aprovação leva `ENVIADA` direto para `PUBLICADA`, sem marcar itens como editados.
 - `SelecaoEnsaioItem` (`selecao_ensaio_itens`): foto, número de galeria, nome do arquivo e tipo (`PACOTE`/`EXTRA`).
 - `FotoEnsaio`: ganhou `numeroGaleria`, `versaoAtual` (`ORIGINAL`/`EDITADA`), paths editados e `emSelecaoEdicao`.
 
@@ -202,16 +202,17 @@ Staff:
    `EM_EDICAO` ou `CONCLUIDA`); o carrinho sincroniza o snapshot via
    `ItemCarrinhoAdicionadoEvent`/`ItemCarrinhoRemovidoEvent`.
 3. O download/comercialização só é liberado após a publicação da edição
-   (`COM_EDICAO`) ou após a aprovação da seleção (`SEM_EDICAO`).
+   (`COM_EDICAO`) ou após a aprovação da seleção (`ENTREGA_DIRETA`).
 4. Na comercialização a galeria mostra as fotos da seleção publicada
-   (`versaoAtual = EDITADA` em `COM_EDICAO`, `ORIGINAL` em `SEM_EDICAO`) **e** as
+   (`versaoAtual = EDITADA` em `COM_EDICAO`, `ORIGINAL` em `ENTREGA_DIRETA`) **e** as
    fotos restantes (fora da seleção). Em `COM_EDICAO` as restantes podem ser
-   compradas e entram em edição sob demanda; em `SEM_EDICAO` são entregues em
-   original após o pagamento.
+   compradas e entram em edição sob demanda; em `ENTREGA_DIRETA` são entregues
+   com o arquivo publicado após o pagamento. Aqui `ORIGINAL` é o arquivo base
+   da galeria, que pode já ter sido editado antes do upload.
 5. O fluxo legado `DIRETO` foi desativado (`V13`). Galerias limpas são migradas
    para `COM_EDICAO/SELECAO`; `DIRETO` só permanece como leitura para linhas
    antigas com seleção/compra/download/edição. Novas galerias usam `COM_EDICAO`
-   por padrão ou `SEM_EDICAO` quando configurado/selecionado.
+   por padrão ou `ENTREGA_DIRETA` quando configurado/selecionado.
 6. O preço dos extras é congelado no snapshot da seleção no momento em que a
    foto entra no carrinho. `getValorUnitarioExtra` considera a seleção ativa
    antes da publicação e a publicada depois dela.
@@ -226,16 +227,16 @@ Staff:
    sem compra/download (`SelecaoFotoValidator`).
 10. O modo da galeria não pode ser alterado com seleção ativa/publicada, venda,
     download ou versão editada já enviada (`podeAlterarModo`).
-11. Em `SEM_EDICAO`, uma seleção `PUBLICADA` pode ser **reaberta** (volta para
+11. Em `ENTREGA_DIRETA`, uma seleção `PUBLICADA` pode ser **reaberta** (volta para
     `SELECAO`) enquanto nenhuma foto tiver sido baixada ou vendida. Em
     `COM_EDICAO` a seleção publicada continua imutável. A resposta da seleção
     expõe `podeReabrir` para a UI decidir se mostra a ação.
 12. Em `COM_EDICAO`, a publicação exige que **todos** os itens do snapshot
-    (pacote + extras) tenham versão editada. Em `SEM_EDICAO`, a aprovação não
+    (pacote + extras) tenham versão editada. Em `ENTREGA_DIRETA`, a aprovação não
     exige itens editados.
 13. Em `COM_EDICAO`, extras comprados depois da publicação não entram em uma
     nova seleção: ficam `PAGA` + `versaoAtual = ORIGINAL` e aparecem na fila
-    `GET /api/v1/admin/ecommerce/extras/pendentes-edicao`. Em `SEM_EDICAO` os
+    `GET /api/v1/admin/ecommerce/extras/pendentes-edicao`. Em `ENTREGA_DIRETA` os
     extras pagos são baixados em original e **não** entram nessa fila.
 14. O estúdio envia a versão editada em
     `PUT /api/v1/agendamentos/{id}/fotos/{fotoId}/editada-compra` e libera o

@@ -318,7 +318,7 @@ public class GaleriaEnsaioService {
 
     /**
      * Reabertura permitida enquanto nenhuma foto foi baixada ou vendida.
-     * Usada pela reabertura de uma seleção SEM_EDICAO já aprovada.
+     * Usada pela reabertura de uma seleção ENTREGA_DIRETA já aprovada.
      */
     public boolean podeReabrirSelecao(UUID agendamentoId) {
         return !temVendaOuDownload(agendamentoId);

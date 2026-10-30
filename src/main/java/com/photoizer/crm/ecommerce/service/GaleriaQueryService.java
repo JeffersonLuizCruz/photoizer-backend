@@ -175,7 +175,7 @@ public class GaleriaQueryService {
                 return false;
             }
         }
-        // Nos modos SEM_EDICAO e DIRETO o entregável é o arquivo original.
+        // Nos modos ENTREGA_DIRETA e DIRETO o entregável é o arquivo já publicado.
         return foto.isSelecionadaPacote()
             || foto.getStatus() == com.photoizer.crm.foto.model.StatusFoto.PAGA;
     }
@@ -230,7 +230,7 @@ public class GaleriaQueryService {
         if (galeria.getModo().requerEdicao() && fotoEmSelecaoPublicada(foto)) {
             return foto.getVersaoAtual() == VersaoFoto.EDITADA;
         }
-        // SEM_EDICAO: a foto da seleção publicada é entregue em original.
+        // ENTREGA_DIRETA: a foto da seleção publicada é entregue como foi publicada.
         // COM_EDICAO: foto restante será editada pelo estúdio após a compra.
         return true;
     }

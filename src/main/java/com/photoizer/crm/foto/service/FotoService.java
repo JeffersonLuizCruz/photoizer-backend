@@ -633,7 +633,7 @@ public class FotoService {
     }
 
     /**
-     * Salva a versão editada de uma foto existente, preservando o RAW e a
+     * Salva a versão editada de uma foto existente, preservando o arquivo base e a
      * identidade da foto (id, numero de galeria e nome de exibição).
      */
     public FotoEnsaio uploadEditada(UUID agendamentoId, UUID fotoId,
@@ -671,7 +671,7 @@ public class FotoService {
      *
      * <p>É o fluxo de ajuste solicitado depois da publicação: a foto continua
      * com {@code versaoAtual = EDITADA} e o cliente pode baixar novamente a
-     * versão mais recente. O RAW, o número de galeria, o nome e a seleção
+     * versão mais recente. O arquivo base, o número de galeria, o nome e a seleção
      * original não são alterados.
      */
     public FotoEnsaio reeditarFotoPublicada(UUID agendamentoId, UUID fotoId,
