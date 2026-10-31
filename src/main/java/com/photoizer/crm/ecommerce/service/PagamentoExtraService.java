@@ -8,6 +8,7 @@ import com.photoizer.crm.ecommerce.exception.CompraNaoEncontradaException;
 import com.photoizer.crm.ecommerce.model.CompraExtra;
 import com.photoizer.crm.ecommerce.model.StatusCompraExtra;
 import com.photoizer.crm.ecommerce.repository.CompraExtraRepository;
+import com.photoizer.crm.foto.service.FotoService;
 import com.photoizer.crm.shared.exception.BadRequestException;
 import com.photoizer.crm.shared.exception.ConflictException;
 import org.slf4j.Logger;
@@ -37,13 +38,19 @@ public class PagamentoExtraService {
 
     private final CompraExtraRepository compraExtraRepository;
     private final GaleriaQueryService galeriaQueryService;
+    private final FotoService fotoService;
+    private final SelecaoEnsaioService selecaoEnsaioService;
     private final ApplicationEventPublisher eventPublisher;
 
     public PagamentoExtraService(CompraExtraRepository compraExtraRepository,
                                  GaleriaQueryService galeriaQueryService,
+                                 FotoService fotoService,
+                                 SelecaoEnsaioService selecaoEnsaioService,
                                  ApplicationEventPublisher eventPublisher) {
         this.compraExtraRepository = compraExtraRepository;
         this.galeriaQueryService = galeriaQueryService;
+        this.fotoService = fotoService;
+        this.selecaoEnsaioService = selecaoEnsaioService;
         this.eventPublisher = eventPublisher;
     }
 
@@ -117,6 +124,14 @@ public class PagamentoExtraService {
         if (!compra.getStatus().podeSerCancelada()) {
             throw new CompraJaPagaException();
         }
+
+        // Extras de uma seleção ativa só podem ser recusadas enquanto ainda
+        // não foram editadas. Extras já publicadas também bloqueiam a recusa.
+        var fotoIds = fotoService.listarPorCompraExtraId(compraId).stream()
+            .map(com.photoizer.crm.foto.model.FotoEnsaio::getId)
+            .toList();
+        selecaoEnsaioService.validarERemoverExtrasPorCancelamento(
+            compra.getAgendamentoId(), fotoIds);
 
         compra.setStatus(StatusCompraExtra.CANCELADA);
         if (motivoRecusa != null && !motivoRecusa.isBlank()) {

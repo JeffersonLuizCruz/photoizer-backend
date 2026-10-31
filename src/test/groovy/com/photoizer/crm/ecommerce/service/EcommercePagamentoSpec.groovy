@@ -17,6 +17,8 @@ class EcommercePagamentoSpec extends Specification {
     def configuracaoRepository = Mock(ConfiguracaoPagamentoEcommerceRepository)
     def compraRepository = Mock(CompraExtraRepository)
     def galeriaQueryService = Mock(GaleriaQueryService)
+    def fotoService = Mock(com.photoizer.crm.foto.service.FotoService)
+    def selecaoEnsaioService = Mock(SelecaoEnsaioService)
     def eventPublisher = Mock(ApplicationEventPublisher)
 
     @Subject
@@ -24,7 +26,7 @@ class EcommercePagamentoSpec extends Specification {
 
     @Subject
     def pagamentoService = new PagamentoExtraService(
-        compraRepository, galeriaQueryService, eventPublisher)
+        compraRepository, galeriaQueryService, fotoService, selecaoEnsaioService, eventPublisher)
 
     def "retorna configuracao vazia quando ainda nao existe PIX"() {
         given:

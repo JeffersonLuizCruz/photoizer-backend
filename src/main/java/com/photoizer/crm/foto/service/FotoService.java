@@ -112,6 +112,12 @@ public class FotoService {
             .orElseThrow(() -> new FotoEnsaioNaoEncontradaException(id));
     }
 
+    /** Leitura tolerante a registros órfãos (ex.: item de carrinho sem foto). */
+    @Transactional(readOnly = true)
+    public java.util.Optional<FotoEnsaio> buscarPorIdOpcional(UUID id) {
+        return fotoEnsaioRepository.findById(id);
+    }
+
     /**
      * Aplica a qualidade de prévia configurada na galeria a todas as fotos
      * publicadas/pagas.
@@ -649,15 +655,26 @@ public class FotoService {
         if (foto.isArquivosRemovidos()) {
             throw new ArquivoExpurgadoException();
         }
-        if (foto.getStatus() != StatusFoto.PUBLICADA) {
+        // Extra paga antes da publicação continua na seleção ativa e precisa
+        // ser editada junto com o pacote. Fora da seleção, a foto paga usa o
+        // fluxo de edição sob demanda (uploadEditadaCompraExtra).
+        var emSelecaoAtiva = foto.isEmSelecaoEdicao();
+        var pagaNaSelecao = emSelecaoAtiva
+            && (foto.getStatus() == StatusFoto.PAGA
+                || foto.getStatus() == StatusFoto.AGUARDANDO_COMPROVANTE
+                || foto.getStatus() == StatusFoto.AGUARDANDO_CONFIRMACAO);
+        if (foto.getStatus() != StatusFoto.PUBLICADA && !pagaNaSelecao) {
             throw new FotoNaoEditavelException("status atual " + foto.getStatus());
         }
-        if (foto.getCompraExtraId() != null
-            || foto.getDataDownload() != null
-            || foto.getVersaoAtual() == com.photoizer.crm.foto.model.VersaoFoto.EDITADA
-            || foto.getStatus() == StatusFoto.PAGA
-            || foto.getStatus() == StatusFoto.AGUARDANDO_COMPROVANTE
-            || foto.getStatus() == StatusFoto.AGUARDANDO_CONFIRMACAO) {
+        if (foto.getDataDownload() != null
+            || foto.getVersaoAtual() == com.photoizer.crm.foto.model.VersaoFoto.EDITADA) {
+            throw new FotoNaoEditavelException("foto já baixada ou com edição publicada");
+        }
+        if (!emSelecaoAtiva
+            && (foto.getCompraExtraId() != null
+                || foto.getStatus() == StatusFoto.PAGA
+                || foto.getStatus() == StatusFoto.AGUARDANDO_COMPROVANTE
+                || foto.getStatus() == StatusFoto.AGUARDANDO_CONFIRMACAO)) {
             throw new FotoNaoEditavelException("foto já vendida, baixada ou com edição publicada");
         }
 

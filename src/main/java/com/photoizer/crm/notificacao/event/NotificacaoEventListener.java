@@ -7,6 +7,7 @@ import com.photoizer.crm.agenda.event.EntregaPendenteEvent;
 import com.photoizer.crm.agenda.event.PagamentoFinalRegistradoEvent;
 import com.photoizer.crm.ecommerce.event.CompraExtraSolicitadaEvent;
 import com.photoizer.crm.ecommerce.event.ComprovanteCompraEnviadoEvent;
+import com.photoizer.crm.ecommerce.event.LeadPacoteCriadoEvent;
 import com.photoizer.crm.ecommerce.event.SelecaoEnviadaEvent;
 import com.photoizer.crm.notificacao.model.TipoNotificacao;
 import com.photoizer.crm.notificacao.service.NotificacaoService;
@@ -210,6 +211,29 @@ public class NotificacaoEventListener {
             .addKeyValue("destinatarios", criadas)
             .addKeyValue("lembrete_diario", event.lembreteDiario())
             .log("Notificações de entrega pendente criadas");
+    }
+
+    @EventListener
+    @Transactional
+    public void onLeadPacoteCriado(LeadPacoteCriadoEvent event) {
+        var destinatarios = usuarioStaffPort.listarComercialAtivos();
+        if (destinatarios.isEmpty()) return;
+
+        var mensagem = "Novo interesse no pacote " + event.pacoteNome()
+            + " de " + event.clienteNome() + ". Entre em contato para converter.";
+        for (UUID userId : destinatarios) {
+            notificacaoService.criar(
+                userId,
+                "Novo lead de pacote",
+                mensagem,
+                "/admin/leads",
+                TipoNotificacao.LEAD_PACOTE);
+        }
+        log.atInfo()
+            .addKeyValue("event_action", "notificacao.lead_pacote")
+            .addKeyValue("lead_id", event.leadId())
+            .addKeyValue("destinatarios", destinatarios.size())
+            .log("Notificações de lead de pacote criadas");
     }
 
     /**

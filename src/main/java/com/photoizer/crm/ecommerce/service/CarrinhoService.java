@@ -59,7 +59,8 @@ public class CarrinhoService {
             throw new FotoIndisponivelException("Foto já incluída no pacote não pode ser adicionada ao carrinho");
         }
 
-        var jaExiste = itemCarrinhoRepository.findBySessionIdAndAgendamentoIdOrderByAuditInfoCreatedAtAsc(sessionId, agendamento.getId())
+        var jaExiste = itemCarrinhoRepository
+            .findBySessaoAndAgendamentoForUpdate(sessionId, agendamento.getId())
             .stream().anyMatch(item -> item.getFotoId().equals(fotoId));
 
         if (!jaExiste) {
@@ -100,11 +101,12 @@ public class CarrinhoService {
         var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
         var itensCarrinho = itemCarrinhoRepository.findBySessionIdAndAgendamentoIdOrderByAuditInfoCreatedAtAsc(sessionId, agendamento.getId());
         var valorUnitarioPadrao = galeriaQueryService.getValorUnitarioFotoExtra(agendamento.getId());
-        var quantidade = itensCarrinho.size();
 
         var itens = itensCarrinho.stream()
             .map(ItemCarrinho::getFotoId)
-            .map(galeriaQueryService::buscarFotoPorId)
+            .distinct()
+            .map(galeriaQueryService::buscarFotoPorIdOpcional)
+            .flatMap(java.util.Optional::stream)
             .filter(foto -> foto.getAgendamentoId().equals(agendamento.getId()))
             .map(foto -> new CalculoItemResponse(
                 foto.getId(),
@@ -116,7 +118,7 @@ public class CarrinhoService {
             .reduce(BigDecimal.ZERO, BigDecimal::add)
             .setScale(2, RoundingMode.HALF_UP);
 
-        return new CalculoCarrinhoResponse(itens, quantidade, valorUnitarioPadrao, subtotal, subtotal);
+        return new CalculoCarrinhoResponse(itens, itens.size(), valorUnitarioPadrao, subtotal, subtotal);
     }
 
     public List<UUID> obterFotoIdsCarrinho(UUID token, UUID sessionId) {

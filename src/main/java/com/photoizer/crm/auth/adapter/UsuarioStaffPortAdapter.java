@@ -27,6 +27,12 @@ public class UsuarioStaffPortAdapter implements UsuarioStaffPort {
         Papel.FOTOGRAFO
     );
 
+    private static final List<Papel> PAPEIS_COMERCIAL = List.of(
+        Papel.ADMIN,
+        Papel.FOTOGRAFO,
+        Papel.AGENDADOR
+    );
+
     private final UserRepository userRepository;
 
     public UsuarioStaffPortAdapter(UserRepository userRepository) {
@@ -51,6 +57,14 @@ public class UsuarioStaffPortAdapter implements UsuarioStaffPort {
     @Override
     public List<UUID> listarAprovadoresCompras() {
         return userRepository.findByPapelInAndAtivoTrue(PAPEIS_APROVADORES_COMPRAS)
+            .stream()
+            .map(User::getId)
+            .toList();
+    }
+
+    @Override
+    public List<UUID> listarComercialAtivos() {
+        return userRepository.findByPapelInAndAtivoTrue(PAPEIS_COMERCIAL)
             .stream()
             .map(User::getId)
             .toList();

@@ -8,7 +8,9 @@ import com.photoizer.crm.ecommerce.exception.GaleriaArquivadaException;
 import com.photoizer.crm.ecommerce.exception.GaleriaNaoEncontradaException;
 import com.photoizer.crm.ecommerce.exception.TokenExpiradoException;
 import com.photoizer.crm.ecommerce.exception.FotoNaoEncontradaException;
+import com.photoizer.crm.ecommerce.model.SelecaoEnsaio;
 import com.photoizer.crm.ecommerce.model.StatusSelecao;
+import com.photoizer.crm.ecommerce.model.TipoItemSelecao;
 import com.photoizer.crm.ecommerce.repository.SelecaoEnsaioItemRepository;
 import com.photoizer.crm.ecommerce.repository.SelecaoEnsaioRepository;
 import com.photoizer.crm.foto.model.FotoEnsaio;
@@ -35,6 +37,9 @@ import java.util.UUID;
 @Service
 @Transactional(readOnly = true)
 public class GaleriaQueryService {
+
+    private static final List<StatusSelecao> STATUS_SELECAO_ATIVA = List.of(
+        StatusSelecao.ENVIADA, StatusSelecao.EM_EDICAO, StatusSelecao.CONCLUIDA);
 
     private final AgendamentoRepository agendamentoRepository;
     private final FotoEnsaioRepository fotoEnsaioRepository;
@@ -150,6 +155,36 @@ public class GaleriaQueryService {
     public FotoEnsaio buscarFotoPorId(UUID fotoId) {
         return fotoEnsaioRepository.findById(fotoId)
             .orElseThrow(() -> new FotoNaoEncontradaException(fotoId));
+    }
+
+    public java.util.Optional<FotoEnsaio> buscarFotoPorIdOpcional(UUID fotoId) {
+        return fotoEnsaioRepository.findById(fotoId);
+    }
+
+    /** Seleção ativa (enviada, em edição ou concluída) do ensaio. */
+    public java.util.Optional<SelecaoEnsaio> buscarSelecaoAtiva(UUID agendamentoId) {
+        return selecaoRepository.findFirstByAgendamentoIdAndStatusInOrderByNumeroDesc(
+            agendamentoId, STATUS_SELECAO_ATIVA);
+    }
+
+    /**
+     * Uma foto pode ser paga durante a seleção/edição quando já pertence ao
+     * snapshot ativo como EXTRA. A foto precisa continuar disponível e fora do
+     * pacote; o valor congelado vem do próprio item da seleção.
+     */
+    public boolean isFotoExtraEmSelecaoAtiva(FotoEnsaio foto) {
+        if (!foto.isVisivel()
+            || foto.getStatus() != com.photoizer.crm.foto.model.StatusFoto.PUBLICADA
+            || foto.getCompraExtraId() != null
+            || foto.getDataDownload() != null
+            || foto.isSelecionadaPacote()) {
+            return false;
+        }
+        return buscarSelecaoAtiva(foto.getAgendamentoId())
+            .flatMap(selecao -> selecaoItemRepository
+                .findBySelecaoIdAndFotoId(selecao.getId(), foto.getId()))
+            .map(item -> item.getTipo() == TipoItemSelecao.EXTRA)
+            .orElse(false);
     }
 
     public boolean isDownloadPermitido(FotoEnsaio foto) {

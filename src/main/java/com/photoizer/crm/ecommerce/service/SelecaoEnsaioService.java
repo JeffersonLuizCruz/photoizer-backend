@@ -295,6 +295,67 @@ public class SelecaoEnsaioService {
             .log("Extra removido da seleção em edição");
     }
 
+    /**
+     * Valida e remove as extras de uma compra recusada.
+     *
+     * <p>Uma extra já editada (ou pertencente a uma seleção publicada) não pode
+     * ser recusada: o estúdio já produziu/entregou o trabalho. Nesse caso o
+     * cancelamento é bloqueado. Quando a seleção ainda está ativa e a extra não
+     * foi editada, o item é removido do snapshot e a foto é liberada.
+     */
+    public void validarERemoverExtrasPorCancelamento(UUID agendamentoId, List<UUID> fotoIds) {
+        if (fotoIds == null || fotoIds.isEmpty()) {
+            return;
+        }
+        for (var fotoId : new LinkedHashSet<>(fotoIds)) {
+            for (var item : itemRepository.findByFotoId(fotoId)) {
+                if (item.getTipo() != TipoItemSelecao.EXTRA) {
+                    continue;
+                }
+                var selecaoOpt = selecaoRepository.findById(item.getSelecaoId());
+                if (selecaoOpt.isEmpty()) {
+                    continue;
+                }
+                var selecao = selecaoOpt.get();
+                if (selecao.getStatus() == StatusSelecao.PUBLICADA) {
+                    throw new SelecaoNaoEditavelException(
+                        "A extra já foi publicada e não pode ter a compra recusada. "
+                            + "Fale com o administrador para ajustar a seleção.");
+                }
+                if (!STATUS_ATIVOS.contains(selecao.getStatus())) {
+                    continue;
+                }
+                var selecaoBloqueada = selecaoRepository.findByIdForUpdate(selecao.getId()).orElse(selecao);
+                var itemAtual = itemRepository.findBySelecaoIdAndFotoId(selecaoBloqueada.getId(), fotoId)
+                    .orElse(null);
+                if (itemAtual == null || itemAtual.getTipo() != TipoItemSelecao.EXTRA) {
+                    continue;
+                }
+                if (itemAtual.isEditada()) {
+                    throw new SelecaoNaoEditavelException(
+                        "A extra já foi editada e não pode ter a compra recusada. "
+                            + "Fale com o administrador para ajustar a seleção.");
+                }
+                itemRepository.delete(itemAtual);
+                eventPublisher.publishEvent(new SelecaoExtraRemovidaEvent(
+                    agendamentoId, selecaoBloqueada.getId(), fotoId));
+                concluirSeTodosEditados(selecaoBloqueada);
+            }
+        }
+    }
+
+    private void concluirSeTodosEditados(SelecaoEnsaio selecao) {
+        if (selecao.getStatus() != StatusSelecao.EM_EDICAO) {
+            return;
+        }
+        var total = itemRepository.countBySelecaoId(selecao.getId());
+        var editadas = itemRepository.countBySelecaoIdAndEditadaTrue(selecao.getId());
+        if (total > 0 && total == editadas) {
+            selecao.concluir();
+            selecaoRepository.save(selecao);
+        }
+    }
+
     public SelecaoEnsaioResponse detalhar(UUID agendamentoId, UUID selecaoId) {
         var selecao = buscarSelecao(agendamentoId, selecaoId);
         return paraResponse(selecao, itemRepository.findBySelecaoIdOrderByNumeroGaleriaAsc(selecaoId));

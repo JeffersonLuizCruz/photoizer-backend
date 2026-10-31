@@ -5235,6 +5235,57 @@
         }
       }
     },
+    "/api/v1/ecommerce/leads" : {
+      "post" : {
+        "tags" : [ "Leads de Pacotes" ],
+        "summary" : "Registrar solicitação de pacote (lead)",
+        "operationId" : "criar",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/LeadPacoteRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LeadPacotePublicoResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Um ou mais campos estão inválidos",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/ecommerce/galeria/{token}/selecao" : {
       "get" : {
         "tags" : [ "Ecommerce" ],
@@ -9984,6 +10035,93 @@
         } ]
       }
     },
+    "/api/v1/admin/leads/{id}/status" : {
+      "patch" : {
+        "tags" : [ "Admin Leads" ],
+        "summary" : "Atualizar o status comercial do lead",
+        "operationId" : "atualizarStatus",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AtualizarStatusLeadRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LeadPacoteResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Um ou mais campos estão inválidos",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/admin/ecommerce/compras/{id}/link-pagamento" : {
       "patch" : {
         "tags" : [ "Admin Compras" ],
@@ -14017,6 +14155,148 @@
         } ]
       }
     },
+    "/api/v1/admin/leads" : {
+      "get" : {
+        "tags" : [ "Admin Leads" ],
+        "summary" : "Listar leads de pacotes",
+        "operationId" : "listar",
+        "parameters" : [ {
+          "name" : "status",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "NOVO", "CONTATADO", "CONVERTIDO", "DESCARTADO" ]
+          }
+        }, {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 1
+          }
+        }, {
+          "name" : "perPage",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/admin/leads/novos" : {
+      "get" : {
+        "tags" : [ "Admin Leads" ],
+        "summary" : "Contar leads novos (badge do menu)",
+        "operationId" : "contarNovos",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/admin/galerias/pipeline" : {
       "get" : {
         "tags" : [ "Admin Central de Galerias" ],
@@ -17840,6 +18120,64 @@
           }
         }
       },
+      "LeadPacoteRequest" : {
+        "type" : "object",
+        "properties" : {
+          "pacoteId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "nome" : {
+            "type" : "string",
+            "maxLength" : 120,
+            "minLength" : 0
+          },
+          "email" : {
+            "type" : "string",
+            "format" : "email",
+            "maxLength" : 160,
+            "minLength" : 0
+          },
+          "telefone" : {
+            "type" : "string",
+            "maxLength" : 20,
+            "minLength" : 0
+          },
+          "opcaoEntrega" : {
+            "type" : "string",
+            "minLength" : 1,
+            "pattern" : "DIGITAL|FISICA|AMBAS"
+          },
+          "formaPagamento" : {
+            "type" : "string",
+            "minLength" : 1,
+            "pattern" : "PIX|CARTAO_CREDITO|TRANSFERENCIA|PAYPAL"
+          },
+          "quantidadeExtras" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 0
+          },
+          "observacao" : {
+            "type" : "string",
+            "maxLength" : 2000,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "formaPagamento", "nome", "opcaoEntrega", "pacoteId", "telefone" ]
+      },
+      "LeadPacotePublicoResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "status" : {
+            "type" : "string"
+          }
+        }
+      },
       "EnviarSelecaoRequest" : {
         "type" : "object",
         "properties" : {
@@ -18769,6 +19107,71 @@
           },
           "destaque" : {
             "type" : "boolean"
+          }
+        }
+      },
+      "AtualizarStatusLeadRequest" : {
+        "type" : "object",
+        "properties" : {
+          "status" : {
+            "type" : "string",
+            "enum" : [ "NOVO", "CONTATADO", "CONVERTIDO", "DESCARTADO" ]
+          }
+        },
+        "required" : [ "status" ]
+      },
+      "LeadPacoteResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "pacoteId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "pacoteNome" : {
+            "type" : "string"
+          },
+          "valorBase" : {
+            "type" : "number"
+          },
+          "precoFotoExtra" : {
+            "type" : "number"
+          },
+          "nome" : {
+            "type" : "string"
+          },
+          "email" : {
+            "type" : "string"
+          },
+          "telefone" : {
+            "type" : "string"
+          },
+          "opcaoEntrega" : {
+            "type" : "string"
+          },
+          "formaPagamento" : {
+            "type" : "string"
+          },
+          "quantidadeExtras" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "observacao" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
           }
         }
       },
@@ -19943,6 +20346,9 @@
             "type" : "boolean"
           },
           "podeComprar" : {
+            "type" : "boolean"
+          },
+          "podePagarExtras" : {
             "type" : "boolean"
           },
           "podeBaixar" : {

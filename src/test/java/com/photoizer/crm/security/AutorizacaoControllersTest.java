@@ -37,6 +37,7 @@ class AutorizacaoControllersTest {
         "PropostaPublicaController.java",
         "LogoContratadaController.java",
         "EcommerceController.java",
+        "LeadPacoteController.java",
         "AvaliacaoController.java",
         "SessaoController.java",
         "GlobalExceptionHandler.java"

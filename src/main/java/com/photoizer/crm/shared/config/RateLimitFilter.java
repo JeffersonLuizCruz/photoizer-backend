@@ -61,8 +61,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
      */
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getRequestURI();
-        return properties.limits().keySet().stream().noneMatch(path::contains);
+        var pathBusca = request.getRequestURI().replace("/", "");
+        return properties.limits().keySet().stream().noneMatch(pathBusca::contains);
     }
 
     @Override
@@ -70,10 +70,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
         String path = request.getRequestURI();
+        // O binder de propriedades normaliza chaves com "/" removendo-as. Para
+        // casar "/auth/login" (chave "authlogin") sem afetar outros paths,
+        // comparamos a versão sem barras.
+        var pathBusca = path.replace("/", "");
 
-        // Extrai apenas o trecho do endpoint (ex: /checkout) em vez do path completo
+        // Extrai apenas o trecho do endpoint (ex: checkout) em vez do path completo
         String endpoint = properties.limits().keySet().stream()
-            .filter(path::contains)
+            .filter(pathBusca::contains)
             .findFirst()
             .orElse(null);
 
@@ -83,7 +87,18 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         int limit = properties.limits().get(endpoint);
-        String key = request.getRemoteAddr() + "|" + endpoint;
+
+        // Carrinho/checkout são por sessão assinada, não só por IP: vários
+        // clientes podem compartilhar o mesmo IP (Wi-Fi de evento/CGNAT).
+        var chaveSessao = "";
+        if (endpoint.equals("checkout") || endpoint.equals("selecao")) {
+            var sessao = request.getHeader("X-Session-Id");
+            if (sessao != null && !sessao.isBlank()) {
+                var ponto = sessao.indexOf('.');
+                chaveSessao = "|" + (ponto > 0 ? sessao.substring(0, ponto) : sessao);
+            }
+        }
+        String key = request.getRemoteAddr() + chaveSessao + "|" + endpoint;
 
         AtomicInteger counter = cache.get(key, k -> new AtomicInteger(0));
         int count = counter.incrementAndGet();

@@ -174,6 +174,7 @@ public class EcommerceController {
             galeria.getModo().requerEdicao(),
             galeria.permiteSelecionar(),
             galeria.permiteComercializar(),
+            podePagarExtras(galeria, selecaoAtual),
             galeria.permiteComercializar(),
             selecaoAtual,
             selecaoReaberta,
@@ -277,7 +278,9 @@ public class EcommerceController {
         var valorUnitarioPadrao = ecommerceService.getValorUnitarioFotoExtra(agendamento.getId());
         var itensResponse = itens.stream()
             .map(com.photoizer.crm.ecommerce.model.ItemCarrinho::getFotoId)
-            .map(fotoService::buscarPorId)
+            .distinct()
+            .map(fotoService::buscarPorIdOpcional)
+            .flatMap(java.util.Optional::stream)
             .map(foto -> CarrinhoItemResponse.of(
                 fotoMapper.toPublicResponse(foto),
                 itens.size(),
@@ -485,5 +488,24 @@ public class EcommerceController {
         return foto.isVisivel()
             && !foto.isArquivosRemovidos()
             && (foto.getStatus() == StatusFoto.PUBLICADA || foto.getStatus() == StatusFoto.PAGA);
+    }
+
+    /**
+     * O pagamento das extras fica disponível na comercialização e também
+     * depois que o cliente envia a seleção, para que o estúdio possa aprovar
+     * o PIX antes da edição ser publicada.
+     */
+    private boolean podePagarExtras(
+            com.photoizer.crm.ecommerce.model.GaleriaEnsaio galeria,
+            SelecaoEnsaioResponse selecaoAtual) {
+        if (galeria.permiteComercializar()) {
+            return true;
+        }
+        if (!galeria.getModo().usaSelecaoSnapshot() || selecaoAtual == null) {
+            return false;
+        }
+        var fase = galeria.getFase();
+        return fase == com.photoizer.crm.ecommerce.model.FaseGaleria.SELECAO_ENVIADA
+            || fase == com.photoizer.crm.ecommerce.model.FaseGaleria.EM_EDICAO;
     }
 }

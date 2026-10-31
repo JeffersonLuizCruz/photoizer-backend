@@ -341,3 +341,40 @@ Cliente autenticado:
 7. CSV usa BOM UTF-8, separador `;`, decimal com vírgula e neutraliza fórmulas (`=`, `+`, `-`, `@`)
    e quebras de linha em campos livres.
 
+
+## 11. Compra de extras durante a seleção/edição (V24)
+
+- A resposta pública expõe `podePagarExtras`: `true` em `COMERCIALIZACAO`, no legado `DIRETO` e em
+  `SELECAO_ENVIADA`/`EM_EDICAO` quando existe seleção ativa. Em `SELECAO` continua `false`; o cliente
+  precisa enviar a seleção primeiro.
+- `POST /ecommerce/galeria/{token}/checkout` aceita extras nas fases de seleção/edição desde que cada
+  foto do carrinho seja um item `EXTRA` da seleção ativa (`GaleriaQueryService.isFotoExtraEmSelecaoAtiva`).
+  O valor usa o preço congelado no snapshot.
+- O checkout continua criando `CompraExtra` em `AGUARDANDO_COMPROVANTE` (PIX). O staff aprova
+  (`PAGA`) ou recusa. A foto paga continua na seleção ativa e é editada pelo fluxo normal
+  (`PUT /agendamentos/{id}/fotos/{fotoId}/editada`), que agora aceita `PAGA` quando
+  `emSelecaoEdicao = true`.
+- Recusa de compra: se a extra já foi editada ou pertence a seleção publicada, o cancelamento é
+  bloqueado. Se a seleção está ativa e a extra não foi editada, o item é removido do snapshot e a foto
+  volta para `PUBLICADA`.
+- `findExtrasPendentesEdicao` ignora fotos com `emSelecaoEdicao = true`: extras pagas dentro da
+  seleção são editadas na tela de seleção, não na fila de edição sob demanda.
+- A listagem pública inclui `PAGA` (`findPublicadasVisiveisByAgendamentoId`), para a extra paga
+  continuar visível como “Adquirida” e baixável após a publicação.
+- O envio da seleção não limpa as extras do carrinho; o frontend abre o checkout PIX em seguida.
+- `itens_carrinho` ganhou índice único `(session_id, agendamento_id, foto_id)` e a inserção usa lock
+  pessimista para reduzir duplicatas concorrentes.
+- Rate limit: `/checkout` e `/selecao` são chaveados por sessão + IP; `/sessao` foi ampliado. O filtro
+  normaliza a barra ao casar chaves com o path (corrige chaves como `/auth/login`).
+
+## 12. Leads de pacotes (V25)
+
+- `POST /api/v1/ecommerce/leads` (público, rate limit 5/min) registra um lead do catálogo de pacotes.
+  Não cria pedido, agendamento ou cobrança.
+- `leads_pacote` guarda snapshot do pacote (`pacote_nome`, `valor_base`, `preco_foto_extra`), contato,
+  entrega, forma de pagamento de interesse, quantidade de extras, observação e status
+  (`NOVO`, `CONTATADO`, `CONVERTIDO`, `DESCARTADO`).
+- `GET /api/v1/admin/leads` e `PATCH /api/v1/admin/leads/{id}/status` (ADMIN/FOTOGRAFO/AGENDADOR).
+- `LeadPacoteCriadoEvent` notifica o time comercial (`LEAD_PACOTE`) com link `/admin/leads`.
+- O checkout público (`CheckoutPage`) virou formulário de solicitação; não registra cliente nem
+  simula pagamento.

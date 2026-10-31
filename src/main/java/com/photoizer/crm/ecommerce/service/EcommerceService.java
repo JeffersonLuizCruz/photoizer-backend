@@ -133,8 +133,24 @@ public class EcommerceService {
             throw new FotoIndisponivelException(
                 "A galeria não está disponível para compra porque o agendamento foi cancelado");
         }
-        galeriaEnsaioService.validarComercializacaoPermitida(
-            galeriaEnsaioService.obter(agendamento.getId()));
+        var galeria = galeriaEnsaioService.obter(agendamento.getId());
+        var fase = galeria.getFase();
+        var pagamentoDuranteSelecao = galeria.getModo().usaSelecaoSnapshot()
+            && (fase == com.photoizer.crm.ecommerce.model.FaseGaleria.SELECAO_ENVIADA
+                || fase == com.photoizer.crm.ecommerce.model.FaseGaleria.EM_EDICAO);
+        if (pagamentoDuranteSelecao) {
+            if (galeriaQueryService.buscarSelecaoAtiva(agendamento.getId()).isEmpty()) {
+                throw new FotoIndisponivelException(
+                    "Envie sua seleção para liberar o pagamento das extras");
+            }
+        } else {
+            if (galeria.getModo().usaSelecaoSnapshot()
+                && fase == com.photoizer.crm.ecommerce.model.FaseGaleria.SELECAO) {
+                throw new FotoIndisponivelException(
+                    "Envie sua seleção para liberar o pagamento das extras");
+            }
+            galeriaEnsaioService.validarComercializacaoPermitida(galeria);
+        }
         var itensCarrinho = carrinhoService.listarCarrinho(token, sessionId);
 
         if (itensCarrinho.isEmpty()) {
@@ -150,7 +166,10 @@ public class EcommerceService {
         if (fotos.isEmpty()) {
             throw new FotoIndisponivelException("Nenhuma foto valida no carrinho");
         }
-        if (fotos.stream().anyMatch(f -> !galeriaQueryService.isFotoComercializavel(f))) {
+        var fotosValidas = pagamentoDuranteSelecao
+            ? fotos.stream().allMatch(galeriaQueryService::isFotoExtraEmSelecaoAtiva)
+            : fotos.stream().allMatch(galeriaQueryService::isFotoComercializavel);
+        if (!fotosValidas) {
             throw new FotoIndisponivelException("Uma ou mais fotos não estão disponíveis para compra");
         }
 

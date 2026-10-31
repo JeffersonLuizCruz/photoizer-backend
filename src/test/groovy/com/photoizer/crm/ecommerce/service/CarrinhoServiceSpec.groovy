@@ -32,7 +32,7 @@ class CarrinhoServiceSpec extends Specification {
         galeriaQueryService.buscarAgendamentoPorToken(token) >> agendamento()
         galeriaQueryService.buscarFotoPorId(fotoId) >> foto()
         galeriaQueryService.isFotoDisponivelParaCarrinho(_) >> true
-        itemCarrinhoRepository.findBySessionIdAndAgendamentoIdOrderByAuditInfoCreatedAtAsc(sessionId, agendamentoId) >> []
+        itemCarrinhoRepository.findBySessaoAndAgendamentoForUpdate(sessionId, agendamentoId) >> []
         itemCarrinhoRepository.save(_ as ItemCarrinho) >> { args -> args[0] }
 
         when:
@@ -50,7 +50,7 @@ class CarrinhoServiceSpec extends Specification {
         galeriaQueryService.buscarAgendamentoPorToken(token) >> agendamento()
         galeriaQueryService.buscarFotoPorId(fotoId) >> foto()
         galeriaQueryService.isFotoDisponivelParaCarrinho(_) >> true
-        itemCarrinhoRepository.findBySessionIdAndAgendamentoIdOrderByAuditInfoCreatedAtAsc(sessionId, agendamentoId) >>
+        itemCarrinhoRepository.findBySessaoAndAgendamentoForUpdate(sessionId, agendamentoId) >>
             [ItemCarrinho.builder().agendamentoId(agendamentoId).fotoId(fotoId).sessionId(sessionId).build()]
 
         when:

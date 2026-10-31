@@ -143,6 +143,53 @@ class GaleriaQueryServiceSpec extends Specification {
         service.isFotoDisponivelParaCarrinho(foto)
     }
 
+    def "extra da seleção ativa pode ser comprada durante a edição"() {
+        given:
+        def selecao = SelecaoEnsaio.builder()
+            .id(UUID.randomUUID())
+            .agendamentoId(agendamentoId)
+            .numero(1)
+            .status(StatusSelecao.EM_EDICAO)
+            .enviadaEm(java.time.LocalDateTime.now())
+            .build()
+        def foto = foto(VersaoFoto.ORIGINAL)
+        selecaoRepository.findFirstByAgendamentoIdAndStatusInOrderByNumeroDesc(
+            agendamentoId, _) >> Optional.of(selecao)
+        selecaoItemRepository.findBySelecaoIdAndFotoId(selecao.id, foto.id) >>
+            Optional.of(SelecaoEnsaioItem.builder()
+                .selecaoId(selecao.id)
+                .fotoId(foto.id)
+                .tipo(TipoItemSelecao.EXTRA)
+                .build())
+
+        expect:
+        service.isFotoExtraEmSelecaoAtiva(foto)
+    }
+
+    def "foto do pacote não pode ser cobrada como extra durante a edição"() {
+        given:
+        def selecao = SelecaoEnsaio.builder()
+            .id(UUID.randomUUID())
+            .agendamentoId(agendamentoId)
+            .numero(1)
+            .status(StatusSelecao.EM_EDICAO)
+            .enviadaEm(java.time.LocalDateTime.now())
+            .build()
+        def foto = foto(VersaoFoto.ORIGINAL)
+        foto.selecionadaPacote = true
+        selecaoRepository.findFirstByAgendamentoIdAndStatusInOrderByNumeroDesc(
+            agendamentoId, _) >> Optional.of(selecao)
+        selecaoItemRepository.findBySelecaoIdAndFotoId(selecao.id, foto.id) >>
+            Optional.of(SelecaoEnsaioItem.builder()
+                .selecaoId(selecao.id)
+                .fotoId(foto.id)
+                .tipo(TipoItemSelecao.PACOTE)
+                .build())
+
+        expect:
+        !service.isFotoExtraEmSelecaoAtiva(foto)
+    }
+
     def "galeria em comercialização lista também as fotos restantes"() {
         given:
         def restante = foto(VersaoFoto.ORIGINAL)

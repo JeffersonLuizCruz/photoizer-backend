@@ -24,4 +24,10 @@ public interface UsuarioStaffPort {
      * financeiro sem expor o dado a papeis sem essa permissao.
      */
     List<UUID> listarAprovadoresCompras();
+
+    /**
+     * Usuários do time comercial que devem receber leads de pacotes
+     * (ADMIN, FOTOGRAFO e AGENDADOR).
+     */
+    List<UUID> listarComercialAtivos();
 }

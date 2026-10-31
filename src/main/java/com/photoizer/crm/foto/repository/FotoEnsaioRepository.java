@@ -51,7 +51,7 @@ public interface FotoEnsaioRepository extends JpaRepository<FotoEnsaio, UUID> {
     @Query("""
         SELECT f FROM FotoEnsaio f
         WHERE f.agendamentoId = :agendamentoId
-          AND f.status = 'PUBLICADA'
+          AND f.status IN ('PUBLICADA', 'PAGA')
           AND f.visivel = true
         ORDER BY COALESCE(f.numeroGaleria, 2147483647) ASC, f.ordem ASC
         """)
@@ -68,6 +68,7 @@ public interface FotoEnsaioRepository extends JpaRepository<FotoEnsaio, UUID> {
         WHERE f.compraExtraId IS NOT NULL
           AND f.status = 'PAGA'
           AND f.versaoAtual <> 'EDITADA'
+          AND f.emSelecaoEdicao = false
         ORDER BY f.compraExtraId ASC,
                  COALESCE(f.numeroGaleria, 2147483647) ASC,
                  f.ordem ASC
@@ -174,7 +175,8 @@ public interface FotoEnsaioRepository extends JpaRepository<FotoEnsaio, UUID> {
                SUM(CASE WHEN f.status = 'PAGA' THEN 1 ELSE 0 END) AS pagas,
                SUM(CASE WHEN f.compraExtraId IS NOT NULL
                          AND f.status = 'PAGA'
-                         AND f.versaoAtual <> 'EDITADA' THEN 1 ELSE 0 END) AS extrasPendentesEdicao,
+                         AND f.versaoAtual <> 'EDITADA'
+                         AND f.emSelecaoEdicao = false THEN 1 ELSE 0 END) AS extrasPendentesEdicao,
                SUM(CASE WHEN f.arquivosRemovidos = true THEN 1 ELSE 0 END) AS arquivadas
         FROM FotoEnsaio f
         WHERE f.agendamentoId IN :agendamentoIds

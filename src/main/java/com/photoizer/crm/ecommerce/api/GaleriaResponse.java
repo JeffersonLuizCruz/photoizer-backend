@@ -25,6 +25,7 @@ public record GaleriaResponse(
     boolean requerEdicao,
     boolean podeSelecionar,
     boolean podeComprar,
+    boolean podePagarExtras,
     boolean podeBaixar,
     SelecaoEnsaioResponse selecaoAtual,
     boolean selecaoReaberta,

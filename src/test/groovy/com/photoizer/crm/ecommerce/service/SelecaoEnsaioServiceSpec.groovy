@@ -434,6 +434,59 @@ class SelecaoEnsaioServiceSpec extends Specification {
         0 * eventPublisher.publishEvent(_)
     }
 
+    def "remove extra não editada ao recusar a compra"() {
+        given:
+        def selecao = selecao(StatusSelecao.EM_EDICAO)
+        def item = itemExtra(selecao.id, false)
+        selecaoRepository.findById(selecao.id) >> Optional.of(selecao)
+        selecaoRepository.findByIdForUpdate(selecao.id) >> Optional.of(selecao)
+        itemRepository.findByFotoId(item.fotoId) >> [item]
+        itemRepository.findBySelecaoIdAndFotoId(selecao.id, item.fotoId) >> Optional.of(item)
+        itemRepository.countBySelecaoId(selecao.id) >> 1
+        itemRepository.countBySelecaoIdAndEditadaTrue(selecao.id) >> 0
+
+        when:
+        service.validarERemoverExtrasPorCancelamento(agendamentoId, [item.fotoId])
+
+        then:
+        1 * itemRepository.delete(item)
+        1 * eventPublisher.publishEvent({ it instanceof SelecaoExtraRemovidaEvent
+            && it.fotoId() == item.fotoId })
+    }
+
+    def "bloqueia recusa quando a extra já foi editada"() {
+        given:
+        def selecao = selecao(StatusSelecao.EM_EDICAO)
+        def item = itemExtra(selecao.id, true)
+        selecaoRepository.findById(selecao.id) >> Optional.of(selecao)
+        selecaoRepository.findByIdForUpdate(selecao.id) >> Optional.of(selecao)
+        itemRepository.findByFotoId(item.fotoId) >> [item]
+        itemRepository.findBySelecaoIdAndFotoId(selecao.id, item.fotoId) >> Optional.of(item)
+
+        when:
+        service.validarERemoverExtrasPorCancelamento(agendamentoId, [item.fotoId])
+
+        then:
+        def erro = thrown(SelecaoNaoEditavelException)
+        erro.message.contains('editada')
+        0 * itemRepository.delete(_)
+    }
+
+    def "bloqueia recusa quando a extra pertence a seleção publicada"() {
+        given:
+        def selecao = selecao(StatusSelecao.PUBLICADA)
+        def item = itemExtra(selecao.id, false)
+        selecaoRepository.findById(selecao.id) >> Optional.of(selecao)
+        itemRepository.findByFotoId(item.fotoId) >> [item]
+
+        when:
+        service.validarERemoverExtrasPorCancelamento(agendamentoId, [item.fotoId])
+
+        then:
+        thrown(SelecaoNaoEditavelException)
+        0 * itemRepository.delete(_)
+    }
+
     def "identifica rascunho reaberto quando a última seleção foi cancelada"() {
         given:
         selecaoRepository.findFirstByAgendamentoIdOrderByNumeroDesc(agendamentoId) >>

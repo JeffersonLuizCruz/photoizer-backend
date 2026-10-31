@@ -40,6 +40,7 @@ public enum ErrorCode {
 
     // ─── Pacote ────────────────────────────────────────────────
     PACOTE_NAO_ENCONTRADO,
+    LEAD_NAO_ENCONTRADO,
     PACOTE_INATIVO,
     PACOTE_VINCULADO_A_AGENDAMENTOS,
 
