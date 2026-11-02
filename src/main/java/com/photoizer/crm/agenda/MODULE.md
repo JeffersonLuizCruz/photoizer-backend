@@ -146,6 +146,7 @@ CONFIRMADO ──realizar──▶ AGUARDANDO_PAGAMENTO_FINAL ──pagarFinal�
 - A reserva é definida por **um dos dois modos**: `percentualEntrada` (calculado sobre pacote + deslocamento) **ou** `valorJaRecebido` (entrada exigida = valor recebido, registrado como pagamento histórico).
 - O token público (`tokenProposta`) é gerado na criação e o staff envia o link ao cliente.
 - No link público (`/propostas/publico/{token}`), o cliente preenche os próprios dados, escolhe uso de imagem e assina. O avulso **não exige comprovante** e **permanece CONFIRMADO**; o aceite é registrado sem transição de status.
+- **Compartilhamento do termo assinado**: `GET /api/v1/propostas/publico/{token}/termo` (público, `inline`, `noindex`/`no-store`) serve o PDF do termo pelo token da proposta, sem aplicar a expiração do link de assinatura — o contrato assinado continua acessível. O detalhe do agendamento (aba Contrato) usa esse link no botão "Enviar no WhatsApp" e mantém "Baixar PDF" (`/agendamentos/{id}/termo`, autenticado) para envio com anexo manual.
 - O contrato usa o placeholder `{{statusReserva}}` (`recebida`/`a receber`) para não afirmar que a reserva foi paga no modo percentual. O `ConfigContratoSeeder` adiciona o placeholder a templates persistidos que ainda usam a linha antiga, de forma idempotente.
 
 ## 5. Regras Específicas

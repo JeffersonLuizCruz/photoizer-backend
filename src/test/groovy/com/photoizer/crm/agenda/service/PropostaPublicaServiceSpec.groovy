@@ -297,6 +297,60 @@ class PropostaPublicaServiceSpec extends Specification {
         OrigemAgendamento.AVULSO          | new BigDecimal("300.00") || "recebida"
     }
 
+    def "retorna o termo assinado pelo token público"() {
+        given: "uma proposta já assinada com PDF gerado"
+        def token = "token-termo"
+        def proposta = agendamento(
+            status: StatusAgendamento.AGUARDANDO_APROVACAO,
+            tokenProposta: token,
+            tokenPropostaExpiracao: LocalDateTime.now().plusDays(1),
+            dataAssinatura: LocalDateTime.now(),
+            urlPdfAssinatura: "uploads/propostas/termo.pdf")
+        agendamentoRepository.findByTokenPropostaHash(HashUtils.sha256(token)) >> Optional.of(proposta)
+
+        expect: "o termo é localizado para compartilhamento"
+        service.buscarTermoAssinado(token).urlPdfAssinatura == "uploads/propostas/termo.pdf"
+    }
+
+    def "mantém o termo acessível depois da expiração do link de assinatura"() {
+        given: "uma proposta assinada com token de assinatura expirado"
+        def token = "token-termo-expirado"
+        def proposta = agendamento(
+            status: StatusAgendamento.AGUARDANDO_APROVACAO,
+            tokenProposta: token,
+            tokenPropostaExpiracao: LocalDateTime.now().minusDays(10),
+            dataAssinatura: LocalDateTime.now().minusDays(11),
+            urlPdfAssinatura: "uploads/propostas/termo.pdf")
+        agendamentoRepository.findByTokenPropostaHash(HashUtils.sha256(token)) >> Optional.of(proposta)
+
+        expect: "o contrato assinado continua disponível"
+        service.buscarTermoAssinado(token).urlPdfAssinatura == "uploads/propostas/termo.pdf"
+    }
+
+    @Unroll
+    def "não expõe termo quando #motivo"() {
+        given: "uma proposta sem termo assinado disponível"
+        def token = "token-sem-termo"
+        def proposta = agendamento(
+            status: StatusAgendamento.PRE_RESERVA,
+            tokenProposta: token,
+            dataAssinatura: dataAssinatura,
+            urlPdfAssinatura: urlPdf)
+        agendamentoRepository.findByTokenPropostaHash(HashUtils.sha256(token)) >> Optional.of(proposta)
+
+        when: "o termo é solicitado"
+        service.buscarTermoAssinado(token)
+
+        then: "o termo é tratado como inexistente"
+        thrown(PropostaNaoEncontradaException)
+
+        where:
+        motivo                          | dataAssinatura      | urlPdf
+        "a proposta não foi assinada"   | null                | "uploads/propostas/termo.pdf"
+        "o PDF ainda não foi gerado"    | LocalDateTime.now() | null
+        "o caminho do PDF está vazio"   | LocalDateTime.now() | " "
+    }
+
     private def propostaValida(String token) {
         agendamento(
             status: StatusAgendamento.PRE_RESERVA,

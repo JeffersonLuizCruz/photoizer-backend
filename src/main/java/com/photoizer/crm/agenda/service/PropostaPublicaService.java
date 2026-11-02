@@ -139,6 +139,23 @@ public class PropostaPublicaService {
         return PropostaStatusPublicoResponse.of(agendamento);
     }
 
+    /**
+     * Localiza o termo assinado pelo token público da proposta para permitir o
+     * compartilhamento do PDF com o cliente (ex.: WhatsApp). O termo já assinado
+     * é um registro do contrato e permanece acessível depois que o link de
+     * assinatura expira — por isso não aplica {@link #validarExpiracao}.
+     */
+    @Transactional(readOnly = true)
+    public Agendamento buscarTermoAssinado(String token) {
+        var agendamento = buscarPorToken(token);
+        if (agendamento.getDataAssinatura() == null
+            || agendamento.getUrlPdfAssinatura() == null
+            || agendamento.getUrlPdfAssinatura().isBlank()) {
+            throw new PropostaNaoEncontradaException(token);
+        }
+        return agendamento;
+    }
+
     public Agendamento assinar(String token,
                                String nome,
                                String telefone,

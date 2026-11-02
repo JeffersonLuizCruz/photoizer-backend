@@ -1,6 +1,7 @@
 package com.photoizer.crm.agenda.api;
 
 import com.photoizer.crm.agenda.service.PropostaPublicaService;
+import com.photoizer.crm.shared.storage.FileServeHelper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -9,6 +10,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,9 +28,12 @@ import org.springframework.web.multipart.MultipartFile;
 public class PropostaPublicaController {
 
     private final PropostaPublicaService propostaPublicaService;
+    private final FileServeHelper fileServeHelper;
 
-    public PropostaPublicaController(PropostaPublicaService propostaPublicaService) {
+    public PropostaPublicaController(PropostaPublicaService propostaPublicaService,
+                                     FileServeHelper fileServeHelper) {
         this.propostaPublicaService = propostaPublicaService;
+        this.fileServeHelper = fileServeHelper;
     }
 
     @GetMapping("/{token}")
@@ -47,6 +53,33 @@ public class PropostaPublicaController {
     public ResponseEntity<PropostaStatusPublicoResponse> status(
             @PathVariable @Parameter(description = "Token público da proposta") String token) {
         return ResponseEntity.ok(propostaPublicaService.status(token));
+    }
+
+    @GetMapping("/{token}/termo")
+    @Operation(operationId = "baixarTermoPropostaPublica", summary = "Baixar termo assinado da proposta (PDF)",
+        description = "Serve o PDF do termo assinado pelo cliente a partir do token público da proposta, "
+            + "permitindo que o staff encaminhe o documento (ex.: WhatsApp). Continua acessível após a "
+            + "expiração do link de assinatura.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "PDF do termo assinado",
+            content = @Content(mediaType = "application/pdf")),
+        @ApiResponse(responseCode = "404", description = "Token inválido ou termo ainda não assinado", content = @Content)
+    })
+    public ResponseEntity<Resource> termo(
+            @PathVariable @Parameter(description = "Token público da proposta") String token) {
+        var agendamento = propostaPublicaService.buscarTermoAssinado(token);
+        var arquivo = fileServeHelper.servirArquivo(
+            agendamento.getUrlPdfAssinatura(),
+            "termo-proposta-" + agendamento.getId().toString().substring(0, 8) + ".pdf",
+            "inline");
+        if (!arquivo.getStatusCode().is2xxSuccessful()) {
+            return arquivo;
+        }
+        var headers = new HttpHeaders();
+        headers.putAll(arquivo.getHeaders());
+        headers.set("X-Robots-Tag", "noindex");
+        headers.setCacheControl("private, no-store");
+        return new ResponseEntity<>(arquivo.getBody(), headers, arquivo.getStatusCode());
     }
 
     @PostMapping(value = "/{token}/assinar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

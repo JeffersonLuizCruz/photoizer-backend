@@ -10683,6 +10683,45 @@
         }
       }
     },
+    "/api/v1/propostas/publico/{token}/termo" : {
+      "get" : {
+        "tags" : [ "Propostas Públicas" ],
+        "summary" : "Baixar termo assinado da proposta (PDF)",
+        "description" : "Serve o PDF do termo assinado pelo cliente a partir do token público da proposta, permitindo que o staff encaminhe o documento (ex.: WhatsApp). Continua acessível após a expiração do link de assinatura.",
+        "operationId" : "baixarTermoPropostaPublica",
+        "parameters" : [ {
+          "name" : "token",
+          "in" : "path",
+          "description" : "Token público da proposta",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "PDF do termo assinado",
+            "content" : {
+              "application/pdf" : { }
+            }
+          },
+          "404" : {
+            "description" : "Token inválido ou termo ainda não assinado"
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/propostas/publico/{token}/status" : {
       "get" : {
         "tags" : [ "Propostas Públicas" ],
