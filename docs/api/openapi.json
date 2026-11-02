@@ -14511,6 +14511,63 @@
         } ]
       }
     },
+    "/api/v1/admin/galerias/mensagem-link" : {
+      "get" : {
+        "tags" : [ "Admin Central de Galerias" ],
+        "summary" : "Obter o modelo de mensagem para envio do link da galeria ao cliente",
+        "operationId" : "mensagemLink",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MensagemLinkGaleriaResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Não autenticado",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Acesso negado ao recurso",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        }, {
+          "cookieAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/admin/galerias/marca-dagua/fotos" : {
       "get" : {
         "tags" : [ "Admin Galeria" ],
@@ -21220,6 +21277,14 @@
           "comprasAguardandoConfirmacao" : {
             "type" : "integer",
             "format" : "int32"
+          }
+        }
+      },
+      "MensagemLinkGaleriaResponse" : {
+        "type" : "object",
+        "properties" : {
+          "mensagem" : {
+            "type" : "string"
           }
         }
       },

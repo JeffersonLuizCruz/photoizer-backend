@@ -300,6 +300,11 @@ Galerias sem fotos no CRM ficam **fora da fila por padrão** (`semFotos=false`),
 ter sido entregues por outro canal. O resumo expõe `semFotosNoCrm` para o link de conferência e o
 filtro explícito por `AGUARDANDO_UPLOAD` também as inclui.
 
+Staff (`ADMIN/FOTOGRAFO/EDITOR`):
+- `GET /api/v1/admin/galerias/mensagem-link` — modelo de mensagem para envio do link da galeria ao
+  cliente. As URLs de Instagram/Facebook vêm de `app.social.*` no `application.properties`; o
+  placeholder `{{link}}` é substituído pelo frontend com a URL pública da galeria.
+
 Staff (`ADMIN/FOTOGRAFO`):
 - `GET /api/v1/admin/galerias/desempenho?meses=6` — SLA, funil, extras e série mensal
   (calculado por `GaleriaPerformanceCalculator`, com média apenas das amostras disponíveis).
