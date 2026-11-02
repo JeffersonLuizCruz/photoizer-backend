@@ -4,7 +4,6 @@ import com.photoizer.crm.agenda.model.Agendamento
 import com.photoizer.crm.pacote.model.Pacote
 import com.photoizer.crm.ecommerce.service.CompraQueryService
 import com.photoizer.crm.ecommerce.service.EcommerceService
-import com.photoizer.crm.ecommerce.service.FavoritoService
 import com.photoizer.crm.ecommerce.service.GaleriaQueryService
 import com.photoizer.crm.ecommerce.service.PagamentoExtraService
 import com.photoizer.crm.foto.api.FotoMapper
@@ -19,7 +18,6 @@ class AdminEcommerceControllerSpec extends Specification {
     def ecommerceMapper = Mock(EcommerceMapper)
     def fotoMapper = Mock(FotoMapper)
     def pagamentoExtraService = Mock(PagamentoExtraService)
-    def favoritoService = Mock(FavoritoService)
 
     @Subject
     def controller = new AdminEcommerceController(
@@ -29,7 +27,6 @@ class AdminEcommerceControllerSpec extends Specification {
         ecommerceMapper,
         fotoMapper,
         pagamentoExtraService,
-        favoritoService,
     )
 
     def "resumo preenche o token e o link relativo da galeria"() {
@@ -45,7 +42,6 @@ class AdminEcommerceControllerSpec extends Specification {
         galeriaQueryService.buscarAgendamentoPorId(agendamentoId) >> agendamento
         galeriaQueryService.listarFotosPorAgendamento(agendamentoId) >> []
         compraQueryService.listarComprasPorAgendamento(agendamentoId) >> []
-        favoritoService.contarFavoritosPorFoto(agendamentoId) >> [:]
 
         when:
         def resposta = controller.resumo(agendamentoId).body
@@ -67,7 +63,6 @@ class AdminEcommerceControllerSpec extends Specification {
         galeriaQueryService.buscarAgendamentoPorId(agendamentoId) >> agendamento
         galeriaQueryService.listarFotosPorAgendamento(agendamentoId) >> []
         compraQueryService.listarComprasPorAgendamento(agendamentoId) >> []
-        favoritoService.contarFavoritosPorFoto(agendamentoId) >> [:]
 
         when:
         def resposta = controller.resumo(agendamentoId).body

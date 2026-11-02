@@ -1,7 +1,7 @@
 # Módulo: E-commerce
 
 ## 1. Responsabilidade
-Gerencia a galeria pública do cliente (via token), seleção de fotos para o pacote, carrinho + checkout de fotos extras (`CompraExtra`), comprovantes, download (individual/ZIP), favoritos (wishlist), comentários por foto e avaliações (depoimentos).
+Gerencia a galeria pública do cliente (via token), seleção de fotos para o pacote, carrinho + checkout de fotos extras (`CompraExtra`), comprovantes, download (individual/ZIP), comentários por foto e avaliações (depoimentos).
 
 ## 2. Estrutura
 ```
@@ -13,7 +13,6 @@ ecommerce/
 │   ├── ConfiguracaoPagamentoEcommerce.java # Config global de PIX do e-commerce (linha única)
 │   ├── StatusSessao.java      # Enum: ATIVA, FINALIZADA, CANCELADA
 │   ├── ItemCarrinho.java      # Entidade: agendamentoId, fotoId, sessionId
-│   ├── Favorito.java          # Entidade: agendamentoId, fotoId, sessionId (wishlist)
 │   ├── FotoComentario.java    # Entidade: fotoId, agendamentoId, autorNome, mensagem, origem, lida
 │   ├── OrigemComentario.java  # Enum: CLIENTE, STAFF
 │   ├── Avaliacao.java         # Entidade: clienteId, agendamentoId, pacoteId, pontuacao(1-5), comentario, depoimento, aprovado
@@ -22,7 +21,6 @@ ecommerce/
 │   ├── CompraExtraRepository.java
 │   ├── ConfiguracaoPagamentoEcommerceRepository.java
 │   ├── ItemCarrinhoRepository.java
-│   ├── FavoritoRepository.java
 │   ├── FotoComentarioRepository.java
 │   ├── AvaliacaoRepository.java
 │   └── SessaoRepository.java
@@ -30,7 +28,6 @@ ecommerce/
 │   ├── EcommerceService.java         # Orquestrador fino (~200 linhas): checkout, upload comprovante, regen token. Delega seleção/carrinho/queries.
 │   ├── GaleriaQueryService.java      # Fachada read-only: buscarAgendamentoPorToken, valorUnitarioFotoExtra, listarFotosPublicadas, isDownloadPermitido
 │   ├── CarrinhoService.java          # Facade: adicionar/remover/listar/contar/calcular carrinho
-│   ├── FavoritoService.java          # Facade: adicionar/remover/listar favoritos (wishlist)
 │   ├── DownloadService.java          # Facade: download foto individual + ZIP com limpeza de temp
 │   ├── PagamentoExtraService.java    # State Pattern: confirmarPagamento, simularPagamento, cancelarCompra, atualizarLinkPagamentoCartao
 │   ├── ConfiguracaoPagamentoEcommerceService.java # PIX global do e-commerce (altera e reflete em todas as galerias)
@@ -78,7 +75,7 @@ ecommerce/
 
 | Pattern | Onde | Motivo |
 |---------|------|--------|
-| **Facade** | `CarrinhoService`, `FavoritoService`, `DownloadService`, `GaleriaQueryService` | Isolar responsabilidades do God class EcommerceService em beans coesos |
+| **Facade** | `CarrinhoService`, `DownloadService`, `GaleriaQueryService` | Isolar responsabilidades do God class EcommerceService em beans coesos |
 | **State** | `StatusCompraExtra` enum | Transições de estado válidas centralizadas no enum, eliminando if/else espalhados |
 | **Facade** | `PagamentoExtraService` | Orquestra transições de estado de CompraExtra usando State Pattern |
 | **Mapper (MapStruct)** | `EcommerceMapper` | Elimina `static of()` manuais nos DTOs; consistência com agenda/despesa/edicao |
@@ -125,7 +122,7 @@ ecommerce/
 
 | # | Melhoria | Impacto |
 |---|----------|---------|
-| 1 | **Split God Class**: `EcommerceService` (574→~200 linhas) extraindo `CarrinhoService`, `FavoritoService`, `DownloadService`, `PagamentoExtraService`, `GaleriaQueryService`, `SelecaoFotosService`, `CompraQueryService` | Manutenibilidade |
+| 1 | **Split God Class**: `EcommerceService` (574→~200 linhas) extraindo `CarrinhoService`, `DownloadService`, `PagamentoExtraService`, `GaleriaQueryService`, `SelecaoFotosService`, `CompraQueryService` | Manutenibilidade |
 | 2 | **Query `findByCompraExtraId`**: substitui 4x `findAll().stream().filter()` por query dedicada no banco | Performance (P1) |
 | 3 | **10 exceções de domínio**: substituem `RuntimeException`/`IllegalArgumentException` genéricas | UX, tratamento de erros |
 | 4 | **State Pattern em `StatusCompraExtra`**: transições de estado centralizadas no enum | Manutenibilidade |
@@ -347,11 +344,17 @@ Cliente autenticado:
 - A resposta pública expõe `podePagarExtras`: `true` em `COMERCIALIZACAO`, no legado `DIRETO` e em
   `SELECAO_ENVIADA`/`EM_EDICAO` quando existe seleção ativa. Em `SELECAO` continua `false`; o cliente
   precisa enviar a seleção primeiro.
-- `POST /ecommerce/galeria/{token}/checkout` aceita extras nas fases de seleção/edição desde que cada
-  foto do carrinho seja um item `EXTRA` da seleção ativa (`GaleriaQueryService.isFotoExtraEmSelecaoAtiva`).
-  O valor usa o preço congelado no snapshot.
-- O checkout continua criando `CompraExtra` em `AGUARDANDO_COMPROVANTE` (PIX). O staff aprova
-  (`PAGA`) ou recusa. A foto paga continua na seleção ativa e é editada pelo fluxo normal
+- O fluxo atual é `POST /ecommerce/galeria/{token}/checkout-pix` (multipart, campo `comprovante`):
+  valida o arquivo, cria a `CompraExtra` e anexa o comprovante **na mesma transação**, já em
+  `AGUARDANDO_CONFIRMACAO`. Se o cliente fechar/atualizar a página antes de enviar o comprovante,
+  nenhuma compra é criada e o carrinho continua salvo.
+- O endpoint `POST /checkout` antigo permanece como deprecated para clientes com frontend em cache:
+  ele cria a compra em `AGUARDANDO_COMPROVANTE` e deixa o comprovante para depois. O frontend novo
+  não o utiliza.
+- Ambos aceitam extras nas fases de seleção/edição desde que cada foto do carrinho seja um item
+  `EXTRA` da seleção ativa (`GaleriaQueryService.isFotoExtraEmSelecaoAtiva`). O valor usa o preço
+  congelado no snapshot.
+- A foto paga continua na seleção ativa e é editada pelo fluxo normal
   (`PUT /agendamentos/{id}/fotos/{fotoId}/editada`), que agora aceita `PAGA` quando
   `emSelecaoEdicao = true`.
 - Recusa de compra: se a extra já foi editada ou pertence a seleção publicada, o cancelamento é

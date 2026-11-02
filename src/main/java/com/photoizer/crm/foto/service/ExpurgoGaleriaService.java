@@ -122,7 +122,7 @@ public class ExpurgoGaleriaService {
         }
         fotoEnsaioRepository.saveAll(pendentes);
 
-        // Limpa carrinho, favoritos, comentários, capa/hero e caches no ecommerce.
+        // Limpa carrinho, comentários, capa/hero e caches no ecommerce.
         eventPublisher.publishEvent(new GaleriaArquivadaEvent(
             agendamentoId, pendentes.stream().map(FotoEnsaio::getId).toList()));
 

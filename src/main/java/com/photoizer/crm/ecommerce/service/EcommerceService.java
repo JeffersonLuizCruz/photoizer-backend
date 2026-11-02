@@ -34,7 +34,7 @@ import java.util.UUID;
 /**
  * PATTERN: Facade Pattern (refatorado)
  * Apos a extracao dos services especializados, o EcommerceService agora atua como
- * um orquestrador fino que delega para CarrinhoService, FavoritoService,
+ * um orquestrador fino que delega para CarrinhoService,
  * DownloadService, PagamentoExtraService e GaleriaQueryService.
  * Restam apenas: checkout, selecao de fotos, queries admin, override selecao,
  * regenerar token e upload de comprovante - que sao operacoes de orquestracao.
@@ -126,7 +126,31 @@ public class EcommerceService {
 
     // ==================== Checkout ====================
 
+    /**
+     * Fluxo legado: cria a compra e deixa o comprovante para depois. Mantido
+     * apenas para clientes antigos em cache; o fluxo atual usa
+     * {@link #checkoutComprovante(UUID, UUID, MultipartFile)}.
+     */
+    @Deprecated
     public CompraExtra checkout(UUID token, UUID sessionId, MetodoPagamento metodoPagamento) {
+        return checkoutInterno(token, sessionId, metodoPagamento, true);
+    }
+
+    /**
+     * Fluxo atual de PIX: cria a compra e anexa o comprovante na mesma
+     * transação. Se o cliente fechar a página antes de enviar o comprovante,
+     * nenhuma compra é criada e o carrinho continua intacto.
+     */
+    public CompraExtra checkoutComprovante(UUID token, UUID sessionId, MultipartFile comprovante) {
+        // Falha antes de criar qualquer registro se o arquivo for inválido.
+        fileValidator.validate(comprovante, "receipt");
+        var compra = checkoutInterno(token, sessionId, MetodoPagamento.PIX, false);
+        return uploadComprovante(token, compra.getId(), comprovante);
+    }
+
+    private CompraExtra checkoutInterno(UUID token, UUID sessionId,
+                                        MetodoPagamento metodoPagamento,
+                                        boolean publicarSolicitacao) {
         var agendamento = galeriaQueryService.buscarAgendamentoPorToken(token);
         if (agendamento.getStatus() == StatusAgendamento.CANCELADO
             || agendamento.getStatus() == StatusAgendamento.NO_SHOW) {
@@ -200,9 +224,11 @@ public class EcommerceService {
         eventPublisher.publishEvent(new CompraExtraCriadaEvent(
             agendamento.getId(), compra.getId(), valorTotal, fotos.size()));
 
-        eventPublisher.publishEvent(new CompraExtraSolicitadaEvent(
-            agendamento.getId(), compra.getId(), agendamento.nomeCliente(),
-            fotografoId(agendamento), fotos.size(), valorTotal));
+        if (publicarSolicitacao) {
+            eventPublisher.publishEvent(new CompraExtraSolicitadaEvent(
+                agendamento.getId(), compra.getId(), agendamento.nomeCliente(),
+                fotografoId(agendamento), fotos.size(), valorTotal));
+        }
 
         log.atInfo()
             .addKeyValue("event_action", "ecommerce.checkout_criado")

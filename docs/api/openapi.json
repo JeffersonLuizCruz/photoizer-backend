@@ -5506,98 +5506,6 @@
         }
       }
     },
-    "/api/v1/ecommerce/galeria/{token}/favoritos/{fotoId}" : {
-      "post" : {
-        "tags" : [ "Ecommerce" ],
-        "summary" : "Adicionar foto aos favoritos (wishlist)",
-        "operationId" : "adicionarFavorito",
-        "parameters" : [ {
-          "name" : "token",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        }, {
-          "name" : "X-Session-Id",
-          "in" : "header",
-          "required" : false,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
-          "name" : "fotoId",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK"
-          },
-          "500" : {
-            "description" : "Erro interno do servidor",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "type" : "object",
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete" : {
-        "tags" : [ "Ecommerce" ],
-        "summary" : "Remover foto dos favoritos",
-        "operationId" : "removerFavorito",
-        "parameters" : [ {
-          "name" : "token",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        }, {
-          "name" : "X-Session-Id",
-          "in" : "header",
-          "required" : false,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
-          "name" : "fotoId",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK"
-          },
-          "500" : {
-            "description" : "Erro interno do servidor",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "type" : "object",
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/ecommerce/galeria/{token}/comprovante" : {
       "post" : {
         "tags" : [ "Ecommerce" ],
@@ -5664,7 +5572,7 @@
     "/api/v1/ecommerce/galeria/{token}/checkout" : {
       "post" : {
         "tags" : [ "Ecommerce" ],
-        "summary" : "Finalizar compra usando itens do carrinho",
+        "summary" : "Finalizar compra usando itens do carrinho (legado; use /checkout-pix)",
         "operationId" : "checkout",
         "parameters" : [ {
           "name" : "token",
@@ -5709,6 +5617,69 @@
                 "schema" : {
                   "type" : "object",
                   "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Erro interno do servidor",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "deprecated" : true
+      }
+    },
+    "/api/v1/ecommerce/galeria/{token}/checkout-pix" : {
+      "post" : {
+        "tags" : [ "Ecommerce" ],
+        "summary" : "Criar a compra de extras e anexar o comprovante PIX na mesma transação",
+        "operationId" : "checkoutComprovante",
+        "parameters" : [ {
+          "name" : "token",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "X-Session-Id",
+          "in" : "header",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "comprovante" : {
+                    "type" : "string",
+                    "format" : "binary"
+                  }
+                },
+                "required" : [ "comprovante" ]
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CompraExtraResponse"
                 }
               }
             }
@@ -12174,56 +12145,6 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/GaleriaStatusResponse"
-                }
-              }
-            }
-          },
-          "500" : {
-            "description" : "Erro interno do servidor",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "type" : "object",
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/ecommerce/galeria/{token}/favoritos" : {
-      "get" : {
-        "tags" : [ "Ecommerce" ],
-        "summary" : "Listar favoritos da sessão",
-        "operationId" : "listarFavoritos",
-        "parameters" : [ {
-          "name" : "token",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        }, {
-          "name" : "X-Session-Id",
-          "in" : "header",
-          "required" : false,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "type" : "array",
-                  "items" : {
-                    "type" : "string",
-                    "format" : "uuid"
-                  }
                 }
               }
             }
@@ -21722,17 +21643,6 @@
           },
           "valorTotalExtras" : {
             "type" : "number"
-          },
-          "favoritosPorFoto" : {
-            "type" : "object",
-            "additionalProperties" : {
-              "type" : "integer",
-              "format" : "int64"
-            }
-          },
-          "fotosFavoritas" : {
-            "type" : "integer",
-            "format" : "int32"
           },
           "linkGaleria" : {
             "type" : "string"

@@ -1,10 +1,8 @@
 package com.photoizer.crm.foto.api
 
-import com.photoizer.crm.ecommerce.model.Favorito
 import com.photoizer.crm.ecommerce.model.FotoComentario
 import com.photoizer.crm.ecommerce.model.ItemCarrinho
 import com.photoizer.crm.ecommerce.model.OrigemComentario
-import com.photoizer.crm.ecommerce.repository.FavoritoRepository
 import com.photoizer.crm.ecommerce.repository.FotoComentarioRepository
 import com.photoizer.crm.ecommerce.repository.ItemCarrinhoRepository
 import com.photoizer.crm.foto.model.FotoEnsaio
@@ -38,9 +36,6 @@ class FotoControllerIntegrationSpec extends Specification {
 
     @Autowired
     FotoEnsaioRepository fotoRepository
-
-    @Autowired
-    FavoritoRepository favoritoRepository
 
     @Autowired
     ItemCarrinhoRepository itemCarrinhoRepository
@@ -79,11 +74,6 @@ class FotoControllerIntegrationSpec extends Specification {
         given:
         def foto = novaFoto()
         def sessionId = UUID.randomUUID()
-        favoritoRepository.save(Favorito.builder()
-            .agendamentoId(agendamentoId)
-            .fotoId(foto.id)
-            .sessionId(sessionId)
-            .build())
         itemCarrinhoRepository.save(ItemCarrinho.builder()
             .agendamentoId(agendamentoId)
             .fotoId(foto.id)
@@ -105,7 +95,6 @@ class FotoControllerIntegrationSpec extends Specification {
 
         then:
         resultado.andExpect(status().isOk())
-        favoritoRepository.findBySessionIdAndFotoId(sessionId, foto.id).isEmpty()
         itemCarrinhoRepository.findBySessionIdAndAgendamentoIdOrderByAuditInfoCreatedAtAsc(sessionId, agendamentoId).isEmpty()
         fotoComentarioRepository.findByFotoIdOrderByAuditInfoCreatedAtAsc(foto.id).isEmpty()
     }

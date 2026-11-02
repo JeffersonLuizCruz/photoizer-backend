@@ -1,6 +1,5 @@
 package com.photoizer.crm.ecommerce.listener;
 
-import com.photoizer.crm.ecommerce.repository.FavoritoRepository;
 import com.photoizer.crm.ecommerce.repository.FotoComentarioRepository;
 import com.photoizer.crm.ecommerce.repository.GaleriaEnsaioRepository;
 import com.photoizer.crm.ecommerce.repository.ItemCarrinhoRepository;
@@ -19,27 +18,24 @@ import java.util.UUID;
 
 /**
  * Limpa referências do ecommerce quando fotos são removidas ou quando uma
- * galeria é arquivada, evitando carrinhos, favoritos e comentários órfãos.
+ * galeria é arquivada, evitando carrinhos e comentários órfãos.
  */
 @Component
 public class FotosRemovidasListener {
 
     private static final Logger log = LoggerFactory.getLogger(FotosRemovidasListener.class);
 
-    private final FavoritoRepository favoritoRepository;
     private final ItemCarrinhoRepository itemCarrinhoRepository;
     private final FotoComentarioRepository fotoComentarioRepository;
     private final GaleriaEnsaioRepository galeriaRepository;
     private final GaleriaCapaService capaService;
     private final FotoPreviewService fotoPreviewService;
 
-    public FotosRemovidasListener(FavoritoRepository favoritoRepository,
-                                  ItemCarrinhoRepository itemCarrinhoRepository,
+    public FotosRemovidasListener(ItemCarrinhoRepository itemCarrinhoRepository,
                                   FotoComentarioRepository fotoComentarioRepository,
                                   GaleriaEnsaioRepository galeriaRepository,
                                   GaleriaCapaService capaService,
                                   FotoPreviewService fotoPreviewService) {
-        this.favoritoRepository = favoritoRepository;
         this.itemCarrinhoRepository = itemCarrinhoRepository;
         this.fotoComentarioRepository = fotoComentarioRepository;
         this.galeriaRepository = galeriaRepository;
@@ -63,7 +59,6 @@ public class FotosRemovidasListener {
         if (fotoIds == null || fotoIds.isEmpty()) {
             return;
         }
-        favoritoRepository.deleteByFotoIdIn(fotoIds);
         itemCarrinhoRepository.deleteByFotoIdIn(fotoIds);
         fotoComentarioRepository.deleteByFotoIdIn(fotoIds);
 

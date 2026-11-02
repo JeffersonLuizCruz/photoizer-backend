@@ -12,7 +12,6 @@ import com.photoizer.crm.ecommerce.service.GaleriaEnsaioService;
 import com.photoizer.crm.ecommerce.service.GaleriaCapaService;
 import com.photoizer.crm.ecommerce.service.GaleriaPipelineQueryService;
 import com.photoizer.crm.ecommerce.service.GaleriaQueryService;
-import com.photoizer.crm.ecommerce.service.FavoritoService;
 import com.photoizer.crm.ecommerce.service.SelecaoEnsaioService;
 import com.photoizer.crm.ecommerce.service.SessionService;
 import com.photoizer.crm.foto.api.FotoEnsaioResponse;
@@ -60,7 +59,6 @@ public class EcommerceController {
     private final EcommerceService ecommerceService;
     private final GaleriaQueryService galeriaQueryService;
     private final CarrinhoService carrinhoService;
-    private final FavoritoService favoritoService;
     private final DownloadService downloadService;
     private final FotoService fotoService;
     private final SessionService sessionService;
@@ -80,7 +78,6 @@ public class EcommerceController {
     public EcommerceController(EcommerceService ecommerceService,
                                GaleriaQueryService galeriaQueryService,
                                CarrinhoService carrinhoService,
-                               FavoritoService favoritoService,
                                DownloadService downloadService,
                                FotoService fotoService,
                                SessionService sessionService,
@@ -99,7 +96,6 @@ public class EcommerceController {
         this.ecommerceService = ecommerceService;
         this.galeriaQueryService = galeriaQueryService;
         this.carrinhoService = carrinhoService;
-        this.favoritoService = favoritoService;
         this.downloadService = downloadService;
         this.fotoService = fotoService;
         this.sessionService = sessionService;
@@ -306,8 +302,10 @@ public class EcommerceController {
         return ResponseEntity.ok(carrinhoService.calcularCarrinho(token, resolverSessionId(sessionId)));
     }
 
+    @Deprecated
     @PostMapping("/galeria/{token}/checkout")
-    @Operation(summary = "Finalizar compra usando itens do carrinho")
+    @Operation(summary = "Finalizar compra usando itens do carrinho (legado; use /checkout-pix)",
+        deprecated = true)
     public ResponseEntity<CompraExtraResponse> checkout(
             @PathVariable UUID token,
             @RequestHeader(value = HEADER_SESSION, required = false) String sessionId,
@@ -317,6 +315,18 @@ public class EcommerceController {
             : null;
         var compra = ecommerceService.checkout(token, resolverSessionId(sessionId), metodo);
         return ResponseEntity.status(HttpStatus.CREATED).body(ecommerceMapper.toPublicResponse(compra));
+    }
+
+    @PostMapping(value = "/galeria/{token}/checkout-pix", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Criar a compra de extras e anexar o comprovante PIX na mesma transação")
+    public ResponseEntity<CompraExtraResponse> checkoutComprovante(
+            @PathVariable UUID token,
+            @RequestHeader(value = HEADER_SESSION, required = false) String sessionId,
+            @RequestParam("comprovante") MultipartFile comprovante) {
+        var compra = ecommerceService.checkoutComprovante(
+            token, resolverSessionId(sessionId), comprovante);
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(ecommerceMapper.toPublicResponse(compra));
     }
 
     @GetMapping("/galeria/{token}/compras")
@@ -354,34 +364,6 @@ public class EcommerceController {
             @RequestParam MultipartFile comprovante) {
         var compra = ecommerceService.uploadComprovante(token, compraExtraId, comprovante);
         return ResponseEntity.ok(ecommerceMapper.toPublicResponse(compra));
-    }
-
-    @PostMapping("/galeria/{token}/favoritos/{fotoId}")
-    @Operation(summary = "Adicionar foto aos favoritos (wishlist)")
-    public ResponseEntity<Void> adicionarFavorito(
-            @PathVariable UUID token,
-            @RequestHeader(value = HEADER_SESSION, required = false) String sessionId,
-            @PathVariable UUID fotoId) {
-        favoritoService.adicionarFavorito(token, resolverSessionId(sessionId), fotoId);
-        return ResponseEntity.status(HttpStatus.CREATED).build();
-    }
-
-    @DeleteMapping("/galeria/{token}/favoritos/{fotoId}")
-    @Operation(summary = "Remover foto dos favoritos")
-    public ResponseEntity<Void> removerFavorito(
-            @PathVariable UUID token,
-            @RequestHeader(value = HEADER_SESSION, required = false) String sessionId,
-            @PathVariable UUID fotoId) {
-        favoritoService.removerFavorito(token, resolverSessionId(sessionId), fotoId);
-        return ResponseEntity.ok().build();
-    }
-
-    @GetMapping("/galeria/{token}/favoritos")
-    @Operation(summary = "Listar favoritos da sessão")
-    public ResponseEntity<List<UUID>> listarFavoritos(
-            @PathVariable UUID token,
-            @RequestHeader(value = HEADER_SESSION, required = false) String sessionId) {
-        return ResponseEntity.ok(favoritoService.listarFavoritos(token, resolverSessionId(sessionId)));
     }
 
     @GetMapping("/galeria/{token}/download/{fotoId}")

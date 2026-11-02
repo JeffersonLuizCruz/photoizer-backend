@@ -86,6 +86,63 @@ class EcommerceCheckoutFaseSpec extends Specification {
         1 * carrinhoService.limparCarrinho(token, sessionId)
     }
 
+    def "checkout com comprovante cria compra já aguardando confirmação"() {
+        given:
+        def agendamento = agendamento()
+        def foto = foto()
+        def selecao = SelecaoEnsaio.builder()
+            .id(UUID.randomUUID())
+            .agendamentoId(agendamentoId)
+            .numero(1)
+            .status(StatusSelecao.EM_EDICAO)
+            .enviadaEm(java.time.LocalDateTime.now())
+            .build()
+        def comprovante = Mock(org.springframework.web.multipart.MultipartFile)
+        def compraSalva = null
+        galeriaQueryService.buscarAgendamentoPorToken(token) >> agendamento
+        galeriaEnsaioService.obter(agendamentoId) >>
+            galeria(ModoGaleria.COM_EDICAO, FaseGaleria.EM_EDICAO)
+        galeriaQueryService.buscarSelecaoAtiva(agendamentoId) >> Optional.of(selecao)
+        carrinhoService.listarCarrinho(token, sessionId) >>
+            [ItemCarrinho.builder().agendamentoId(agendamentoId).fotoId(fotoId).sessionId(sessionId).build()]
+        fotoRepository.findAllById(_) >> [foto]
+        galeriaQueryService.isFotoExtraEmSelecaoAtiva(foto) >> true
+        galeriaQueryService.getValorUnitarioExtra(agendamentoId, fotoId) >> new BigDecimal('20.00')
+        fileValidator.validate(comprovante, 'receipt') >> {}
+        fileStorage.salvarEmSubdiretorio(comprovante, agendamentoId, 'comprovante_extra') >>
+            'uploads/comprovante.jpg'
+        compraRepository.save(_ as CompraExtra) >> { CompraExtra compra ->
+            if (compra.id == null) compra.id = UUID.randomUUID()
+            compraSalva = compra
+            compra
+        }
+        compraRepository.findById(_ as UUID) >> { Optional.of(compraSalva) }
+
+        when:
+        def compra = service.checkoutComprovante(token, sessionId, comprovante)
+
+        then:
+        compra.status.name() == 'AGUARDANDO_CONFIRMACAO'
+        compra.urlComprovante == 'uploads/comprovante.jpg'
+        1 * eventPublisher.publishEvent({ it instanceof com.photoizer.crm.ecommerce.event.ComprovanteCompraEnviadoEvent })
+        0 * eventPublisher.publishEvent({ it instanceof com.photoizer.crm.ecommerce.event.CompraExtraSolicitadaEvent })
+        1 * carrinhoService.limparCarrinho(token, sessionId)
+    }
+
+    def "comprovante inválido não cria compra"() {
+        given:
+        def comprovante = Mock(org.springframework.web.multipart.MultipartFile)
+        fileValidator.validate(comprovante, 'receipt') >> { throw new IllegalArgumentException('inválido') }
+
+        when:
+        service.checkoutComprovante(token, sessionId, comprovante)
+
+        then:
+        thrown(IllegalArgumentException)
+        0 * compraRepository.save(_)
+        0 * carrinhoService.limparCarrinho(_, _)
+    }
+
     def "não permite checkout antes do envio da seleção"() {
         given:
         galeriaQueryService.buscarAgendamentoPorToken(token) >> agendamento()
