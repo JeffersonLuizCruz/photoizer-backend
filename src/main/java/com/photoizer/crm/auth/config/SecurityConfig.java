@@ -4,6 +4,7 @@ import com.photoizer.crm.shared.config.CorsConfig;
 import com.photoizer.crm.shared.config.RateLimitFilter;
 import com.photoizer.crm.shared.exception.SecurityErrorHandler;
 import com.photoizer.crm.shared.logging.UserMdcFilter;
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -53,6 +54,14 @@ public class SecurityConfig {
             .csrf(c -> c.disable())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> {
+                // Respostas em streaming (StreamingResponseBody) passam de novo pela
+                // cadeia de filtros no dispatch ASYNC, mas o contexto JWT não é
+                // recarregado nesse dispatch. Sem liberar o ASYNC aqui, a autorização
+                // falha depois de o corpo já ter sido escrito e o Tomcat aborta a
+                // resposta sem o chunk final (download truncado no navegador).
+                // A autorização real continua no REQUEST original e no @RolesAllowed.
+                auth.dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll();
+
                 auth
                     .requestMatchers("/api/v1/auth/login").permitAll()
                     .requestMatchers("/api/v1/auth/refresh").permitAll()

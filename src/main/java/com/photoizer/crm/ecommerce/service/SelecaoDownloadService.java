@@ -14,8 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -91,27 +89,36 @@ public class SelecaoDownloadService {
         return new SelecaoZip("selecao_" + selecao.getNumero() + ".zip", itensZip);
     }
 
+    /**
+     * Escreve o ZIP direto no stream da resposta HTTP.
+     *
+     * <p>O stream da resposta nao deve ser fechado aqui: quem finaliza a resposta
+     * (inclusive o chunk final do {@code Transfer-Encoding: chunked}) e o container.
+     * {@link ZipOutputStream#finish()} grava o diretorio central do ZIP sem fechar
+     * o stream subjacente.
+     */
     public void escreverZip(SelecaoZip zip, OutputStream outputStream) throws IOException {
-        try (var zos = new ZipOutputStream(outputStream)) {
-            for (var item : zip.itens()) {
-                if (item.presente()) {
-                    zos.putNextEntry(new ZipEntry(item.entryName()));
-                    Files.copy(item.path(), zos);
-                    zos.closeEntry();
-                }
+        var zos = new ZipOutputStream(outputStream);
+        for (var item : zip.itens()) {
+            if (item.presente()) {
+                zos.putNextEntry(new ZipEntry(item.entryName()));
+                Files.copy(item.path(), zos);
+                zos.closeEntry();
             }
-            zos.putNextEntry(new ZipEntry("manifest.csv"));
-            escreverManifest(zip, zos);
-            zos.closeEntry();
         }
+        zos.putNextEntry(new ZipEntry("manifest.csv"));
+        escreverManifest(zip, zos);
+        zos.closeEntry();
+        zos.finish();
+        zos.flush();
     }
 
-    private void escreverManifest(SelecaoZip zip, OutputStream outputStream) throws IOException {
-        Writer writer = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8);
-        writer.write('\ufeff'); // BOM para abrir no Excel em pt-BR
-        writer.write("numero_galeria;foto_id;tipo;ordem;nome_original;nome_esperado_editado;presente\n");
+    private void escreverManifest(SelecaoZip zip, ZipOutputStream outputStream) throws IOException {
+        var manifest = new StringBuilder();
+        manifest.append('\ufeff'); // BOM para abrir no Excel em pt-BR
+        manifest.append("numero_galeria;foto_id;tipo;ordem;nome_original;nome_esperado_editado;presente\n");
         for (var item : zip.itens()) {
-            writer.write(String.join(";",
+            manifest.append(String.join(";",
                 String.valueOf(item.item().getNumeroGaleria()),
                 item.item().getFotoId().toString(),
                 item.item().getTipo() == TipoItemSelecao.PACOTE ? "PACOTE" : "EXTRA",
@@ -119,9 +126,9 @@ public class SelecaoDownloadService {
                 csv(item.item().getNomeArquivo()),
                 item.entryName(),
                 item.presente() ? "SIM" : "NAO"));
-            writer.write('\n');
+            manifest.append('\n');
         }
-        writer.flush();
+        outputStream.write(manifest.toString().getBytes(StandardCharsets.UTF_8));
     }
 
     private String csv(String valor) {
